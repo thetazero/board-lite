@@ -31,7 +31,7 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 - **At most 6 Claude seats run at once on the machine**, across every playtest from every tab: two 3-seat games, three 2-seat games, or one 6-seat game. `bot` seats don't count.
 - A game takes one slot per Claude seat before it starts any of them. If the slots aren't free, or free memory (`MemAvailable`) would drop under 2 GB once its seats start (counting 450 MB a seat), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once the slots free up. `--max-minutes` counts from the start, not from the wait.
 - A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Rerun it later.
-- So start a whole batch at once (all 8 games in the background is fine): the pool runs them a few at a time. Expect a batch to take about (games × seats ÷ 6) game-lengths.
+- So start a whole batch at once (`batch.ts`, below, or all games in the background): the pool runs them a few at a time. Expect a batch to take about (games × seats ÷ 6) game-lengths.
 - Slots live in `~/.cache/board-lite/seat-slots/`, one file per running game naming its `--out`, so `ls` there shows who holds them. A game that dies without cleaning up frees its slots automatically (its process is gone).
 - `BOARD_LITE_MAX_SEATS=N` changes the limit, and every playtest on the machine must use the same N for it to hold; leave it alone unless the owner says so. A game with more Claude seats than the limit is refused.
 
@@ -42,10 +42,26 @@ In the `--out` directory:
 - `results.json`: status (`over`, `stalled`, `time limit`, ...), seed, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, or `player: <name>` for someone else's seat in a `--room` game), final points (hidden ones included), and for Claude seats cost and how many times its process was (re)started; plus counts of public and private messages.
 - `log.txt`: the whole game log as the engine recorded it, talk included. Lines only some players saw are marked `(only P1, P3)`: private messages, card draws, secret votes and fight-or-bail choices.
 - `talk.txt`: just the talk.
-- `seat-N.jsonl`: seat N's full Claude transcript (stream-json), including its reasoning between moves.
+- `seat-N.moves.txt`: why seat N made each move. Every `act` (and `say`) carries a private `why` that no other player sees, and this file pairs each one with what really happened (`-> done` or `-> not allowed: can't afford ...`). It's the record of reasoning to audit: read it, not the narration.
+- `seat-N.jsonl`: seat N's full Claude transcript (stream-json): every tool call and result and the text between them. Its thinking blocks are empty: `claude -p` drops thinking from its output (there is no flag to keep it), which is why `why` exists. The text between moves is narration, sometimes of a move that then failed; check it against the tool results or `seat-N.moves.txt`.
 - `runner.log`, `seat-N.stderr.log`, `game.json` (the game, saved after every change; with `--room` the host keeps it instead).
 
-For a depth batch (Haiku vs Opus), run several games with seats shuffled across games and read `winner.model` from each `results.json`.
+Claude seats are named Rowan, Quinn, Ellis, ... in seat order, never after their model, so no player knows which opponent is the stronger one. Which model plays which name is only in `runner.log` and `results.json`.
+
+## Depth batches
+
+"Does haiku regularly lose to opus? If not, the game has no depth." One game, or four, can't answer it: with 1 Opus against 2 Haiku a no-skill Opus still wins 1 game in 3, and 4 games can't tell "no depth" from "some depth". `batch.ts` runs a batch big enough and tallies it:
+
+```
+node src/playtest/batch.ts --games 30 --models opus,haiku,haiku
+```
+
+- Game *i* goes in `<out>/g<i>` and rotates the seats *i*-1 places, so each model sits in each seat equally often (seat order matters: in batch b13-0921, P2 won all 4 games). It takes `--out`, `--seed` and the run.ts options `--effort`, `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--advice`, passed to every game.
+- It runs as many games at once as the seat pool can seat (two 3-seat games) and the rest after them. Run it in the background: about (games × Claude seats ÷ 6) game-lengths, so 30 three-seat games are 15 game-lengths, about 2 hours on an idle machine, and about $55 at today's costs (Opus about $1.80 a game, Haiku under $0.10).
+- A game that doesn't finish (`stalled`, `low memory`, ...) is left in `g<i>.failed<n>`; run the same command with the same `--out` again to rerun just those.
+- At the end it writes `<out>/summary.md`: per model, games, wins, win rate with a 95% range, its fair share of wins (its share of the seats), and the chance of that many wins or more if every seat were equally strong; wins by seat; and one line per game. `node src/playtest/batch.ts --summary <out>` rewrites it at any time, e.g. while the batch runs.
+
+How many games: **30**, with 1 Opus and 2 Haiku. Opus "regularly" beating Haiku means Opus wins clearly more than 1 in 3. Over 30 games, 15 or more Opus wins happens by chance under 5% of the time; an Opus that really wins 60% of its games gets there 9 times in 10 (with 20 games, only 3 in 4; at 50% it takes 60 games to be as sure). So: fewer than 15 of 30 means no clear depth so far; 15 or more means depth, and the chance column says how sure. Read `seat-N.moves.txt` for why the winners won.
 
 ## What a player can do
 
@@ -54,7 +70,7 @@ The seat server (`src/playtest/seat-server.ts <room-url> <token>`, an MCP server
 | Tool | Does |
 |---|---|
 | `view` | the seat's view (`node src/cli.ts view`): public board, own hand and resources, recent events, options |
-| `act` | one decision command, exactly as in `docs/cli.md` |
+| `act` | one decision command, exactly as in `docs/cli.md`, with a private `why` (see `seat-N.moves.txt`) |
 | `say` | talk: to the table, or with `to: "P2"` privately to one player |
 | `wait` | blocks up to 120 s until it's the seat's decision, someone talks, or the game ends; returns the new events |
 | `rules` | `docs/rules.md` |

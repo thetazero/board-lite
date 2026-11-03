@@ -151,7 +151,7 @@ export function commandHints(g: Game, p: number): string[] {
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
     for (const o of g.offers.filter((x) => x.from === p)) out.push(`cancel ${o.id}`);
-    out.push('end   (end your turn)');
+    out.push(g.offers.some((o) => o.to === p) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
     return out;
   }
   if (g.phase === 'cards') {
