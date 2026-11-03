@@ -10,24 +10,41 @@ import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
 import { apply, newGame, score, waitingOn, type Game } from '../engine.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
+import type { Room } from '../server/room.ts';
 
 export const NAMES = ['Ada', 'Bram', 'Cora', 'Dax', 'Eve', 'Finn'];
+// The longest names the server takes (12 characters), wide letters included.
+export const LONG_NAMES = ['Maximilianus', 'Wilhelmina W', 'Bartholomew', 'Anastasia M.', 'Gwendolyn W.', 'Christopher'];
 
 export interface Shot {
   file: string; // png name, without the extension
   caption: string;
   client: 'tv' | 'phone';
   seat?: number; // phone: whose phone; none means a phone that hasn't joined
+  path?: string; // a phone that hasn't joined: the address it opens (default: the room's, /CODE)
+  remember?: string; // a phone that hasn't joined: the name it remembers from an earlier game
+  fill?: { code?: string; name?: string }; // the join form: typed in, then Join tapped
+  guest?: boolean; // TV: a second screen opened on the room's address, without the room's host token
+  tailscale?: boolean; // TV: the machine also has a Tailscale address
+  loading?: boolean; // shot before the page's script runs (what a slow connection shows)
+  then?: (room: Room) => void; // something that happens at the table after the page is up (before the clicks)
+  offline?: boolean; // the connection to the server drops after the page is up
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
+  waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
   live?: boolean; // TV: load the page, then let the scene's `live` moves happen, then shoot
+  sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
 }
 
 export interface Scene {
   name: string;
   players: number;
   seed: number;
-  lobby?: { bots: number }; // a room that hasn't started: no game
+  lobby?: { bots: number }; // a room that hasn't started: no game (players - bots humans join, then the bots)
+  names?: string[]; // seat names (default NAMES)
+  bots?: number[]; // in a game: seats the server plays (they never move while staged)
+  away?: number[]; // seats whose player has gone quiet (shown "(away)")
+  resume?: boolean; // a saved game hosted again: every seat open until a phone claims it
   until?: (g: Game) => boolean; // play bot moves until this holds
   setup?: (g: Game) => void; // scripted commands once it holds
   live?: (g: Game) => boolean; // for live shots: bot moves after the TV is open, until this holds
@@ -90,6 +107,31 @@ function seatWhere(g: Game, ok: (p: number) => boolean): number {
   return p;
 }
 
+// The hand the acting player would hold with these cards, and how the phone sees it.
+const ALL_CARDS = [...Object.keys(BUILDINGS), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
+function giveHand(g: Game, p: number, keys: string[]) {
+  g.players[p].hand = keys.map((key, i) => ({ id: `c${900 + i}`, deck: DRAGONS[key] || ACTIONS[key] ? 'action' : 'building', key }));
+}
+function handWith(g: Game, p: number, keys: string[]) {
+  const c = structuredClone(g);
+  giveHand(c, p, keys);
+  return seatState(c, p).hand;
+}
+const card = (id: string) => `[data-card="${id}"]`;
+// Why each card can't be played, one card per reason.
+function blockedReasons(g: Game, p: number) {
+  const seen = new Map<string, { id: string; key: string }>();
+  for (const c of seatState(g, p).hand) {
+    const reason = c.blocked?.replace(/No open \w+ hex/, 'No open hex').replace(/un-upgraded \w+/, 'un-upgraded');
+    if (reason && !seen.has(reason)) seen.set(reason, { id: c.id, key: c.key });
+  }
+  return [...seen.values()];
+}
+// How the last raid ended, as the log says it.
+const raidOutcome = (g: Game) => g.log.findLast((e) => /falls!|holds\.|Everyone bailed|Nobody commits/.test(e.text))?.text ?? '';
+const raidOver = (g: Game) => g.raid === null || g.raid.step === 'vote';
+const drain = (g: Game, p: number) => Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 0));
+
 // What a player has most of (to give in a trade), other than `not`.
 function most(g: Game, p: number, not = ''): string {
   const r = g.players[p].resources;
@@ -97,6 +139,9 @@ function most(g: Game, p: number, not = ''): string {
 }
 
 // ---------- the scenes ----------
+// The hand-3p scene's cards: kept, choose a dragon (two ways), on the tower, choose a building.
+const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'tower_floor', 'workshop'];
+
 
 export const SCENES: Scene[] = [
   {
@@ -105,9 +150,18 @@ export const SCENES: Scene[] = [
     seed: 1,
     lobby: { bots: 1 },
     shots: () => [
-      { file: 'tv-lobby-3p', caption: 'TV lobby: two players and a bot joined', client: 'tv' },
-      { file: 'phone-join', caption: 'Phone: joining a room (code from the address)', client: 'phone' },
-      { file: 'phone-lobby-host', caption: 'Phone in the lobby: the first player, who can start', client: 'phone', seat: 0 },
+      { file: 'tv-lobby-3p', caption: 'TV lobby: two players and a bot joined', client: 'tv', sizes: true },
+      { file: 'phone-join', caption: 'Phone: joining a room (code from the address)', client: 'phone', sizes: true },
+      { file: 'phone-lobby-host', caption: 'Phone in the lobby: the first player, who can start', client: 'phone', seat: 0, sizes: true },
+      { file: 'phone-lobby-waiting', caption: 'Phone in the lobby: anyone else, waiting for the start', client: 'phone', seat: 1 },
+      { file: 'tv-loading', caption: 'TV: before its script has loaded', client: 'tv', loading: true },
+      { file: 'phone-loading', caption: 'Phone: before its script has loaded', client: 'phone', path: '/', loading: true },
+      { file: 'phone-join-no-code', caption: 'Phone: the join form opened without a room code', client: 'phone', path: '/', sizes: true },
+      { file: 'phone-join-remembered', caption: 'Phone: the join form, remembering the name from last time', client: 'phone', path: '/', remember: 'Dax' },
+      { file: 'phone-join-bad-code', caption: 'Phone: joining with a code no room has', client: 'phone', path: '/', fill: { code: 'QQQQ', name: 'Dax' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-join-name-taken', caption: 'Phone: joining with a name already taken', client: 'phone', fill: { name: 'ada' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-join-blank-name', caption: 'Phone: joining with only spaces for a name (empty is stopped by the browser first)', client: 'phone', fill: { name: '   ' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'tv-guest-start', caption: "TV: a second screen on the room's address (no host token) taps Start", client: 'tv', guest: true, clicks: ['#start'], waitFor: '.toast' },
     ],
   },
   {
@@ -117,8 +171,9 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 1 && g.phase === 'action',
     shots: (g) => [
       { file: 'tv-opening-production-2p', caption: "TV, round 1 (2 players): the opening production roll", client: 'tv', waitMs: 1800 },
-      { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn },
+      { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-opening-waiting-2p', caption: "Phone, round 1: someone else's turn", client: 'phone', seat: (g!.turn + 1) % 2 },
+      { file: 'phone-reconnecting', caption: 'Phone: the connection to the server dropped', client: 'phone', seat: g!.turn, offline: true },
     ],
   },
   {
@@ -127,10 +182,14 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
     shots: (g) => [
-      { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv' },
-      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)'] },
-      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)', '[data-pickhex]'] },
-      { file: 'phone-build-bank-3p', caption: 'Phone: special projects and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
+      { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
+      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)'], sizes: true },
+      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
+      { file: 'phone-build-bank-3p', caption: 'Phone: special projects and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
+      { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-card]'] },
+      { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
+      { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
+      { file: 'phone-join-started', caption: 'Phone: joining a game that has started, every seat taken', client: 'phone', fill: { name: 'Zed' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
     ],
   },
   {
@@ -149,8 +208,14 @@ export const SCENES: Scene[] = [
       { file: 'phone-trade-incoming-4p', caption: 'Phone: an offer to you, out of turn', client: 'phone', seat: (g!.turn + 1) % 4 },
       { file: 'phone-trade-acting-4p', caption: "Phone, acting player: an offer in, and their own out", client: 'phone', seat: g!.turn },
       {
-        file: 'phone-trade-compose-4p', caption: 'Phone, acting player: putting an offer together', client: 'phone', seat: g!.turn,
+        file: 'phone-trade-compose-4p', caption: 'Phone, acting player: putting an offer together', client: 'phone', seat: g!.turn, sizes: true,
         clicks: ['[data-tab=trade]', '[data-to]:last-child', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '[data-tcard]'],
+      },
+      { file: 'phone-trade-own-offer-4p', caption: "Phone: your own offer out, on someone else's turn", client: 'phone', seat: (g!.turn + 2) % 4 },
+      {
+        // Last: it changes the room. The offerer has spent what they offered by the time it's accepted.
+        file: 'phone-toast-4p', caption: 'Phone: an error toast (accepting an offer the offerer can no longer pay)', client: 'phone', seat: (g!.turn + 1) % 4,
+        then: (room) => room.mutate((g2) => drain(g2, g2.turn)), clicks: ['[data-accept]'], waitFor: '.toast',
       },
     ],
   },
@@ -176,8 +241,8 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round >= 3 && step(g) === 'vote' && g.raid!.votes.filter((v) => v !== null).length === 2,
     shots: (g) => [
-      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted', client: 'tv' },
-      { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] === null) },
+      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted', client: 'tv', sizes: true },
+      { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] === null), sizes: true },
       { file: 'phone-raid-voted-5p', caption: 'Phone: voted, waiting', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] !== null) },
     ],
   },
@@ -220,7 +285,8 @@ export const SCENES: Scene[] = [
     until: (g) => g.phase === 'discard',
     shots: (g) => [
       { file: 'tv-discard-4p', caption: 'TV, end of round: someone is discarding', client: 'tv' },
-      { file: 'phone-discard-4p', caption: 'Phone: over the hand limit, one card picked', client: 'phone', seat: waitingOn(g!)[0], clicks: ['[data-card]'] },
+      { file: 'phone-discard-4p', caption: 'Phone: over the hand limit, one card picked', client: 'phone', seat: waitingOn(g!)[0], clicks: ['[data-card]'], sizes: true },
+      { file: 'phone-discard-waiting-4p', caption: 'Phone: under the limit, waiting for the others to discard', client: 'phone', seat: seatWhere(g!, (p) => !waitingOn(g!).includes(p)) },
     ],
   },
   {
@@ -239,8 +305,8 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       const leader = seatWhere(g!, (p) => score(g!, p).total === best(g!));
       return [
-        { file: 'tv-late-6p', caption: 'TV, late game (6 players): a busy board', client: 'tv' },
-        { file: `phone-late-6p`, caption: 'Phone, late game: the leader', client: 'phone', seat: leader },
+        { file: 'tv-late-6p', caption: 'TV, late game (6 players): a busy board', client: 'tv', sizes: true },
+        { file: 'phone-late-6p', caption: 'Phone, late game: the leader', client: 'phone', seat: leader, sizes: true },
       ];
     },
   },
@@ -268,8 +334,9 @@ export const SCENES: Scene[] = [
     until: (g) => g.phase === 'over',
     shots: (g) => [
       { file: 'tv-game-over-4p', caption: 'TV: final scores', client: 'tv' },
-      { file: 'phone-game-over-winner', caption: 'Phone: the winner', client: 'phone', seat: g!.winner! },
+      { file: 'phone-game-over-winner', caption: 'Phone: the winner', client: 'phone', seat: g!.winner!, sizes: true },
       { file: 'phone-game-over-loser', caption: 'Phone: everyone else', client: 'phone', seat: (g!.winner! + 1) % 4 },
+      { file: 'phone-join-another', caption: 'Phone: after "Join another game", back at the join form', client: 'phone', seat: (g!.winner! + 1) % 4, clicks: ['#newgame'], waitFor: '#join' },
     ],
   },
   {
@@ -277,6 +344,252 @@ export const SCENES: Scene[] = [
     players: 6,
     seed: 1,
     until: (g) => g.phase === 'over',
-    shots: () => [{ file: 'tv-game-over-6p', caption: 'TV: final scores (6 players)', client: 'tv' }],
+    shots: () => [{ file: 'tv-game-over-6p', caption: 'TV: final scores (6 players)', client: 'tv', sizes: true }],
+  },
+  // ---------- the lobby, more ways ----------
+  {
+    name: 'lobby-empty',
+    players: 0,
+    seed: 1,
+    lobby: { bots: 0 },
+    shots: () => [{ file: 'tv-lobby-empty', caption: 'TV lobby: a new room, nobody yet', client: 'tv' }],
+  },
+  {
+    name: 'lobby-alone',
+    players: 1,
+    seed: 1,
+    lobby: { bots: 0 },
+    shots: () => [
+      { file: 'tv-lobby-alone', caption: 'TV lobby: one player, Start disabled', client: 'tv' },
+      { file: 'phone-lobby-alone', caption: 'Phone in the lobby: the first player, alone', client: 'phone', seat: 0 },
+    ],
+  },
+  {
+    name: 'lobby-full-6p',
+    players: 6,
+    seed: 1,
+    lobby: { bots: 2 },
+    names: LONG_NAMES,
+    away: [1],
+    shots: () => [
+      { file: 'tv-lobby-full-6p', caption: 'TV lobby: full (6), long names, two bots, one away, with a Tailscale address', client: 'tv', tailscale: true, sizes: true },
+      { file: 'phone-lobby-full-6p', caption: 'Phone in the lobby: full, long names', client: 'phone', seat: 2, sizes: true },
+      { file: 'phone-join-full', caption: 'Phone: joining a full room', client: 'phone', fill: { name: 'Zed' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+    ],
+  },
+  {
+    // Each shot changes the room, in this order.
+    name: 'lobby-leave',
+    players: 3,
+    seed: 1,
+    lobby: { bots: 0 },
+    shots: () => [
+      { file: 'phone-removed', caption: 'Phone: removed from the lobby (by the TV or the first player)', client: 'phone', seat: 2, then: (room) => room.leave(2), waitFor: '#join' },
+      { file: 'phone-left', caption: 'Phone: after tapping Leave in the lobby', client: 'phone', seat: 1, clicks: ['#leave'], waitFor: '#join' },
+    ],
+  },
+  {
+    name: 'resume-3p',
+    players: 3,
+    seed: 1,
+    resume: true,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    shots: () => [
+      { file: 'tv-resume-3p', caption: 'TV: a saved game hosted again, every seat open', client: 'tv' },
+      { file: 'phone-resume-join', caption: 'Phone: joining a resumed game takes an open seat', client: 'phone', fill: { name: 'Ada' }, clicks: ['#join button[type=submit]'], waitFor: '.mehead' },
+    ],
+  },
+
+  // ---------- players and names ----------
+  {
+    name: 'names-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    bots: [4, 5],
+    away: [2],
+    until: (g) => g.round >= 4 && g.phase === 'action' && g.turn < 4,
+    setup: (g) => {
+      const t = g.turn, a = (t + 1) % 4;
+      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
+      apply(g, a, 'say Only if you leave Knightsgate to me.');
+    },
+    shots: (g) => [
+      { file: 'tv-names-6p', caption: 'TV (6 players): long names, two bots, one away, an offer and talk', client: 'tv', sizes: true },
+      { file: 'phone-names-6p', caption: 'Phone with a long name, on its turn', client: 'phone', seat: g!.turn, sizes: true },
+      { file: 'phone-names-trade-6p', caption: 'Phone: the trade tab with long names', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
+    ],
+  },
+
+  // ---------- the hand, more ways ----------
+  {
+    // A staged hand of cards that can all be played (each needs something different), with resources to pay.
+    name: 'hand-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action' && handWith(g, g.turn, PLAYABLE).every((c) => !c.blocked || c.needs === 'unplayable'),
+    setup: (g) => {
+      giveHand(g, g.turn, PLAYABLE);
+      for (const r of Object.keys(g.players[g.turn].resources)) g.players[g.turn].resources[r as 'gold'] = 8;
+    },
+    shots: (g) => {
+      const id = (key: string) => `c${900 + PLAYABLE.indexOf(key)}`;
+      const me = { client: 'phone' as const, seat: g!.turn };
+      return [
+        { ...me, file: 'phone-hand-3p', caption: 'Phone: a hand of playable cards (staged)' },
+        { ...me, file: 'phone-zoom-hoard', caption: 'Phone: Secret Hoard tapped open (kept, not played)', clicks: [card(id('secret_hoard'))] },
+        { ...me, file: 'phone-zoom-elixir', caption: 'Phone: Growth Elixir, choosing the dragon', clicks: [card(id('growth_elixir'))] },
+        { ...me, file: 'phone-zoom-potion', caption: 'Phone: Healing Potion, choosing the hurt dragon', clicks: [card(id('healing_potion'))] },
+        { ...me, file: 'phone-zoom-floor', caption: 'Phone: Tower Floor tapped open', clicks: [card(id('tower_floor'))] },
+        { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
+        { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
+        { ...me, file: 'phone-pick-project', caption: 'Phone: choosing where a special project goes', clicks: ['[data-tab=more]', '[data-project]:not([disabled])'] },
+        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=more]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
+      ];
+    },
+  },
+  {
+    // One of every card again, in a game where each reason a card can't be played comes up.
+    name: 'blocked-3p',
+    players: 3,
+    seed: 3,
+    until: (g) => {
+      if (g.round < 4 || g.phase !== 'action') return false;
+      const c = structuredClone(g);
+      giveHand(c, c.turn, ALL_CARDS);
+      return blockedReasons(c, c.turn).length >= 6 && seatState(c, c.turn).hand.some((x) => !x.blocked && !x.affordable);
+    },
+    setup: (g) => giveHand(g, g.turn, ALL_CARDS),
+    shots: (g) => {
+      const me = { client: 'phone' as const, seat: g!.turn };
+      const poor = seatState(g!, g!.turn).hand.find((x) => !x.blocked && !x.affordable)!;
+      return [
+        ...blockedReasons(g!, g!.turn).filter((b) => b.key !== 'secret_hoard').map((b) => ({ ...me, file: `phone-blocked-${b.key}`, caption: `Phone: a card that can't be played (${b.key})`, clicks: [card(b.id)] })),
+        { ...me, file: 'phone-cant-afford', caption: "Phone: a card you can't afford yet", clicks: [card(poor.id)] },
+      ];
+    },
+  },
+  {
+    name: 'empty-hand-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => (g.players[g.turn].hand = []),
+    shots: (g) => [{ file: 'phone-empty-hand', caption: 'Phone: no cards in hand', client: 'phone', seat: g!.turn }],
+  },
+  {
+    name: 'discard-many',
+    players: 4,
+    seed: 1,
+    until: (g) => g.phase === 'discard' && g.players.some((pl) => pl.hand.length - seatState(g, 0).handCap >= 2),
+    shots: (g) => [
+      { file: 'phone-discard-many', caption: 'Phone: discarding several cards, two picked', client: 'phone', seat: seatWhere(g!, (p) => g!.players[p].hand.length - seatState(g!, p).handCap >= 2), clicks: ['[data-card]', '[data-card]:not(.picked)'] },
+    ],
+  },
+
+  // ---------- the raid, more ways ----------
+  {
+    name: 'horn-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => step(g) === 'vote' && g.raidsLeft >= 2,
+    shots: () => [{ file: 'tv-two-raids-4p', caption: 'TV: a round with two raids (War Horn), the first vote', client: 'tv' }],
+  },
+  {
+    name: 'commit-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => {
+      if (step(g) !== 'commit') return false;
+      const r = g.raid!, ready = (p: number) => seatState(g, p).raidReady.length;
+      return g.players.some((_, p) => r.ready[p] && r.commits[p].length) && g.players.some((_, p) => !r.ready[p] && !r.commits[p].length && ready(p)) && g.players.some((_, p) => !ready(p));
+    },
+    shots: (g) => {
+      const r = g!.raid!, ready = (p: number) => seatState(g!, p).raidReady.length;
+      return [
+        { file: 'phone-raid-locked-5p', caption: 'Phone, raid: locked in', client: 'phone', seat: seatWhere(g!, (p) => r.ready[p] && r.commits[p].length > 0) },
+        { file: 'phone-raid-stay-home-5p', caption: 'Phone, raid: nothing committed yet ("Lock in (stay home)")', client: 'phone', seat: seatWhere(g!, (p) => !r.ready[p] && !r.commits[p].length && ready(p) > 0), sizes: true },
+        { file: 'phone-raid-no-dragons-5p', caption: 'Phone, raid: no dragon able to raid', client: 'phone', seat: seatWhere(g!, (p) => !ready(p)) },
+      ];
+    },
+  },
+  {
+    name: 'bail-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => step(g) === 'bail' && g.players.some((_, p) => !g.raid!.commits[p].length) && g.players.some((_, p) => g.raid!.commits[p].length && g.raid!.choices[p]),
+    shots: (g) => [
+      { file: 'phone-raid-not-in-4p', caption: "Phone, fight or bail: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
+      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or bail: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
+    ],
+  },
+  {
+    name: 'raid-lost-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 1,
+    live: raidOver,
+    liveEnd: (g) => /holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid ("… holds.")', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+  },
+  {
+    name: 'raid-bailed-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => step(g) === 'bail' && committed(g) >= 1,
+    live: raidOver,
+    liveEnd: (g) => /Everyone bailed/.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-bailed-3p', caption: 'TV: everyone bailed', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+  },
+  {
+    name: 'raid-nobody-3p',
+    players: 3,
+    seed: 1,
+    // With no dragon able to raid, the commit step is skipped: the raid ends on the last vote.
+    until: (g) => step(g) === 'vote' && g.raid!.votes.filter((v) => v === null).length === 1 && g.players.every((_, p) => !seatState(g, p).raidReady.length),
+    live: (g) => g.raid === null || g.raid.votes.every((v) => v === null), // this raid is over (the next one, if any, hasn't had a vote)
+    liveEnd: (g) => /Nobody commits/.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-nobody-3p', caption: 'TV: nobody commits to the raid', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+  },
+  {
+    // The round's last raid is fought, then the next round opens: two banners back to back.
+    name: 'banners-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && g.raidsLeft === 1 && committed(g) >= 1,
+    live: (g) => g.phase === 'action',
+    liveEnd: (g) => /falls!|holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-banners-3p', caption: "TV: the next round's production, right after a raid's result", client: 'tv', live: true, waitFor: '#overlay .production', waitMs: 1800 }],
+  },
+
+  // ---------- table talk ----------
+  {
+    name: 'talk-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn, a = (t + 1) % 4, b = (t + 2) % 4;
+      apply(g, a, 'say Anyone want timber? I have far too much of it.');
+      apply(g, t, 'say Maybe. What do you want for 2?');
+      apply(g, b, `tell P${t + 1} Don't trade with them, they're one roost from winning.`);
+      apply(g, a, 'say A crystal each, and I stay out of the next raid.');
+    },
+    shots: (g) => {
+      const t = g!.turn, a = (t + 1) % 4, b = (t + 2) % 4;
+      return [
+        { file: 'tv-talk-4p', caption: 'TV: table talk (private messages stay off it)', client: 'tv', sizes: true },
+        { file: 'phone-talk-open-4p', caption: 'Phone: the talk sheet open, with a private message', client: 'phone', seat: t, clicks: ['.talkbar .latest'], sizes: true },
+        {
+          // Last: it adds to the talk. What was said before the page opened counts as heard.
+          file: 'phone-talk-unread-4p', caption: 'Phone: the talk bar with unread messages', client: 'phone', seat: t,
+          then: (room) => room.mutate((g2) => {
+            apply(g2, b, 'say Deal or not, the raid is next.');
+            apply(g2, a, `tell P${t + 1} Two crystal then. Final offer.`);
+          }),
+        },
+      ];
+    },
   },
 ];
+
