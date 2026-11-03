@@ -185,6 +185,71 @@ function tileGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+// Merges a model's pieces into one mesh per material and one set of crease
+// lines, so a busy board is a few hundred draw calls, not thousands. Pieces
+// marked userData.float keep moving on their own and stay separate; with
+// `joints`, so do all child groups (a dragon's moving parts), merged in place.
+function bake(root: THREE.Group, joints = false): THREE.Group {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const kept: THREE.Object3D[] = joints ? root.children.filter((c) => !(c instanceof THREE.Mesh)) : [];
+  if (!joints) root.traverse((c) => c.userData.float !== undefined && kept.push(c));
+  const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const lines: number[] = [];
+  const walk = (o: THREE.Object3D) => {
+    if (kept.includes(o)) return;
+    const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    if (o instanceof THREE.Mesh) {
+      const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(m);
+      const list = byMat.get(o.material as THREE.Material) ?? [];
+      list.push(g);
+      byMat.set(o.material as THREE.Material, list);
+    } else if (o instanceof THREE.LineSegments) {
+      const g = o.geometry.clone().applyMatrix4(m);
+      lines.push(...(g.getAttribute('position').array as Float32Array));
+      g.dispose();
+    }
+    o.children.forEach(walk);
+  };
+  root.children.forEach(walk);
+  if (joints) {
+    // Same group, its own pieces swapped for the merged ones.
+    for (const c of [...root.children]) {
+      if (kept.includes(c)) continue;
+      root.remove(c);
+      dispose(c);
+      c.removeFromParent();
+    }
+    for (const k of kept) bake(k as THREE.Group, true);
+  } else dispose(root);
+  const out = joints ? root : new THREE.Group();
+  for (const [mat, geos] of byMat) {
+    const merged = new THREE.BufferGeometry();
+    for (const name of ['position', 'normal', 'uv']) {
+      const size = name === 'uv' ? 2 : 3;
+      merged.setAttribute(name, new THREE.Float32BufferAttribute(geos.flatMap((g) => Array.from((g.getAttribute(name)?.array as Float32Array | undefined) ?? new Float32Array(g.getAttribute('position').count * size))), size));
+    }
+    geos.forEach((g) => g.dispose());
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.castShadow = mesh.receiveShadow = true;
+    out.add(mesh);
+  }
+  if (lines.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+    out.add(new THREE.LineSegments(g, CREASE));
+  }
+  if (!joints) {
+    for (const k of kept) {
+      // Re-parented to the merged group, where it was.
+      new THREE.Matrix4().multiplyMatrices(inv, k.matrixWorld).decompose(k.position, k.quaternion, k.scale);
+      out.add(k);
+    }
+    out.userData.floaters = kept;
+  }
+  return out;
+}
+
 function dispose(o: THREE.Object3D) {
   o.traverse((x) => {
     if (x instanceof THREE.Mesh || x instanceof THREE.LineSegments) x.geometry.dispose();
@@ -609,6 +674,7 @@ function dragonRig(element: string): Rig {
   const legs = new THREE.Group();
   for (const [x, z] of [[0.11, 0.18], [-0.11, 0.18], [0.12, -0.18], [-0.12, -0.18]]) legs.add(part(cone(0.05, 0.36, 4), skin, { at: [x, -0.2, z], rot: [Math.PI, 0, 0], crease: false }));
   body.add(legs);
+  bake(body, true);
   return { root, body, neck, tail, wings, legs };
 }
 
@@ -655,7 +721,8 @@ export class Board3D {
   private sun: THREE.DirectionalLight;
   private world = new THREE.Group();
   private mapSig = '';
-  private tiles = new Map<string, { hex: HexView; decor: THREE.Group; decorSig: string }>();
+  private tiles = new Map<string, { hex: HexView; decorSig: string }>();
+  private decor = new THREE.Group(); // everything growing on the map, merged
   private built = new Map<string, Built>();
   private dragons = new Map<string, DragonEntry>();
   private plateMats = PLAYER_COLORS.map((c) => new THREE.MeshLambertMaterial({ color: c, map: null, flatShading: true }));
@@ -708,16 +775,28 @@ export class Board3D {
     if (sig !== this.mapSig) this.buildMap(g.map, sig);
     const now = clock();
     const animate = !this.firstUpdate;
+    let regrow = false;
     for (const h of g.map) {
       const t = this.tiles.get(h.k)!;
       t.hex = h;
       const decorSig = h.building ? `b${h.building.type}` : '';
-      if (decorSig !== t.decorSig) {
-        this.world.remove(t.decor);
-        dispose(t.decor);
-        t.decor = this.placed(decor(h), h);
-        t.decorSig = decorSig;
+      if (decorSig !== t.decorSig) regrow = true;
+      t.decorSig = decorSig;
+    }
+    if (regrow) {
+      this.world.remove(this.decor);
+      dispose(this.decor);
+      const all = new THREE.Group();
+      for (const h of g.map) {
+        const d = decor(h);
+        const [x, z] = hexXZ(h.q, h.r);
+        d.position.set(x, 0, z);
+        all.add(d);
       }
+      this.decor = bake(all);
+      this.world.add(this.decor);
+    }
+    for (const h of g.map) {
       const b = h.building;
       const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}` : '';
       const had = this.built.get(h.k);
@@ -749,7 +828,8 @@ export class Board3D {
 
   private buildingGroup(b: NonNullable<HexView['building']>): THREE.Group {
     const g = plate(b.owner, !!b.upgrade, this.plateMats);
-    const { model, offset } = buildingModel(b);
+    const { model: parts, offset } = buildingModel(b);
+    const model = bake(parts);
     const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
     pop.position.set(0, GROUND, -0.6);
     model.scale.setScalar(1.15);
@@ -770,14 +850,14 @@ export class Board3D {
     this.dragons.clear();
     this.mapSig = sig;
     const geo = tileGeometry();
+    const tiles = new THREE.Group();
     for (const h of map) {
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
-      const tile = part(geo, mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12), { at: [x, (r() - 0.5) * 0.03, z], rot: [0, 0, 0] });
-      tile.rotation.y = 0;
-      this.world.add(tile);
-      this.tiles.set(h.k, { hex: h, decor: new THREE.Group(), decorSig: '-' });
+      tiles.add(part(geo, mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12), { at: [x, (r() - 0.5) * 0.03, z] }));
+      this.tiles.set(h.k, { hex: h, decorSig: '-' });
     }
+    this.world.add(bake(tiles));
     // The open book the map is pasted into.
     this.bounds.makeEmpty();
     for (const h of map) {
@@ -952,9 +1032,7 @@ export class Board3D {
       m.emissive.set(on ? PLAYER_COLORS[i] : '#000');
       m.emissiveIntensity = on ? 0.25 + 0.2 * Math.sin(t * 3) : 0;
     });
-    for (const tile of this.tiles.values()) {
-      for (const c of tile.decor.children) if (c.userData.float !== undefined) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
-    }
+    for (const c of (this.decor.userData.floaters ?? []) as THREE.Object3D[]) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
     for (const e of this.dragons.values()) this.animateDragon(e, t);
     this.renderer.render(this.scene, this.camera);
   }
