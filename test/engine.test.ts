@@ -36,6 +36,17 @@ test('bot games reach a winner for every player count', () => {
   }
 });
 
+test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {
+  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls! \S+ each take|\ba (adult|egg)\b/;
+  for (let players = 2; players <= 6; players++) {
+    for (let seed = 1; seed <= 10; seed++) {
+      const g = newGame(players, seed);
+      playOut(g, { state: seed * 31 + players });
+      for (const e of g.log) assert.doesNotMatch(e.text, bad, `${players}p seed ${seed}`);
+    }
+  }
+});
+
 test('the same seed gives the same game', () => {
   const a = newGame(4, 42), b = newGame(4, 42);
   playOut(a, { state: 1 });
@@ -280,4 +291,35 @@ test('building cards count their neighbours, whoever owns them', () => {
   const free = neighbors(next).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
   g.buildings[free] = { type: 'monument', owner: 1, upgrade: null, floors: 0 }; // P2's
   assert.equal(buildingPoints(g, next), touching + 1);
+});
+
+test('a fight replays from its events: the hits add up to the result', () => {
+  let fights = 0;
+  for (let players = 2; players <= 6; players++) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const g = newGame(players, seed);
+      playOut(g, { state: seed * 31 + players });
+      for (const [i, e] of g.log.entries()) {
+        if (e.ev?.k !== 'fight') continue;
+        fights++;
+        const units = e.ev.units.map((u) => u.hp);
+        const fighting = new Set(e.ev.ds);
+        let j = i + 1;
+        for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
+          for (const h of c.hits) {
+            if (h.by === 'dragon') {
+              units[h.u] = Math.max(0, units[h.u] - h.dmg);
+              assert.equal(h.down, units[h.u] === 0);
+            } else if (h.down) fighting.delete(h.d);
+          }
+        }
+        const end = g.log[j].ev;
+        assert.equal(end?.k, 'raidEnd', `${players}p seed ${seed}`);
+        if (end?.k !== 'raidEnd') continue;
+        assert.equal(end.won, units.every((hp) => hp === 0));
+        assert.equal(!end.won, fighting.size === 0);
+      }
+    }
+  }
+  assert.ok(fights > 10);
 });

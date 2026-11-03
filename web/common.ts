@@ -1,15 +1,15 @@
 // Shared by the TV and phone clients: talking to the server, colours, icons
 // and the hex map. Plain DOM, no framework; the server strips the types.
 
-import type { DragonView, HexView, Res, Snapshot } from '../src/state.ts';
-import { icon } from './icons.ts';
+import type { DragonView, EventView, HexView, PublicState, Res, Snapshot } from '../src/state.ts';
+import { icon, iconShapes } from './icons.ts';
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
 export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Ley line', meadow: 'Meadow', plains: 'Plains', harbor: 'Harbor (ports)', ocean: 'Ocean' };
-export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#cfd8dc', water: '#2f8fff' };
+export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#9fe3c4', water: '#2f8fff' };
 
 // ---------- server ----------
 
@@ -82,21 +82,22 @@ export function elemIcon(e: string, size = 1.25): string {
   return icon(e, size);
 }
 
-// "2 stone, 1 gold" as icons. Empty bundles read "free".
+// "2 stone, 1 gold" as icons. A free thing shows no cost at all.
 export function resChips(b: Res, size = 1.25): string {
-  const parts = RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `<span class="chip">${b[r]}${resIcon(r, size)}</span>`);
-  return parts.join('') || '<span class="chip free">free</span>';
+  return RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `<span class="chip">${b[r]}${resIcon(r, size)}</span>`).join('');
 }
 
 // Game text (the log, card rules, offers) with the things it names over and
 // over drawn as icons: "gains 3 livestock" reads "gains 3" and a sheep. Takes
 // text that is already escaped HTML.
-const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b/g;
-const POINTS_WORD = /\b(\d+) (?:more )?points?\b/g;
+const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]?)/g;
+const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
+// Punctuation right after an icon stays on its line, not wrapped alone onto the next.
+const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
 export function iconText(html: string, size = 1.2): string {
   return html
-    .replace(RES_WORD, (_, n, r) => `<span class="tchip">${n ?? ''}${icon(r, size)}</span>`)
-    .replace(POINTS_WORD, (m, n) => `<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`);
+    .replace(RES_WORD, (_, n, r, p) => glue(`<span class="tchip">${n ?? ''}${icon(r, size)}</span>`, p))
+    .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
 
 export const BUILDING_ICON: Record<string, string> = {
@@ -124,18 +125,78 @@ export function buildingIcon(type: string, size = 22, color = '#fff', cls?: stri
 
 export const STAGE_LABEL = ['Egg', 'Hatchling', 'Young', 'Adult'];
 
-// A dragon as a small badge: element colour, a size by life stage.
+// What someone gains: each resource with a plus, "+2 stone +1 gold".
+export function gainChips(b: Res, size = 1.25): string {
+  return RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `<span class="chip">+${b[r]}${resIcon(r, size)}</span>`).join('');
+}
+
+// A building as it sits on the map: its owner's disc with the building's mark,
+// and a gold star when it carries an upgrade.
+export function buildingChip(type: string, owner: number, upgraded = false, size = 26, cls?: string): string {
+  const star = upgraded ? '<g transform="translate(6.5 -6.5)"><circle r="3.6" fill="#f5c542" stroke="#0009" stroke-width=".8"/><path transform="scale(.3)" d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z" fill="#7a4d00"/></g>' : '';
+  return `<svg class="bchip" width="${size}" height="${size}" viewBox="-11 -11 22 22"><circle r="9.5" fill="${PLAYER_COLORS[owner]}" stroke="#0009" stroke-width="1.2"/><g transform="scale(.72)" fill="#fff">${iconOf(type, cls)}</g>${star}</svg>`;
+}
+
+export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower', territory: 'territory' };
+
+// What just happened, drawn rather than told: who did it (their name in their
+// colour), then the thing itself as the board and the cards show it. Returns ''
+// for events the screen already shows elsewhere (a turn starting is the top
+// bar, an open offer is the offers panel, the raid's steps are its overlay).
+// Old saves without event data fall back to the text.
+export function eventHtml(e: EventView, g: PublicState, names: string[]): string {
+  const ev = e.ev;
+  if (!ev) return named(e.text, names, g.dragons);
+  const who = (p: number) => playerTag(p, names);
+  const dragon = (id: string, stage?: number, size = 28) => {
+    const d = g.dragons.find((x) => x.id === id);
+    return d ? dragonBadge(stage === undefined ? d : { ...d, stage }, size) : '';
+  };
+  const owner = (id: string) => g.dragons.find((x) => x.id === id)?.owner ?? 0;
+  const dname = (id: string) => esc(g.dragons.find((x) => x.id === id)?.name ?? '');
+  const res = (b: Res) => resChips(b, 1.2);
+  switch (ev.k) {
+    case 'round': return `<span class="evround">Round ${ev.n}</span>`;
+    case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
+    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} <em class="st-${ev.why}">${ev.why}</em>`;
+    case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, false, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
+    case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, true, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'hatch': return `${who(ev.p)} ${dragon(ev.d, 0)} ${dname(ev.d)}`;
+    case 'play': {
+      const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : '';
+      return `${who(ev.p)} <span class="evcard">${esc(ev.name)}</span> ${what}`;
+    }
+    case 'bank': return `${who(ev.p)} ${res(ev.give)}<span class="arrow">➜</span>${res(ev.get)}`;
+    case 'trade': return `${who(ev.from)} <b>${iconText(esc(ev.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(ev.get))}</b> ${who(ev.to)}`;
+    case 'decline': return `${who(ev.p)} <span class="no">✗</span> ${who(ev.from)}`;
+    case 'title': return `<span class="title-badge">${icon(TITLE_ICON[ev.t], 1.1)}${esc(g.titles.find((t) => t.key === ev.t)?.name ?? '')}</span><span class="arrow">➜</span>${ev.p === null ? '<span class="none">—</span>' : who(ev.p)}`;
+    case 'discard': return `${who(ev.p)} −${ev.n}${icon('cards', 1.2)}`;
+    case 'target': return `${icon('raid', 1.3)} <b>${esc(ev.name)}</b>${ev.coin ? ' <small>coin flip</small>' : ''}`;
+    case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
+    case 'raidEnd': return ev.won
+      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map(who).join(' ')} ${gainChips(ev.share, 1.2)}`
+      : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
+    case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'everyone bailed' : 'nobody went'}</span>`;
+    case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
+    default: return '';
+  }
+}
+
+// A dragon as a small badge: element colour, a size by life stage, and its
+// element's icon in the corner so it reads by shape as well as colour.
 export function dragonBadge(d: DragonView, size = 30): string {
   const c = ELEMENT_COLORS[d.element];
   const s = [0.55, 0.7, 0.85, 1][d.stage];
+  const mark = `<g transform="translate(6 6) scale(0.4)">${iconShapes(d.element)}</g>`;
   if (d.stage === 0) {
-    return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><ellipse cx="0" cy="1" rx="${5 * s + 2}" ry="${7 * s + 2}" fill="${c}" stroke="#0008" stroke-width="1"/><path d="M-3 -1 l2 2 l2 -3 l2 2" stroke="#0007" fill="none"/></svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><ellipse cx="0" cy="1" rx="${5 * s + 2}" ry="${7 * s + 2}" fill="${c}" stroke="#0008" stroke-width="1"/><path d="M-3 -1 l2 2 l2 -3 l2 2" stroke="#0007" fill="none"/>${mark}</svg>`;
   }
   // A simple dragon head-and-wings mark, scaled by stage.
   return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><g transform="scale(${s})" fill="${c}" stroke="#0009" stroke-width="0.8">
     <path d="M-9 -2 L-3 -7 L-2 0 Z"/><path d="M9 -2 L3 -7 L2 0 Z"/>
     <path d="M0 -6 C4 -6 5 -1 4 3 L2 8 L0 6 L-2 8 L-4 3 C-5 -1 -4 -6 0 -6 Z"/>
-    <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g></svg>`;
+    <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g>${mark}</svg>`;
 }
 
 // A dragon with its stage, growth, health and why it is staying home, if it is.

@@ -92,11 +92,22 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
-    '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu',
+    '--force-color-profile=srgb', '--font-render-hinting=none',
+    '--use-angle=swiftshader', '--enable-unsafe-swiftshader', // WebGL for the TV's 3D board, on the CPU
+    '--disable-gpu-rasterization', // the rest of the page rasterized in software, the same every run
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  proc.on('exit', () => rmSync(profile, { recursive: true, force: true }));
+  // Chrome's helper processes can still be writing the profile for a moment after it exits.
+  const removeProfile = (tries: number) => {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch (e) {
+      if (tries > 0) setTimeout(() => removeProfile(tries - 1), 300);
+      else console.error(`Couldn't remove Chrome's profile ${profile}: ${(e as Error).message}`);
+    }
+  };
+  proc.on('exit', () => removeProfile(10));
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
@@ -115,10 +126,11 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
 
 // ---------- a browser tab ----------
 
-// Runs before every page's own scripts: a frozen clock, no animations, a fresh
-// phone (no remembered seat; a seat comes in the address).
+// Runs before every page's own scripts: a frozen clock (the 3D board's too),
+// no animations, a fresh phone (no remembered seat; a seat comes in the address).
 const PAGE_SETUP = `
   Date.now = () => ${FROZEN_NOW};
+  window.boardClock = 0;
   try { localStorage.clear(); } catch {}
   addEventListener('DOMContentLoaded', () => {
     const s = document.createElement('style');
@@ -202,8 +214,21 @@ class Tab {
     if (device.mobile) {
       const h = await this.eval<number>('Math.max(document.documentElement.scrollHeight, innerHeight)');
       clip = { x: 0, y: 0, width: device.width, height: h, scale: 1 };
+      // A full-page capture would leave fixed bars (table talk, the hand) at the bottom of the
+      // first screen, over the middle of the page. Pin them to the page's end, as a
+      // phone scrolled to the bottom shows them.
+      await this.eval(`(() => {
+        for (const el of document.querySelectorAll('.talkbar, .handfan')) {
+          const top = el.getBoundingClientRect().top + ${h} - innerHeight; // the same distance from the bottom, on the page's last screen
+          el.dataset.shotStyle = el.getAttribute('style') ?? '';
+          el.style.cssText += ';position:absolute;bottom:auto;top:' + top + 'px';
+        }
+        return true;
+      })()`);
+      await this.settle();
     }
     const r = await this.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !!clip, ...(clip ? { clip } : {}) });
+    if (clip) await this.eval(`(document.querySelectorAll('.talkbar, .handfan').forEach((el) => { el.setAttribute('style', el.dataset.shotStyle); delete el.dataset.shotStyle; }), true)`);
     return Buffer.from(r.data, 'base64');
   }
 }
@@ -285,14 +310,24 @@ async function main() {
           }
           for (const sel of shot.clicks ?? []) await tab.click(sel);
           if (shot.waitMs) await sleep(shot.waitMs);
-          await tab.settle();
-          const png = await tab.png(device);
-          const file = join(out, `${shot.file}.png`);
-          writeFileSync(file, png);
-          const before = join(prev, `${shot.file}.png`);
-          const changed = existsSync(before) ? !readFileSync(before).equals(png) : null;
-          done.push({ ...shot, scene: st.scene.name, ms: Date.now() - ts, changed });
-          console.log(`${changed ? '* ' : '  '}${shot.file}.png  ${Date.now() - ts} ms`);
+          // A moving 3D board is shot frame by frame, at board clock times.
+          const frames: (string | null)[] = shot.frames
+            ? shot.frames.map((f) => (shot.flight ? `window.boardFlightAt?.(${f})` : String(f)))
+            : [null];
+          for (const [i, clockAt] of frames.entries()) {
+            const name = clockAt === null ? shot.file : `${shot.file}-${i + 1}`;
+            if (clockAt !== null) {
+              const ok = await tab.eval<boolean>(`(() => { const t = ${clockAt}; if (t == null) return false; window.boardClock = t; return true; })()`);
+              if (!ok) throw new Error('No dragon on the board can fly');
+            }
+            await tab.settle();
+            const png = await tab.png(device);
+            writeFileSync(join(out, `${name}.png`), png);
+            const before = join(prev, `${name}.png`);
+            const changed = existsSync(before) ? !readFileSync(before).equals(png) : null;
+            done.push({ ...shot, file: name, caption: clockAt === null ? shot.caption : `${shot.caption} (frame ${i + 1} of ${frames.length})`, scene: st.scene.name, ms: Date.now() - ts, changed });
+            console.log(`${changed ? '* ' : '  '}${name}.png  ${Date.now() - ts} ms`);
+          }
         } catch (e) {
           failures++;
           console.error(`  ${shot.file}: FAILED: ${(e as Error).message}`);

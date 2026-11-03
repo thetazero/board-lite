@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle, type Resource } from './data.ts';
 import {
-  TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity,
+  type GameEvent, TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity,
   neighbourCount, production, score, specialProjectCost, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type TradeSide, type Title,
 } from './engine.ts';
@@ -71,6 +71,7 @@ export interface EventView {
   text: string;
   dice?: Die[];
   private?: boolean;
+  ev?: GameEvent; // what happened, as data: the clients draw this rather than print the text
 }
 
 export interface PublicState {
@@ -184,12 +185,12 @@ function events(g: Game, keep: (e: Game['log'][number]) => boolean, n: number): 
   for (let i = g.log.length - 1; i >= 0 && out.length < n; i--) {
     const e = g.log[i];
     if (!keep(e)) continue;
-    out.push({ i, round: e.round, text: e.text, ...(e.dice ? { dice: e.dice } : {}), ...(e.to ? { private: true } : {}) });
+    out.push({ i, round: e.round, text: e.text, ...(e.dice ? { dice: e.dice } : {}), ...(e.ev ? { ev: e.ev } : {}), ...(e.to ? { private: true } : {}) });
   }
   return out.reverse();
 }
 
-export function publicState(g: Game, logLines = 40): PublicState {
+export function publicState(g: Game, logLines = 60): PublicState {
   const n = g.players.length;
   const raid = g.raid;
   return {

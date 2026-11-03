@@ -1,6 +1,7 @@
 // The board-lite web server: serves the TV and phone clients and runs rooms.
-// No dependencies: node:http, server-sent events for pushes, and the
-// browser's TypeScript is stripped of types on the fly (no build step).
+// node:http, server-sent events for pushes, and the browser's TypeScript is
+// stripped of types on the fly (no build step). The TV's 3D board uses three.js,
+// served from node_modules at /vendor/three/.
 //
 //   node src/server/server.ts [--port 8080] [--game <file>]
 //
@@ -16,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { Room, RoomError, type RoomOptions } from './room.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
+const THREE_BUILD = fileURLToPath(new URL('../../node_modules/three/build/', import.meta.url));
+const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three.module.js', '/vendor/three/three.core.js': 'three.core.js' };
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
 const MAX_BODY = 4096;
 
@@ -173,12 +176,20 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     res.end(text);
   }
 
+  async function vendor(res: ServerResponse, name: string) {
+    const text = await readFile(join(THREE_BUILD, name), 'utf8').catch(() => null);
+    if (text === null) return json(res, 404, { error: 'three.js is missing: run npm install.' });
+    res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'max-age=86400' });
+    res.end(text);
+  }
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
     const parts = url.pathname.split('/').filter(Boolean);
     try {
       if (parts[0] === 'api') return await api(req, res, parts.slice(1), url.searchParams);
       if (PAGES[url.pathname]) return await file(res, PAGES[url.pathname]);
+      if (VENDOR[url.pathname]) return await vendor(res, VENDOR[url.pathname]);
       if (/^\/[A-Za-z]{4}\/?$/.test(url.pathname)) return await file(res, 'phone.html'); // a room's address
       return await file(res, url.pathname);
     } catch (e) {
