@@ -34,7 +34,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
         if (a.effect === 'gain_gold' || a.effect === 'extra_raid') out.push(`play ${c.id}`);
         const growable = mine.filter((d) => d.stage < 3);
         if (a.effect === 'grow_dragon' && growable.length) out.push(`play ${c.id} ${pick(rng, growable).id}`);
-        const hurt = mine.filter((d) => d.damage > 0);
+        const hurt = mine.filter((d) => d.damage > 0 || d.resting === 'hurt');
         if (a.effect === 'heal_dragon' && hurt.length) out.push(`play ${c.id} ${pick(rng, hurt).id}`);
       }
     }

@@ -28,7 +28,8 @@ export interface Dragon {
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
   damage: number;
-  fed: boolean;
+  // Why the dragon sits out this round (no growth, no raid): it was hungry or hurt at production.
+  resting: '' | 'hungry' | 'hurt';
 }
 
 export interface Player {
@@ -154,7 +155,7 @@ export function stageStats(d: Dragon): DragonStage | null {
 }
 
 export function canRaid(d: Dragon): boolean {
-  return d.stage > 0 && d.fed && d.damage === 0;
+  return d.stage > 0 && !d.resting && d.damage === 0;
 }
 
 function parsePlayer(g: Game, s: string | undefined): number {
@@ -319,7 +320,7 @@ export function newGame(players: number, seed: number): Game {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, fed: true });
+    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, resting: '' });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins (checked at the end of each round).`);
   startRound(g);
@@ -347,18 +348,19 @@ function startRound(g: Game) {
     gain(g.players[p], got);
     log(g, `${pname(p)} produces ${bundleText(got)}.`);
   }
-  // Dragons heal, then eat and grow.
+  // Every dragon eats and heals fully. One that was hungry or hurt sits out
+  // the round: it doesn't grow and can't raid.
   for (const d of g.dragons) {
-    // A hurt dragon heals half its health each round, so a knocked-out one
-    // misses exactly the next round's raid.
-    if (d.stage > 0) d.damage = Math.max(0, d.damage - Math.ceil(stageStats(d)!.hp / 2));
     const pl = g.players[d.owner];
-    d.fed = pl.resources.livestock >= TUNING.livestockPerDragon;
-    if (!d.fed) {
-      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) goes hungry: it won't grow or raid this round.`);
+    const hurt = d.damage > 0;
+    d.damage = 0;
+    const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
+    if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
+    d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
+    if (d.resting) {
+      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing' : 'goes hungry'}: it won't grow or raid this round.`);
       continue;
     }
-    pl.resources.livestock -= TUNING.livestockPerDragon;
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;
@@ -692,7 +694,7 @@ export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object
 function hatch(g: Game, p: number, dragonKey: string) {
   const mine = g.dragons.filter((d) => d.owner === p).length;
   if (mine >= dragonCapacity(g, p)) fail(`You have no room for another dragon (${mine}/${dragonCapacity(g, p)}). Build a roost first.`);
-  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, fed: true };
+  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, resting: '' };
   g.dragons.push(d);
   log(g, `${pname(p)} hatches an egg: ${dragonName(d)} (${d.id}), a ${DRAGONS[dragonKey].element} dragon.`);
 }
@@ -826,10 +828,11 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.damage === 0) fail(`${d.id} isn't hurt.`);
+          if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
-          what = `fully heals ${d.id}`;
+          if (d.resting === 'hurt') d.resting = '';
+          what = `heals ${d.id}, ready to raid`;
           break;
         }
         case 'extra_raid':
@@ -864,7 +867,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
       const ids = args.filter((a) => a !== 'none');
       for (const id of ids) {
         const d = ownDragon(g, p, id);
-        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched, fed and unhurt).`);
+        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched and not sitting out the round, and unhurt).`);
       }
       raid.commits[p] = [...new Set(ids)];
       return log(g, `${pname(p)} commits ${ids.length ? ids.join(' ') : 'nothing'}.`);

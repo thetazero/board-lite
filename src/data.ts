@@ -53,7 +53,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   crystal_mine: { name: 'Crystal Mine', class: 'production', cost: { stone: 2, timber: 1 }, terrain: 'ley', produces: { resource: 'crystal', base: 1, die: 3 }, text: 'Produces 1 crystal plus a d3 each round.', copies: 4, specialProject: true },
   pasture: { name: 'Pasture', class: 'production', cost: { timber: 2, stone: 1 }, terrain: 'meadow', produces: { resource: 'livestock', base: 1, die: 3 }, text: 'Produces 1 livestock plus a d3 each round.', copies: 4, specialProject: true },
   roost: { name: 'Roost', class: 'dragon', cost: { stone: 3, timber: 1 }, dragonCapacity: 2, text: 'Houses 2 more dragons.', copies: 4, specialProject: true },
-  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your fed dragons grow one extra step each round.', copies: 3 },
+  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   caravan_post: { name: 'Caravan Post', class: 'trade', cost: { timber: 3, stone: 2, gold: 1 }, bankRate: 2, text: 'You trade with the bank at 2:1.', copies: 2 },
   tower_floor: { name: 'Tower Floor', class: 'points', cost: { stone: 4, crystal: 1, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
@@ -96,7 +96,7 @@ export const ACTIONS: Record<string, ActionDef> = {
   windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 5 },
   treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 4 },
   growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { crystal: 1 }, text: 'One of your dragons grows to its next life stage.', copies: 4 },
-  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your dragons.', copies: 3 },
+  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Heal one of your hurt dragons so it can raid this round.', copies: 3 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'This round has one more raid.', copies: 3 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
 };
