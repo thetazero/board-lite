@@ -14,6 +14,10 @@ import {
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
 import { distance, generateMap, key, mapRadius, neighbors, parseKey, towerSpots } from './map.ts';
 
+// The owner's target game length (docs/design.md, Winning). Not a rule: the
+// datasheet prices things against it.
+const GAME_ROUNDS = 15;
+
 // ---------- the yardstick ----------
 
 // One common unit to add mixed costs up: every non-gold resource is worth 1,
@@ -263,6 +267,11 @@ function points(): string {
   const hatcheryNote = hatchery
     ? `\n\nWith a ${hatchery.name} (+${hatchery.growthBonus} growth a round), a growth-time-${base.growthTime} dragon reaches adult in ${growth(base.growthTime, 1 + hatchery.growthBonus!, 3)} rounds instead of ${r3}.`
     : '';
+  // A dragon keeps eating once grown, so its points cost more the longer the
+  // game: here one hatched in round 1 and fed to the end of the owner's
+  // target length (docs/design.md).
+  const held = Object.values(DRAGONS).filter((d, i, all) => all.findIndex((x) => `${value(x.cost)}/${x.growthTime}` === `${value(d.cost)}/${d.growthTime}`) === i);
+  const heldNote = `\n\nFed to the end of a ${GAME_ROUNDS}-round game, hatched in round 1: ${held.map((d) => `${d.base ? 'base dragon' : d.name.split(' ').pop()!.toLowerCase()} ${n1((value(d.cost) + GAME_ROUNDS * TUNING.livestockPerDragon) / TUNING.dragonPointsByStage[3])}`).join(', ')} per point. A building's points cost nothing more once built.`;
   const tower = value(TUNING.towerProduction);
   // Spread of what a point costs, free cards aside.
   const priced = rows.filter((r) => Number(r[3]) > 0).sort((a, b) => Number(a[3]) - Number(b[3]));
@@ -274,7 +283,7 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 
 ${table(['Source', 'Pays', 'Points', 'Value per point', 'Ready'], rows)}
 
-${spread}${hatcheryNote}
+${spread}${hatcheryNote}${heldNote}
 
 Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most buildings, tower included (at least ${TUNING.titleMinimum.territory}).`;
 }
@@ -308,6 +317,11 @@ function raidOnce(target: string, dragons: Raider[], seed: number): { won: boole
   const g = structuredClone(template);
   g.rng = { state: seed };
   g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: d.owner ?? 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
+  // A hatchling P2 keeps at home, so the next raid has a raider and isn't
+  // skipped: the engine then stops at its vote, before the round ends.
+  const home = { id: 'home', owner: 1, key: dragons[0].key, stage: 1, growth: 0, damage: 0, resting: '' as const };
+  const raiders = [...g.dragons];
+  g.dragons.push(home);
   const worth = (p: number) => value(g.players[p].resources);
   const before = [worth(0), worth(1)];
   g.phase = 'raid';
@@ -318,12 +332,12 @@ function raidOnce(target: string, dragons: Raider[], seed: number): { won: boole
   };
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 1');
-  const sent = [0, 1].filter((p) => g.dragons.some((d) => d.owner === p));
-  for (const p of sent) apply(g, p, `commit ${g.dragons.filter((d) => d.owner === p).map((d) => d.id).join(' ')}`);
-  for (const p of sent) apply(g, p, 'ready');
+  const sent = [0, 1].filter((p) => raiders.some((d) => d.owner === p));
+  for (const p of sent) apply(g, p, `commit ${raiders.filter((d) => d.owner === p).map((d) => d.id).join(' ')}`);
+  for (const p of [0, 1]) if (sent.includes(p) || p === home.owner) apply(g, p, 'ready');
   for (const p of sent) apply(g, p, 'fight');
   const got = [worth(0) - before[0], worth(1) - before[1]];
-  return { won: g.log.some((e) => e.ev?.k === 'raidEnd' && e.ev.won), got, damage: g.dragons.map((d) => d.damage) };
+  return { won: g.log.some((e) => e.ev?.k === 'raidEnd' && e.ev.won), got, damage: raiders.map((r) => g.dragons.find((d) => d.id === r.id)!.damage) };
 }
 const raid = (target: string, dragons: Raider[], seed: number) => raidOnce(target, dragons, seed).won;
 
