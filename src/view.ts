@@ -1,13 +1,13 @@
 // What one player is allowed to see, as text. Everything here is either
 // public (the TV) or this player's own hidden state (their phone).
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, FAUNA, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
 import {
   PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, dragonPower, faunaOnMap, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
+  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
-import { mapRadius } from './map.ts';
+import { PEAK, mapRadius, nearBeast } from './map.ts';
 
 const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
 // Two letters per building on the text map.
@@ -17,7 +17,7 @@ const BUILDING_CODE: Record<string, string> = {
   shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
   monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
-const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X' };
+const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 
 export function cardText(c: Card): string {
@@ -67,7 +67,7 @@ function mapText(g: Game): string[] {
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
-  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${FAUNA[k].name}`).join(', ')}.`);
+  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -76,7 +76,8 @@ function mapText(g: Game): string[] {
       if (!hex) continue;
       const b = g.buildings[k];
       const label = b ? `${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}` : '';
-      cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${label ? `[${label}]` : ''}${hex.fauna ? `{${FAUNA_CODE[hex.fauna]}}` : ''}`);
+      const held = hex.fauna ? `{${FAUNA_CODE[hex.fauna]}}` : nearBeast(g.map, k) && hex.terrain !== 'ocean' ? '{x}' : '';
+      cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${k === PEAK ? '^' : ''}${label ? `[${label}]` : ''}${held}`);
     }
     lines.push(`  ${' '.repeat(Math.abs(r) * 4)}${cells.join('  ')}`);
   }
@@ -120,8 +121,9 @@ export function targetText(t: string): string {
 }
 
 export function faunaText(k: string): string {
-  const x = FAUNA[k];
-  return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; loot ${bundleText(x.loot)})`;
+  const x = faunaDef(k);
+  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; 1 try each round` : `loot ${bundleText(x.loot)}`;
+  return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
 }
 
 // Command hints for this player right now. Empty if they have nothing to decide.
@@ -161,8 +163,8 @@ export function commandHints(g: Game, p: number): string[] {
       if (hexes.length) out.push(`build ${b}${def.onTower ? '' : ' <hex>'}   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}${def.onTower ? '' : `; open hexes: ${hexes.join(' ')}`})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
     }
     const fighters = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
-    const fauna = faunaOnMap(g);
-    if (fauna.length && fighters.length) out.push(`clear <hex> <dragon ids...>   (fight the fauna there; those dragons then sit out this round's raids. Your ready dragons: ${fighters.join(' ')}; fauna at: ${fauna.map((k) => `${k} ${FAUNA[g.map[k].fauna!].name}`).join(', ')})`);
+    const fauna = huntable(g, p);
+    if (fauna.length && fighters.length) out.push(`clear <hex> <dragon ids...>   (fight the beast there to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${fighters.join(' ')}; you can fight: ${fauna.map((k) => `${k} ${faunaDef(g.map[k].fauna!).name}`).join(', ')})`);
     out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
@@ -224,7 +226,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   for (let q = 0; q < g.players.length; q++) {
     const s = score(g, q);
     const extra = q === p ? ` + ${s.hidden} hidden = ${s.total}` : '';
-    out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
+    out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles}${s.beasts ? `, great beasts ${s.beasts}` : ''})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
   }
   out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'no one' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
   out.push('');
@@ -248,6 +250,8 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   out.push(...mapText(g));
   const fauna = faunaOnMap(g);
   out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
+  const slain = Object.entries(g.slain).map(([k, q]) => `${BEASTS[k].name} by ${pname(q)}`);
+  out.push(`Great beasts: a Thunderbird on the peak (${PEAK}) and a Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
   if (g.phase === 'raid') {
     out.push('');
     out.push(...raidText(g, p));

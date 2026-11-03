@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
 import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
-import { ACTIONS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
-import { distance, mapRadius, neighbors } from '../src/map.ts';
+import { PEAK, distance, mapRadius, neighbors } from '../src/map.ts';
 
 // Each round starts with everyone keeping a building card: keep the first.
 function keepAll(g: Game) {
@@ -465,7 +465,7 @@ test('the starting map has fauna, at least 2 steps from every tower, stronger fu
   for (let players = 2; players <= 6; players++) {
     const g = newGame(players, 3);
     const land = Object.values(g.map).filter((h) => h.terrain !== 'ocean');
-    const fauna = land.filter((h) => h.fauna);
+    const fauna = land.filter((h) => h.fauna && FAUNA[h.fauna]);
     assert.equal(fauna.length, Math.round(land.length / TUNING.landHexesPerFauna));
     for (const h of fauna) {
       const away = Math.min(...g.towers.map((t) => { const [q, r] = t.split(',').map(Number); return distance(h.q - q, h.r - r); }));
@@ -473,6 +473,73 @@ test('the starting map has fauna, at least 2 steps from every tower, stronger fu
       assert.equal(h.fauna, FAUNA_BY_DISTANCE[Math.min(away - 2, FAUNA_BY_DISTANCE.length - 1)]);
     }
   }
+});
+
+test('the great beasts: the Thunderbird on the centre peak, the Leviathan off a harbor, nothing around them', () => {
+  for (let players = 2; players <= 6; players++) {
+    for (const seed of [1, 2, 3]) {
+      const g = newGame(players, seed);
+      assert.equal(g.map[PEAK].fauna, 'thunderbird');
+      assert.equal(g.map[PEAK].terrain, 'mountain');
+      const sea = Object.keys(g.map).filter((k) => g.map[k].fauna === 'leviathan');
+      assert.equal(sea.length, 1);
+      assert.equal(g.map[sea[0]].terrain, 'ocean');
+      assert.ok(neighbors(sea[0]).some((n) => g.map[n]?.terrain === 'harbor'));
+      for (const b of [PEAK, sea[0]]) {
+        for (const n of neighbors(b)) {
+          assert.ok(!g.map[n]?.fauna, `${players}p: fauna next to a great beast`);
+          assert.ok(!g.towers.includes(n), `${players}p: a tower next to a great beast`);
+        }
+      }
+    }
+  }
+});
+
+// A game with an adult of the beast's weakness or not, and P1's land next to the peak.
+function beastGame() {
+  const g = newGame(2, 5);
+  keepAll(g);
+  rich(g, 0);
+  const [ring] = neighbors(PEAK);
+  const [beyond] = neighbors(ring).filter((n) => n !== PEAK && !neighbors(PEAK).includes(n));
+  g.buildings[beyond] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  g.map[ring].terrain = 'meadow';
+  delete g.map[ring].fauna;
+  return { g, ring, beyond };
+}
+
+test('a great beast holds the hexes around it: nothing is built there until it falls', () => {
+  const { g, ring } = beastGame();
+  assert.throws(() => apply(g, 0, `build pasture ${ring}`), /great beast/);
+  assert.throws(() => apply(g, 0, `build roost ${PEAK}`), RuleError);
+  delete g.map[PEAK].fauna;
+  g.slain.thunderbird = 1;
+  apply(g, 0, `build pasture ${ring}`);
+  // A production building next to the freed peak makes more.
+  assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock! + TUNING.peakBonus);
+});
+
+test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {
+  const { g } = beastGame();
+  const d = g.dragons.find((x) => x.owner === 0)!;
+  d.stage = 1; // a hatchling can't beat the Thunderbird
+  const extra = { ...d, id: 'd90', resting: '' as const };
+  g.dragons.push(extra);
+  apply(g, 0, `clear ${PEAK} ${d.id}`);
+  assert.equal(g.map[PEAK].fauna, 'thunderbird');
+  assert.throws(() => apply(g, 0, `clear ${PEAK} d90`), /1 try each round/);
+  // Next round: three adult ice dragons, its weakness.
+  g.round++;
+  g.dragons = g.dragons.filter((x) => x.owner !== 0);
+  for (let i = 0; i < 3; i++) g.dragons.push({ id: `d8${i}`, owner: 0, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0, resting: '' });
+  const untitled = () => score(g, 0).total - score(g, 0).titles; // the army title may move too
+  const before = untitled();
+  apply(g, 0, `clear ${PEAK} d80 d81 d82`);
+  assert.equal(g.map[PEAK].fauna, undefined);
+  assert.equal(g.slain.thunderbird, 0);
+  assert.equal(score(g, 0).beasts, BEASTS.thunderbird.points);
+  assert.equal(untitled(), before + BEASTS.thunderbird.points);
+  assert.match(playerView(g, 1), /Thunderbird by P1/);
 });
 
 // A game where P1's own land is set: a meadow pasture next to the tower, and

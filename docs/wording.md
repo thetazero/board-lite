@@ -39,6 +39,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **place** (a beast) | put, send | Putting a beast on a hex with Wolf Call or Rouse the Bear |
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
 | **clear** (fauna) | hunt, fight | Sending dragons against a beast on the map |
+| **slay** (a great beast) | kill, defeat | Clearing the Thunderbird or the Leviathan: a great beast is slain, for good |
 | **sit out** | miss, rest, skip | A dragon that can't raid this round |
 | **raid-ready** | fit, able | A hatched, unhurt dragon not sitting out |
 | **beast**, **fauna** | animal, monster | One wild creature on a hex is a beast; all of them, and the rules about them, are fauna |
