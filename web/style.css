@@ -218,7 +218,7 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
 .handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); }
 .handfan.discarding .card:not(.picked) { filter: none; }
-body.has-hand { padding-bottom: 14.5em; }
+body.phone.has-hand { padding-bottom: 14.5em; } /* more specific than the talk bar's body.phone padding below, which would otherwise win */
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
