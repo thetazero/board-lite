@@ -119,7 +119,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
 - Loot is split evenly (among those who play; see Combat for fled dragons).
 - Targets have units with stats and with elemental strengths and weaknesses.
-- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost.
+- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost. *(Provisionally removed: the secret bail is the only way out of a raid. See `docs/decisions.md`, 2026-11-02, raids.)*
 
 ### Combat
 
@@ -128,7 +128,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Targeting is simple and automatic; the rule is printed on the dragon card (e.g. lowest health, strongest attacker, random, a unit weak to my element).
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
-- After each round of combat, players get 10 seconds to choose whether to roll to flee.
+- After each round of combat, players get 10 seconds to choose whether to roll to flee. *(Provisionally removed with fleeing, above.)*
 - Healing: healing time scales with health lost, measured in global rounds. Typically it's one round; only a fully mature dragon that took a lot of damage is out longer.
 - Loot is split evenly among players whose dragons were still fighting at the end.
 - Loot is gold plus resources, skewed heavily toward gold.
@@ -185,8 +185,8 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a points and a dragon building.
 - Special projects cost double the card: the four production buildings, a roost, or a base egg of any element.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing is 8 health per round; any damage keeps a dragon out of raids. Dragons never die: at 0 health they are knocked out and heal at home.
-- Combat: dragons strike first, then each defender hits random dragons. Fleeing is d6 + dragon speed against d6 + the best defender chase; losing costs 2 damage per point.
+- Healing is half a dragon's full health per round; any damage keeps a dragon out of raids, so a knocked-out dragon misses exactly the next round's raid. Dragons never die: at 0 health they are knocked out and heal at home.
+- Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Loot is rounded down per player; the remainder is lost.
 - The bank sells gold at the normal rate.
@@ -194,4 +194,3 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
-- The 10-second flee timer is left to the clients; the CLI waits for every choice.

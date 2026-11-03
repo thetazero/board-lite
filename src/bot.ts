@@ -62,8 +62,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
     return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
   }
-  if (raid.step === 'bail') return [next(rng) < 0.85 ? 'fight' : 'bail'];
-  return [next(rng) < 0.2 ? 'flee all' : 'stay'];
+  return [next(rng) < 0.85 ? 'fight' : 'bail'];
 }
 
 // Makes one move for one waiting player. Returns the command it applied.

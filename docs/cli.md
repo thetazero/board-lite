@@ -29,7 +29,7 @@ node src/cli.ts do ~/.cache/board-lite/g1.json 1 build c49 1,0
 node src/cli.ts do ~/.cache/board-lite/g1.json 1 end
 ```
 
-Repeat: `status` to see whose decision it is, `view` that seat, `do` its decision. In the simultaneous steps (raid vote, commit, fight-or-bail, flee, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only.
+Repeat: `status` to see whose decision it is, `view` that seat, `do` its decision. In the simultaneous steps (raid vote, commit, fight-or-bail, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only.
 
 ## Decision commands
 
@@ -50,7 +50,7 @@ Any time in the action phase: `accept o40` / `decline o40` for an offer made to 
 
 Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
 
-Raid phase: `vote 2`; then `commit d3 d7` (or `commit none`) and `ready`; then, if committed, `fight` or `bail`; then after each combat round, if you have dragons in the fight, `stay`, `flee all` or `flee d3`.
+Raid phase: `vote 2`; then `commit d3 d7` (or `commit none`) and `ready`; then, if committed, `fight` or `bail`. The fight then plays out to the end with no further choices.
 
 End of round, if over 7 cards: `discard c4 c9`.
 
