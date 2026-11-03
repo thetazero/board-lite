@@ -4,7 +4,7 @@
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
   PLAYER_COLORS, RESOURCES, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, elemIcon, esc, eventHtml, gainChips, hpBar,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 import { glyph } from './art.ts';
 import { Board3D } from './board3d.ts';
@@ -117,7 +117,7 @@ function phaseLabel(g: PublicState): string {
 
 function prodChips(prod: Record<string, { base: number; dice: number[] }>): string {
   return RESOURCES.filter((r) => prod[r].base || prod[r].dice.length)
-    .map((r) => `<span class="chip">${resIcon(r, 1.2)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
+    .map((r) => `<span class="chip">${resIcon(r, 1.2)}${iconText(incomeText(prod[r]), 1)}</span>`)
     .join('');
 }
 
@@ -197,7 +197,7 @@ function targetCard(t: TargetView, extra = ''): string {
   const units = t.units.map((u) => `
     <div class="unit${u.hp <= 0 ? ' down' : ''}">
       <b>${esc(u.name)}</b> ${hpBar(u.hp, u.maxHp)} <span class="hp">${u.hp}/${u.maxHp}</span>
-      <small>${glyph('attack', 'attack')}${esc(u.attack)}${u.weak.length ? ` <span class="weak">×2 ${u.weak.map(elem).join('')}</span>` : ''}${u.strong.length ? ` <span class="strong">½ ${u.strong.map(elem).join('')}</span>` : ''}</small>
+      <small>${glyph('attack', 'attack')}${iconText(esc(u.attack))}${u.weak.length ? ` <span class="weak">×2 ${u.weak.map(elem).join('')}</span>` : ''}${u.strong.length ? ` <span class="strong">½ ${u.strong.map(elem).join('')}</span>` : ''}</small>
     </div>`).join('');
   return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">${resChips(t.loot, 1.4)}</div></div>`;
 }

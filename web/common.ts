@@ -94,8 +94,14 @@ const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]
 const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
 // Punctuation right after an icon stays on its line, not wrapped alone onto the next.
 const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
+// Dice to roll, "2d6", read as a count and the die: "2" and a white square.
+const DICE_WORD = /\b(\d+)d(4|6|8)\b/g;
+export function diceChip(n: number | string, sides: number, size = 1.2): string {
+  return `<span class="tchip dicechip">${n}${icon(`d${sides}`, size)}</span>`;
+}
 export function iconText(html: string, size = 1.2): string {
   return html
+    .replace(DICE_WORD, (_, n, s) => diceChip(n, Number(s), size))
     .replace(RES_WORD, (_, n, r, p) => glue(`<span class="tchip">${n ?? ''}${icon(r, size)}</span>`, p))
     .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
@@ -106,7 +112,8 @@ export const BUILDING_ICON: Record<string, string> = {
   lumber_camp: '<path d="M0 -8 L6 0 H2 L6 5 H-6 L-2 0 H-6 Z"/><rect x="-1.2" y="5" width="2.4" height="3"/>',
   crystal_mine: '<path d="M0 -8 L6 -2 L0 8 L-6 -2 Z"/>',
   pasture: '<rect x="-7" y="-5" width="2" height="12"/><rect x="5" y="-5" width="2" height="12"/><rect x="-7" y="-3" width="14" height="2"/><rect x="-7" y="2" width="14" height="2"/>',
-  roost: '<path d="M-8 1 Q0 10 8 1 Z"/><ellipse cx="0" cy="-2" rx="3.5" ry="4.5"/>',
+  // A twig nest with an egg sitting in it (the phone's empty nests are the same nest).
+  roost: '<ellipse cx="0" cy="-2.5" rx="4.6" ry="6"/><path d="M-7.5 1.5 L-5 2.8 L-2.5 1.5 L0 2.8 L2.5 1.5 L5 2.8 L7.5 1.5 Q7 8.5 0 8.5 Q-7 8.5 -7.5 1.5 Z" stroke="#0009" stroke-width=".6"/><path d="M-6 4.5 L5.5 6.5 M-5 7 L6.5 4" stroke="#0008" stroke-width="1" fill="none"/>',
   hatchery: '<ellipse cx="0" cy="0.5" rx="5.5" ry="7.5"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0007" stroke-width="1.4"/>',
   port: '<circle cx="0" cy="-5.5" r="2.6"/><circle cx="0" cy="-5.5" r="1.1" fill="#0006"/><rect x="-0.9" y="-3.5" width="1.8" height="11"/><rect x="-4" y="-1.5" width="8" height="1.8"/><path d="M-7 2 Q-6 8 0 8 Q6 8 7 2 L5 3.5 Q4 6 0 6 Q-4 6 -5 3.5 Z"/>',
   tower_floor: '<rect x="-6" y="-6" width="12" height="12"/>',
@@ -222,8 +229,9 @@ export function hpBar(hp: number, max: number): string {
   return `<span class="hpbar"><span style="width:${pct}%;background:${color}"></span></span>`;
 }
 
+// A rolled die: the same white shape as a die to roll, with what it landed on.
 export function dieFace(sides: number, value: number, cls = ''): string {
-  return `<span class="die ${cls}" data-sides="${sides}"><b>${value}</b><small>d${sides}</small></span>`;
+  return `<span class="die ${cls}" data-sides="${sides}">${icon(`d${sides}face`, 2.4, 'dieicon')}<b>${value}</b></span>`;
 }
 
 // ---------- hex map ----------

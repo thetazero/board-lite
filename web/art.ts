@@ -435,9 +435,12 @@ export function frameColor(kind: string, element?: string): string {
   return { building: '#c0703f', upgrade: '#d9a13a', action: '#7a5cc8' }[kind] ?? '#888';
 }
 
-// Small kind marks for the card's corner (icons, not words).
+// Small kind marks for the card's corner (icons, not words). The corner disc and
+// the name ribbon share one colour per kind (frameColor): rust buildings, gold
+// upgrades, purple actions, and a dragon in its element's colour.
 export const KIND_ICON: Record<string, string> = {
-  building: '<path d="M-7 8 V-1 L0 -8 L7 -1 V8 Z"/><path d="M-2 8 V3 H2 V8 Z" fill="#0004"/>',
+  // A building card goes on a hex of the map: its mark is the hex, not a house (a house reads as one building, like the Market).
+  building: '<path d="M0 -9 L7.8 -4.5 V4.5 L0 9 L-7.8 4.5 V-4.5 Z"/><path d="M0 -4.5 L3.9 -2.25 V2.25 L0 4.5 L-3.9 2.25 V-2.25 Z" fill="#0003"/>',
   upgrade: '<path d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z"/>',
   action: '<path d="M0 -9 L2 -2 L9 0 L2 2 L0 9 L-2 2 L-9 0 L-2 -2 Z"/>',
   dragon: '<ellipse cx="0" cy="1" rx="6" ry="8"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0005" stroke-width="1.4"/>',

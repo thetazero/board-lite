@@ -65,6 +65,28 @@ function hexFacets(cx: number, cy: number, light: string, dark: string): Facet[]
   ];
 }
 
+// A die's paper shape, and its pips as small dark octagons.
+const DIE: Record<string, Facet[]> = {
+  d6: [
+    ['#b9b2a2', P([[-7.5, 7.5], [7.5, 7.5], [7.5, -7.5], [8.8, -6.2], [8.8, 8.8], [-6.2, 8.8]])],
+    ['#ffffff', P([[-7.5, -7.5], [7.5, -7.5], [-7.5, 7.5]])],
+    ['#e6e0d2', P([[7.5, -7.5], [7.5, 7.5], [-7.5, 7.5]])],
+  ],
+  d8: [
+    ['#ffffff', P([[0, -9.5], [0, 0], [-8, 0]])],
+    ['#e6e0d2', P([[0, -9.5], [8, 0], [0, 0]])],
+    ['#e6e0d2', P([[-8, 0], [0, 0], [0, 9.5]])],
+    ['#b9b2a2', P([[0, 0], [8, 0], [0, 9.5]])],
+  ],
+  d4: [
+    ['#ffffff', P([[0, -9], [0, 2.5], [-9, 7.5]])],
+    ['#e6e0d2', P([[0, -9], [9, 7.5], [0, 2.5]])],
+    ['#b9b2a2', P([[-9, 7.5], [0, 2.5], [9, 7.5]])],
+  ],
+};
+const pips = (at: [number, number][], r: number): Facet[] =>
+  at.map(([x, y]) => ['#2b2228', P(Array.from({ length: 8 }, (_, i) => { const [px, py] = polar(r, 22.5 + i * 45); return [x + px, y + py] as [number, number]; }))]);
+
 const ICONS: Record<string, Facet[]> = {
   // A faceted boulder.
   stone: [
@@ -196,11 +218,20 @@ const ICONS: Record<string, Facet[]> = {
     ['#1f6fd6', P([[6, 1], [4.5, 6.5], [0, 9], [0, 1.5]])],
     ['#d9eeff', P([[-3.5, 0], [-2, -3.5], [-1.6, 0.4]])],
   ],
+  // Dice: white paper shapes, one per kind of die (a square d6, a diamond d8,
+  // a triangle d4). With pips, a die still to roll ("2" and a d6 is 2d6); the
+  // blank `…face` shape carries a number once it's rolled (dieFace).
+  d6face: DIE.d6,
+  d8face: DIE.d8,
+  d4face: DIE.d4,
+  d6: [...DIE.d6, ...pips([[-4, -4], [4, -4], [0, 0], [-4, 4], [4, 4]], 1.7)],
+  d8: [...DIE.d8, ...pips([[0, -3.2], [-2.8, 1.6], [2.8, 1.6]], 1.5)],
+  d4: [...DIE.d4, ...pips([[0, 3.2]], 1.6)],
 };
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory' };
+const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {
