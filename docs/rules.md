@@ -16,7 +16,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
    - **Special project** (no card): hatch a base egg of any element, for double the base dragon card's cost.
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
-   - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. Open offers expire when the turn ends.
+   - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
 4. **Raid** (all at once). Repeat once per War Horn played this round.
    - **Vote**: three random kingdoms are shown; everyone secretly votes; ties are a coin flip.
    - **Commit**: everyone publicly commits raid-ready dragons (hatched, unhurt, not sitting out) and can change their mind until they say ready. When everyone is ready, commitments lock.

@@ -115,6 +115,12 @@ test('trades are binding and move resources and cards', () => {
   apply(g, 1, 'offer P1 give 1 stone get 40 timber');
   assert.throws(() => apply(g, 0, `accept ${g.offers[0].id}`), RuleError);
   assert.equal(g.offers.length, 1);
+  // The acting player answers offers made to them before ending the turn; their own offers expire with it.
+  assert.throws(() => apply(g, 0, 'end'), /Answer P2's offer/);
+  apply(g, 0, `decline ${g.offers[0].id}`);
+  apply(g, 0, 'offer P2 give 1 stone get 1 timber');
+  apply(g, 0, 'end');
+  assert.equal(g.offers.length, 0);
 });
 
 test('buildings must touch your territory and match terrain', () => {

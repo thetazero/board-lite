@@ -214,5 +214,5 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - The bank sells gold at the normal rate.
 - Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
-- Trade offers expire at the end of the acting player's turn.
+- Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.

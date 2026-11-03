@@ -865,9 +865,13 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
   }
   if (p !== g.turn) fail(`It's ${pname(g.turn)}'s turn. Out of turn you can only offer, accept, decline or cancel trades.`);
   switch (verb) {
-    case 'end':
+    case 'end': {
+      // An offer made to you gets an answer from you, not from the clock.
+      const open = g.offers.filter((o) => o.to === p);
+      if (open.length) fail(`Answer ${open.map((o) => `${pname(o.from)}'s offer ${o.id}`).join(' and ')} first: accept or decline.`);
       log(g, `${pname(p)} ends their turn.`, { k: 'end', p });
       return endTurn(g);
+    }
     case 'bank': {
       const give = parseResource(args[0]), get = parseResource(args[1]);
       const times = args[2] ? Number(args[2]) : 1;
