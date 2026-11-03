@@ -30,12 +30,11 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  fed: boolean;
+  resting: '' | 'hungry' | 'hurt'; // sitting out this round: no growth, no raid
   canRaid: boolean;
   status: string;
   targeting: string;
   attack: string;
-  speed: number;
 }
 
 export interface UnitView {
@@ -43,7 +42,6 @@ export interface UnitView {
   hp: number;
   maxHp: number;
   attack: string;
-  chase: number;
   weak: string[];
   strong: string[];
 }
@@ -56,7 +54,7 @@ export interface TargetView {
 }
 
 export interface RaidView {
-  step: 'vote' | 'commit' | 'bail' | 'flee';
+  step: 'vote' | 'commit' | 'bail';
   candidates: TargetView[];
   voted: boolean[];
   target: TargetView | null; // units carry current health once the fight starts
@@ -65,8 +63,6 @@ export interface RaidView {
   decided: boolean[]; // fight-or-bail chosen (not what)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
-  fleeDecided: boolean[];
-  combatRound: number;
 }
 
 export interface EventView {
@@ -129,7 +125,6 @@ export interface SeatState {
   raidReady: string[]; // my dragons that can be committed
   myVote: number | null;
   myChoice: 'fight' | 'bail' | null;
-  myFlee: string[] | null;
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
@@ -143,11 +138,11 @@ function attackText(a: { targets: number; dice: number; sides: number }) {
 function dragonView(d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
-  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : !d.fed ? 'hungry' : 'hurt';
+  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.resting === 'hungry' ? 'hungry' : 'hurt';
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
-    growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, fed: d.fed,
-    canRaid: canRaid(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '', speed: st?.speed ?? 0,
+    growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
+    canRaid: canRaid(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
   };
 }
 
@@ -157,7 +152,7 @@ function targetView(key: string, hp?: number[]): TargetView {
     key, name: t.name, loot: res(t.loot),
     units: t.units.map((u, i) => {
       const x = UNITS[u];
-      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), chase: x.chase, weak: x.weak, strong: x.strong };
+      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), weak: x.weak, strong: x.strong };
     }),
   };
 }
@@ -218,8 +213,6 @@ export function publicState(g: Game, logLines = 40): PublicState {
       decided: raid.choices.map((c) => c !== null),
       fighting: Array.from({ length: n }, (_, p) => raid.fighters.some((id) => g.dragons.find((d) => d.id === id)!.owner === p)),
       fighters: raid.fighters,
-      fleeDecided: raid.flee.map((f) => f !== null),
-      combatRound: raid.combatRound,
     },
     raidsLeft: g.raidsLeft,
     winner: g.winner,
@@ -249,7 +242,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const d = DRAGONS[c.key];
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
-    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}, speed ${adult.speed}; ${TARGETING_TEXT[d.targeting]}.`;
+    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     return { ...base, text, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];
@@ -260,7 +253,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are fully grown.' };
   }
   if (a.effect === 'heal_dragon') {
-    const ids = mine.filter((d) => d.damage > 0).map((d) => d.id);
+    const ids = mine.filter((d) => d.damage > 0 || d.resting === 'hurt').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };
   }
   return { ...base, text: a.text, needs: 'none' };
@@ -292,7 +285,6 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     myVote: raid?.votes[p] ?? null,
     myChoice: raid?.choices[p] ?? null,
-    myFlee: raid?.flee[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
     talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),
   };
@@ -307,7 +299,6 @@ export interface Lobby {
   seats: { name: string; kind: SeatKind; connected: boolean }[];
   minPlayers: number;
   maxPlayers: number;
-  fleeDeadline: number | null; // ms epoch, while the flee choice is open
   file: string; // where the server saves the game
 }
 

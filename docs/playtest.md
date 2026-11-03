@@ -20,7 +20,6 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
 | `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
 | `--serve PORT` | off | also open the game's TV and phone pages to the network on PORT, to watch a playtest on a TV (the runner prints the TV link) |
-| `--flee-seconds N` | 120 | the stay-or-flee clock in raid battles; whoever hasn't answered when it runs out stays |
 | `--room URL` | none | don't host: join the Claude seats to a room someone else hosts; see [`play-vs-claude.md`](play-vs-claude.md) |
 
 It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.

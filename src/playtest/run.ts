@@ -37,7 +37,6 @@ const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
   --seed N                          game seed when hosting (default random)
   --out DIR                         where everything goes (default ~/.cache/board-lite/playtests/<time>-<models>)
   --serve PORT                      when hosting, also open the TV and phone pages to the network on PORT
-  --flee-seconds N                  when hosting, the stay-or-flee clock (default 120)
   --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
   --max-minutes N                   stop after this long (default 240)
@@ -71,7 +70,6 @@ const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
 const advice = opt(args, '--advice');
 const servePort = opt(args, '--serve');
-const fleeSeconds = Number(opt(args, '--flee-seconds') ?? 120);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const out = resolve(opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
@@ -100,10 +98,10 @@ const lobby = async (): Promise<Lobby> => (await call('')).lobby;
 async function host() {
   gameFile = join(out, 'game.json');
   if (existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
-  const { server, rooms } = startServer(Number(servePort ?? 0), { fleeSeconds, botDelayMs: 300 }, [], servePort ? '0.0.0.0' : '127.0.0.1');
+  const { server, rooms } = startServer(Number(servePort ?? 0), { botDelayMs: 300 }, [], servePort ? '0.0.0.0' : '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const port = (server.address() as AddressInfo).port;
-  hosted = new Room(Room.newCode((c) => rooms.has(c)), { fleeSeconds, botDelayMs: 300, file: gameFile });
+  hosted = new Room(Room.newCode((c) => rooms.has(c)), { botDelayMs: 300, file: gameFile });
   rooms.set(hosted.code, hosted);
   roomUrl = `http://127.0.0.1:${port}/${hosted.code}`;
   api = `http://127.0.0.1:${port}/api/rooms/${hosted.code}`;
@@ -148,7 +146,6 @@ How to play:
 - Read the rules once at the start (rules tool).
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and raid commitments can be bailed on in secret. Keep messages short, like real table talk, and reply when someone talks to you.
-- The stay-or-flee choice in a raid battle is on a clock; anyone who hasn't answered when it runs out stays. Answer it promptly.
 - Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
 }
 

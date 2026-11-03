@@ -177,17 +177,17 @@ Titles: ${TUNING.titlePoints} points each, for most dragon points, most tower fl
 function dragons(): string {
   const rows = Object.values(DRAGONS).filter((d, i, all) => !d.base || all.findIndex((x) => x.base) === i).map((d) => [
     d.base ? 'Base whelp (any element)' : d.name, d.base ? 'any' : d.element, cost(d.cost), d.growthTime, d.targeting,
-    ...d.stages.map((s) => `${s.hp}hp ${s.targets}×${s.dice}d${s.sides} (${n1(avgAttack(s))}) spd ${s.speed}`),
+    ...d.stages.map((s) => `${s.hp}hp ${s.targets}×${s.dice}d${s.sides} (${n1(avgAttack(s))})`),
   ]);
   return `## Dragons
 
-Each stage: health, targets × dice (average damage a combat round, before elements), flee speed.
+Each stage: health, targets × dice (average damage a combat round, before elements).
 
 ${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}`;
 }
 
 // Run one raid through the real engine: P1 sends these dragons and fights to
-// the end (no fleeing). Returns whether the kingdom fell.
+// the end. Returns whether the kingdom fell.
 // A small game to copy for each raid: no map, decks or log, so the engine's
 // per-command snapshot stays cheap.
 let template: Game | null = null;
@@ -200,20 +200,19 @@ function raid(target: string, dragons: { key: string; stage: number }[], seed: n
   }
   const g = structuredClone(template);
   g.rng = { state: seed };
-  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: 0, key: d.key, stage: d.stage, growth: 0, damage: 0, fed: true }));
+  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
   const before = RESOURCES.reduce((s, r) => s + g.players[0].resources[r], 0);
   g.phase = 'raid';
   g.raidsLeft = 2; // so the engine stops at the next raid's vote, before healing
   g.raid = {
     step: 'vote', candidates: [target], votes: [null, null], target: null, commits: [[], []], ready: [false, false],
-    choices: [null, null], units: [], fighters: [], flee: [null, null], combatRound: 0,
+    choices: [null, null], units: [], fighters: [],
   };
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 1');
   apply(g, 0, `commit ${g.dragons.map((d) => d.id).join(' ')}`);
   apply(g, 0, 'ready');
   apply(g, 0, 'fight');
-  while (g.raid?.step === 'flee') apply(g, 0, 'stay');
   return RESOURCES.reduce((s, r) => s + g.players[0].resources[r], 0) > before; // only loot pays out here
 }
 
@@ -231,10 +230,10 @@ function raids(): string {
     const units = t.units.map((u) => UNITS[u]);
     return [
       t.name, t.units.map((u) => UNITS[u].name).join(', '), units.reduce((s, u) => s + u.hp, 0),
-      n1(units.reduce((s, u) => s + avgAttack(u), 0)), Math.max(...units.map((u) => u.chase)), cost(t.loot), value(t.loot),
+      n1(units.reduce((s, u) => s + avgAttack(u), 0)), cost(t.loot), value(t.loot),
     ];
   });
-  const unitRows = Object.values(UNITS).map((u) => [u.name, u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.chase, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
+  const unitRows = Object.values(UNITS).map((u) => [u.name, u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
 
   // A lone dragon of every kind, at every stage, against every kingdom.
   const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
@@ -261,13 +260,13 @@ function raids(): string {
 
 Defenders:
 
-${table(['Unit', 'Health', 'Attack (avg)', 'Chase', 'Strong vs', 'Weak vs'], unitRows)}
+${table(['Unit', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], unitRows)}
 
 Kingdoms (${TUNING.raidCandidates} are offered each raid; average damage is the defenders' total a combat round):
 
-${table(['Kingdom', 'Defenders', 'Total health', 'Avg damage a round', 'Best chase', 'Loot', 'Loot value'], targetRows)}
+${table(['Kingdom', 'Defenders', 'Total health', 'Avg damage a round', 'Loot', 'Loot value'], targetRows)}
 
-Chance the kingdom falls to one player's raiders fighting to the end with no fleeing, from ${RAIDS_PER_CELL} raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
 
 ${table(head, rows)}`;
 }

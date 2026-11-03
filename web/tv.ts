@@ -34,7 +34,6 @@ async function boot() {
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
   watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
-  setInterval(tickClock, 250);
 }
 
 function onSnapshot(s: Snapshot) {
@@ -184,7 +183,7 @@ function targetCard(t: TargetView, extra = ''): string {
   const units = t.units.map((u) => `
     <div class="unit${u.hp <= 0 ? ' down' : ''}">
       <b>${esc(u.name)}</b> ${hpBar(u.hp, u.maxHp)} <span class="hp">${u.hp}/${u.maxHp}</span>
-      <small>hits ${esc(u.attack)} · chase ${u.chase}${u.weak.length ? ` · <span class="weak">weak: ${u.weak.map(elem).join(' ')}</span>` : ''}${u.strong.length ? ` · <span class="strong">resists: ${u.strong.map(elem).join(' ')}</span>` : ''}</small>
+      <small>hits ${esc(u.attack)}${u.weak.length ? ` · <span class="weak">weak: ${u.weak.map(elem).join(' ')}</span>` : ''}${u.strong.length ? ` · <span class="strong">resists: ${u.strong.map(elem).join(' ')}</span>` : ''}</small>
     </div>`).join('');
   return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">Loot ${resChips(t.loot, 1.4)} <small>split among the winners</small></div></div>`;
 }
@@ -216,26 +215,8 @@ function renderRaid(g: PublicState) {
     const rows = names.flatMap((_, p) => (raid.commits[p].length ? [`<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id))).join('')} ${check(raid.decided[p])}</li>`] : [])).join('');
     body = `<h1>Fight or bail?</h1><p class="sub">Each committed player chooses in secret on their phone.</p>
       <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
-  } else {
-    const fighters = raid.fighters.map((id) => {
-      const d = dragonById(id);
-      return `<div class="fighter" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<div><b>${esc(d.name)}</b> <small>${esc(names[d.owner])}</small><br>${hpBar(d.hp, d.maxHp)} ${d.hp}/${d.maxHp}</div></div>`;
-    }).join('');
-    const combat = g.log.filter((e) => /^Combat round|flees|bails!|^Fighting:/.test(e.text)).slice(-4).map((e) => `<li>${named(e.text, names, g.dragons)}${e.dice ? ` ${e.dice.map((d) => dieFace(d.sides, d.value)).join('')}` : ''}</li>`).join('');
-    const deciding = names.flatMap((_, p) => (raid.fighting[p] ? [`${playerTag(p, names)} ${check(raid.fleeDecided[p])}`] : [])).join(' ');
-    body = `<h1>Battle for ${esc(raid.target!.name)} <small>round ${raid.combatRound}</small></h1>
-      <div class="battle"><div class="side-d">${fighters}</div><div class="vs">VS</div>${targetCard(raid.target!)}</div>
-      <ul class="combatlog">${combat}</ul>
-      <div class="status">Stay or flee? <span id="clock" class="clock"></span> ${deciding}</div>`;
   }
   el.innerHTML = `<div class="raidbox">${body}</div>`;
-  tickClock();
-}
-
-function tickClock() {
-  const c = document.getElementById('clock');
-  const dl = snap?.lobby.fleeDeadline;
-  if (c && dl) c.textContent = `${Math.max(0, Math.ceil((dl - Date.now()) / 1000))}s`;
 }
 
 // Short banners for things that just happened, shown one after another: the
@@ -247,7 +228,14 @@ let bannerUp = false;
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
   for (const e of fresh) {
-    if (/falls!|holds\.|Everyone bailed|Nobody commits/.test(e.text)) {
+    if (/^Fighting:/.test(e.text)) {
+      // There is no retreat, so the whole fight resolves at once: replay it.
+      const rounds = fresh.filter((x) => x.i > e.i && x.round === e.round && /^Combat round/.test(x.text));
+      const rows = rounds.map((x) => `<li>${named(x.text, names, g.dragons)}</li>`).join('');
+      const end = fresh.find((x) => x.i > e.i && /falls!|holds\./.test(x.text));
+      banners.push({ html: `<div class="result"><h2>${named(e.text, names, g.dragons)}</h2><ul class="combatlog">${rows}</ul>${end ? `<h1>${named(end.text, names, g.dragons)}</h1>` : ''}</div>`, ms: 5000 + 1500 * rounds.length });
+    }
+    if (/Everyone bailed|Nobody commits/.test(e.text)) {
       banners.push({ html: `<div class="result"><h1>${named(e.text, names, g.dragons)}</h1></div>`, ms: 5000 });
     }
     if (/^=== Round \d+ ===$/.test(e.text)) {

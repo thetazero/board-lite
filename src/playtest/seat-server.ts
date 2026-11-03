@@ -62,7 +62,7 @@ const TOOLS = [
   },
   {
     name: 'act',
-    description: 'Make a game decision as your seat, e.g. "build c12 2,-1", "offer P2 give 2 stone get 1 gold", "accept o40", "end", "vote 2", "commit d3", "ready", "fight", "bail", "stay", "discard c4". Returns what happened and your next options.',
+    description: 'Make a game decision as your seat, e.g. "build c12 2,-1", "offer P2 give 2 stone get 1 gold", "accept o40", "end", "vote 2", "commit d3", "ready", "fight", "bail", "discard c4". Returns what happened and your next options.',
     inputSchema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
     run: (a: { command: string }) => act(String(a.command ?? '')),
   },

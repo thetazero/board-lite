@@ -19,7 +19,7 @@ let stop: (() => void) | null = null;
 let tab: 'hand' | 'more' | 'trade' = 'hand';
 let picking: { title: string; hexes: string[]; command: (hex: string) => string } | null = null;
 let openCard: string | null = null;
-let selected = new Set<string>(); // discard picks, or dragons to flee with
+let selected = new Set<string>(); // discard picks
 let trade = fresh();
 let bank = { give: 'stone', get: 'gold', times: 1 };
 let busy = false;
@@ -93,7 +93,7 @@ function onSnapshot(s: Snapshot) {
   }
   if (!s.you) return leaveToJoin('You are not in this game.');
   // Reset per-decision UI when the situation changes under us.
-  const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.raid?.combatRound}|${x?.game?.round}`;
+  const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
   if (key(prev) !== key(s)) {
     picking = null;
     selected = new Set();
@@ -308,7 +308,6 @@ function hexPicker(g: PublicState): string {
 
 function raidView(g: PublicState, me: Me): string {
   const raid = g.raid!;
-  const myDragons = g.dragons.filter((d) => d.owner === me.seat);
   if (raid.step === 'vote') {
     if (me.myVote !== null) return `<p class="big-note">You voted for <b>${esc(raid.candidates[me.myVote].name)}</b>. Waiting for the others…</p>`;
     return `<h2>Vote for the raid target</h2><p class="hint">Details are on the TV.</p>${raid.candidates.map((t, i) => `
@@ -328,18 +327,10 @@ function raidView(g: PublicState, me: Me): string {
   if (raid.step === 'bail') {
     if (!raid.commits[me.seat].length) return `<p class="big-note">You're not in this raid. The others are choosing in secret.</p>`;
     if (me.myChoice) return `<p class="big-note">You chose to <b>${me.myChoice}</b>. Nobody else knows yet.</p>`;
-    return `<h2>Fight or bail?</h2><p class="hint">Secret. Bailing costs nothing, but you get no loot.</p>
+    return `<h2>Fight or bail?</h2><p class="hint">Secret. Bailing costs nothing, but you get no loot. Once the fight starts there is no retreat, and a dragon that takes a hit sits out next round.</p>
       <div class="row big2"><button id="fight" class="primary big">Fight</button><button id="bail" class="big">Bail</button></div>`;
   }
-  const mine = raid.fighters.filter((id) => myDragons.some((d) => d.id === id));
-  if (!mine.length) return `<p class="big-note">The battle is on the TV.</p>`;
-  if (me.myFlee !== null) return `<p class="big-note">${me.myFlee.length ? `Fleeing with ${me.myFlee.length} dragon(s).` : 'Your dragons stay and fight.'} Waiting for the others…</p>`;
-  const list = mine.map((id) => {
-    const d = g.dragons.find((x) => x.id === id)!;
-    return `<button class="dragon${selected.has(id) ? ' on' : ''}" data-flee="${id}">${dragonBadge(d, 40)}<span><b>${esc(d.name)}</b> ${selected.has(id) ? '<em>flee</em>' : '<em>stay</em>'}<br>${hpBar(d.hp, d.maxHp)} ${d.hp}/${d.maxHp} · speed ${d.speed}</span></button>`;
-  }).join('');
-  return `<h2>Stay or flee? <span id="clock" class="clock"></span></h2><p class="hint">Tap a dragon to flee with it. Fleeing rolls d6 + speed against the defenders' chase. Anyone who doesn't choose stays.</p>
-    ${list}<div class="row big2"><button id="fleego" class="primary big">${selected.size ? `Flee with ${selected.size}` : 'Stay and fight'}</button>${selected.size === mine.length ? '' : '<button id="fleeall" class="big">Flee with all</button>'}</div>`;
+  return `<p class="big-note">The battle is on the TV.</p>`;
 }
 
 // ---- discard / end ----
@@ -527,22 +518,8 @@ function wire(g: PublicState, me: Me) {
   on('ready', () => send('ready'));
   on('fight', () => send('fight'));
   on('bail', () => send('bail'));
-  bind('[data-flee]', (el) => {
-    const id = el.dataset.flee!;
-    if (selected.has(id)) selected.delete(id);
-    else selected.add(id);
-    render();
-  });
-  on('fleego', () => send(selected.size ? `flee ${[...selected].join(' ')}` : 'stay'));
-  on('fleeall', () => send('flee all'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
   on('newgame', () => leaveToJoin(''));
-}
-
-function tickClock() {
-  const c = document.getElementById('clock');
-  const dl = snap?.lobby.fleeDeadline;
-  if (c) c.textContent = dl ? `${Math.max(0, Math.ceil((dl - Date.now()) / 1000))}s` : '';
 }
 
 function toast(e: unknown) {
@@ -553,5 +530,4 @@ function toast(e: unknown) {
   setTimeout(() => t.remove(), 3500);
 }
 
-setInterval(tickClock, 250);
 boot().catch(toast);

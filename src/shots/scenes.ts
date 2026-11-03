@@ -188,26 +188,13 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    name: 'flee-4p',
-    players: 4,
-    seed: 1,
-    until: (g) => g.round >= 3 && step(g) === 'flee' && fightingPlayers(g) >= 2 && g.raid!.fighters.some((id) => g.dragons.find((d) => d.id === id)!.damage > 0),
-    shots: (g) => {
-      const owner = (p: number) => g!.raid!.fighters.some((id) => g!.dragons.find((d) => d.id === id)!.owner === p);
-      return [
-        { file: 'tv-raid-battle-4p', caption: 'TV, raid battle (4 players): stay or flee, with the clock', client: 'tv' },
-        { file: 'phone-raid-flee-4p', caption: 'Phone: stay or flee (one dragon tapped to flee)', client: 'phone', seat: seatWhere(g!, owner), clicks: ['[data-flee]'], waitMs: 300 }, // the phone's clock ticks every 250 ms
-      ];
-    },
-  },
-  {
     name: 'raid-result-3p',
     players: 3,
     seed: 3,
-    until: (g) => g.round >= 3 && step(g) === 'flee' && fightingPlayers(g) >= 1,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote', // the raid is over
     liveEnd: (g) => /falls!/.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''), // and won
-    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's result banner", client: 'tv', live: true, waitMs: 400 }],
+    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replay and result", client: 'tv', live: true, waitMs: 400 }],
   },
   {
     name: 'discard-4p',

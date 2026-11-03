@@ -2,7 +2,7 @@
 // No dependencies: node:http, server-sent events for pushes, and the
 // browser's TypeScript is stripped of types on the fly (no build step).
 //
-//   node src/server/server.ts [--port 8080] [--game <file>] [--flee-seconds N]
+//   node src/server/server.ts [--port 8080] [--game <file>]
 //
 // The TV opens http://<this machine>:<port>/tv, phones open
 // http://<this machine>:<port>/ and type the room code.
@@ -216,8 +216,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   };
   const port = Number(flag('--port') ?? process.env.PORT ?? 8080);
   const game = flag('--game');
-  const flee = flag('--flee-seconds');
-  const { server, rooms } = startServer(port, flee ? { fleeSeconds: Number(flee) } : {}, game ? [resolve(game)] : []);
+  const { server, rooms } = startServer(port, {}, game ? [resolve(game)] : []);
   server.on('listening', () => {
     const hosts = lanAddresses();
     const tail = tailscaleAddresses();

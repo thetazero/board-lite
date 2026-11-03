@@ -42,7 +42,7 @@ Measured on 300 generated maps per player count. Each cell: share of towers with
 | Card | Kind | Cost | Value | Special project value | Does |
 |---|---|---|---|---|---|
 | Roost | building | 3 stone, 1 timber | 4 | 8 | Houses 2 more dragons. |
-| Hatchery | building | 2 stone, 2 timber, 2 crystal | 6 | — | Your fed dragons grow one extra step each round. |
+| Hatchery | building | 2 stone, 2 timber, 2 crystal | 6 | — | Your growing dragons grow one extra step each round. |
 | Market | building | 1 stone, 3 timber, 1 livestock | 5 | — | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
 | Caravan Post | building | 2 stone, 3 timber, 1 gold | 9 | — | You trade with the bank at 2:1. Saves 2 per resource bought vs the bank: pays back after buying 4.5. |
 | Nesting Grounds | upgrade (dragon) | 1 stone, 2 gold | 9 | — | This roost, hatchery or tower houses 1 more dragon. |
@@ -80,64 +80,64 @@ Titles: 2 points each, for most dragon points, most tower floors and most buildi
 
 ## Dragons
 
-Each stage: health, targets × dice (average damage a combat round, before elements), flee speed.
+Each stage: health, targets × dice (average damage a combat round, before elements).
 
 | Dragon | Element | Cost | Growth time | Targets | Hatchling | Young | Adult |
 |---|---|---|---|---|---|---|---|
-| Base whelp (any element) | any | 2 crystal, 1 livestock | 2 | random | 6hp 1×1d6 (3.5) spd 1 | 12hp 1×2d6 (7) spd 2 | 20hp 2×2d6 (14) spd 2 |
-| Ember Wyrm | fire | 3 crystal, 1 livestock, 1 gold | 3 | weak_to_me | 7hp 1×1d8 (4.5) spd 1 | 14hp 1×2d8 (9) spd 1 | 24hp 2×3d8 (27) spd 1 |
-| Cinder Drake | fire | 3 crystal, 1 livestock | 2 | lowest_health | 6hp 1×1d6 (3.5) spd 2 | 11hp 2×1d6 (7) spd 2 | 18hp 3×1d8 (13.5) spd 3 |
-| Frost Wyrm | ice | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 9hp 1×1d6 (3.5) spd 0 | 17hp 1×2d6 (7) spd 0 | 30hp 1×3d8 (13.5) spd 1 |
-| Rime Drake | ice | 3 crystal, 1 livestock | 2 | weak_to_me | 6hp 1×1d6 (3.5) spd 1 | 12hp 1×2d6 (7) spd 2 | 20hp 2×2d8 (18) spd 2 |
-| Storm Wyrm | lightning | 3 crystal, 1 livestock, 1 gold | 3 | random | 6hp 2×1d4 (5) spd 2 | 12hp 3×1d6 (10.5) spd 2 | 20hp 4×1d8 (18) spd 3 |
-| Bolt Drake | lightning | 3 crystal, 1 livestock | 2 | strongest_attacker | 5hp 1×1d8 (4.5) spd 3 | 10hp 1×2d8 (9) spd 3 | 16hp 1×3d8 (13.5) spd 4 |
-| Sky Wyrm | air | 3 crystal, 1 livestock, 1 gold | 3 | lowest_health | 6hp 1×1d6 (3.5) spd 3 | 13hp 2×1d8 (9) spd 4 | 22hp 2×2d8 (18) spd 5 |
-| Zephyr Drake | air | 3 crystal, 1 livestock | 1 | random | 5hp 1×1d4 (2.5) spd 4 | 9hp 1×1d8 (4.5) spd 5 | 14hp 2×1d8 (9) spd 6 |
-| Abyss Wyrm | water | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 8hp 1×1d8 (4.5) spd 1 | 16hp 2×1d8 (9) spd 1 | 28hp 2×2d8 (18) spd 2 |
-| Reef Drake | water | 3 crystal, 1 livestock | 2 | weak_to_me | 7hp 1×1d6 (3.5) spd 2 | 13hp 1×2d6 (7) spd 2 | 21hp 2×2d6 (14) spd 3 |
+| Base whelp (any element) | any | 2 crystal, 1 livestock | 2 | random | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d6 (14) |
+| Ember Wyrm | fire | 3 crystal, 1 livestock, 1 gold | 3 | weak_to_me | 7hp 1×1d8 (4.5) | 14hp 1×2d8 (9) | 24hp 2×3d8 (27) |
+| Cinder Drake | fire | 3 crystal, 1 livestock | 2 | lowest_health | 6hp 1×1d6 (3.5) | 11hp 2×1d6 (7) | 18hp 3×1d8 (13.5) |
+| Frost Wyrm | ice | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 9hp 1×1d6 (3.5) | 17hp 1×2d6 (7) | 30hp 1×3d8 (13.5) |
+| Rime Drake | ice | 3 crystal, 1 livestock | 2 | weak_to_me | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d8 (18) |
+| Storm Wyrm | lightning | 3 crystal, 1 livestock, 1 gold | 3 | random | 6hp 2×1d4 (5) | 12hp 3×1d6 (10.5) | 20hp 4×1d8 (18) |
+| Bolt Drake | lightning | 3 crystal, 1 livestock | 2 | strongest_attacker | 5hp 1×1d8 (4.5) | 10hp 1×2d8 (9) | 16hp 1×3d8 (13.5) |
+| Sky Wyrm | air | 3 crystal, 1 livestock, 1 gold | 3 | lowest_health | 6hp 1×1d6 (3.5) | 13hp 2×1d8 (9) | 22hp 2×2d8 (18) |
+| Zephyr Drake | air | 3 crystal, 1 livestock | 1 | random | 5hp 1×1d4 (2.5) | 9hp 1×1d8 (4.5) | 14hp 2×1d8 (9) |
+| Abyss Wyrm | water | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 8hp 1×1d8 (4.5) | 16hp 2×1d8 (9) | 28hp 2×2d8 (18) |
+| Reef Drake | water | 3 crystal, 1 livestock | 2 | weak_to_me | 7hp 1×1d6 (3.5) | 13hp 1×2d6 (7) | 21hp 2×2d6 (14) |
 
 ## Raids
 
 Defenders:
 
-| Unit | Health | Attack (avg) | Chase | Strong vs | Weak vs |
-|---|---|---|---|---|---|
-| Militia | 5 | 1×1d4 (2.5) | 1 | — | fire |
-| Archers | 6 | 1×1d6 (3.5) | 3 | water | air |
-| Knights | 12 | 1×1d8 (4.5) | 2 | fire | lightning |
-| Frost Golem | 16 | 1×1d6 (3.5) | 0 | ice, water | fire |
-| Storm Griffin | 10 | 1×1d8 (4.5) | 4 | air, lightning | ice |
-| Sea Serpent | 14 | 2×1d4 (5) | 2 | water, fire | lightning |
+| Unit | Health | Attack (avg) | Strong vs | Weak vs |
+|---|---|---|---|---|
+| Militia | 5 | 1×1d4 (2.5) | — | fire |
+| Archers | 6 | 1×1d6 (3.5) | water | air |
+| Knights | 12 | 1×1d8 (4.5) | fire | lightning |
+| Frost Golem | 16 | 1×1d6 (3.5) | ice, water | fire |
+| Storm Griffin | 10 | 1×1d8 (4.5) | air, lightning | ice |
+| Sea Serpent | 14 | 2×1d4 (5) | water, fire | lightning |
 
 Kingdoms (3 are offered each raid; average damage is the defenders' total a combat round):
 
-| Kingdom | Defenders | Total health | Avg damage a round | Best chase | Loot | Loot value |
-|---|---|---|---|---|---|---|
-| Hamlet of Brindle | Militia, Militia | 10 | 5 | 1 | 2 livestock, 3 gold | 14 |
-| Archer's Hold | Archers, Archers, Militia | 17 | 9.5 | 3 | 2 timber, 5 gold | 22 |
-| Knightsgate | Knights, Knights | 24 | 9 | 2 | 2 stone, 7 gold | 30 |
-| Frostpeak | Frost Golem, Archers | 22 | 7 | 3 | 2 crystal, 7 gold | 30 |
-| Stormspire | Storm Griffin, Storm Griffin | 20 | 9 | 4 | 9 gold | 36 |
-| Tidewatch | Sea Serpent, Knights | 26 | 9.5 | 2 | 2 livestock, 9 gold | 38 |
+| Kingdom | Defenders | Total health | Avg damage a round | Loot | Loot value |
+|---|---|---|---|---|---|
+| Hamlet of Brindle | Militia, Militia | 10 | 5 | 2 livestock, 3 gold | 14 |
+| Archer's Hold | Archers, Archers, Archers, Archers, Militia | 29 | 16.5 | 2 timber, 7 gold | 30 |
+| Knightsgate | Knights, Knights, Knights, Knights | 48 | 18 | 3 stone, 14 gold | 59 |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | 44 | 14 | 3 crystal, 14 gold | 59 |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | 40 | 18 | 16 gold | 64 |
+| Tidewatch | Sea Serpent, Sea Serpent, Knights, Knights | 52 | 19 | 3 livestock, 16 gold | 67 |
 
-Chance the kingdom falls to one player's raiders fighting to the end with no fleeing, from 100 raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
 
 | Raider | Hamlet of Brindle | Archer's Hold | Knightsgate | Frostpeak | Stormspire | Tidewatch |
 |---|---|---|---|---|---|---|
-| Base whelp, hatchling | 35% (18%–70%) | 0% (0%–1%) | 1% (0%–6%) | 0% (0%–0%) | 3% (0%–16%) | 0% (0%–0%) |
-| Base whelp, young | 99% (98%–100%) | 37% (0%–65%) | 19% (0%–75%) | 33% (0%–81%) | 25% (0%–87%) | 14% (0%–68%) |
-| Base whelp, adult | 100% (100%–100%) | 97% (87%–100%) | 80% (16%–100%) | 85% (49%–100%) | 75% (31%–100%) | 62% (4%–100%) |
-| Two young base whelps | 100% | 99% | 83% | 95% | 83% | 74% |
-| Ember Wyrm (fire), adult | 100% | 100% | 99% | 100% | 100% | 99% |
-| Cinder Drake (fire), adult | 100% | 98% | 0% | 98% | 66% | 0% |
-| Frost Wyrm (ice), adult | 100% | 100% | 100% | 100% | 100% | 100% |
-| Rime Drake (ice), adult | 100% | 98% | 99% | 92% | 100% | 97% |
-| Storm Wyrm (lightning), adult | 100% | 100% | 98% | 84% | 4% | 99% |
-| Bolt Drake (lightning), adult | 100% | 95% | 97% | 94% | 29% | 99% |
-| Sky Wyrm (air), adult | 100% | 100% | 100% | 100% | 79% | 100% |
-| Zephyr Drake (air), adult | 100% | 92% | 23% | 72% | 1% | 11% |
-| Abyss Wyrm (water), adult | 100% | 100% | 100% | 100% | 100% | 92% |
-| Reef Drake (water), adult | 100% | 93% | 94% | 55% | 97% | 42% |
+| Base whelp, hatchling | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base whelp, young | 99% (98%–100%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base whelp, adult | 100% (100%–100%) | 50% (0%–89%) | 13% (0%–65%) | 23% (0%–66%) | 21% (0%–88%) | 9% (0%–44%) |
+| Two young base whelps | 100% | 62% | 16% | 28% | 22% | 13% |
+| Ember Wyrm (fire), adult | 100% | 99% | 0% | 100% | 91% | 0% |
+| Cinder Drake (fire), adult | 100% | 37% | 0% | 50% | 0% | 0% |
+| Frost Wyrm (ice), adult | 100% | 31% | 21% | 1% | 63% | 12% |
+| Rime Drake (ice), adult | 100% | 70% | 11% | 5% | 89% | 5% |
+| Storm Wyrm (lightning), adult | 100% | 74% | 82% | 10% | 0% | 57% |
+| Bolt Drake (lightning), adult | 100% | 0% | 0% | 2% | 0% | 0% |
+| Sky Wyrm (air), adult | 100% | 93% | 12% | 87% | 0% | 7% |
+| Zephyr Drake (air), adult | 100% | 16% | 0% | 0% | 0% | 0% |
+| Abyss Wyrm (water), adult | 100% | 29% | 28% | 4% | 65% | 0% |
+| Reef Drake (water), adult | 100% | 0% | 1% | 0% | 6% | 0% |
 
 ## Resource demand
 
@@ -185,6 +185,6 @@ Building deck 49 cards, action deck 38. Last column: chance a player is dealt at
 
 | Players | Fewest rounds | Median | Most | Stalled |
 |---|---|---|---|---|
-| 2 | 5 | 10 | 13 | 0 |
-| 3 | 7 | 10 | 12 | 0 |
-| 4 | 6 | 9 | 16 | 0 |
+| 2 | 7 | 10 | 14 | 0 |
+| 3 | 6 | 11 | 15 | 0 |
+| 4 | 6 | 10 | 13 | 0 |

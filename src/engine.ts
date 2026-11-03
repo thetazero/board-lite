@@ -28,7 +28,8 @@ export interface Dragon {
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
   damage: number;
-  fed: boolean;
+  // Why the dragon sits out this round (no growth, no raid): it was hungry or hurt at production.
+  resting: '' | 'hungry' | 'hurt';
 }
 
 export interface Player {
@@ -50,7 +51,7 @@ export interface Offer {
 }
 
 export interface Raid {
-  step: 'vote' | 'commit' | 'bail' | 'flee';
+  step: 'vote' | 'commit' | 'bail';
   candidates: string[];
   votes: (number | null)[];
   target: string | null;
@@ -59,8 +60,6 @@ export interface Raid {
   choices: ('fight' | 'bail' | null)[];
   units: { key: string; hp: number }[];
   fighters: string[];
-  flee: (string[] | null)[];
-  combatRound: number;
 }
 
 export interface Die {
@@ -165,7 +164,7 @@ export function stageStats(d: Dragon): DragonStage | null {
 }
 
 export function canRaid(d: Dragon): boolean {
-  return d.stage > 0 && d.fed && d.damage === 0;
+  return d.stage > 0 && !d.resting && d.damage === 0;
 }
 
 function parsePlayer(g: Game, s: string | undefined): number {
@@ -330,7 +329,7 @@ export function newGame(players: number, seed: number): Game {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, fed: true });
+    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, resting: '' });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins (checked at the end of each round).`);
   startRound(g);
@@ -366,16 +365,19 @@ function startRound(g: Game) {
     gain(g.players[p], got);
     log(g, `${pname(p)} produces ${bundleText(got)}.`, undefined, dice);
   }
-  // Dragons heal, then eat and grow.
+  // Every dragon eats and heals fully. One that was hungry or hurt sits out
+  // the round: it doesn't grow and can't raid.
   for (const d of g.dragons) {
-    d.damage = Math.max(0, d.damage - TUNING.healPerRound);
     const pl = g.players[d.owner];
-    d.fed = pl.resources.livestock >= TUNING.livestockPerDragon;
-    if (!d.fed) {
-      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) goes hungry: it won't grow or raid this round.`);
+    const hurt = d.damage > 0;
+    d.damage = 0;
+    const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
+    if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
+    d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
+    if (d.resting) {
+      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing' : 'goes hungry'}: it won't grow or raid this round.`);
       continue;
     }
-    pl.resources.livestock -= TUNING.livestockPerDragon;
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;
@@ -443,8 +445,6 @@ function startRaid(g: Game) {
     choices: Array(n).fill(null),
     units: [],
     fighters: [],
-    flee: Array(n).fill(null),
-    combatRound: 0,
   };
   log(g, `Raid phase: vote for a target among ${g.raid.candidates.map((t, i) => `${i + 1}. ${TARGETS[t].name}`).join(', ')}.`);
 }
@@ -523,7 +523,8 @@ function resolveBail(g: Game) {
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
   log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`);
-  combatRound(g);
+  // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
+  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, round);
 }
 
 function rollAttack(g: Game, a: Attack): number {
@@ -561,9 +562,8 @@ function knockedOut(g: Game, d: Dragon): boolean {
   return true;
 }
 
-function combatRound(g: Game) {
+function combatRound(g: Game, round: number) {
   const raid = g.raid!;
-  raid.combatRound++;
   const lines: string[] = [];
   // Dragons strike first.
   for (const id of raid.fighters) {
@@ -591,11 +591,7 @@ function combatRound(g: Game) {
       lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${knockedOut(g, d) ? ' (knocked out, limps home)' : ''}`);
     }
   }
-  log(g, `Combat round ${raid.combatRound}: ${lines.join('; ')}.`);
-  if (checkRaidOver(g)) return;
-  raid.step = 'flee';
-  raid.flee = g.players.map((_, p) => (raid.fighters.some((id) => dragonById(g, id).owner === p) ? null : []));
-  log(g, `Defenders left: ${unitsText(g)}. Players with dragons in the fight choose to flee or stay.`);
+  log(g, `Combat round ${round}: ${lines.join('; ')}.`);
 }
 
 export function unitsText(g: Game): string {
@@ -620,30 +616,6 @@ function checkRaidOver(g: Game): boolean {
     return true;
   }
   return false;
-}
-
-function resolveFlee(g: Game) {
-  const raid = g.raid!;
-  const chase = Math.max(...raid.units.filter((u) => u.hp > 0).map((u) => UNITS[u.key].chase));
-  for (const ids of raid.flee) {
-    for (const id of ids ?? []) {
-      const d = dragonById(g, id);
-      const myDie = roll(g.rng, TUNING.fleeDie);
-      const theirDie = roll(g.rng, TUNING.fleeDie);
-      const mine = myDie + stageStats(d)!.speed;
-      const theirs = theirDie + chase;
-      const dice = [{ sides: TUNING.fleeDie, value: myDie }, { sides: TUNING.fleeDie, value: theirDie }];
-      raid.fighters = raid.fighters.filter((x) => x !== id);
-      if (mine >= theirs) {
-        log(g, `${pname(d.owner)}'s ${d.id} flees cleanly (${mine} vs ${theirs}).`, undefined, dice);
-      } else {
-        const dmg = (theirs - mine) * TUNING.fleeDamagePerPoint;
-        d.damage = Math.min(stageStats(d)!.hp, d.damage + dmg);
-        log(g, `${pname(d.owner)}'s ${d.id} flees but is caught (${mine} vs ${theirs}) and takes ${dmg} damage${d.damage >= stageStats(d)!.hp ? ', limping home knocked out' : ''}.`, undefined, dice);
-      }
-    }
-  }
-  if (!checkRaidOver(g)) combatRound(g);
 }
 
 // ---------- commands ----------
@@ -739,7 +711,7 @@ export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object
 function hatch(g: Game, p: number, dragonKey: string) {
   const mine = g.dragons.filter((d) => d.owner === p).length;
   if (mine >= dragonCapacity(g, p)) fail(`You have no room for another dragon (${mine}/${dragonCapacity(g, p)}). Build a roost first.`);
-  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, fed: true };
+  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, resting: '' };
   g.dragons.push(d);
   log(g, `${pname(p)} hatches an egg: ${dragonName(d)} (${d.id}), a ${DRAGONS[dragonKey].element} dragon.`);
 }
@@ -873,10 +845,11 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.damage === 0) fail(`${d.id} isn't hurt.`);
+          if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
-          what = `fully heals ${d.id}`;
+          if (d.resting === 'hurt') d.resting = '';
+          what = `heals ${d.id}, ready to raid`;
           break;
         }
         case 'extra_raid':
@@ -911,7 +884,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
       const ids = args.filter((a) => a !== 'none');
       for (const id of ids) {
         const d = ownDragon(g, p, id);
-        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched, fed and unhurt).`);
+        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched and not sitting out the round, and unhurt).`);
       }
       raid.commits[p] = [...new Set(ids)];
       return log(g, `${pname(p)} commits ${ids.length ? ids.join(' ') : 'nothing'}.`);
@@ -931,19 +904,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
     raid.choices[p] = verb as 'fight' | 'bail';
     log(g, `You choose to ${verb}.`, [p]);
     if (raid.commits.every((c, q) => !c.length || raid.choices[q])) resolveBail(g);
-    return;
   }
-  // flee
-  if (raid.flee[p] !== null) fail(`You have nothing to decide right now.`);
-  if (verb === 'stay') raid.flee[p] = [];
-  else if (verb === 'flee') {
-    const mine = raid.fighters.filter((id) => dragonById(g, id).owner === p);
-    const ids = args.length === 0 || args[0] === 'all' ? mine : args;
-    for (const id of ids) if (!mine.includes(id)) fail(`${id} isn't one of your dragons in the fight.`);
-    raid.flee[p] = [...new Set(ids)];
-  } else fail(`Choose "stay", "flee all", or "flee d3".`);
-  log(g, `You choose to ${verb} ${raid.flee[p]!.join(' ')}.`.replace(' .', '.'), [p]);
-  if (raid.flee.every((f) => f !== null)) resolveFlee(g);
 }
 
 function discardCommand(g: Game, p: number, verb: string, args: string[]) {
@@ -1005,6 +966,5 @@ export function waitingOn(g: Game): number[] {
   const raid = g.raid!;
   if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null);
   if (raid.step === 'commit') return all.filter((p) => !raid.ready[p]);
-  if (raid.step === 'bail') return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
-  return all.filter((p) => raid.flee[p] === null);
+  return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
 }
