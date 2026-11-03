@@ -546,6 +546,8 @@ button.on:disabled { opacity: 1; }
 .row.big2 > button small .chip { margin: 0 .15em; }
 .sent { display: flex; flex-wrap: wrap; gap: .4em; margin-bottom: .6em; }
 .stat { display: inline-flex; align-items: center; gap: .1em; margin-left: .3em; }
+.stat.power { font-weight: 800; }
+.stat.power.big { font-size: 1.15em; }
 .status .over, .status .tag { display: inline-flex; align-items: center; gap: .15em; margin-left: .4em; font-size: .85em; }
 .status .over { color: var(--bad); }
 .pts .hiddenpts { display: inline-flex; align-items: center; gap: .1em; margin-left: .5em; font-size: .7em; background: #0001; border-radius: 6px; padding: .05em .35em; color: var(--text); }

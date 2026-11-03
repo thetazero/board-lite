@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -274,7 +274,7 @@ function roost(g: PublicState, me: Me): string {
   const mine = g.dragons.filter((d) => d.owner === me.seat);
   const empty = Math.max(0, me.dragonCapacity - mine.length);
   if (!mine.length && !empty) return '';
-  return `<section class="roost"><div class="nests">${mine.map((d) => dragonChip(d, g.dragons)).join('')}${NEST.repeat(empty)}</div></section>`;
+  return `<section class="roost"><div class="nests">${mine.map((d) => dragonChip(d, g.dragons, g.round)).join('')}${NEST.repeat(empty)}</div></section>`;
 }
 
 // ---- action phase ----
@@ -437,7 +437,7 @@ function hexPicker(g: PublicState): string {
 
 // The kingdom under attack, drawn: its defenders by kind and its loot.
 function targetPanel(t: TargetView): string {
-  return `<section class="ptarget">${foeStack(t.units, 1.8)}<div class="loot">${resChips(t.loot, 1.4)}</div></section>`;
+  return `<section class="ptarget">${powerTag(t.power, 'big')}${foeStack(t.units, 1.8)}<div class="loot">${resChips(t.loot, 1.4)}</div></section>`;
 }
 
 // Each raid step is its choices as buttons. A choice once made stays on screen,
@@ -446,10 +446,11 @@ function targetPanel(t: TargetView): string {
 function raidView(g: PublicState, me: Me): string {
   const raid = g.raid!;
   const dragon = (id: string) => g.dragons.find((d) => d.id === id)!;
+  const sum = (ids: string[]) => ids.reduce((s, id) => s + dragon(id).power, 0);
   if (raid.step === 'vote') {
     const voted = me.myVote !== null;
     return `${roost(g, me)}${raid.candidates.map((t, i) => `
-      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)}</b>${foeStack(t.units, 1.7)}<span class="loot">${resChips(t.loot, 1.3)}</span></button>`).join('')}`;
+      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}<span class="loot">${resChips(t.loot, 1.3)}</span></button>`).join('')}`;
   }
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return `${roost(g, me)}${targetPanel(raid.target!)}`; // nobody fit to go: the roost shows why
@@ -457,20 +458,20 @@ function raidView(g: PublicState, me: Me): string {
     const ready = raid.ready[me.seat];
     const list = me.raidReady.map((id) => {
       const d = dragon(id);
-      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
+      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
     }).join('');
-    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
+    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
-      ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')}</div>`] : [])).join('');
+      ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.commits[p]))}</div>`] : [])).join('');
     if (!mine.length) return `${roost(g, me)}${targetPanel(raid.target!)}${others ? `<div class="allies">${others}</div>` : ''}`;
-    const sent = mine.map((id) => dragonChip(dragon(id), g.dragons)).join('');
+    const sent = mine.map((id) => dragonChip(dragon(id), g.dragons, g.round)).join('');
     const chose = me.myChoice;
     return `${targetPanel(raid.target!)}
-      <div class="sent">${sent}</div>
+      <div class="sent">${sent}${powerTag(sum(mine))}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
       <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;

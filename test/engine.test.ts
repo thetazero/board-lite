@@ -5,8 +5,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
-import { RuleError, apply, bankRate, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
-import { BUILDINGS, TUNING } from '../src/data.ts';
+import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
+import { BUILDINGS, DRAGONS, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
 import { mapRadius, neighbors } from '../src/map.ts';
 
@@ -386,4 +386,77 @@ test('a fight replays from its events: the hits add up to the result', () => {
     }
   }
   assert.ok(fights > 10);
+});
+
+test('a hurt dragon heals a little each production and sits out until it is whole', () => {
+  const g = newGame(2, 7);
+  const a = g.dragons[0];
+  a.stage = 3; // an adult, so it has the health to take a big hit
+  const damage = 2 * TUNING.healPerRound + 1;
+  a.damage = damage; // hurt in this round's raid
+  g.players[a.owner].resources.livestock = 20;
+  const out = Math.ceil(damage / TUNING.healPerRound);
+  const passRound = () => {
+    for (const pl of g.players) pl.hand = []; // nothing to discard
+    advanceToRaidVote(g);
+    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
+  };
+  assert.equal(backInRound(g, a), g.round + out + 1);
+  for (let i = 1; i <= out; i++) {
+    passRound();
+    assert.equal(a.damage, Math.max(0, damage - i * TUNING.healPerRound));
+    assert.equal(a.resting, 'hurt', `still out in round ${g.round}`);
+    assert.ok(!canRaid(a));
+  }
+  passRound();
+  assert.equal(a.resting, '');
+  assert.ok(canRaid(a), `back in round ${g.round}`);
+});
+
+test('raid loot is split by the combat power still fighting at the end, the rest to the strongest', () => {
+  let shared = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    g.dragons = [
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0, resting: '' },
+    ];
+    g.raid!.candidates = ['archers_hold'];
+    g.raidsLeft = 2; // stop at the next raid's vote, before the next production
+    const before = g.players.map((pl) => ({ ...pl.resources }));
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
+    apply(g, 0, 'ready'); apply(g, 1, 'ready');
+    apply(g, 0, 'fight'); apply(g, 1, 'fight');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd' || !end.won) continue;
+    const loot = TARGETS.archers_hold.loot;
+    const total = end.power.reduce((s, x) => s + x, 0);
+    const top = end.winners[end.power.indexOf(Math.max(...end.power))];
+    for (const r of RESOURCES) {
+      if (!loot[r]) continue;
+      const got: number[] = end.winners.map((p) => g.players[p].resources[r] - before[p][r]);
+      assert.equal(got.reduce((s, x) => s + x, 0), loot[r], 'none of the loot is lost');
+      end.winners.forEach((p, i) => {
+        const fair = Math.floor((loot[r]! * end.power[i]) / total);
+        assert.equal(got[i], p === top ? loot[r]! - end.power.reduce((s, x, j) => (j === i ? s : s + Math.floor((loot[r]! * x) / total)), 0) : fair);
+      });
+    }
+    if (end.winners.length === 2) shared++;
+  }
+  assert.ok(shared > 0, 'some raids should be shared');
+});
+
+test('combat power: dragons and kingdoms carry one number, and a side adds up', () => {
+  const g = newGame(2, 7);
+  const a = g.dragons[0];
+  a.stage = 3;
+  const st = DRAGONS[a.key].stages[2];
+  assert.equal(dragonPower(a), Math.round(Math.sqrt(st.hp * st.targets * st.dice * (st.sides + 1) / 2)));
+  assert.equal(targetPower('brindle'), 2 * combatPower(UNITS.militia));
+  assert.match(playerView(g, 0), new RegExp(`power ${dragonPower(a)}`));
 });

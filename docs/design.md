@@ -127,7 +127,10 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.
 - Bailing costs nothing except that you get no share of the loot.
 - Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
-- Loot is split evenly (among those who play; see Combat for fled dragons).
+- Loot is split by combat power (see Combat).
+- Easy raids give almost nothing, hard ones a lot. The owner (2026-11-03): "right I think the way raids should work is easy ones give almost nothing, hard ones give a lot. And there should be a "combat power" estimate on dragons and on the raid target, so players can judge at a glance."
+- Combat power: one number on each dragon and each raid target, readable at a glance. It stays a rough guide on purpose and there is no win-chance display: "Yup steeper curve, the single number misleads is literally the point, you want players to still have to think and guess".
+- The raid choice stays the single vote, one target a raid phase (the owner: "the current vote"). The sabotage the owner wants is backing out of the harder, richer target with the secret bail: "I think the interesting dynamic comes in when you try to pick which raid to take and people back out of the harder more loot one to sabotage, etc..."
 - Targets have units with stats and with elemental strengths and weaknesses.
 - Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost. *(Provisionally removed: the secret bail is the only way out of a raid. Reasoning in the pull request for issue #5.)*
 
@@ -139,8 +142,8 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
 - After each round of combat, players get 10 seconds to choose whether to roll to flee. *(Provisionally removed with fleeing, above.)*
-- Healing: healing time scales with health lost, measured in global rounds. Typically it's one round; only a fully mature dragon that took a lot of damage is out longer.
-- Loot is split evenly among players whose dragons were still fighting at the end.
+- Healing: healing time scales with health lost, measured in global rounds, and is slow enough that being left in a losing raid stings. The owner (2026-11-03): "I think to make that sting heal times need to be increased (healing rate decreased)".
+- Loot is split among players whose dragons were still fighting at the end, by the combat power each still has fighting. The owner, on the even split: "Also I feel like raiding has a free rider problem, that is un fun? weak players should always just follow the strong one in, and if the strong bails not much happens? wdyt? Like some free rider is good but this feels like a flat dynamic". Their call ("let's try A"): split loot by combat power still standing at the end.
 - Loot is gold plus resources, skewed heavily toward gold.
 - Action cards can add another raid phase.
 - No retaliation and no defense buildings.
@@ -207,10 +210,10 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a monument and a dragon building.
 - The special project is a base egg of any element, at double the base dragon card.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round's raids. Only hunger stops growth, as the upkeep rule above says. Any hit in a raid costs the next raid, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
+- Healing: every dragon heals a fixed amount at production (7 health, in `src/data.ts`), and one that was still hurt when production began (or went hungry) sits out that round's raids, so it misses a raid round per 7 damage, rounded up. Only hunger stops growth, as the upkeep rule above says. Dragons never die: at 0 health they are knocked out and heal at home. (Changed in #65 from healing fully each round.)
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
-- Loot is rounded down per player; the remainder is lost.
+- Combat power is √(health × average damage a combat round), rounded; a side's is the sum (Lanchester's square law makes these add). Loot is split in proportion to it, rounded down per player, and the remainder goes to the player with the most power standing. Loot grows with the square of a kingdom's power. (#65)
 - The bank sells gold at the normal rate.
 - Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.

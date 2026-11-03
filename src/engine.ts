@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES,
+  ACTIONS, BASIC_BUILDINGS, combatPower, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource,
 } from './data.ts';
 import { generateMap, key, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -114,7 +114,7 @@ export type GameEvent =
   | { k: 'bail'; p: number }
   | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; units: { name: string; hp: number }[] }
   | { k: 'combat'; round: number; hits: Hit[] }
-  | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; share: Bundle }
+  | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[] } // shares and power line up with winners
   | { k: 'noRaid'; why: 'nobody' | 'bailed' }
   | { k: 'again' }
   | { k: 'begin'; players: number }
@@ -169,11 +169,6 @@ function log(g: Game, text: string, ev: GameEvent, opts: { to?: number[]; dice?:
 
 const nCards = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
 
-// "Ada", "Ada and Bram", "Ada, Bram and Cora".
-function andList(xs: string[]): string {
-  return xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-}
-
 export function bundleText(b: Bundle): string {
   const parts = RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `${b[r]} ${r}`);
   return parts.length ? parts.join(', ') : 'nothing';
@@ -220,6 +215,17 @@ export function stageStats(d: Dragon): DragonStage | null {
 
 export function canRaid(d: Dragon): boolean {
   return d.stage > 0 && !d.resting && d.damage === 0;
+}
+
+// The round a hurt dragon can raid again: it heals at each production and
+// sits out every round it starts hurt.
+export function backInRound(g: Game, d: Dragon): number {
+  return g.round + Math.ceil(d.damage / TUNING.healPerRound) + 1;
+}
+
+export function dragonPower(d: Dragon): number {
+  const st = stageStats(d);
+  return st ? combatPower(st) : 0;
 }
 
 function parsePlayer(g: Game, s: string | undefined): number {
@@ -448,12 +454,12 @@ function startRound(g: Game) {
     gain(g.players[p], got);
     log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
   }
-  // Every dragon eats and heals fully. One that was hungry or hurt sits out
-  // the round's raids; only hunger stops it growing.
+  // Every dragon eats, and a hurt one heals some. One that was hungry or hurt
+  // sits out the round's raids; only hunger stops it growing.
   for (const d of g.dragons) {
     const pl = g.players[d.owner];
     const hurt = d.damage > 0;
-    d.damage = 0;
+    d.damage = Math.max(0, d.damage - TUNING.healPerRound);
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
     d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
@@ -728,21 +734,29 @@ export function unitsText(g: Game): string {
 function checkRaidOver(g: Game): boolean {
   const raid = g.raid!;
   if (raid.units.every((u) => u.hp <= 0)) {
-    const winners = [...new Set(raid.fighters.map((id) => dragonById(g, id).owner))].sort();
+    // Loot is split by the combat power each player still has fighting.
+    const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
+    const total = power.reduce((s, x) => s + x, 0);
+    const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = TARGETS[raid.target!].loot;
-    const share: Bundle = {};
-    for (const r of RESOURCES) if (loot[r]) share[r] = Math.floor(loot[r]! / winners.length);
-    for (const p of winners) gain(g.players[p], share);
-    const who = andList(winners.map(pname));
-    const take = RESOURCES.some((r) => share[r])
-      ? winners.length === 1 ? `${who} takes ${bundleText(share)}` : `${who} each take ${bundleText(share)}`
-      : `The loot doesn't go round ${winners.length} ways: ${who} get nothing`;
-    log(g, `${TARGETS[raid.target!].name} falls! ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, share });
+    const shares: Bundle[] = g.players.map(() => ({}));
+    // Each resource is split in proportion, rounded down; what's left over goes
+    // to the player with the most power standing (the earlier seat on a tie).
+    const top = winners.reduce((a, b) => (power[b] > power[a] ? b : a));
+    for (const r of RESOURCES) {
+      if (!loot[r]) continue;
+      let left = loot[r]!;
+      for (const p of winners) { const n = Math.floor((loot[r]! * power[p]) / total); if (n) shares[p][r] = n; left -= n; }
+      if (left) shares[top][r] = (shares[top][r] ?? 0) + left;
+    }
+    for (const p of winners) gain(g.players[p], shares[p]);
+    const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
+    log(g, `${TARGETS[raid.target!].name} falls! ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
     finishRaid(g);
     return true;
   }
   if (raid.fighters.length === 0) {
-    log(g, `No dragons are left in the fight. ${TARGETS[raid.target!].name} holds.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: false, winners: [], share: {} });
+    log(g, `No dragons are left in the fight. ${TARGETS[raid.target!].name} holds.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: false, winners: [], shares: [], power: [] });
     finishRaid(g);
     return true;
   }

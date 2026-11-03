@@ -2,9 +2,9 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity,
+  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower,
   neighbourCount, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -32,6 +32,8 @@ export interface DragonView {
   maxHp: number;
   resting: '' | 'hungry' | 'hurt'; // sitting out this round's raids; a hungry one doesn't grow either
   canRaid: boolean;
+  backIn: number | null; // hurt: the round it can raid again
+  power: number; // combat power (0 for an egg)
   status: string;
   targeting: string;
   attack: string;
@@ -42,6 +44,7 @@ export interface UnitView {
   hp: number;
   maxHp: number;
   attack: string;
+  power: number;
   weak: string[];
   strong: string[];
 }
@@ -51,6 +54,7 @@ export interface TargetView {
   name: string;
   units: UnitView[];
   loot: Res;
+  power: number; // the defenders' combat power, summed
 }
 
 export interface RaidView {
@@ -112,7 +116,7 @@ export interface CardView {
   blocked: string | null; // why it can't be played right now, if known
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
-  dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
+  dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string; power: number }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
 export interface SeatState {
@@ -147,24 +151,24 @@ function attackText(a: { targets: number; dice: number; sides: number }) {
   return `${a.targets > 1 ? `${a.targets}× ` : ''}${a.dice}d${a.sides}`;
 }
 
-function dragonView(d: Dragon): DragonView {
+function dragonView(g: Game, d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
   const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.resting === 'hungry' ? 'hungry' : 'hurt';
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
-    canRaid: canRaid(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    canRaid: canRaid(d), backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
   };
 }
 
 function targetView(key: string, hp?: number[]): TargetView {
   const t = TARGETS[key];
   return {
-    key, name: t.name, loot: res(t.loot),
+    key, name: t.name, loot: res(t.loot), power: targetPower(key),
     units: t.units.map((u, i) => {
       const x = UNITS[u];
-      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), weak: x.weak, strong: x.strong };
+      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong };
     }),
   };
 }
@@ -213,7 +217,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, floors: b.floors } : null,
       };
     }),
-    dragons: g.dragons.map(dragonView),
+    dragons: g.dragons.map((d) => dragonView(g, d)),
     offers: g.offers.map((o) => ({ id: o.id, from: o.from, to: o.to, give: sideText(g, o.give), get: sideText(g, o.get) })),
     raid: raid && {
       step: raid.step,
@@ -257,7 +261,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
-    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st) })) };
+    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st), power: combatPower(st) })) };
     return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];

@@ -8,7 +8,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 ## A round: four phases
 
-1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry: d6 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then every dragon eats 1 livestock, heals fully and grows one step (plus one per hatchery you own); one that went hungry doesn't grow. A dragon that went hungry, or was hurt in the last raid, **sits out** this round's raids. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
+1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry: d6 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then every dragon eats 1 livestock, heals 7 health and grows one step (plus one per hatchery you own); one that went hungry doesn't grow. A dragon that went hungry, or was still hurt when production began, **sits out** this round's raids: a dragon misses one round of raids for every 7 damage it took, rounded up. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
 2. **Cards** (all at once). Draw 1 action card and 2 building cards; keep one of the building cards and discard the other. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
    - **Build** on an empty land hex touching one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on ley line, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor). Or add a **tower floor** on your tower, no card needed.
@@ -18,11 +18,12 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
 4. **Raid** (all at once). Repeat once per War Horn played this round.
-   - **Vote**: three random kingdoms are shown; everyone secretly votes; ties are a coin flip.
+   - **Combat power** is a rough guide printed on every dragon and kingdom: √(health × average damage a combat round), a kingdom's being its defenders' added up. Raiders whose powers add up past a kingdom's usually win, but it ignores elements and targeting, so it can mislead.
+   - **Vote**: three random kingdoms are shown; everyone secretly votes; ties are a coin flip. Easy kingdoms give almost nothing; hard ones a lot.
    - **Commit**: everyone publicly commits raid-ready dragons (hatched, unhurt, not sitting out) and can change their mind until they say ready. When everyone is ready, commitments lock.
-   - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and any dragon that takes a hit sits out next round's raids. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
+   - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and a dragon that takes a hit sits out raids while it heals. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
    - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
-   - **Loot**: if every defender falls, the players with dragons still fighting split the loot evenly (rounded down).
+   - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting (rounded down; what's left over goes to the one with the most).
 
 **End of round.** Anyone over 7 cards discards down to 7. If anyone has 15 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
 
