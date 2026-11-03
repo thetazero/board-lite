@@ -77,7 +77,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Fishery | pasture | ocean hexes | 2 stone, 3 timber, 2 crystal | 7 | 1 livestock a round | 7 | 3.5 | 2.3 | 3 / 39% |
 | Market | trade building | trade buildings (anyone's) | 2 stone, 2 timber, 2 crystal, 1 gold | 10 | 1 gold a round | 2.5 | 1.3 ⚠ | 0.8 ⚠ | built |
 | Monument | monument | monuments (anyone's) | 3 stone, 2 timber, 2 gold | 13 | 1 point | 13 | 6.5 | 4.3 | built |
-| Dragon Shrine | monument | dragon buildings (anyone's) | 2 stone, 2 crystal, 2 gold | 12 | 1 point | 12 | 6 | 4 | built |
+| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 2 gold | 12 | 1 point | 12 | 6 | 4 | 1.6 / 21% |
 | Lighthouse | monument | ocean hexes | 4 stone, 2 timber, 2 gold | 14 | 1 point | 14 | 7 | 4.7 | 3 / 39% |
 | Guildhall | monument | trade buildings (anyone's) | 2 stone, 2 timber, 2 gold | 12 | 1 point | 12 | 6 | 4 | built |
 
@@ -99,7 +99,7 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 |---|---|---|---|---|
 | Tower Floor | 3 stone, 2 timber, 1 gold | 1 | 9 | now |
 | Monument, 2 neighbours | 3 stone, 2 timber, 2 gold | 2 | 6.5 | now |
-| Dragon Shrine, 2 neighbours | 2 stone, 2 crystal, 2 gold | 2 | 6 | now |
+| Standing Stones, 2 neighbours | 2 stone, 2 crystal, 2 gold | 2 | 6 | now |
 | Lighthouse, 2 neighbours | 4 stone, 2 timber, 2 gold | 2 | 7 | now |
 | Guildhall, 2 neighbours | 2 stone, 2 timber, 2 gold | 2 | 6 | now |
 | Gilding (upgrade) | 3 gold | 2 | 6 | now |
@@ -219,7 +219,7 @@ Building deck 52 cards (19 buildings, 4 upgrades), action deck 38. Last column: 
 | Market | building | 2 | 4% | 35% |
 | Tower Floor | building | 6 | 12% | 74% |
 | Monument | building | 2 | 4% | 35% |
-| Dragon Shrine | building | 2 | 4% | 35% |
+| Standing Stones | building | 2 | 4% | 35% |
 | Lighthouse | building | 2 | 4% | 35% |
 | Guildhall | building | 1 | 2% | 19% |
 | Workshop | building deck (upgrade) | 4 | 8% | 59% |
@@ -243,6 +243,6 @@ Last three columns: share of games that end with someone holding each title (it 
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held |
 |---|---|---|---|---|---|---|---|
-| 2 | 8 | 11 | 17 | 0 | 93% | 7% | 73% |
-| 3 | 7 | 11 | 14 | 0 | 97% | 3% | 77% |
-| 4 | 8 | 11 | 16 | 0 | 93% | 13% | 70% |
+| 2 | 8 | 11 | 17 | 0 | 90% | 3% | 70% |
+| 3 | 7 | 11 | 14 | 0 | 97% | 3% | 73% |
+| 4 | 8 | 11 | 15 | 0 | 93% | 13% | 70% |

@@ -100,7 +100,9 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   market: { name: 'Market', class: 'trade', cost: { stone: 2, timber: 2, crystal: 2, gold: 1 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold a round for each neighbouring trade building.', copies: 2 },
   tower_floor: { name: 'Tower Floor', class: 'monument', cost: { stone: 3, timber: 2, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
   monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 2 }, points: 1, per: 'monument', text: 'Worth 1 point for each neighbouring monument.', copies: 2 },
-  dragon_shrine: { name: 'Dragon Shrine', class: 'monument', cost: { stone: 2, crystal: 2, gold: 2 }, points: 1, per: 'dragon', text: 'Worth 1 point for each neighbouring dragon building.', copies: 2 },
+  // Point cards count only what can't be bought without limit: terrain, or
+  // classes that hold no basic building (monuments, trade buildings).
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 2, crystal: 2, gold: 2 }, points: 1, per: 'ley', text: 'Worth 1 point for each neighbouring ley line.', copies: 2 },
   lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 4, timber: 2, gold: 2 }, points: 1, per: 'ocean', text: 'Worth 1 point for each neighbouring ocean hex.', copies: 2 },
   guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 2, timber: 2, gold: 2 }, points: 1, per: 'trade', text: 'Worth 1 point for each neighbouring trade building.', copies: 1 },
 };

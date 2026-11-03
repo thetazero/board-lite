@@ -15,7 +15,7 @@ const BUILDING_CODE: Record<string, string> = {
   tower: 'TW', quarry: 'qu', lumber_camp: 'lc', crystal_mine: 'cm', pasture: 'pa', roost: 'ro',
   cliff_works: 'cw', stonemason: 'sm', woodcutter: 'wc', sawmill: 'sw', driftwood_yard: 'dy', ley_spire: 'ls', gem_cutter: 'gc', smelter: 'se',
   shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
-  monument: 'mo', dragon_shrine: 'ds', lighthouse: 'lh', guildhall: 'gh',
+  monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 
