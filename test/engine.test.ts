@@ -72,7 +72,7 @@ test('illegal moves are refused without changing the game', () => {
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
   assert.throws(() => apply(g, 0, 'build c999 0,0'), RuleError);
-  assert.throws(() => apply(g, 0, 'bank stone gold'), RuleError); // can't afford 4 stone
+  assert.throws(() => apply(g, 0, 'bank stone gold 2'), RuleError); // can't afford 8 stone
   assert.throws(() => apply(g, 0, 'dance'), RuleError);
   assert.equal(JSON.stringify(g), before);
 });
@@ -100,9 +100,10 @@ test('buildings must touch your territory and match terrain', () => {
   assert.throws(() => apply(g, 0, `project quarry ${tower}`), RuleError); // occupied
   const far = Object.keys(g.map).find((k) => g.map[k].terrain === 'mountain' && !neighbors(k).some((n) => g.buildings[n]))!;
   assert.throws(() => apply(g, 0, `project quarry ${far}`), RuleError); // not touching
-  const wrong = neighbors(tower).find((k) => g.map[k]?.terrain === 'forest')!;
+  const [wrong, right] = neighbors(tower).filter((k) => g.map[k]); // the land around a tower is random, so set it
+  g.map[wrong].terrain = 'forest';
+  g.map[right].terrain = 'mountain';
   assert.throws(() => apply(g, 0, `project quarry ${wrong}`), RuleError); // wrong terrain
-  const right = neighbors(tower).find((k) => g.map[k]?.terrain === 'mountain')!; // fair starts have one
   apply(g, 0, `project quarry ${right}`);
   assert.equal(g.buildings[right].type, 'quarry');
   // Special projects cost double the card.

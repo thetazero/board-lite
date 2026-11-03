@@ -63,8 +63,13 @@ async function wait(): Promise<string> {
   for (;;) {
     const g = load(file);
     const fresh = visible(g).slice(seen);
-    const talk = fresh.some((e) => isTalk(e.text) && !e.text.startsWith(`${pname(seat)} `));
-    if (g.phase === 'over' || waitingOn(g).includes(seat) || talk || Date.now() > end) return report(g);
+    const others = fresh.filter((e) => !e.text.startsWith(`${pname(seat)} `));
+    const talk = others.some((e) => isTalk(e.text));
+    // On your own turn with an offer out, wait for an answer instead of
+    // returning at once (it is always your decision on your turn).
+    const awaitingAnswer = g.phase === 'action' && g.turn === seat && g.offers.some((o) => o.from === seat) && !others.length;
+    const mine = waitingOn(g).includes(seat) && !awaitingAnswer;
+    if (g.phase === 'over' || mine || talk || Date.now() > end) return report(g);
     await new Promise((r) => setTimeout(r, 300));
   }
 }
@@ -94,7 +99,7 @@ const TOOLS = [
   },
   {
     name: 'wait',
-    description: `Wait (up to ${WAIT_SECS}s) until it is your decision, someone talks to you or the table, or the game ends. Returns the new events, including talk, and your status.`,
+    description: `Wait (up to ${WAIT_SECS}s) until it is your decision, someone talks to you or the table, or the game ends. On your own turn with an offer out, it waits for an answer. Returns the new events, including talk, and your status.`,
     inputSchema: { type: 'object', properties: {} },
     run: () => wait(),
   },

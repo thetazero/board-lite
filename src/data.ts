@@ -16,7 +16,7 @@ export const TUNING = {
   handCap: 7,
   buildingCardsPerRound: 2,
   actionCardsPerRound: 1,
-  startingResources: { stone: 2, timber: 2, crystal: 2, livestock: 2 } as Bundle,
+  startingResources: { stone: 3, timber: 3, crystal: 3, livestock: 3 } as Bundle,
   // The tower produces this every round, no dice.
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
@@ -52,10 +52,10 @@ export interface BuildingDef {
 }
 
 export const BUILDINGS: Record<string, BuildingDef> = {
-  quarry: { name: 'Quarry', class: 'production', cost: { timber: 2, livestock: 1 }, terrain: 'mountain', produces: { resource: 'stone', base: 1, die: 3 }, text: 'Produces 1 stone plus a d3 each round.', copies: 4, specialProject: true },
-  lumber_camp: { name: 'Lumber Camp', class: 'production', cost: { stone: 2, livestock: 1 }, terrain: 'forest', produces: { resource: 'timber', base: 1, die: 3 }, text: 'Produces 1 timber plus a d3 each round.', copies: 4, specialProject: true },
-  crystal_mine: { name: 'Crystal Mine', class: 'production', cost: { stone: 2, timber: 1 }, terrain: 'ley', produces: { resource: 'crystal', base: 1, die: 3 }, text: 'Produces 1 crystal plus a d3 each round.', copies: 4, specialProject: true },
-  pasture: { name: 'Pasture', class: 'production', cost: { timber: 2, stone: 1 }, terrain: 'meadow', produces: { resource: 'livestock', base: 1, die: 3 }, text: 'Produces 1 livestock plus a d3 each round.', copies: 4, specialProject: true },
+  quarry: { name: 'Quarry', class: 'production', cost: { timber: 3, livestock: 3, crystal: 2 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 6 }, text: 'Produces a d6 stone each round.', copies: 4, specialProject: true },
+  lumber_camp: { name: 'Lumber Camp', class: 'production', cost: { stone: 3, crystal: 3, livestock: 2 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 6 }, text: 'Produces a d6 timber each round.', copies: 4, specialProject: true },
+  crystal_mine: { name: 'Crystal Mine', class: 'production', cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Produces a d6 crystal each round.', copies: 4, specialProject: true },
+  pasture: { name: 'Pasture', class: 'production', cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.', copies: 4, specialProject: true },
   roost: { name: 'Roost', class: 'dragon', cost: { stone: 3, timber: 1 }, dragonCapacity: 2, text: 'Houses 2 more dragons.', copies: 4, specialProject: true },
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your fed dragons grow one extra step each round.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
