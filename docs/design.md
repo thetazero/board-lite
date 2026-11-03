@@ -25,7 +25,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 ## Hidden vs public state
 
-- Hidden, on your phone: resource cards and action cards.
+- Hidden, on your phone: resource tokens, building cards and action cards.
 - Public, on the TV: dragons and buildings, on the shared map.
 
 ## Resources
@@ -40,6 +40,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Dragons eat livestock every round, which keeps trade demand steady and limits how many dragons you can keep.
 - Gold is raid currency, not the score.
+- Resources are tokens, not cards, and are unlimited: they don't count toward the hand cap.
 
 ## Winning
 
@@ -110,14 +111,13 @@ Living design doc. Decisions here were made in conversation with the project own
   2. Card picking phase: cards are drawn from a deck. Picking is free. Each player gets a fixed number per round, maybe 2 building cards and 1 action card.
      - Upgrade cards come from the building deck.
      - Dragon cards are mixed randomly into the action deck, roughly evenly; no separate dragon deck.
-     - Hand cap of 7 cards. Cards (not just resources) can be traded.
+     - Hand cap of 7 cards, counting only building and action cards. Over the cap, you discard down to 7 at the end of the round. Cards (not just resources) can be traded.
   3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
 ## Open questions
 
 - Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
-- Whether the 7-card hand cap counts resource cards or only building and action cards, and what happens when you go over.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
