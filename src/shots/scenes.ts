@@ -125,13 +125,13 @@ const card = (id: string) => `[data-card="${id}"]`;
 function blockedReasons(g: Game, p: number) {
   const seen = new Map<string, { id: string; key: string }>();
   for (const c of seatState(g, p).hand) {
-    const reason = c.blocked?.replace(/No open \w+ hex/, 'No open hex').replace(/un-upgraded \w+/, 'un-upgraded');
+    const reason = c.blocked?.replace(/No empty [\w ]+ is adjacent/, 'No empty hex is adjacent').replace(/no [\w ,]+ without an upgrade/, 'no building without an upgrade');
     if (reason && !seen.has(reason)) seen.set(reason, { id: c.id, key: c.key });
   }
   return [...seen.values()];
 }
 // How the last raid ended, as the log says it.
-const raidOutcome = (g: Game) => g.log.findLast((e) => /falls!|holds\.|Everyone bailed|Nobody commits/.test(e.text))?.text ?? '';
+const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone bails|No one raids/.test(e.text))?.text ?? '';
 const raidOver = (g: Game) => g.raid === null || g.raid.step === 'vote';
 const drain = (g: Game, p: number) => Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 0));
 
@@ -404,7 +404,7 @@ export const SCENES: Scene[] = [
     seed: 3,
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote', // the raid is over
-    liveEnd: (g) => /falls!/.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''), // and won
+    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''), // and won
     shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replayed, at the end: who won and what they took", client: 'tv', live: true, waitMs: 6600 }],
   },
   {
@@ -414,7 +414,7 @@ export const SCENES: Scene[] = [
     seed: 3,
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls!/.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''),
+    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
     shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2200 }],
   },
   {
@@ -425,7 +425,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c) => c === null),
     setup: (g) => apply(g, seatWhere(g, (p) => g.raid!.commits[p].length > 0), 'bail'),
     live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls!|holds\./.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''), // the rest fought
+    liveEnd: (g) => /falls\.|holds\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''), // the rest fought
     shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 2200 }],
   },
   {
@@ -699,7 +699,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => step(g) === 'bail' && committed(g) >= 1,
     live: raidOver,
-    liveEnd: (g) => /Everyone bailed/.test(raidOutcome(g)),
+    liveEnd: (g) => /Everyone bails/.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-bailed-2p', caption: 'TV: everyone bailed (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
@@ -709,7 +709,7 @@ export const SCENES: Scene[] = [
     // With no dragon able to raid, the commit step is skipped: the raid ends on the last vote.
     until: (g) => step(g) === 'vote' && g.raid!.votes.filter((v) => v === null).length === 1 && g.players.every((_, p) => !seatState(g, p).raidReady.length),
     live: (g) => g.raid === null || g.raid.votes.every((v) => v === null), // this raid is over (the next one, if any, hasn't had a vote)
-    liveEnd: (g) => /Nobody commits/.test(raidOutcome(g)),
+    liveEnd: (g) => /No one raids/.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-nobody-3p', caption: 'TV: nobody commits to the raid', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
@@ -719,7 +719,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round >= 3 && step(g) === 'bail' && g.raidsLeft === 1 && committed(g) >= 1,
     live: (g) => g.phase === 'action',
-    liveEnd: (g) => /falls!|holds\./.test(raidOutcome(g)),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-banners-3p', caption: "TV: the next round's production, right after a raid's result", client: 'tv', live: true, waitFor: '#overlay .production', waitMs: 1800 }],
   },
 

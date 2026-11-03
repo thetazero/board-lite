@@ -13,6 +13,12 @@ export type Element = (typeof ELEMENTS)[number];
 
 export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
+// How text names one hex of a terrain ("a mountain", "a ley line").
+export const TERRAIN_NOUN: Record<Terrain, string> = {
+  mountain: 'mountain', forest: 'forest', ley: 'ley line', meadow: 'meadow', plains: 'plains hex', harbor: 'harbor', ocean: 'ocean hex',
+};
+// "a, b or c": how card text lists choices.
+export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
 
 export const TUNING = {
   pointsToWin: 15,
@@ -76,17 +82,17 @@ export interface BuildingDef {
   per?: Counted;
 }
 
-const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = per as string): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} a round for each neighbouring ${noun}.` });
+const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = TERRAIN_NOUN[per]): BuildingDef =>
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${noun}.` });
 const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} a round for each neighbouring ${CLASS_NAMES[per]}.` });
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}.` });
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
-  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 3, livestock: 3, crystal: 2 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 6 }, text: 'Produces a d6 stone each round.' },
-  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 3, crystal: 3, livestock: 2 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 6 }, text: 'Produces a d6 timber each round.' },
-  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Produces a d6 crystal each round.' },
-  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.' },
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 3, livestock: 3, crystal: 2 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 6 }, text: 'Makes 1d6 stone each round.' },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 3, crystal: 3, livestock: 2 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 6 }, text: 'Makes 1d6 timber each round.' },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Makes 1d6 crystal each round.' },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Makes 1d6 livestock each round.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // The always-open way to turn gold, which comes from raids, into points.
   tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 2, gold: 3 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },
@@ -95,22 +101,22 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 2, crystal: 2, livestock: 1 }, 2),
   woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 2, crystal: 2, livestock: 1 }, 2),
   sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 2, crystal: 2, livestock: 1 }, 2),
-  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 3, crystal: 2, livestock: 2 }, 1, 'ocean hex'),
-  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 2, timber: 2, livestock: 1 }, 2, 'ley line'),
+  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 3, crystal: 2, livestock: 2 }, 1),
+  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 2, timber: 2, livestock: 1 }, 2),
   gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 2, timber: 2, livestock: 1 }, 2),
   smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 2, stone: 1, livestock: 2 }, 1),
   shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 2, timber: 2, crystal: 1 }, 2),
   drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 2, crystal: 2, stone: 1 }, 2),
-  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 2, timber: 3, crystal: 2 }, 1, 'ocean hex'),
-  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 2 },
+  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 2, timber: 3, crystal: 2 }, 1),
+  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
-  market: { name: 'Market', class: 'trade', cost: { stone: 2, timber: 2, crystal: 2, gold: 1 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold a round for each neighbouring trade building.', copies: 2 },
-  monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 2 }, points: 1, per: 'monument', text: 'Worth 1 point for each neighbouring monument.', copies: 2 },
+  market: { name: 'Market', class: 'trade', cost: { stone: 2, timber: 2, crystal: 2, gold: 1 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
+  monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 2 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
   // Point cards count only what can't be bought without limit: terrain, or
   // classes that hold no basic building (monuments, trade buildings).
-  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 2, crystal: 2, gold: 2 }, points: 1, per: 'ley', text: 'Worth 1 point for each neighbouring ley line.', copies: 2 },
-  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 4, timber: 2, gold: 2 }, points: 1, per: 'ocean', text: 'Worth 1 point for each neighbouring ocean hex.', copies: 2 },
-  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 2, timber: 2, gold: 2 }, points: 1, per: 'trade', text: 'Worth 1 point for each neighbouring trade building.', copies: 1 },
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 2, crystal: 2, gold: 2 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
+  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 4, timber: 2, gold: 2 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
+  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 2, timber: 2, gold: 2 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
 };
 
 export const BASIC_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].basic);
@@ -149,14 +155,14 @@ export interface ActionDef {
 export const ACTIONS: Record<string, ActionDef> = {
   windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 5 },
   treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 4 },
-  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 2 }, text: 'One of your dragons grows to its next life stage.', copies: 4 },
-  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Heal one of your hurt dragons so it can raid this round.', copies: 3 },
-  war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'This round has one more raid.', copies: 3 },
+  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 2 }, text: 'Grow one of your dragons to its next life stage.', copies: 4 },
+  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons. It can raid this round.', copies: 3 },
+  war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 3 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
-  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 1, gold: 2 }, text: 'Put a Wolf Pack on any land hex but a tower.', copies: 2 },
-  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 2, gold: 3 }, text: 'Put a Cave Bear on any land hex but a tower.', copies: 1 },
+  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 1, gold: 2 }, text: 'Place a Wolf Pack on any land hex with no tower or beast.', copies: 2 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 2, gold: 3 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 1 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';

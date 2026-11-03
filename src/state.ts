@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, FAUNA, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes,
   neighbourCount, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -260,14 +260,14 @@ function cardView(g: Game, p: number, c: Card): CardView {
   if (kind === 'building') {
     const b = BUILDINGS[c.key];
     const hexes = b.onTower ? [] : buildableHexes(g, p, c.key);
-    const text = `${b.text}${b.terrain ? ` Goes on ${b.terrain}.` : ''}`;
+    const text = `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}`;
     const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, neighbourCount(g, k, b.per!)])) : undefined;
-    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? `No open ${b.terrain ?? ''} hex next to your buildings.`.replace('  ', ' ') : null };
+    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings.` : null };
   }
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
     const hexes = upgradeTargets(g, p, c.key);
-    return { ...base, text: `${u.text} (On a ${u.appliesTo} building.)`, needs: 'hex', hexes, blocked: hexes.length ? null : `You have no un-upgraded ${u.appliesTo} building.` };
+    return { ...base, text: u.text, needs: 'hex', hexes, blocked: hexes.length ? null : `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.` };
   }
   if (kind === 'dragon') {
     const d = DRAGONS[c.key];
@@ -275,14 +275,14 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st), power: combatPower(st) })) };
-    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
+    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room for another dragon: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];
-  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep it: it scores while in your hand.' };
+  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep this card in your hand to score its point.' };
   if (a.effect === 'gain_resource') return { ...base, text: a.text, needs: 'resource' };
   if (a.effect === 'grow_dragon') {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
-    return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are fully grown.' };
+    return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are adults.' };
   }
   if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
@@ -316,7 +316,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     deciding: waitingOn(g).includes(p),
     basics: BASIC_BUILDINGS.map((k) => {
       const b = BUILDINGS[k];
-      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Goes on ${b.terrain}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes: buildableHexes(g, p, k), onTower: !!b.onTower };
+      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes: buildableHexes(g, p, k), onTower: !!b.onTower };
     }),
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),

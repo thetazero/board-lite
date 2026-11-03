@@ -166,7 +166,7 @@ function renderLobby() {
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
       <p class="muted">Room <b>${esc(l.code)}</b></p>
       <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
-      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>
+      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start game</button>
         <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
       : '<p class="hint">The first player or the TV starts the game.</p>'}
       <button id="leave" class="ghost">Leave</button>
@@ -228,7 +228,7 @@ function status(g: PublicState, me: Me): string {
   if (g.phase === 'over') return `<div class="status you"><span>${g.winner === me.seat ? 'You win!' : `${playerTag(g.winner!, names)} wins`}</span></div>`;
   if (me.deciding) {
     let what = '';
-    if (g.phase === 'action') what = me.myTurn ? 'Your turn!' : 'An offer for you';
+    if (g.phase === 'action') what = me.myTurn ? 'Your turn' : 'An offer for you';
     else if (g.phase === 'discard') what = `Discard ${me.hand.length - me.handCap} <span class="over">${icon('cards', 1.2)}${me.hand.length}/${me.handCap}</span>`;
     else if (g.phase === 'cards') what = `Keep 1 ${icon('cards', 1.2)}`;
     else if (g.raid?.step === 'vote') what = `${icon('raid', 1.3)} Vote`;
@@ -325,6 +325,9 @@ function actionView(g: PublicState, me: Me): string {
   return `${incoming}${mine}${tabs}${content}${clear}${end}`;
 }
 
+// "1 dragon", "2 dragons".
+const dragons = (n: number) => `${n} dragon${n === 1 ? '' : 's'}`;
+
 const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon' };
 
 // What a card costs, with what you're short of marked.
@@ -366,12 +369,12 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
   if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
   else if (!playable) actions = '';
   else if (c.blocked) actions = `<p class="blocked">${iconText(esc(c.blocked))}</p>`;
-  else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch it' : c.kind === 'action' ? 'Play it' : 'Build it'}</button>`;
+  else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch' : c.kind === 'action' ? 'Play' : c.kind === 'upgrade' ? 'Upgrade' : 'Build'}</button>`;
   else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn" data-play="${c.id} ${r}" aria-label="${r}">${resIcon(r, 1.9)}</button>`).join('')}</div>`;
   else if (c.needs === 'dragon') actions = `<div class="row">${c.dragons.map((id) => `<button data-play="${c.id} ${id}">${esc(dragonLabel(id))}</button>`).join('')}</div>`;
-  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : c.kind === 'action' ? 'Choose where to send it' : 'Choose where to build'}</button>`;
-  else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build it</button>`;
-  else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch it' : 'Play it'}</button>`;
+  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Upgrade' : c.fauna ? 'Place' : c.kind === 'action' ? 'Play' : 'Build'}</button>`;
+  else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build</button>`;
+  else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch' : 'Play'}</button>`;
   return `<div class="zoom" id="zoom">
     <div class="card big k-${c.kind}" style="--kc:${frameColor(c.kind, c.element)}">
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
@@ -421,7 +424,7 @@ function moreView(me: Me): string {
     <section class="panel"><h3>Basic buildings</h3>${basics}</section>
     <section class="panel"><h3>Special projects</h3>
       <div class="proj${eggOk ? '' : ' dim'}"><b>Base dragon egg</b> ${resChips(egg.cost)}</div>
-      <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost.</p>'}</section>
+      <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost first.</p>'}</section>
     <section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Get</span>${pick('get', bank.get)}</div>
@@ -468,10 +471,10 @@ function huntView(g: PublicState, me: Me): string {
   const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
   const n = hunting!.chosen.size;
   const sent = [...hunting!.chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
-  return `<h3 class="huntname">Fight the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>
+  return `<h3 class="huntname">Clear the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>
     ${list}
-    <p class="hint">They miss this round's raids.</p>
-    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} Send ${n || ''}${n ? ` ${powerTag(sent)}` : ''}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
+    <p class="hint">Dragons you send sit out this round's raids.</p>
+    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
 }
 
 function hexPicker(g: PublicState): string {
@@ -507,7 +510,7 @@ function raidView(g: PublicState, me: Me): string {
       const d = dragon(id);
       return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
     }).join('');
-    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
+    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${dragons(committed.size)} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
@@ -560,7 +563,7 @@ function gameOver(g: PublicState, me: Me): string {
     <div class="hero">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]))}</div>
     <h1>${w === me.seat ? 'You win!' : `${playerTag(w, names)} wins!`}</h1>
     ${note ? `<p class="tiebreak">${note}</p>` : ''}
-    ${w === me.seat ? '' : `<p class="mine">You came ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
+    ${w === me.seat ? '' : `<p class="mine">You finish ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
     ${standingsHtml(g, names, me.seat)}
     <button id="newgame" class="primary big">New game</button>
   </div>`;
@@ -631,7 +634,7 @@ function renderTalk() {
   const lines = me.talk;
   const mine = (text: string) => text.startsWith(`P${me.seat + 1} `);
   const atBottom = talk.list.scrollHeight - talk.list.scrollTop - talk.list.clientHeight < 40;
-  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>Nobody has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
+  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>No one has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
   if (atBottom) talk.list.scrollTop = talk.list.scrollHeight;
   const last = lines.at(-1);
   if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
@@ -669,14 +672,14 @@ function wire(g: PublicState, me: Me) {
     const c = me.hand.find((x) => x.id === el.dataset.pickhex)!;
     const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build';
     const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
-    const title = c.fauna ? `Send the ${c.fauna.name} where?` : `${c.kind === 'upgrade' ? 'Put' : 'Build'} ${c.name}${c.kind === 'upgrade' ? ' on…' : ' where?'}`;
+    const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
     picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels };
     render();
   });
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
     if (b.onTower) return send(`build ${b.key}`);
-    picking = { title: `Build a ${b.name} where?`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}` };
+    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}` };
     render();
   });
   bind('[data-keep]', (el) => send(`keep ${el.dataset.keep}`));
@@ -690,7 +693,7 @@ function wire(g: PublicState, me: Me) {
     if (!cmd.startsWith('hunt ')) send(cmd);
   }));
   on('hunt', () => {
-    picking = { title: 'Clear which beast?', hexes: g.map.filter((h) => h.fauna).map((h) => h.k), command: (h) => `hunt ${h}` };
+    picking = { title: 'Choose a beast to clear', hexes: g.map.filter((h) => h.fauna).map((h) => h.k), command: (h) => `hunt ${h}` };
     render();
   });
   bind('[data-hunter]', (el) => {

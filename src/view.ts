@@ -67,7 +67,7 @@ function mapText(g: Game): string[] {
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
-  lines.push(`Fauna shows as {code} (no building there; a building under it produces nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${FAUNA[k].name}`).join(', ')}.`);
+  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${FAUNA[k].name}`).join(', ')}.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -218,7 +218,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   const out: string[] = [];
   out.push(`You are ${pname(p)}. ${phaseText(g)}`);
   const hints = commandHints(g, p);
-  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingOn(g).map(pname).join(', ') || 'nobody'}.`);
+  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingOn(g).map(pname).join(', ') || 'no one'}.`);
   out.push('');
   out.push(`== Scores (first to ${TUNING.pointsToWin}; hidden points count at the end) ==`);
   for (let q = 0; q < g.players.length; q++) {
@@ -226,7 +226,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
     const extra = q === p ? ` + ${s.hidden} hidden = ${s.total}` : '';
     out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
   }
-  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'nobody' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
+  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'no one' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
   out.push('');
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${RESOURCES.map((r) => `${pl.resources[r]} ${r}`).join(', ')}`);
