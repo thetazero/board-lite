@@ -2,10 +2,11 @@
 // Command-line interface. Each call loads the game file, does one thing, and
 // saves it, so several separate processes (one per player) can share a game.
 
-import { closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { botMove, playOut } from './bot.ts';
 import { RuleError, apply, newGame, pname, score, waitingOn, type Game } from './engine.ts';
+import { load, save, sleepMs, withLock } from './store.ts';
 import { commandHints, playerView, publicStatus } from './view.ts';
 
 const USAGE = `board-lite: wizards raising dragons (headless rules + CLI)
@@ -21,43 +22,6 @@ const USAGE = `board-lite: wizards raising dragons (headless rules + CLI)
 
 Seats are 1-based (1 = P1). If BOARD_LITE_SEAT is set, only that seat can be viewed or played.
 See docs/cli.md for how to play.`;
-
-function sleepMs(ms: number) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function withLock<T>(file: string, fn: () => T): T {
-  const lock = `${file}.lock`;
-  const start = Date.now();
-  for (;;) {
-    try {
-      closeSync(openSync(lock, 'wx'));
-      break;
-    } catch {
-      try {
-        if (Date.now() - statSync(lock).mtimeMs > 10000) unlinkSync(lock); // stale lock
-      } catch { /* gone already */ }
-      if (Date.now() - start > 30000) throw new Error(`Timed out waiting for ${lock}`);
-      sleepMs(20);
-    }
-  }
-  try {
-    return fn();
-  } finally {
-    try { unlinkSync(lock); } catch { /* ignore */ }
-  }
-}
-
-function load(file: string): Game {
-  if (!existsSync(file)) throw new Error(`No game at ${file}. Start one with: board-lite new ${file}`);
-  return JSON.parse(readFileSync(file, 'utf8')) as Game;
-}
-
-function save(file: string, g: Game) {
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(g));
-  renameSync(tmp, file);
-}
 
 function flag(args: string[], name: string, dflt: number): number {
   const i = args.indexOf(name);

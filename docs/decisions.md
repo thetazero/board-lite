@@ -2,6 +2,11 @@
 
 Provisional design calls made without the owner present, newest first. Each entry: the call, why, and what would change it. The owner reviews these; any can be reversed.
 
+## 2026-11-02: table talk and sandboxed playtests
+
+- **Call:** talk is an engine command (`say`, `tell P2`), allowed for anyone at any time, binding no one. **Why:** at a real table people talk whenever they like, so "when the game allows talk" is simply always; one rule with no timing questions. Putting it in the game log means the TV can show table talk later and playtest logs carry the conversation next to the moves. It adds no rule beyond "promises don't bind; only accepted trades do", which the design already implied. **What would change it:** playtests where unlimited private talk during the secret bail step makes raids pointless.
+- **Call:** playtest players are separate `claude -p` processes with no built-in tools and one per-seat MCP server, not subagents of the orchestrator with a restricted Bash. **Why:** a subagent inherits the orchestrator's permissions, and a Bash allow-pattern for the CLI still lets a player read the game file (every hand) or act as another seat. With no built-ins and a server whose seat is fixed, the player physically can only play its seat and talk. It also lets each seat pick its own model.
+
 ## 2026-11-02: first rules engine
 
 The engine (issue #1) had to fill the gaps `docs/design.md` left open. The full list is in design.md's open questions; these are the calls with real reasoning behind them.

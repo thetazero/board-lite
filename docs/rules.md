@@ -26,6 +26,8 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **End of round.** Anyone over 7 cards discards down to 7. If anyone has 15 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
 
+**Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
+
 ## Points
 
 - Dragons: hatchling 1, young 2, adult 4. Eggs 0.
