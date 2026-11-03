@@ -206,6 +206,8 @@ q::after { content: close-quote; }
 /* The log, drawn: a row of icons per thing that happened */
 .ticker li { display: flex; align-items: center; gap: .35em; flex-wrap: nowrap; white-space: nowrap; }
 .ticker li .chip { margin-right: .15em; }
+/* What people said is a sentence, and wraps rather than running off the edge. */
+.ticker li.said { display: block; white-space: normal; }
 .evround { color: var(--muted); font-size: .8em; text-transform: uppercase; letter-spacing: .1em; border-top: 1px solid var(--line); flex: 1; padding-top: .15em; }
 .arrow { color: var(--muted); margin: 0 .1em; }
 .no { color: var(--bad); font-weight: 800; }

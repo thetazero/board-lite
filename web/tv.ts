@@ -183,9 +183,9 @@ function renderGame(g: PublicState) {
   const titles = g.titles.map((t) => `<li>${icon(TITLE_ICON[t.key], 1.3)}<b>${esc(t.name)}</b>
     <span class="tvals">${t.values.map((v, p) => `<span class="tval${t.holder === p ? ' held' : ''}${v < t.min ? ' under' : ''}" style="--pc:${PLAYER_COLORS[p]}">${v}</span>`).join('')}</span><small class="tmin">≥${t.min}</small></li>`).join('');
   // Things that happened and what people said, in the order they did.
-  const feed = [...g.log.map((e) => ({ i: e.i, html: eventHtml(e, g, names) })), ...g.talk.map((e) => ({ i: e.i, html: `<span class="said">${talkLine(e.text, g)}</span>` }))]
+  const feed = [...g.log.map((e) => ({ i: e.i, html: eventHtml(e, g, names), said: false })), ...g.talk.map((e) => ({ i: e.i, html: talkLine(e.text, g), said: true }))]
     .filter((x) => x.html).sort((a, b) => a.i - b.i).slice(-8)
-    .map((x) => `<li>${x.html}</li>`).join('');
+    .map((x) => `<li${x.said ? ' class="said"' : ''}>${x.html}</li>`).join('');
   if (board3d === undefined) board3d = Board3D.supported() ? new Board3D() : null;
   const highlight = g.phase === 'action' ? g.turn : null;
   // The flat map needs a legend; the 3D board shows what things are.
