@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, dragonBadge, elemIcon, esc, hpBar, icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 
 type Me = SeatState & { name: string };
@@ -167,7 +167,12 @@ function bind(sel: string, fn: (el: HTMLElement) => unknown) {
 }
 
 function header(g: PublicState, me: Me): string {
-  const res = RESOURCES.map((r) => `<div class="res${me.resources[r] ? '' : ' zero'}">${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div>`).join('');
+  // Each token with what a round brings in under it, upkeep taken off.
+  const res = RESOURCES.map((r) => {
+    const inc = me.income[r];
+    const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
+    return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${incomeText(inc)}</small></div>`;
+  }).join('');
   const pts = me.hiddenPoints ? `${me.totalPoints} <small>(${me.hiddenPoints} secret)</small>` : `${me.totalPoints}`;
   // Name, points and resources stay on screen together while the page scrolls.
   return `
@@ -200,9 +205,22 @@ function render() {
   else if (g.phase === 'discard') body = me.deciding ? discardView(me) : handList(me, false);
   else if (g.phase === 'raid') body = raidView(g, me);
   else body = actionView(g, me);
+  const den = !picking && (g.phase === 'action' || g.phase === 'discard') ? roost(g, me) : '';
   const recent = me.log.slice(-2).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
-  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${body}</main>${recent && !picking ? `<ul class="mylog">${recent}</ul>` : ''}`;
+  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${recent && !picking ? `<ul class="mylog">${recent}</ul>` : ''}`;
   wire(g, me);
+}
+
+// Your dragons at home: one place in the roost per dragon you can house,
+// empty places drawn as empty nests.
+function roost(g: PublicState, me: Me): string {
+  const mine = g.dragons.filter((d) => d.owner === me.seat);
+  const empty = Math.max(0, me.dragonCapacity - mine.length);
+  const full = !empty;
+  return `<section class="roost${full ? ' full' : ''}">
+    <div class="rhead">${buildingIcon('roost', 22, '#cfd3dc')}<b>${mine.length}/${me.dragonCapacity}</b></div>
+    <div class="nests">${mine.map((d) => dragonChip(d)).join('')}${'<div class="nest" aria-label="room for a dragon"></div>'.repeat(empty)}</div>
+  </section>`;
 }
 
 // ---- action phase ----

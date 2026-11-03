@@ -13,7 +13,7 @@
 // what changed since the previous run.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -87,8 +87,9 @@ function findChrome(): string {
 }
 
 async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
-  const profile = join(CACHE, 'chrome-profile');
-  mkdirSync(profile, { recursive: true });
+  // A profile of its own, so runs from several worktrees at once don't collide.
+  mkdirSync(CACHE, { recursive: true });
+  const profile = mkdtempSync(join(CACHE, 'chrome-profile-'));
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
@@ -96,6 +97,7 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  proc.on('exit', () => rmSync(profile, { recursive: true, force: true }));
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
