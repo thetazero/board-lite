@@ -17,9 +17,6 @@ import { load, save, withLock } from '../store.ts';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
-// The design gives players 10 seconds after each combat round to choose
-// whether to flee; anyone who hasn't chosen by then stays.
-export const FLEE_SECONDS = 10;
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
 
 export interface Seat {
@@ -39,7 +36,6 @@ export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
-  fleeSeconds?: number;
 }
 
 export class Room {
@@ -48,11 +44,8 @@ export class Room {
   readonly hostToken = token();
   readonly opts: RoomOptions;
   seats: Seat[] = [];
-  fleeDeadline: number | null = null;
   lastActive = Date.now();
   private cached: Game | null = null;
-  private fleeTimer: NodeJS.Timeout | null = null;
-  private fleeRound = 0;
   private botTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private botRng = { state: Date.now() | 0 };
@@ -216,40 +209,9 @@ export class Room {
     }
   }
 
-  // Called after every change: keep the flee clock and the bots going.
+  // Called after every change: keep the bots going.
   private tick() {
-    const g = this.game;
-    if (!g) return;
-    const raid = g.raid;
-    const fleeOpen = g.phase === 'raid' && raid?.step === 'flee';
-    if (fleeOpen && this.fleeRound !== raid!.combatRound) {
-      this.clearFlee();
-      this.fleeRound = raid!.combatRound;
-      const ms = (this.opts.fleeSeconds ?? FLEE_SECONDS) * 1000;
-      this.fleeDeadline = Date.now() + ms;
-      this.fleeTimer = setTimeout(() => this.fleeTimeout(), ms);
-    } else if (!fleeOpen && this.fleeDeadline !== null) {
-      this.clearFlee();
-      this.fleeRound = 0;
-    }
     this.scheduleBot();
-  }
-
-  private clearFlee() {
-    if (this.fleeTimer) clearTimeout(this.fleeTimer);
-    this.fleeTimer = null;
-    this.fleeDeadline = null;
-  }
-
-  private fleeTimeout() {
-    this.fleeTimer = null;
-    const round = this.fleeRound;
-    this.mutate((g) => {
-      for (const p of waitingOn(g)) {
-        if (g.raid?.step !== 'flee' || g.raid.combatRound !== round) break;
-        apply(g, p, 'stay');
-      }
-    });
   }
 
   private scheduleBot() {
@@ -279,7 +241,6 @@ export class Room {
       seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: s.kind === 'bot' || s.connected > 0 || Date.now() - s.seen < 60000 })),
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
-      fleeDeadline: this.fleeDeadline,
       file: this.file,
     };
   }
@@ -318,7 +279,6 @@ export class Room {
   }
 
   close() {
-    this.clearFlee();
     if (this.botTimer) clearTimeout(this.botTimer);
     this.botTimer = null;
     this.listeners.clear();

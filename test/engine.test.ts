@@ -65,6 +65,9 @@ test('votes and fight-or-bail choices stay secret until revealed', () => {
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
   apply(g, 1, 'fight');
   assert.ok(playerView(g, 1, 1000).includes('P1 bails!'));
+  // There is no retreat: the fight plays out to the end with no more choices.
+  assert.equal(g.raid, null);
+  assert.match(playerView(g, 1, 1000), /falls!|holds\./);
 });
 
 test('illegal moves are refused without changing the game', () => {
@@ -179,4 +182,22 @@ test('a playtest seat server plays one seat over MCP', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('a dragon hurt in a raid heals but sits out the next round', () => {
+  const g = newGame(2, 7);
+  const a = g.dragons[0];
+  a.damage = 3; // hurt in this round's raid
+  g.players[a.owner].resources.livestock = 5;
+  const ga = a.growth + a.stage * 10;
+  advanceToRaidVote(g);
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
+  assert.equal(g.round, 2);
+  assert.equal(a.damage, 0);
+  assert.equal(a.resting, 'hurt');
+  assert.equal(a.growth + a.stage * 10, ga, 'a resting dragon does not grow');
+  advanceToRaidVote(g);
+  for (const p of waitingOn(g)) apply(g, p, 'vote 1');
+  assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
 });

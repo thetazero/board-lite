@@ -147,15 +147,9 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .raidrow { display: flex; gap: 2em; justify-content: center; align-items: flex-start; }
 .commits { list-style: none; padding: 0; text-align: left; font-size: 1.3em; }
 .commits li { display: flex; align-items: center; gap: .6em; margin: .5em 0; background: var(--panel); padding: .4em .8em; border-radius: 10px; }
-.battle { display: flex; gap: 2em; align-items: center; justify-content: center; }
-.side-d { display: flex; flex-direction: column; gap: .6em; }
-.fighter { display: flex; align-items: center; gap: .6em; background: var(--panel); border-left: .4em solid var(--pc); border-radius: 10px; padding: .4em .8em; text-align: left; font-size: 1.15em; }
-.fighter .hpbar { width: 7em; height: .7em; }
-.vs { font-size: 3em; font-weight: 900; color: #ff7a59; }
 .combatlog { list-style: none; padding: 0; margin: 1em auto 0; max-width: 70em; text-align: left; font-size: 1.05em; color: #c9cdd8; }
 .combatlog li { margin: .3em 0; }
 .combatlog li:last-child { color: var(--text); }
-.clock { color: var(--accent); font-weight: 900; font-size: 1.3em; }
 
 /* ================= phone ================= */
 body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2em; }

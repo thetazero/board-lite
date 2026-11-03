@@ -34,7 +34,7 @@ export function cardText(c: Card): string {
 
 export function dragonCardText(k: string): string {
   const d = DRAGONS[k];
-  const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides} spd${s.speed}`).join(' / ');
+  const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides}`).join(' / ');
   return `${d.element}, grows every ${d.growthTime} step(s), ${TARGETING_TEXT[d.targeting]}; ${st}`;
 }
 
@@ -43,8 +43,8 @@ function dragonLine(g: Game, d: Dragon): string {
   const def = DRAGONS[d.key];
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${def.growthTime}`;
   const health = st ? `${st.hp - d.damage}/${st.hp}hp` : 'egg';
-  const status = canRaid(d) ? 'can raid' : d.stage === 0 ? 'egg, cannot raid' : !d.fed ? 'hungry, cannot raid' : 'hurt, cannot raid';
-  return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}, speed ${st.speed}` : ''}`;
+  const status = canRaid(d) ? 'can raid' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? `${d.resting === 'hungry' ? 'went hungry' : 'healing from a raid'}: no growth or raids this round` : 'hurt, cannot raid';
+  return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
 }
 
 function productionText(g: Game, p: number): string {
@@ -94,11 +94,6 @@ function raidText(g: Game, p: number): string[] {
     out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${pname(q)} ${raid.choices[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
     if (raid.choices[p]) out.push(`  You chose to ${raid.choices[p]}.`);
   }
-  if (raid.step === 'flee') {
-    out.push(`Combat round ${raid.combatRound} done. Defenders: ${unitsText(g)}`);
-    out.push(`Dragons still fighting: ${raid.fighters.join(' ')}`);
-    out.push(`Flee decisions made: ${g.players.flatMap((_, q) => (raid.fighters.some((id) => g.dragons.find((d) => d.id === id)!.owner === q) ? [`${pname(q)} ${raid.flee[q] === null ? 'not yet' : 'yes'}`] : [])).join(', ')}`);
-  }
   return out;
 }
 
@@ -106,7 +101,7 @@ export function targetText(t: string): string {
   const def = TARGETS[t];
   const units = def.units.map((u) => {
     const x = UNITS[u];
-    return `${x.name} (${x.hp}hp ${x.targets}x${x.dice}d${x.sides} chase${x.chase}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
+    return `${x.name} (${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
   });
   return `${def.name} — defenders: ${units.join(', ')}; loot ${bundleText(def.loot)} (split among winners)`;
 }
@@ -160,10 +155,6 @@ export function commandHints(g: Game, p: number): string[] {
     out.push('ready   (lock in your commitment)');
   }
   if (raid.step === 'bail') out.push('fight  |  bail   (secret)');
-  if (raid.step === 'flee') {
-    const mine = raid.fighters.filter((id) => g.dragons.find((d) => d.id === id)!.owner === p);
-    out.push(`stay  |  flee all  |  flee <${mine.join('|')}>`);
-  }
   return out;
 }
 
