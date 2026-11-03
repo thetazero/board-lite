@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 import { promisify } from 'node:util';
 import { candidateCommands } from '../src/bot.ts';
@@ -207,10 +207,11 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
       { jsonrpc: '2.0', id: 2, method: 'tools/list' },
       { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'view', arguments: {} } },
       { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'say', arguments: { message: 'hello', to: 'P1' } } },
-      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'act', arguments: { command: 'end' } } },
+      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'act', arguments: { command: 'end', why: 'nothing left to build' } } },
       { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'wait', arguments: {} } },
     ];
-    const child = execFile(process.execPath, ['src/playtest/seat-server.ts', `${base}/${code}`, opus.token], { env: { ...process.env, BOARD_LITE_WAIT_SECS: '20' } });
+    const moves = join(mkdtempSync(join(tmpdir(), 'board-lite-moves-')), 'moves.txt');
+    const child = execFile(process.execPath, ['src/playtest/seat-server.ts', `${base}/${code}`, opus.token, moves], { env: { ...process.env, BOARD_LITE_WAIT_SECS: '20' } });
     const lines: any[] = [];
     let buf = '';
     child.stdout!.on('data', (d) => {
@@ -234,6 +235,9 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     assert.match((await reply(3)).result.content[0].text, /^Table: P1 Ada, P2 Opus \(you\)\.\nYou are P2\./);
     assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
     assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
+    // The moves file pairs each move's private reason with what really happened.
+    assert.match(readFileSync(moves, 'utf8'), /tell P1 hello\n  -> done\n.* end\n  why: nothing left to build\n  -> not allowed: It's P1's turn/);
+    rmSync(dirname(moves), { recursive: true });
     // Waiting returns as soon as the phone player talks.
     child.stdin!.write(`${JSON.stringify(reqs[5])}\n`);
     await sleep(200);

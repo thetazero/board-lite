@@ -141,8 +141,8 @@ function most(g: Game, p: number, not = ''): string {
 }
 
 // ---------- the scenes ----------
-// The hand-3p scene's cards: kept, choose a dragon (two ways), on the tower, choose a building.
-const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'tower_floor', 'workshop'];
+// The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
+const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'monument', 'workshop'];
 
 
 export const SCENES: Scene[] = [
@@ -172,7 +172,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 1 && g.phase === 'action',
     shots: (g) => [
-      { file: 'tv-opening-production-2p', caption: "TV, round 1 (2 players): the opening production roll", client: 'tv', waitMs: 1800 },
+      { file: 'tv-opening-production-2p', caption: 'TV, round 1 (2 players): the round opens (no dice to roll yet)', client: 'tv', waitMs: 600 },
       { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-opening-waiting-2p', caption: "Phone, round 1: someone else's turn", client: 'phone', seat: (g!.turn + 1) % 2 },
       { file: 'phone-reconnecting', caption: 'Phone: the connection to the server dropped', client: 'phone', seat: g!.turn, offline: true },
@@ -257,7 +257,7 @@ export const SCENES: Scene[] = [
     // The acting player offers the next seat a trade, and the seat after offers them one.
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4, b = (t + 2) % 4;
-      apply(g, t, `offer P${a + 1} give 2 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
+      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
       apply(g, b, `offer P${t + 1} give 1 ${most(g, b)} get 1 ${most(g, t, most(g, b))}`);
     },
     shots: (g) => [
@@ -373,7 +373,15 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.phase === 'discard',
     live: (g) => g.phase === 'action',
-    shots: () => [{ file: 'tv-production-4p', caption: 'TV: a new round opens with the production dice', client: 'tv', live: true, waitMs: 1800 }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with each player's production roll, one after another (the second rolling)", client: 'tv', live: true, waitMs: 1800 }],
+  },
+  {
+    name: 'production-done-6p',
+    players: 6,
+    seed: 1,
+    until: (g) => g.round >= 4 && g.phase === 'discard',
+    live: (g) => g.phase === 'action',
+    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
   },
   {
     name: 'late-6p',
@@ -521,7 +529,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-hoard', caption: 'Phone: Secret Hoard tapped open (kept, not played)', clicks: [card(id('secret_hoard'))] },
         { ...me, file: 'phone-zoom-elixir', caption: 'Phone: Growth Elixir, choosing the dragon', clicks: [card(id('growth_elixir'))] },
         { ...me, file: 'phone-zoom-potion', caption: 'Phone: Healing Potion, choosing the hurt dragon', clicks: [card(id('healing_potion'))] },
-        { ...me, file: 'phone-zoom-floor', caption: 'Phone: Tower Floor tapped open', clicks: [card(id('tower_floor'))] },
+        { ...me, file: 'phone-zoom-monument', caption: 'Phone: Monument tapped open', clicks: [card(id('monument'))] },
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },

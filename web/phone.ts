@@ -291,7 +291,8 @@ function actionView(g: PublicState, me: Me): string {
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
   const t = !me.myTurn && tab === 'more' ? 'none' : tab;
   const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
-  const end = me.myTurn ? '<button id="end" class="primary big endturn">End turn</button>' : '';
+  // An offer to you needs your answer before your turn can end.
+  const end = !me.myTurn ? '' : incoming ? '<button id="end" class="primary big endturn" disabled>Answer the offer to end your turn</button>' : '<button id="end" class="primary big endturn">End turn</button>';
   return `${incoming}${mine}${tabs}${content}${end}`;
 }
 
@@ -625,6 +626,7 @@ function wire(g: PublicState, me: Me) {
   });
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
+    if (b.onTower) return send(`build ${b.key}`);
     picking = { title: `Build a ${b.name} where?`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}` };
     render();
   });

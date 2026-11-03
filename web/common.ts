@@ -121,7 +121,6 @@ export function iconText(html: string, size = 1.2): string {
 export const BUILDING_ICON: Record<string, string> = {
   hatchery: '<ellipse cx="0" cy="0.5" rx="5.5" ry="7.5"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0007" stroke-width="1.4"/>',
   port: '<circle cx="0" cy="-5.5" r="2.6"/><circle cx="0" cy="-5.5" r="1.1" fill="#0006"/><rect x="-0.9" y="-3.5" width="1.8" height="11"/><rect x="-4" y="-1.5" width="8" height="1.8"/><path d="M-7 2 Q-6 8 0 8 Q6 8 7 2 L5 3.5 Q4 6 0 6 Q-4 6 -5 3.5 Z"/>',
-  tower_floor: '<rect x="-6" y="-6" width="12" height="12"/>',
   monument: '<path d="M-2 -8 L2 -8 L3.5 6 H-3.5 Z"/><rect x="-6" y="6" width="12" height="2"/>',
 };
 
@@ -130,12 +129,13 @@ export const BUILDING_ICON: Record<string, string> = {
 // it wears its class's. `owner` colours the tower's roof.
 const CLASS_ICON: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
 export function iconOf(type: string, cls?: string, owner?: number): string {
+  if (type === 'tower_floor') type = 'tower'; // a floor goes on the tower, as the log shows it
   const pc = owner === undefined ? undefined : PLAYER_COLORS[owner];
   const like = CLASS_ICON[cls ?? ''] ?? '';
   return buildingShapes(type, pc) || (BUILDING_ICON[type] ?? '') || buildingShapes(like, pc) || (BUILDING_ICON[like] ?? '');
 }
 // Whether a building's icon is a folded-paper drawing (it brings its own colours).
-const folded = (type: string, cls?: string) => !!buildingShapes(type) || (!BUILDING_ICON[type] && !!buildingShapes(CLASS_ICON[cls ?? ''] ?? ''));
+const folded = (type: string, cls?: string) => type === 'tower_floor' || !!buildingShapes(type) || (!BUILDING_ICON[type] && !!buildingShapes(CLASS_ICON[cls ?? ''] ?? ''));
 
 export function buildingIcon(type: string, size = 22, color = '#fff', cls?: string, owner?: number): string {
   return `<svg class="bicon" width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${iconOf(type, cls, owner)}</svg>`;

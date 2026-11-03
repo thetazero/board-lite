@@ -111,13 +111,13 @@ async function host() {
   }
 }
 
-function seatName(model: string, taken: string[]): string {
-  const m = /opus|sonnet|haiku|fable/i.exec(model)?.[0] ?? model.replace(/^claude-/, '');
-  const base = model === 'bot' ? 'Bot' : `${m[0].toUpperCase()}${m.slice(1).toLowerCase()}`.slice(0, 9);
-  for (let n = 1; ; n++) {
-    const name = n === 1 ? base : `${base} ${n}`;
-    if (!taken.some((t) => t.toLowerCase() === name.toLowerCase())) return name;
-  }
+// Claude seats get plain names that say nothing about their model: in a depth
+// test (Haiku vs Opus) no player may know which opponent is the stronger one.
+// The model behind each name is only in runner.log and results.json.
+const NAMES = ['Rowan', 'Quinn', 'Ellis', 'Sage', 'Wren', 'Morgan'];
+function seatName(taken: string[]): string {
+  const free = (n: string) => !taken.some((t) => t.toLowerCase() === n.toLowerCase());
+  return NAMES.find(free) ?? `Wizard ${taken.length + 1}`;
 }
 
 // ---- Claude seats ----
@@ -144,6 +144,7 @@ Your only way to act is the game tools: view, act, say, wait and rules. You have
 How to play:
 - Loop until the game is over: call wait; when it says it's your decision, call view, think, then act. After each act, read the result and keep going until you end your turn or are waiting again.
 - Read the rules once at the start (rules tool).
+- Every act takes a "why": a sentence or two on why you chose it. It is private, never shown to anyone at the table, and kept for the people studying the game afterwards, so be honest and specific.
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and raid commitments can be bailed on in secret. Keep messages short, like real table talk, and reply when someone talks to you.
 - Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
@@ -153,7 +154,7 @@ function startSeat(s: Seat) {
   const dir = join(out, `seat-${s.p + 1}`);
   mkdirSync(dir, { recursive: true });
   const mcp = join(dir, 'mcp.json');
-  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token] } } }));
+  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token, join(out, `seat-${s.p + 1}.moves.txt`)] } } }));
   const first = s.starts === 0;
   const prompt = first
     ? 'The game has started. Read the rules, then play until the game is over.'
@@ -284,7 +285,7 @@ async function main() {
   if (status === 'running') {
     for (const model of models) {
       if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
-      const name = seatName(model, (await lobby()).seats.map((t) => t.name));
+      const name = seatName((await lobby()).seats.map((t) => t.name));
       const r = await call('/join', { name });
       seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, cost: 0, exitedAt: 0 });
       note(`${name} (${model}) takes seat ${r.seat}.`);

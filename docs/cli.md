@@ -41,8 +41,8 @@ Action phase, on your turn:
 
 | Command | Does |
 |---|---|
-| `build c12 2,-1` | build the building card c12 on hex 2,-1 (tower floors take no hex: `build c12`) |
-| `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost` |
+| `build c12 2,-1` | build the building card c12 on hex 2,-1 |
+| `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost`; `build tower_floor` adds a floor to your tower (no hex) |
 | `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
 | `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
 | `project fire` | special project: a base dragon egg of that element, no card, double cost |
