@@ -28,7 +28,7 @@ export interface Dragon {
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
   damage: number;
-  // Why the dragon sits out this round (no growth, no raid): it was hungry or hurt at production.
+  // Why the dragon sits out this round's raids: it was hungry (and doesn't grow) or hurt at production.
   resting: '' | 'hungry' | 'hurt';
 }
 
@@ -449,7 +449,7 @@ function startRound(g: Game) {
     log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
   }
   // Every dragon eats and heals fully. One that was hungry or hurt sits out
-  // the round: it doesn't grow and can't raid.
+  // the round's raids; only hunger stops it growing.
   for (const d of g.dragons) {
     const pl = g.players[d.owner];
     const hurt = d.damage > 0;
@@ -457,10 +457,8 @@ function startRound(g: Game) {
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
     d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
-    if (d.resting) {
-      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing' : 'goes hungry'}: it won't grow or raid this round.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
-      continue;
-    }
+    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? "is healing: it won't raid this round" : "goes hungry: it won't grow or raid this round"}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
+    if (!fed) continue;
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;

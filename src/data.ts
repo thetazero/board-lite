@@ -25,7 +25,7 @@ export const TUNING = {
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
   livestockPerDragon: 1,
-  dragonPointsByStage: [0, 1, 2, 4], // egg, hatchling, young, adult
+  dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
   // A title needs at least this much: dragon points, tower floors, buildings (tower included).
   titleMinimum: { army: 8, tower: 3, territory: 9 },
@@ -83,6 +83,8 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Produces a d6 crystal each round.' },
   pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
+  // The always-open way to turn gold, which comes from raids, into points.
+  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 2, gold: 3 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },
   // Building cards. Most count their neighbours.
   cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 2, crystal: 2, livestock: 1 }, 2),
   stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 2, crystal: 2, livestock: 1 }, 2),
@@ -98,7 +100,6 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { stone: 2, timber: 2, crystal: 2, gold: 1 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold a round for each neighbouring trade building.', copies: 2 },
-  tower_floor: { name: 'Tower Floor', class: 'monument', cost: { stone: 3, timber: 2, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
   monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 2 }, points: 1, per: 'monument', text: 'Worth 1 point for each neighbouring monument.', copies: 2 },
   // Point cards count only what can't be bought without limit: terrain, or
   // classes that hold no basic building (monuments, trade buildings).
@@ -142,7 +143,7 @@ export interface ActionDef {
 export const ACTIONS: Record<string, ActionDef> = {
   windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 5 },
   treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 4 },
-  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { crystal: 1 }, text: 'One of your dragons grows to its next life stage.', copies: 4 },
+  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 2 }, text: 'One of your dragons grows to its next life stage.', copies: 4 },
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Heal one of your hurt dragons so it can raid this round.', copies: 3 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'This round has one more raid.', copies: 3 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
@@ -220,8 +221,8 @@ export const DRAGONS: Record<string, DragonDef> = {
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 2, dice: 1, sides: 8 }, { hp: 22, targets: 2, dice: 2, sides: 8 }],
   },
   zephyr_drake: {
-    name: 'Zephyr Drake', element: 'air', growthTime: 1, targeting: 'random', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 4 }, { hp: 9, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 2, dice: 1, sides: 8 }],
+    name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 3, livestock: 1 }, copies: 1,
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 17, targets: 3, dice: 1, sides: 6 }],
   },
   abyss_wyrm: {
     name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,

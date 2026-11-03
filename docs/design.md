@@ -199,7 +199,7 @@ The owner's calls (2026-11-03), after playing the first clients:
 The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in the first rules engine's PR (#3), and `docs/rules.md` has the rules as played.
 
 - Card picking: 1 action card is dealt; 2 building cards are drawn and one is kept (the owner's "draw two keep 1"), all at once in the cards phase.
-- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
+- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid mostly in gold, so raid loot always has a way into points. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
 - The first player rotates each round.
 - The tower produces 1 of each non-gold resource and houses 1 dragon.
@@ -207,7 +207,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a monument and a dragon building.
 - The special project is a base egg of any element, at double the base dragon card.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round: no growth, no raid. Any hit in a raid costs a round, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
+- Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round's raids. Only hunger stops growth, as the upkeep rule above says. Any hit in a raid costs the next raid, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Loot is rounded down per player; the remainder is lost.
