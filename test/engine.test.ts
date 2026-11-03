@@ -5,14 +5,22 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
-import { RuleError, apply, bankRate, newGame, score, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, bankRate, buildingClass, buildingPoints, newGame, production, score, waitingOn, type Game } from '../src/engine.ts';
 import { BUILDINGS, TUNING } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
 import { mapRadius, neighbors } from '../src/map.ts';
 
+// Each round starts with everyone keeping a building card: keep the first.
+function keepAll(g: Game) {
+  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+}
+
 function advanceToRaidVote(g: Game) {
+  keepAll(g);
   while (g.phase === 'action') apply(g, g.turn, 'end');
 }
+
+const rich = (g: Game, p: number) => (g.players[p].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 });
 
 test('bot games reach a winner for every player count', () => {
   for (let players = 2; players <= 6; players++) {
@@ -72,6 +80,7 @@ test('votes and fight-or-bail choices stay secret until revealed', () => {
 
 test('illegal moves are refused without changing the game', () => {
   const g = newGame(3, 9);
+  keepAll(g);
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
   assert.throws(() => apply(g, 0, 'build c999 0,0'), RuleError);
@@ -82,6 +91,7 @@ test('illegal moves are refused without changing the game', () => {
 
 test('trades are binding and move resources and cards', () => {
   const g = newGame(2, 11);
+  keepAll(g);
   const card = g.players[1].hand[0];
   apply(g, 1, `offer P1 give ${card.id} get 1 stone`);
   const offer = g.offers[0];
@@ -98,23 +108,26 @@ test('trades are binding and move resources and cards', () => {
 
 test('buildings must touch your territory and match terrain', () => {
   const g = newGame(2, 2);
+  keepAll(g);
   const tower = g.towers[0];
-  g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
-  assert.throws(() => apply(g, 0, `project quarry ${tower}`), RuleError); // occupied
+  rich(g, 0);
+  assert.throws(() => apply(g, 0, `build quarry ${tower}`), RuleError); // occupied
   const far = Object.keys(g.map).find((k) => g.map[k].terrain === 'mountain' && !neighbors(k).some((n) => g.buildings[n]))!;
-  assert.throws(() => apply(g, 0, `project quarry ${far}`), RuleError); // not touching
+  assert.throws(() => apply(g, 0, `build quarry ${far}`), RuleError); // not touching
   const [wrong, right] = neighbors(tower).filter((k) => g.map[k]); // the land around a tower is random, so set it
   g.map[wrong].terrain = 'forest';
   g.map[right].terrain = 'mountain';
-  assert.throws(() => apply(g, 0, `project quarry ${wrong}`), RuleError); // wrong terrain
-  apply(g, 0, `project quarry ${right}`);
+  assert.throws(() => apply(g, 0, `build quarry ${wrong}`), RuleError); // wrong terrain
+  apply(g, 0, `build quarry ${right}`);
   assert.equal(g.buildings[right].type, 'quarry');
-  // Special projects cost double the card.
-  assert.equal(g.players[0].resources.timber, 50 - BUILDINGS.quarry.cost.timber! * 2);
+  // A basic building needs no card and costs what it says.
+  assert.equal(g.players[0].resources.timber, 50 - BUILDINGS.quarry.cost.timber!);
+  assert.throws(() => apply(g, 0, `build hatchery ${wrong}`), RuleError); // not a basic: needs its card
 });
 
 test('the ocean rings the land, with one harbor per coast; ports go only on harbors', () => {
   const g = newGame(2, 4);
+  keepAll(g);
   const hexes = Object.values(g.map);
   assert.equal(hexes.filter((h) => h.terrain === 'harbor').length, 6);
   for (const h of hexes) {
@@ -127,7 +140,7 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   g.map[sea].terrain = 'ocean';
   g.map[harbor].terrain = 'harbor';
   g.map[land].terrain = 'plains';
-  assert.throws(() => apply(g, 0, `project roost ${sea}`), RuleError); // nothing on the ocean
+  assert.throws(() => apply(g, 0, `build roost ${sea}`), RuleError); // nothing on the ocean
   g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'port' });
   assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
   apply(g, 0, `build cport ${harbor}`);
@@ -137,6 +150,7 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
 
 test('a title needs its minimum as well as the lead', () => {
   const g = newGame(2, 6);
+  keepAll(g);
   g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
   const free = Object.keys(g.map).filter((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k]);
   const own = (n: number) => { for (const k of free.slice(0, n)) g.buildings[k] = { type: 'roost', owner: 0, upgrade: null, floors: 0 }; };
@@ -169,6 +183,9 @@ test('separate CLI processes can share one game', () => {
     const cli = (...args: string[]) => execFileSync(process.execPath, ['src/cli.ts', ...args], { encoding: 'utf8' });
     cli('new', file, '--players', '2', '--seed', '4');
     assert.match(cli('view', file, '1'), /It's your decision/);
+    assert.match(cli('view', file, '1'), /keep <c\d+\|c\d+>/);
+    assert.match(cli('bot', file, '1'), /Bot plays/);
+    assert.match(cli('bot', file, '2'), /Bot plays/);
     assert.match(cli('do', file, '1', 'end'), /P2's turn/);
     assert.match(cli('wait', file, '2', '--timeout', '1'), /your decision/);
     assert.throws(() => execFileSync(process.execPath, ['src/cli.ts', 'view', file, '1'], { env: { ...process.env, BOARD_LITE_SEAT: '2' }, stdio: 'pipe' }));
@@ -213,4 +230,54 @@ test('a dragon hurt in a raid heals but sits out the next round', () => {
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
   assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
+});
+
+test('each round you draw two building cards and keep one; the other is discarded', () => {
+  const g = newGame(3, 21);
+  assert.equal(g.phase, 'cards');
+  assert.deepEqual(waitingOn(g), [0, 1, 2]);
+  const [a, b] = g.players[0].choice;
+  assert.ok(a && b && a.deck === 'building' && b.deck === 'building');
+  assert.equal(g.players[0].hand.length, TUNING.actionCardsPerRound);
+  assert.throws(() => apply(g, 0, 'keep c99999'), RuleError);
+  assert.throws(() => apply(g, 0, 'end'), RuleError);
+  apply(g, 0, `keep ${b.id}`);
+  assert.ok(g.players[0].hand.some((c) => c.id === b.id));
+  assert.ok(g.discards.building.some((c) => c.id === a.id));
+  assert.throws(() => apply(g, 0, `keep ${a.id}`), RuleError); // already kept
+  assert.ok(!playerView(g, 1, 1000).includes(a.id), 'what P1 drew stays hidden');
+  apply(g, 1, `keep ${g.players[1].choice[0].id}`);
+  assert.equal(g.phase, 'cards');
+  apply(g, 2, `keep ${g.players[2].choice[0].id}`);
+  assert.equal(g.phase, 'action');
+  // Basic buildings aren't in the deck.
+  for (const c of [...g.decks.building, ...g.discards.building]) assert.ok(!BUILDINGS[c.key]?.basic, c.key);
+});
+
+test('building cards count their neighbours, whoever owns them', () => {
+  const g = newGame(2, 8);
+  keepAll(g);
+  rich(g, 0);
+  const tower = g.towers[0];
+  const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
+  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
+  g.map[spot].terrain = 'plains';
+  // Cliff Works makes 1 stone a round for each neighbouring mountain.
+  g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
+  apply(g, 0, `build ccw ${spot}`);
+  const stone = () => production(g, 0).stone.base;
+  const base = stone();
+  const around = neighbors(spot).filter((k) => g.map[k] && !g.buildings[k]);
+  g.map[around[0]].terrain = 'mountain';
+  g.map[around[1]].terrain = 'mountain';
+  assert.equal(stone(), base + 2);
+  // A monument counts neighbouring monuments: the tower is one, and so is anyone else's monument.
+  g.players[0].hand.push({ id: 'cmo', deck: 'building', key: 'monument' });
+  const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  apply(g, 0, `build cmo ${next}`);
+  const touching = neighbors(next).filter((k) => g.buildings[k] && buildingClass(g.buildings[k]).includes('monument')).length;
+  assert.equal(buildingPoints(g, next), touching);
+  const free = neighbors(next).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  g.buildings[free] = { type: 'monument', owner: 1, upgrade: null, floors: 0 }; // P2's
+  assert.equal(buildingPoints(g, next), touching + 1);
 });

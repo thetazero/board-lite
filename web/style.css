@@ -326,3 +326,11 @@ body.phone { padding-bottom: 3.6em; }
 /* Icons inside game text ("gains 3" and a sheep): no gap after them. */
 .tchip { display: inline-flex; align-items: center; gap: .1em; font-weight: 700; white-space: nowrap; vertical-align: bottom; }
 .ricon { flex: none; }
+
+/* Cards phase: the two building cards drawn, side by side; tap Keep under one. */
+.keeprow { display: grid; grid-template-columns: 1fr 1fr; gap: .6em; align-items: start; }
+.keepone { display: flex; flex-direction: column; gap: .4em; min-width: 0; }
+.keepone .card.big { width: 100%; font-size: .78em; }
+.keepone .card.big .cname { font-size: 1.25em; }
+.proj > svg { flex: none; margin-right: -.2em; }
+.proj b { min-width: 6.5em; }

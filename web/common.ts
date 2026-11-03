@@ -112,8 +112,14 @@ export const BUILDING_ICON: Record<string, string> = {
   monument: '<path d="M-2 -8 L2 -8 L3.5 6 H-3.5 Z"/><rect x="-6" y="6" width="12" height="2"/>',
 };
 
-export function buildingIcon(type: string, size = 22, color = '#fff'): string {
-  return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${BUILDING_ICON[type] ?? ''}</svg>`;
+// Until a building has its own icon it wears its class's.
+const CLASS_ICON: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
+export function iconOf(type: string, cls?: string): string {
+  return BUILDING_ICON[type] ?? BUILDING_ICON[CLASS_ICON[cls ?? ''] ?? ''] ?? '';
+}
+
+export function buildingIcon(type: string, size = 22, color = '#fff', cls?: string): string {
+  return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${iconOf(type, cls)}</svg>`;
 }
 
 export const STAGE_LABEL = ['Egg', 'Hatchling', 'Young', 'Adult'];
@@ -181,6 +187,7 @@ export interface MapOptions {
   selectable?: string[]; // hex keys the viewer can tap
   highlight?: number | null; // a player whose buildings are emphasised
   coords?: boolean;
+  labels?: Record<string, string>; // short text shown on hexes, like a count
 }
 
 // The map as an SVG string. Selectable hexes carry data-hex for click handlers.
@@ -212,11 +219,13 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (b) {
       const r = size * 0.55;
       cells.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${owner}" stroke="#0009" stroke-width="2"/>`);
-      cells.push(`<g transform="translate(${x} ${y}) scale(${(r * 1.5) / 20})" fill="#fff">${BUILDING_ICON[b.type] ?? ''}</g>`);
+      cells.push(`<g transform="translate(${x} ${y}) scale(${(r * 1.5) / 20})" fill="#fff">${iconOf(b.type, b.cls)}</g>`);
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})"><circle r="${size * 0.22}" fill="#f5c542" stroke="#0009" stroke-width="1.5"/><path transform="scale(${size / 90})" d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z" fill="#7a4d00"/></g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
+    const label = opts.labels?.[h.k];
+    if (label) cells.push(`<g transform="translate(${x} ${y})"><circle r="${size * 0.36}" fill="#fff" stroke="#0009" stroke-width="2"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.42}" font-weight="800" fill="#111">${label}</text></g>`);
     if (opts.coords) cells.push(`<text x="${x}" y="${y + size * 0.82}" text-anchor="middle" font-size="${size * 0.22}" fill="#0009">${h.k}</text>`);
     cells.push('</g>');
   }

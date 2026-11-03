@@ -8,11 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { playOut } from './bot.ts';
 import {
-  ACTIONS, BUILDINGS, DRAGONS, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
-  type Attack, type Bundle, type Resource,
+  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
+  type Attack, type BuildingClass, type Bundle, type Resource, type Terrain,
 } from './data.ts';
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
-import { distance, generateMap, mapRadius, parseKey, towerSpots } from './map.ts';
+import { distance, generateMap, key, mapRadius, neighbors, parseKey, towerSpots } from './map.ts';
 
 // ---------- the yardstick ----------
 
@@ -40,17 +40,21 @@ function economy(): string {
   const start = value(TUNING.startingResources);
   return `## Economy baseline
 
-Yardstick for every "value" below: 1 per stone, timber, crystal or livestock, and ${VALUE.gold} per gold (the bank's ${TUNING.bankRate}:1 price for it). Gold comes only from raids${Object.values(UPGRADES).some((u) => u.goldPerRound) ? ' and Trade Charters' : ''}.
+Yardstick for every "value" below: 1 per stone, timber, crystal or livestock, and ${VALUE.gold} per gold (the bank's ${TUNING.bankRate}:1 price for it). Gold comes only from raids${goldMakers().length ? ` and ${goldMakers().join(', ')}` : ''}.
 
 - Start: ${cost(TUNING.startingResources)} (value ${start}). Tower income: ${cost(TUNING.towerProduction)} a round (value ${tower}), no dice.
-- Cards: ${TUNING.buildingCardsPerRound} building + ${TUNING.actionCardsPerRound} action a round; hand cap ${TUNING.handCap}.
+- Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} action card; hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Bank: ${TUNING.bankRate}:1${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `, ${b.bankRate}:1 with a ${b.name}`).join('')}.`;
 }
 
+function goldMakers(): string[] {
+  return [...Object.values(BUILDINGS), ...Object.values(UPGRADES)].filter((c) => c.makes?.gold).map((c) => `${c.name}s`);
+}
+
 function production(): string {
-  const workshop = Object.values(UPGRADES).find((u) => u.appliesTo === 'production' && u.baseBonus);
+  const workshop = Object.values(UPGRADES).find((u) => u.baseBonus);
   const rows = Object.values(BUILDINGS).filter((b) => b.produces).map((b) => {
     const p = b.produces!;
     const yieldPerRound = p.base + (p.die + 1) / 2;
@@ -58,18 +62,17 @@ function production(): string {
     return [
       b.name, b.terrain!, cost(b.cost), v, `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(yieldPerRound)})`,
       warnPayback(v / yieldPerRound),
-      b.specialProject ? warnPayback(value(specialProjectCost(b.cost)) / yieldPerRound) : '—',
       workshop ? n1((v + value(workshop.cost)) / (yieldPerRound + workshop.baseBonus!)) : '—',
     ];
   });
   const extra = workshop
     ? `\n\n${workshop.name} (${cost(workshop.cost)}, value ${value(workshop.cost)}) adds ${workshop.baseBonus} a round: it pays for itself in ${warnPayback(value(workshop.cost) / workshop.baseBonus!)} rounds on its own.`
     : '';
-  return `## Production buildings
+  return `## Basic production buildings
 
-Payback = value of the cost ÷ average output a round. ⚠ marks under ${PAYBACK_WARN} rounds.
+Anyone may build these, no card needed. Payback = value of the cost ÷ average output a round. ⚠ marks under ${PAYBACK_WARN} rounds.
 
-${table(['Building', 'Terrain', 'Cost', 'Value', 'Output a round', 'Payback (card)', 'Payback (special project)', 'Payback with Workshop'], rows)}${extra}`;
+${table(['Building', 'Terrain', 'Cost', 'Value', 'Output a round', 'Payback', 'Payback with Workshop'], rows)}${extra}`;
 }
 
 // Generated maps, one batch per player count, shared by the land sections.
@@ -83,6 +86,40 @@ function towerHexes(players: number) {
   return towerSpots(players).map((k) => { const [q, r] = parseKey(k)!; return { q, r }; });
 }
 const PRODUCERS = Object.values(BUILDINGS).filter((b) => b.produces);
+
+// Building cards whose effect counts their neighbours. For a terrain, the
+// map decides the count: measured as the best open hex touching a tower (the
+// first place one could go) and the share of all land hexes with 2 or more.
+function neighbourCards(): string {
+  const cards = Object.values(BUILDINGS).filter((b) => b.per);
+  const terrains = new Set<string>(TERRAINS);
+  const players = 3;
+  const maps = sampleMaps(players);
+  const measured = (t: Terrain) => {
+    let best = 0, twoPlus = 0, landHexes = 0;
+    for (const map of maps) {
+      const count = (k: string) => neighbors(k).filter((n) => map[n]?.terrain === t).length;
+      for (const tw of towerHexes(players)) {
+        const spots = neighbors(key(tw.q, tw.r)).filter((n) => map[n] && map[n].terrain !== 'ocean' && map[n].terrain !== 'harbor');
+        best += Math.max(0, ...spots.map(count));
+      }
+      for (const [k, h] of Object.entries(map)) if (h.terrain !== 'ocean') { landHexes++; if (count(k) >= 2) twoPlus++; }
+    }
+    return `${n1(best / (maps.length * players))} / ${pct(twoPlus / landHexes)}`;
+  };
+  const rows = cards.map((b) => {
+    const v = value(b.cost);
+    const counted = terrains.has(b.per!) ? `${b.per} hexes` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
+    const each = b.makes ? value(b.makes) : 0;
+    const at = (n: number) => (b.makes ? warnPayback(v / (each * n)) : n1(v / ((b.points ?? 0) * n)));
+    return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), v, b.makes ? `${cost(b.makes)} a round` : `${b.points} point`, at(1), at(2), at(3), terrains.has(b.per!) ? measured(b.per as Terrain) : 'built'];
+  });
+  return `## Building cards that count their neighbours
+
+Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building). Makers show payback in rounds; point buildings show value per point. "Map" is for ${players} players: the best count on an open hex touching a tower / share of land hexes with 2 or more.
+
+${table(['Card', 'Class', 'Counts', 'Cost', 'Value', 'Each one adds', 'At 1', 'At 2', 'At 3', 'Map'], rows)}`;
+}
 
 function land(): string {
   // Measured on generated maps: how often a tower has each terrain next to it,
@@ -171,21 +208,21 @@ ${table(['Players', 'Harbor touching the tower', 'Harbor within 2 steps', 'Avera
 
 function others(): string {
   const rows: (string | number)[][] = [];
-  for (const b of Object.values(BUILDINGS).filter((b) => !b.produces && !b.points)) {
+  for (const b of Object.values(BUILDINGS).filter((b) => !b.produces && !b.points && !b.per)) {
     const v = value(b.cost);
     let does = b.text;
     if (b.bankRate) does += ` Saves ${TUNING.bankRate - b.bankRate} per resource bought vs the bank: pays back after buying ${n1(v / (TUNING.bankRate - b.bankRate))}.`;
-    rows.push([b.name, 'building', cost(b.cost), v, b.specialProject ? value(specialProjectCost(b.cost)) : '—', does]);
+    rows.push([b.name, b.basic ? 'basic building' : 'building card', cost(b.cost), v, does]);
   }
-  for (const u of Object.values(UPGRADES).filter((u) => u.appliesTo !== 'production' && !u.points)) {
+  for (const u of Object.values(UPGRADES).filter((u) => !u.baseBonus && !u.points)) {
     const v = value(u.cost);
     let does = u.text;
-    if (u.goldPerRound) does += ` Pays back in ${warnPayback(v / (u.goldPerRound * VALUE.gold))} rounds.`;
-    rows.push([u.name, `upgrade (${u.appliesTo})`, cost(u.cost), v, '—', does]);
+    if (u.makes) does += ` Pays back in ${warnPayback(v / value(u.makes))} rounds.`;
+    rows.push([u.name, `upgrade (${u.appliesTo.map((c) => CLASS_NAMES[c]).join(', ')})`, cost(u.cost), v, does]);
   }
   return `## Dragon and trade buildings and upgrades
 
-${table(['Card', 'Kind', 'Cost', 'Value', 'Special project value', 'Does'], rows)}`;
+${table(['Card', 'Kind', 'Cost', 'Value', 'Does'], rows)}`;
 }
 
 function growth(gt: number, perRound: number, stage: number) {
@@ -195,7 +232,9 @@ function growth(gt: number, perRound: number, stage: number) {
 function points(): string {
   const rows: (string | number)[][] = [];
   for (const b of Object.values(BUILDINGS).filter((b) => b.points)) {
-    rows.push([b.name, cost(b.cost), b.points!, n1(value(b.cost) / b.points!), 'now']);
+    // Neighbour-counting monuments, at 2 neighbours (see the table above).
+    const pts = b.points! * (b.per ? 2 : 1);
+    rows.push([b.per ? `${b.name}, 2 neighbours` : b.name, cost(b.cost), pts, n1(value(b.cost) / pts), 'now']);
   }
   for (const u of Object.values(UPGRADES).filter((u) => u.points)) {
     rows.push([`${u.name} (upgrade)`, cost(u.cost), u.points!, n1(value(u.cost) / u.points!), 'now']);
@@ -340,7 +379,7 @@ ${table(head, rows)}`;
 function deck(): string {
   const build = [...Object.values(BUILDINGS), ...Object.values(UPGRADES)];
   const act = [...Object.values(ACTIONS), ...Object.values(DRAGONS)];
-  const nb = build.reduce((s, c) => s + c.copies, 0);
+  const nb = build.reduce((s, c) => s + (c.copies ?? 0), 0);
   const na = act.reduce((s, c) => s + c.copies, 0);
   // Chance one player is dealt at least one copy within 5 rounds, ignoring
   // what other players draw (a fair approximation while the deck is large).
@@ -350,19 +389,20 @@ function deck(): string {
     return 1 - Math.max(0, miss);
   };
   const R = 5;
+  const seen = R * TUNING.buildingCardsDrawn;
   const rows = [
-    ...Object.values(BUILDINGS).map((c) => [c.name, 'building', c.copies, pct(c.copies / nb), pct(within(c.copies, nb, R * TUNING.buildingCardsPerRound))]),
-    ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb), pct(within(c.copies, nb, R * TUNING.buildingCardsPerRound))]),
+    ...Object.values(BUILDINGS).filter((c) => c.copies).map((c) => [c.name, 'building', c.copies!, pct(c.copies! / nb), pct(within(c.copies!, nb, seen))]),
+    ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb), pct(within(c.copies, nb, seen))]),
     ...Object.values(ACTIONS).map((c) => [c.name, 'action', c.copies, pct(c.copies / na), pct(within(c.copies, na, R * TUNING.actionCardsPerRound))]),
   ];
   const upgradeCopies = Object.values(UPGRADES).reduce((s, u) => s + u.copies, 0);
-  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb), pct(within(upgradeCopies, nb, R * TUNING.buildingCardsPerRound))]);
-  const firstTwo = within(upgradeCopies, nb, 2 * TUNING.buildingCardsPerRound);
+  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb), pct(within(upgradeCopies, nb, seen))]);
+  const firstTwo = within(upgradeCopies, nb, 2 * TUNING.buildingCardsDrawn);
   const dragonCopies = Object.values(DRAGONS).reduce((s, d) => s + d.copies, 0);
   rows.push([`Any dragon (${Object.keys(DRAGONS).length} kinds)`, 'action', dragonCopies, pct(dragonCopies / na), pct(within(dragonCopies, na, R * TUNING.actionCardsPerRound))]);
   return `## Decks
 
-Building deck ${nb} cards, action deck ${na}. Last column: chance a player is dealt at least one within ${R} rounds. A player is dealt at least one upgrade in their first 2 rounds ${pct(firstTwo)} of the time.
+Building deck ${nb} cards (${Object.values(BUILDINGS).filter((c) => c.copies).length} buildings, ${Object.keys(UPGRADES).length} upgrades), action deck ${na}. Last column: chance a player draws at least one (to keep or pass over) within ${R} rounds. A player draws at least one upgrade in their first 2 rounds ${pct(firstTwo)} of the time.
 
 ${table(['Card', 'Deck', 'Copies', 'Share of deck', `By round ${R}`], rows)}`;
 }
@@ -372,13 +412,13 @@ function demand(): string {
   // copies in the deck, against where it comes from.
   const spend = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<Resource, number>;
   const all = [...Object.values(BUILDINGS), ...Object.values(UPGRADES), ...Object.values(ACTIONS), ...Object.values(DRAGONS)];
-  for (const c of all) for (const r of RESOURCES) spend[r] += (c.cost[r] ?? 0) * c.copies;
+  for (const c of all) for (const r of RESOURCES) spend[r] += (c.cost[r] ?? 0) * (c.copies ?? 0);
   const total = RESOURCES.reduce((s, r) => s + spend[r], 0);
   const sources = (r: Resource) => {
     const s: string[] = [];
     if (TUNING.towerProduction[r]) s.push(`tower ${TUNING.towerProduction[r]}`);
-    for (const b of Object.values(BUILDINGS)) if (b.produces?.resource === r) s.push(b.name);
-    for (const u of Object.values(UPGRADES)) if (u.goldPerRound && r === 'gold') s.push(u.name);
+    for (const b of Object.values(BUILDINGS)) if (b.produces?.resource === r || b.makes?.[r]) s.push(b.name);
+    for (const u of Object.values(UPGRADES)) if (u.makes?.[r]) s.push(u.name);
     const loot = Object.values(TARGETS).filter((t) => t.loot[r]).length;
     if (loot) s.push(`raid loot (${loot} of ${Object.keys(TARGETS).length} kingdoms)`);
     return s.join(', ') || 'nothing';
@@ -386,7 +426,7 @@ function demand(): string {
   const rows = RESOURCES.map((r) => [r, spend[r], pct(spend[r] / total), sources(r)]);
   return `## Resource demand
 
-How much of each resource every card in both decks costs in total (each card counted once per copy), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per dragon a round) comes on top.
+How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per dragon a round) comes on top.
 
 ${table(['Resource', 'In all card costs', 'Share', 'Comes from'], rows)}`;
 }
@@ -421,7 +461,7 @@ export function datasheet(): string {
 
 Generated from \`src/data.ts\` and the engine by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff: it shows what the change does to payback, cost per point and raid odds.
 
-${[economy(), production(), land(), shortages(), others(), points(), dragons(), raids(), demand(), deck(), length()].join('\n\n')}
+${[economy(), production(), land(), shortages(), neighbourCards(), others(), points(), dragons(), raids(), demand(), deck(), length()].join('\n\n')}
 `;
 }
 
