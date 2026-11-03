@@ -4,7 +4,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your resources and your hand. **Public** (the TV): the map, buildings, dragons, titles, hand sizes, trade offers.
 
-**Setup.** Each player has a tower (fixed spot by player count; the land around it is random, like the rest of the map), 2 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
+**Setup.** Each player has a tower (fixed spot by player count; the land around it is random, like the rest of the map), 3 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
 
 ## A round: four phases
 

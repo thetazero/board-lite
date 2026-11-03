@@ -72,7 +72,7 @@ test('illegal moves are refused without changing the game', () => {
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
   assert.throws(() => apply(g, 0, 'build c999 0,0'), RuleError);
-  assert.throws(() => apply(g, 0, 'bank stone gold'), RuleError); // can't afford 4 stone
+  assert.throws(() => apply(g, 0, 'bank stone gold 2'), RuleError); // can't afford 8 stone
   assert.throws(() => apply(g, 0, 'dance'), RuleError);
   assert.equal(JSON.stringify(g), before);
 });
