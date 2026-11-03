@@ -32,14 +32,14 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Fauna.** Nothing is built on a hex with fauna, and a building under fauna produces nothing until it's cleared. Anyone may clear any fauna. New fauna comes only from cards (Wolf Call, Rouse the Bear), which put a beast on any land hex but a tower: next to someone, or on their building.
 
-**Great beasts.** Each holds its hex and every hex next to it: nothing is built there while it lives. Whoever slays one scores **1 point** for good, and it never comes back: a race. The Thunderbird is weak to ice and shrugs off lightning, air and water; the Leviathan is weak to lightning and shrugs off water, fire and ice. Once the Thunderbird falls, each production building on or next to its peak makes 2 more a round.
+**Great beasts.** Each holds its hex and every hex next to it: nothing is built there while it lives. Whoever slays one scores **2 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and shrugs off lightning, air and water; the Leviathan is weak to lightning and shrugs off water, fire and ice. Once the Thunderbird falls, each production building on or next to its peak makes 2 more a round.
 
 **Neighbours.** Every building has a class (quarry, lumber camp, mine, pasture, dragon building, monument or trade building); the tower is a monument and a dragon building. Many building cards count their six neighbouring hexes, either hexes of a terrain (built on or not) or buildings of a class, whoever owns them. The count is always the current one: a neighbour built later counts too.
 
 ## Points
 
 - Dragons: hatchling 1, young 2, adult 3. Eggs 0.
-- Tower floor 1 (3 stone and 4 gold, no card: raid loot always has a way into points); other monuments as their card says (most count their neighbours); Gilding +2.
+- Tower floor 1 (3 stone and 2 gold, no card: raid loot always has a way into points); other monuments as their card says (most count their neighbours); Gilding +2.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
 - Great beasts: 1 each to whoever slays it, for good.
 - Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10), Tallest Tower (most floors, at least 4), Largest Territory (most buildings, at least 9). The holder keeps a title on a tie.

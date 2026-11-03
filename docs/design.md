@@ -102,7 +102,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
   - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
   - Titles take real investment: "strongest army and largest territory need a larger threshold".
-  - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 1 point.
+  - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 2 points (1 until #80).
 
 ## Buildings
 
