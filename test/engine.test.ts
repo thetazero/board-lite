@@ -225,3 +225,34 @@ test('a dragon hurt in a raid heals but sits out the next round', () => {
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
   assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
 });
+
+test('a fight replays from its events: the hits add up to the result', () => {
+  let fights = 0;
+  for (let players = 2; players <= 6; players++) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const g = newGame(players, seed);
+      playOut(g, { state: seed * 31 + players });
+      for (const [i, e] of g.log.entries()) {
+        if (e.ev?.k !== 'fight') continue;
+        fights++;
+        const units = e.ev.units.map((u) => u.hp);
+        const fighting = new Set(e.ev.ds);
+        let j = i + 1;
+        for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
+          for (const h of c.hits) {
+            if (h.by === 'dragon') {
+              units[h.u] = Math.max(0, units[h.u] - h.dmg);
+              assert.equal(h.down, units[h.u] === 0);
+            } else if (h.down) fighting.delete(h.d);
+          }
+        }
+        const end = g.log[j].ev;
+        assert.equal(end?.k, 'raidEnd', `${players}p seed ${seed}`);
+        if (end?.k !== 'raidEnd') continue;
+        assert.equal(end.won, units.every((hp) => hp === 0));
+        assert.equal(!end.won, fighting.size === 0);
+      }
+    }
+  }
+  assert.ok(fights > 10);
+});

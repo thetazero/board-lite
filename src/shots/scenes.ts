@@ -293,7 +293,17 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote', // the raid is over
     liveEnd: (g) => /falls!/.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''), // and won
-    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replay and result", client: 'tv', live: true, waitMs: 400 }],
+    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replayed, at the end: who won and what they took", client: 'tv', live: true, waitMs: 6600 }],
+  },
+  {
+    // The same raid, caught mid-replay.
+    name: 'raid-fight-3p',
+    players: 3,
+    seed: 3,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
+    live: (g) => g.raid === null || g.raid.step === 'vote',
+    liveEnd: (g) => /falls!/.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''),
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2200 }],
   },
   {
     name: 'discard-4p',
@@ -550,7 +560,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 1,
     live: raidOver,
     liveEnd: (g) => /holds\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid ("… holds.")', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid, at the end of the replay ("… holds")', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
     name: 'raid-bailed-3p',
