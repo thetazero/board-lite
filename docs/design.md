@@ -21,7 +21,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - You play a wizard who raises dragons. Your tower and buildings produce resources, dragons are hatched and raised, and dragons raid neutral kingdoms for loot.
 - Raids target neutral kingdoms, not other players ("raid neutral targets is definitely the move").
-- Spells are dropped as a system ("Drop spells for the most part though").
+- Spells are dropped as a system ("Drop spells for the most part though"). What remains are spell cards in hand, "basically action cards".
 
 ## Hidden vs public state
 
