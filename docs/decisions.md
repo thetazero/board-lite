@@ -2,14 +2,9 @@
 
 Provisional design calls made without the owner present, newest first. Each entry: the call, why, and what would change it. The owner reviews these; any can be reversed.
 
-## 2026-11-03: first TV and phone clients
+## 2026-11-03: playtest memory limit
 
-- **Call (the owner's):** it's one game whatever the client. "it's the same game regardless of cli clients or phone client... the host/server just has the option to spin up a webserver for the ui, or not"; "this isn't a problem to solve, if every client uses the same interface". So the server hosts the game, and phones, the TV and the CLI all go through the same room API (join for a seat token, then the engine's commands). The CLI's file mode stays for offline play and the current playtest runner; a game saved from it can be hosted by the server.
-
-- **Call:** the 10-second flee clock lives in the server; anyone who hasn't chosen when it runs out stays. **Why:** the design gives 10 seconds and the engine left the timer to the clients; "stay" is the choice that changes nothing, so a distracted player is never dragged out of a fight. No other step has a clock: votes, commitments and fight-or-bail wait for everyone, as at a real table. **What would change it:** playtests where one slow player stalls every raid.
-- **Call:** no chat on the phones. **Why:** everyone is in one room, and eyes should stay on the TV and the people; talking is talking. The engine's `say`/`tell` stay for the CLI and Claude playtests.
-- **Call:** bots can fill seats from the lobby. **Why:** the random test bot already exists; it lets one person try the clients and lets a group of two test a three-seat game. It is not meant to play well.
-- **Call:** the TV shows a short production banner with dice at the start of each round and a banner for each raid's result; everything else is live state. **Why:** dice "shown on screen" and the raid cut scene are in the design; anything more is the graphics workstream.
+- **Call:** playtests take seat slots from one machine-wide pool (6 Claude seats at once by default, plus a free-memory check), and games beyond it queue instead of starting. **Why:** on 2026-11-02 two tabs each started an 8-game batch all at once, about 40 Claude processes, and systemd-oomd killed the terminal holding every tab. A per-batch limit can't stop that, because tabs don't know about each other's batches; a pool in `~/.cache` shared through files can, with no daemon. 6 seats is about 2.7 GB, which fits next to the ~9 GB the tabs, orchestrator and browser already use on the 14 GB machine. **What would change it:** a bigger machine, or measurements showing seats use much less memory than 450 MB.
 
 ## 2026-11-02: table talk and sandboxed playtests
 
