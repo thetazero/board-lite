@@ -623,7 +623,13 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'hatchery': return { model: hatchery(pc), offset: [0, 0] };
     case 'port': return { model: port(pc), offset: [0, 0] };
     case 'monument': return { model: monument(up), offset: [0, 0] };
-    default: return { model: group(part(box(0.4, 0.4, 0.4), pc, { at: [0, 0.2, 0] })), offset: [0, 0] };
+    default: {
+      // Until a building has its own model it borrows its class's.
+      const stand: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
+      const like = stand[b.cls];
+      if (like && like !== b.type) return buildingModel({ ...b, type: like });
+      return { model: group(part(box(0.4, 0.4, 0.4), pc, { at: [0, 0.2, 0] })), offset: [0, 0] };
+    }
   }
 }
 

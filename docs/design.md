@@ -91,11 +91,11 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   - Lots of variety: "I want lots of fun variety."
   - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (port: a better bank rate). No defense buildings (see Raids).
+- Building classes so far: one per resource (quarry, lumber camp, mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
 
 ### Special projects
 
-- Always-available "special projects" let a player get unstuck on all the basic things without a card, such as building the basic buildings or getting a base dragon of each element.
+- Always-available "special projects" let a player get unstuck on all the basic things without a card, such as building the basic buildings or getting a base dragon of each element. (With the basic buildings no longer cards, only the base egg is left as a special project.)
 - They are expensive: always worse than the equivalent card.
 
 ## Map
@@ -198,13 +198,14 @@ The owner's calls (2026-11-03), after playing the first clients:
 
 The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in the first rules engine's PR (#3), and `docs/rules.md` has the rules as played.
 
-- Card picking: cards are dealt (2 building, 1 action), with no choice among them.
+- Card picking: 1 action card is dealt; 2 building cards are drawn and one is kept (the owner's "draw two keep 1"), all at once in the cards phase.
+- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
 - The first player rotates each round.
 - The tower produces 1 of each non-gold resource and houses 1 dragon.
 - Only production buildings are tied to terrain; other buildings go on any free hex.
-- One upgrade per building; the tower counts as a points and a dragon building.
-- Special projects cost double the card: the four production buildings, a roost, or a base egg of any element.
+- One upgrade per building; the tower counts as a monument and a dragon building.
+- The special project is a base egg of any element, at double the base dragon card.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
 - Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round: no growth, no raid. Any hit in a raid costs a round, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.

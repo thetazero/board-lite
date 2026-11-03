@@ -98,7 +98,7 @@ const best = (g: Game) => Math.max(...g.players.map((_, p) => score(g, p).total)
 const dragonsOf = (g: Game, p: number) => g.dragons.filter((d) => d.owner === p);
 const buildingsOf = (g: Game, p: number) => Object.values(g.buildings).filter((b) => b.owner === p).length;
 // The acting player can play a building card on a hex right now.
-const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
+const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.kind === 'building' && c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
 const committed = (g: Game) => g.raid!.commits.filter((c) => c.length).length;
 const fightingPlayers = (g: Game) => new Set(g.raid!.fighters.map((id) => g.dragons.find((d) => d.id === id)!.owner)).size;
 
@@ -185,13 +185,23 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
-      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)'], sizes: true },
-      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
-      { file: 'phone-build-bank-3p', caption: 'Phone: special projects and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
+      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
+      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
+      { file: 'phone-build-bank-3p', caption: 'Phone: basic buildings, the egg project and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
       { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
       { file: 'phone-join-started', caption: 'Phone: joining a game that has started, every seat taken', client: 'phone', fill: { name: 'Zed' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+    ],
+  },
+  {
+    name: 'keep-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'cards' && waitingOn(g).length === 2,
+    shots: (g) => [
+      { file: 'tv-keep-3p', caption: 'TV: everyone keeping one of two building cards', client: 'tv' },
+      { file: 'phone-keep-3p', caption: 'Phone: keep one of the two building cards drawn', client: 'phone', seat: waitingOn(g!)[0] },
     ],
   },
   {
@@ -243,7 +253,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
-      const keys = [...Object.keys(BUILDINGS), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
+      const keys = [...Object.keys(BUILDINGS).filter((k) => !BUILDINGS[k].basic), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
       g.players[g.turn].hand = keys.map((key, i) => ({ id: `c${900 + i}`, deck: DRAGONS[key] || ACTIONS[key] ? 'action' : 'building', key }));
     },
     shots: (g) => [
@@ -473,7 +483,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-floor', caption: 'Phone: Tower Floor tapped open', clicks: [card(id('tower_floor'))] },
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
-        { ...me, file: 'phone-pick-project', caption: 'Phone: choosing where a special project goes', clicks: ['[data-tab=more]', '[data-project]:not([disabled])'] },
+        { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
         { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=more]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
     },
@@ -563,13 +573,13 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid, at the end of the replay ("… holds")', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
-    name: 'raid-bailed-3p',
-    players: 3,
+    name: 'raid-bailed-2p',
+    players: 2,
     seed: 1,
     until: (g) => step(g) === 'bail' && committed(g) >= 1,
     live: raidOver,
     liveEnd: (g) => /Everyone bailed/.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-bailed-3p', caption: 'TV: everyone bailed', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    shots: () => [{ file: 'tv-raid-bailed-2p', caption: 'TV: everyone bailed (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
     name: 'raid-nobody-3p',

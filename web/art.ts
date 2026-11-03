@@ -420,8 +420,11 @@ const ACTIONS: Record<string, () => string> = {
 // ---------- entry points ----------
 
 // The picture for one card. `element` is a dragon's element.
-export function cardArt(kind: string, key: string, element?: string): string {
-  const draw = kind === 'building' ? BUILDINGS[key] : kind === 'upgrade' ? UPGRADES[key] : kind === 'action' ? ACTIONS[key] : null;
+// Until a building has its own picture it borrows its class's.
+const CLASS_ART: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'market' };
+
+export function cardArt(kind: string, key: string, element?: string, cls?: string): string {
+  const draw = kind === 'building' ? BUILDINGS[key] ?? BUILDINGS[CLASS_ART[cls ?? ''] ?? ''] : kind === 'upgrade' ? UPGRADES[key] : kind === 'action' ? ACTIONS[key] : null;
   const body = kind === 'dragon' ? dragonArt(key, element ?? 'fire') : draw ? draw() : actionScene(star(60, 44, 10));
   return `<svg class="art" viewBox="0 0 120 84" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${body}</svg>`;
 }

@@ -2,8 +2,8 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES,
-  type Attack, type BuildingClass, type Bundle, type DragonStage, type Element, type Resource,
+  ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES,
+  type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource,
 } from './data.ts';
 import { generateMap, key, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
@@ -35,6 +35,7 @@ export interface Dragon {
 export interface Player {
   resources: Record<Resource, number>;
   hand: Card[];
+  choice: Card[]; // building cards drawn this round, one to keep
 }
 
 export interface TradeSide {
@@ -87,6 +88,8 @@ export type GameEvent =
   | { k: 'rest'; d: string; why: 'hungry' | 'hurt' }
   | { k: 'grow'; d: string; stage: number }
   | { k: 'draw'; p: number; n: number }
+  | { k: 'pick' } // everyone keeps one of the building cards they drew
+  | { k: 'keep'; p: number }
   | { k: 'turn'; p: number }
   | { k: 'build'; p: number; b: string; name: string; hex: string; project?: boolean }
   | { k: 'floor'; p: number; floors: number; project?: boolean }
@@ -126,7 +129,7 @@ export interface Game {
   version: 1;
   players: Player[];
   round: number;
-  phase: 'action' | 'raid' | 'discard' | 'over';
+  phase: 'cards' | 'action' | 'raid' | 'discard' | 'over';
   turn: number; // whose turn it is in the action phase
   map: Record<string, Hex>;
   buildings: Record<string, Building>;
@@ -247,46 +250,77 @@ function ownedBuildings(g: Game, p: number): [string, Building][] {
   return Object.entries(g.buildings).filter(([, b]) => b.owner === p);
 }
 
-function buildingClass(b: Building): BuildingClass[] {
-  return b.type === 'tower' ? ['points', 'dragon'] : [BUILDINGS[b.type].class];
+export function buildingClass(b: Building): BuildingClass[] {
+  return b.type === 'tower' ? TOWER_CLASSES : [BUILDINGS[b.type].class];
+}
+
+// Does this hex count for an effect that counts `what`? Its terrain does, and
+// so does the class of any building on it, whoever owns it.
+function counts(g: Game, k: string, what: Counted): boolean {
+  const b = g.buildings[k];
+  return g.map[k]?.terrain === what || (!!b && buildingClass(b).includes(what as BuildingClass));
+}
+
+// How many of hex k's neighbours count for `what`.
+export function neighbourCount(g: Game, k: string, what: Counted): number {
+  return neighbors(k).filter((n) => counts(g, n, what)).length;
+}
+
+// The multiplier on a building's effects at hex k: 1, or its neighbour count.
+function times(g: Game, k: string, def: BuildingDef): number {
+  return def.per ? neighbourCount(g, k, def.per) : 1;
+}
+
+// The building types other than the tower, with their hex and multiplier.
+function placed(g: Game, p: number): { k: string; b: Building; def: BuildingDef; n: number }[] {
+  return ownedBuildings(g, p).filter(([, b]) => b.type !== 'tower').map(([k, b]) => ({ k, b, def: BUILDINGS[b.type], n: times(g, k, BUILDINGS[b.type]) }));
 }
 
 export function dragonCapacity(g: Game, p: number): number {
   let cap = TUNING.towerDragonCapacity;
-  for (const [, b] of ownedBuildings(g, p)) {
-    if (b.type !== 'tower') cap += BUILDINGS[b.type].dragonCapacity ?? 0;
-    if (b.upgrade) cap += UPGRADES[b.upgrade].dragonCapacity ?? 0;
-  }
+  for (const { def, n } of placed(g, p)) cap += (def.dragonCapacity ?? 0) * n;
+  for (const [, b] of ownedBuildings(g, p)) if (b.upgrade) cap += UPGRADES[b.upgrade].dragonCapacity ?? 0;
   return cap;
 }
 
 export function bankRate(g: Game, p: number): number {
   let rate = TUNING.bankRate;
-  for (const [, b] of ownedBuildings(g, p)) {
-    if (b.type !== 'tower') rate = Math.min(rate, BUILDINGS[b.type].bankRate ?? rate);
-  }
+  for (const { def } of placed(g, p)) rate = Math.min(rate, def.bankRate ?? rate);
   return rate;
 }
 
 function growthPerRound(g: Game, p: number): number {
   let n = 1;
-  for (const [, b] of ownedBuildings(g, p)) if (b.type !== 'tower') n += BUILDINGS[b.type].growthBonus ?? 0;
+  for (const { def, n: k } of placed(g, p)) n += (def.growthBonus ?? 0) * k;
   return n;
+}
+
+// The resource a building makes, if any (what a Workshop adds to).
+export function madeResource(def: BuildingDef): Resource | null {
+  return def.produces?.resource ?? (RESOURCES.find((r) => def.makes?.[r]) ?? null);
+}
+
+// Points a building at hex k is worth right now, its upgrade included.
+export function buildingPoints(g: Game, k: string): number {
+  const b = g.buildings[k];
+  const up = b.upgrade ? UPGRADES[b.upgrade].points ?? 0 : 0;
+  if (b.type === 'tower') return b.floors * BUILDINGS.tower_floor.points! + up;
+  return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]) + up;
 }
 
 // Public production: fixed amount plus a list of dice, per resource.
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
   for (const r of RESOURCES) out[r].base += TUNING.towerProduction[r] ?? 0;
-  for (const [, b] of ownedBuildings(g, p)) {
-    if (b.type === 'tower') continue;
-    const def = BUILDINGS[b.type];
+  for (const { b, def, n } of placed(g, p)) {
     const up = b.upgrade ? UPGRADES[b.upgrade] : null;
     if (def.produces) {
-      out[def.produces.resource].base += def.produces.base + (up?.baseBonus ?? 0);
+      out[def.produces.resource].base += def.produces.base;
       out[def.produces.resource].dice.push(def.produces.die);
     }
-    if (up?.goldPerRound) out.gold.base += up.goldPerRound;
+    for (const r of RESOURCES) out[r].base += (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0);
+    const made = madeResource(def);
+    if (made && up?.baseBonus) out[made].base += up.baseBonus;
   }
   return out;
 }
@@ -329,11 +363,7 @@ export interface Score {
 export function score(g: Game, p: number): Score {
   const dragons = g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + TUNING.dragonPointsByStage[d.stage], 0);
   let buildings = 0;
-  for (const [, b] of ownedBuildings(g, p)) {
-    if (b.type === 'tower') buildings += b.floors * BUILDINGS.tower_floor.points!;
-    else buildings += BUILDINGS[b.type].points ?? 0;
-    if (b.upgrade) buildings += UPGRADES[b.upgrade].points ?? 0;
-  }
+  for (const [k] of ownedBuildings(g, p)) buildings += buildingPoints(g, k);
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
   const hidden = g.players[p].hand.filter((c) => ACTIONS[c.key]?.effect === 'hidden_point').length;
   const pub = dragons + buildings + titles;
@@ -343,9 +373,9 @@ export function score(g: Game, p: number): Score {
 // ---------- setup ----------
 
 function buildDeck(g: Game, deck: 'building' | 'action'): Card[] {
-  const defs: Record<string, { copies: number }>[] = deck === 'building' ? [BUILDINGS, UPGRADES] : [ACTIONS, DRAGONS];
+  const defs: Record<string, { copies?: number }>[] = deck === 'building' ? [BUILDINGS, UPGRADES] : [ACTIONS, DRAGONS];
   const cards: Card[] = [];
-  for (const d of defs) for (const [k, def] of Object.entries(d)) for (let i = 0; i < def.copies; i++) cards.push({ id: '', deck, key: k });
+  for (const d of defs) for (const [k, def] of Object.entries(d)) for (let i = 0; i < (def.copies ?? 0); i++) cards.push({ id: '', deck, key: k });
   shuffle(g.rng, cards);
   for (const c of cards) c.id = newId(g, 'c');
   return cards;
@@ -380,7 +410,7 @@ export function newGame(players: number, seed: number): Game {
   const baseDragons = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
   for (let p = 0; p < players; p++) {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
-    g.players.push({ resources, hand: [] });
+    g.players.push({ resources, hand: [], choice: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
     g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, resting: '' });
   }
@@ -441,23 +471,41 @@ function startRound(g: Game) {
     }
     if (d.stage === 3) d.growth = 0;
   }
-  // 2. Card picking, all at once.
+  // 2. Cards, all at once: the action cards go straight to hand; of the
+  // building cards, each player keeps one and discards the rest.
   for (let p = 0; p < g.players.length; p++) {
-    const drawn: Card[] = [];
-    for (let i = 0; i < TUNING.buildingCardsPerRound; i++) {
-      const c = drawCard(g, 'building');
-      if (c) drawn.push(c);
-    }
+    const pl = g.players[p];
+    const actions: Card[] = [];
     for (let i = 0; i < TUNING.actionCardsPerRound; i++) {
       const c = drawCard(g, 'action');
-      if (c) drawn.push(c);
+      if (c) actions.push(c);
     }
-    g.players[p].hand.push(...drawn);
-    log(g, `You draw ${drawn.map((c) => `${cardName(c)} (${c.id})`).join(', ') || 'nothing'}.`, { k: 'mine' }, { to: [p] });
-    log(g, `${pname(p)} draws ${nCards(drawn.length)}.`, { k: 'draw', p, n: drawn.length });
+    for (let i = 0; i < TUNING.buildingCardsDrawn; i++) {
+      const c = drawCard(g, 'building');
+      if (c) pl.choice.push(c);
+    }
+    pl.hand.push(...actions);
+    const named = (cs: Card[]) => cs.map((c) => `${cardName(c)} (${c.id})`).join(', ');
+    log(g, `You draw ${named(actions) || 'no action card'}${pl.choice.length ? `, and building cards ${named(pl.choice)}: keep one` : ''}.`, { k: 'mine' }, { to: [p] });
+    log(g, `${pname(p)} draws ${nCards(actions.length + pl.choice.length)}.`, { k: 'draw', p, n: actions.length + pl.choice.length });
+    if (pl.choice.length === 1) keepCard(g, p, pl.choice[0]);
   }
+  g.phase = 'cards';
+  if (g.players.every((pl) => !pl.choice.length)) return startActions(g);
+  log(g, 'Everyone picks a building card to keep.', { k: 'pick' });
+}
+
+function keepCard(g: Game, p: number, c: Card) {
+  const pl = g.players[p];
+  for (const x of pl.choice) if (x !== c) g.discards.building.push(x);
+  pl.choice = [];
+  pl.hand.push(c);
+  log(g, `You keep ${cardName(c)} (${c.id}).`, { k: 'mine' }, { to: [p] });
+}
+
+// 3. Action phase.
+function startActions(g: Game) {
   updateTitles(g);
-  // 3. Action phase.
   g.phase = 'action';
   g.turn = firstPlayer(g);
   g.raidsLeft = 1;
@@ -759,7 +807,7 @@ function placeBuilding(g: Game, p: number, type: string, k: string, project = fa
 
 export function upgradeTargets(g: Game, p: number, up: string): string[] {
   return ownedBuildings(g, p)
-    .filter(([, b]) => !b.upgrade && buildingClass(b).includes(UPGRADES[up].appliesTo))
+    .filter(([, b]) => !b.upgrade && buildingClass(b).some((c) => UPGRADES[up].appliesTo.includes(c)))
     .map(([k]) => k)
     .sort();
 }
@@ -768,7 +816,6 @@ export function specialProjectCost(cost: Bundle): Bundle {
   return scale(cost, TUNING.specialProjectMultiplier);
 }
 
-export const PROJECT_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].specialProject);
 export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object.keys(DRAGONS).find((k) => DRAGONS[k].base && DRAGONS[k].element === e)!])) as Record<Element, string>;
 
 function hatch(g: Game, p: number, dragonKey: string, project = false) {
@@ -832,6 +879,14 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} trades ${rate * times} ${give} to the bank for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
     }
     case 'build': {
+      // A basic building by name, or a building card from hand.
+      const basic = BASIC_BUILDINGS.find((b) => b === args[0]);
+      if (basic) {
+        const k = placeCheck(g, p, basic, args[1]);
+        pay(pl, BUILDINGS[basic].cost);
+        return placeBuilding(g, p, basic, k);
+      }
+      if (!pl.hand.some((c) => c.id === args[0])) fail(`Build a card from your hand (like "build c12 2,-1") or a basic building: ${BASIC_BUILDINGS.join(', ')}.`);
       const c = handCard(g, p, args[0]);
       if (cardKind(c) !== 'building') fail(`${cardName(c)} is not a building card.`);
       const k = placeCheck(g, p, c.key, args[1]);
@@ -853,11 +908,6 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     }
     case 'project': {
       const what = args[0] ?? '';
-      if (PROJECT_BUILDINGS.includes(what)) {
-        const k = placeCheck(g, p, what, args[1]);
-        pay(pl, specialProjectCost(BUILDINGS[what].cost));
-        return placeBuilding(g, p, what, k, true);
-      }
       const el = ELEMENTS.find((e) => e === what);
       if (el) {
         const dk = PROJECT_DRAGONS[el];
@@ -865,7 +915,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         pay(pl, specialProjectCost(DRAGONS[dk].cost));
         return hatch(g, p, dk, true);
       }
-      return fail(`Special projects: ${PROJECT_BUILDINGS.join(', ')}, or a base dragon: ${ELEMENTS.join(', ')}.`);
+      return fail(`The special project is a base dragon egg of an element: ${ELEMENTS.join(', ')}.`);
     }
     case 'play': {
       const c = handCard(g, p, args[0]);
@@ -974,6 +1024,16 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
   }
 }
 
+function cardsCommand(g: Game, p: number, verb: string, args: string[]) {
+  const pl = g.players[p];
+  if (!pl.choice.length) fail(`You've kept your card; waiting on the others.`);
+  if (verb !== 'keep') fail(`Keep one of the building cards you drew: keep ${pl.choice.map((c) => c.id).join(' or ')}.`);
+  const c = pl.choice.find((x) => x.id === args[0]) ?? fail(`Keep one of ${pl.choice.map((c) => `${cardName(c)} (${c.id})`).join(', ')}.`);
+  keepCard(g, p, c);
+  log(g, `${pname(p)} keeps a building card.`, { k: 'keep', p });
+  if (g.players.every((x) => !x.choice.length)) startActions(g);
+}
+
 function discardCommand(g: Game, p: number, verb: string, args: string[]) {
   const pl = g.players[p];
   const over = pl.hand.length - TUNING.handCap;
@@ -1013,7 +1073,8 @@ export function apply(g: Game, p: number, command: string): void {
   if (v === 'say' || v === 'tell') return talk(g, p, v, command.trim().slice(verb.length).trim());
   const snapshot = structuredClone(g);
   try {
-    if (g.phase === 'action') actionCommand(g, p, v, args);
+    if (g.phase === 'cards') cardsCommand(g, p, v, args);
+    else if (g.phase === 'action') actionCommand(g, p, v, args);
     else if (g.phase === 'raid') raidCommand(g, p, v, args);
     else discardCommand(g, p, v, args);
     updateTitles(g);
@@ -1030,6 +1091,7 @@ export function waitingOn(g: Game): number[] {
   if (g.phase === 'over') return [];
   if (g.phase === 'action') return [...new Set([g.turn, ...g.offers.map((o) => o.to)])];
   if (g.phase === 'discard') return all.filter((p) => g.players[p].hand.length > TUNING.handCap);
+  if (g.phase === 'cards') return all.filter((p) => g.players[p].choice.length);
   const raid = g.raid!;
   if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null);
   if (raid.step === 'commit') return all.filter((p) => !raid.ready[p]);
