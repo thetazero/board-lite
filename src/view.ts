@@ -239,6 +239,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
     out.push('== Your options ==');
     for (const h of hints) out.push(`  ${h}`);
   }
+  if (g.phase !== 'over') out.push(`Talk any time: say <message> (everyone hears), tell <P#> <message> (private). Talk binds no one; only accepted offers do.`);
   return out.join('\n');
 }
 

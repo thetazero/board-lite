@@ -141,3 +141,41 @@ test('separate CLI processes can share one game', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('table talk is allowed any time, private talk reaches only the two players, and nothing else changes', () => {
+  const g = newGame(3, 13);
+  const before = JSON.stringify({ ...g, log: [] });
+  apply(g, 2, 'say anyone want   timber?'); // not P3's turn: talk is still fine
+  apply(g, 1, 'tell P1 I will bail, trust me');
+  assert.equal(JSON.stringify({ ...g, log: [] }), before);
+  assert.ok(playerView(g, 0).includes('P3 says: "anyone want timber?"'));
+  assert.ok(playerView(g, 0).includes('P2 to P1 (private): "I will bail, trust me"'));
+  assert.ok(!playerView(g, 2).includes('I will bail'));
+  assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), RuleError);
+  assert.throws(() => apply(g, 0, 'say'), RuleError);
+  advanceToRaidVote(g);
+  apply(g, 0, 'say vote 2 with me');
+  assert.equal(g.raid!.step, 'vote');
+});
+
+test('a playtest seat server plays one seat over MCP', () => {
+  mkdirSync(join(homedir(), '.cache'), { recursive: true });
+  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
+  try {
+    const file = join(dir, 'g.json');
+    execFileSync(process.execPath, ['src/cli.ts', 'new', file, '--players', '2', '--seed', '4']);
+    const reqs = [
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'say', arguments: { message: 'hello', to: 'P1' } } },
+      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'act', arguments: { command: 'end' } } },
+    ];
+    const outText = execFileSync(process.execPath, ['src/playtest/seat-server.ts', file, '2'], { input: reqs.map((r) => JSON.stringify(r)).join('\n') + '\n', encoding: 'utf8' });
+    const res = outText.trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepEqual(res[1].result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
+    assert.match(res[2].result.content[0].text, /P2 to P1 \(private\): "hello"/);
+    assert.match(res[3].result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

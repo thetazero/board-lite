@@ -48,6 +48,8 @@ Action phase, on your turn:
 
 Any time in the action phase: `accept o40` / `decline o40` for an offer made to you, and, out of turn, `offer` to the acting player.
 
+Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
+
 Raid phase: `vote 2`; then `commit d3 d7` (or `commit none`) and `ready`; then, if committed, `fight` or `bail`; then after each combat round, if you have dragons in the fight, `stay`, `flee all` or `flee d3`.
 
 End of round, if over 7 cards: `discard c4 c9`.

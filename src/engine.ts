@@ -939,11 +939,30 @@ function discardCommand(g: Game, p: number, verb: string, args: string[]) {
   maybeEndRound(g);
 }
 
+// Table talk: allowed any time, by anyone, and binds no one (only accepted
+// offers do). "say" is heard by everyone, "tell P2" only by P2.
+const MAX_TALK = 500;
+function talk(g: Game, p: number, verb: string, rest: string) {
+  let to: number[] | undefined;
+  if (verb === 'tell') {
+    const m = /^p(\d+)\s*(.*)$/is.exec(rest);
+    const q = Number(m?.[1]) - 1;
+    if (!m || !(q >= 0 && q < g.players.length) || q === p) fail(`Tell whom? e.g. "tell P2 want my timber?"`);
+    to = [p, q];
+    rest = m![2].trim();
+  }
+  const text = rest.replace(/\s+/g, ' ');
+  if (!text) fail(`Say what?`);
+  if (text.length > MAX_TALK) fail(`Keep it under ${MAX_TALK} characters.`);
+  log(g, to ? `${pname(p)} to ${pname(to[1])} (private): "${text}"` : `${pname(p)} says: "${text}"`, to);
+}
+
 export function apply(g: Game, p: number, command: string): void {
   if (g.phase === 'over') fail(`The game is over.`);
   if (!(p >= 0 && p < g.players.length)) fail(`No such player.`);
   const [verb = '', ...args] = command.trim().split(/\s+/);
   const v = verb.toLowerCase();
+  if (v === 'say' || v === 'tell') return talk(g, p, v, command.trim().slice(verb.length).trim());
   const snapshot = structuredClone(g);
   try {
     if (g.phase === 'action') actionCommand(g, p, v, args);
