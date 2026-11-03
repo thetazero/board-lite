@@ -27,7 +27,7 @@ const TV = { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false };
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true };
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const FLEE_LEFT_MS = 7000; // the flee clock reads 7s
-const LAN = { lan: ['192.168.1.20'], port: 8080 }; // the address the TV shows
+const LAN = { lan: ['192.168.1.20'], tailscale: [], port: 8080 }; // the address the TV shows
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -92,7 +92,8 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
-    '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu',
+    '--force-color-profile=srgb', '--font-render-hinting=none',
+    '--use-angle=swiftshader', '--enable-unsafe-swiftshader', // WebGL for the TV's 3D board, on the CPU
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -114,10 +115,11 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
 
 // ---------- a browser tab ----------
 
-// Runs before every page's own scripts: a frozen clock, no animations, a fresh
-// phone (no remembered seat; a seat comes in the address).
+// Runs before every page's own scripts: a frozen clock (the 3D board's too),
+// no animations, a fresh phone (no remembered seat; a seat comes in the address).
 const PAGE_SETUP = `
   Date.now = () => ${FROZEN_NOW};
+  window.boardClock = 0;
   try { localStorage.clear(); } catch {}
   addEventListener('DOMContentLoaded', () => {
     const s = document.createElement('style');
@@ -285,14 +287,24 @@ async function main() {
           }
           for (const sel of shot.clicks ?? []) await tab.click(sel);
           if (shot.waitMs) await sleep(shot.waitMs);
-          await tab.settle();
-          const png = await tab.png(device);
-          const file = join(out, `${shot.file}.png`);
-          writeFileSync(file, png);
-          const before = join(prev, `${shot.file}.png`);
-          const changed = existsSync(before) ? !readFileSync(before).equals(png) : null;
-          done.push({ ...shot, scene: st.scene.name, ms: Date.now() - ts, changed });
-          console.log(`${changed ? '* ' : '  '}${shot.file}.png  ${Date.now() - ts} ms`);
+          // A moving 3D board is shot frame by frame, at board clock times.
+          const frames: (string | null)[] = shot.frames
+            ? shot.frames.map((f) => (shot.flight ? `window.boardFlightAt?.(${f})` : String(f)))
+            : [null];
+          for (const [i, clockAt] of frames.entries()) {
+            const name = clockAt === null ? shot.file : `${shot.file}-${i + 1}`;
+            if (clockAt !== null) {
+              const ok = await tab.eval<boolean>(`(() => { const t = ${clockAt}; if (t == null) return false; window.boardClock = t; return true; })()`);
+              if (!ok) throw new Error('No dragon on the board can fly');
+            }
+            await tab.settle();
+            const png = await tab.png(device);
+            writeFileSync(join(out, `${name}.png`), png);
+            const before = join(prev, `${name}.png`);
+            const changed = existsSync(before) ? !readFileSync(before).equals(png) : null;
+            done.push({ ...shot, file: name, caption: clockAt === null ? shot.caption : `${shot.caption} (frame ${i + 1} of ${frames.length})`, scene: st.scene.name, ms: Date.now() - ts, changed });
+            console.log(`${changed ? '* ' : '  '}${name}.png  ${Date.now() - ts} ms`);
+          }
         } catch (e) {
           failures++;
           console.error(`  ${shot.file}: FAILED: ${(e as Error).message}`);

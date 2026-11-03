@@ -6,6 +6,7 @@ import {
   ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, esc, hpBar,
   mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
+import { Board3D } from './board3d.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 const app = $('app');
@@ -16,6 +17,8 @@ let snap: Snapshot | null = null;
 let names: string[] = [];
 let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
 let seenLog = -1; // highest log index already animated
+// The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
+let board3d: Board3D | null | undefined;
 
 async function boot() {
   const params = new URLSearchParams(location.search);
@@ -149,9 +152,15 @@ function renderGame(g: PublicState) {
   const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')})</small></li>`).join('');
   const log = g.log.slice(-7).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
-  const legend = Object.keys(TERRAIN_COLORS).map((t) => `<span><i style="background:${TERRAIN_COLORS[t]}"></i>${TERRAIN_NAMES[t]}</span>`).join('');
-  const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'market', 'caravan_post', 'monument'] as const)
-    .map((b) => `<span>${buildingIcon(b, 18, '#ddd')}${b.replace('_', ' ')}</span>`).join('');
+  if (board3d === undefined) board3d = Board3D.supported() ? new Board3D() : null;
+  const highlight = g.phase === 'action' ? g.turn : null;
+  // The flat map needs a legend; the 3D board shows what things are.
+  const flat = () => {
+    const legend = Object.keys(TERRAIN_COLORS).map((t) => `<span><i style="background:${TERRAIN_COLORS[t]}"></i>${TERRAIN_NAMES[t]}</span>`).join('');
+    const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'market', 'caravan_post', 'monument'] as const)
+      .map((b) => `<span>${buildingIcon(b, 18, '#ddd')}${b.replace('_', ' ')}</span>`).join('');
+    return `${mapSvg(g.map, { size: 40, highlight })}<div class="legend">${legend}</div><div class="legend">${bLegend}</div>`;
+  };
   app.innerHTML = `
     <div class="board">
       <header class="topbar">
@@ -159,9 +168,7 @@ function renderGame(g: PublicState) {
         <span class="phase">${phaseLabel(g)}</span>
         <span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>
       </header>
-      <section class="mapwrap">${mapSvg(g.map, { size: 40, highlight: g.phase === 'action' ? g.turn : null })}
-        <div class="legend">${legend}</div><div class="legend">${bLegend}</div>
-      </section>
+      <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
       <aside class="side">
         ${players}
         ${many ? '' : `<div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>`}
@@ -169,6 +176,10 @@ function renderGame(g: PublicState) {
       </aside>
       <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
     </div>`;
+  if (board3d) {
+    $('mapwrap').append(board3d.el);
+    board3d.update(g, highlight);
+  }
 }
 
 // "P2 says: "hi"" -> the speaker's name, then what they said.
