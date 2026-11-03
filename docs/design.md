@@ -107,8 +107,9 @@ Living design doc. Decisions here were made in conversation with the project own
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
 - After each round of combat, players get 10 seconds to choose whether to roll to flee.
-- Healing: a dragon that loses all its health is out healing for one full global round. The owner's tentative idea: healing time simply scales with health lost ("Maybe healing just scaled by health lost works here").
+- Healing: healing time scales with health lost, measured in global rounds. Typically it's one round; only a fully mature dragon that took a lot of damage is out longer.
 - Loot is split evenly among players whose dragons were still fighting at the end.
+- Loot is gold plus resources, skewed heavily toward gold.
 - Action cards can add another raid phase.
 - No retaliation and no defense buildings.
 
@@ -123,10 +124,9 @@ Living design doc. Decisions here were made in conversation with the project own
   3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
+- Order of play: globally visible things happen in turn order; local hidden things happen all at once, to keep the game fast ("make globally visible stuff turn order, local hidden stuff all at once"). So production resolves in turn order (it's just an animation), card picking is all at once, and the raid phase is all at once.
+
 ## Open questions
 
-- Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
-- Victory points: the value of N; how many points each title is worth.
-- Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
-- Action cards: what they do.
-- Player count and game length.
+- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
+- Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
