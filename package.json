@@ -7,6 +7,7 @@
   "bin": { "board-lite": "src/cli.ts" },
   "scripts": {
     "game": "node src/cli.ts",
+    "datasheet": "node src/datasheet.ts",
     "typecheck": "tsc",
     "test": "node --test test/*.test.ts",
     "ci": "npm run typecheck && npm test"

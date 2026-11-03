@@ -170,7 +170,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 
 ## Open questions
 
-- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
+- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length. `docs/datasheet.md` shows the current numbers and what they add up to.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
 
 ### Filled in provisionally by the first rules engine
