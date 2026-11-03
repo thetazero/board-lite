@@ -3,8 +3,8 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, esc, hpBar,
-  mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, elemIcon, esc, hpBar,
+  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -80,7 +80,7 @@ function renderLobby() {
   app.innerHTML = `
     <div class="lobby">
       <h1 class="title">board-lite</h1>
-      <p class="subtitle">Wizards raise dragons. First to 15 points wins.</p>
+      <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
       <div class="join-box">
         <div>On your phone, open</div>
         <div class="url">${esc(joinUrl())}</div>
@@ -121,7 +121,7 @@ function dragonChip(d: DragonView, compact = false): string {
 
 function prodChips(prod: Record<string, { base: number; dice: number[] }>): string {
   return RESOURCES.filter((r) => prod[r].base || prod[r].dice.length)
-    .map((r) => `<span class="chip">${resIcon(r, 18)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
+    .map((r) => `<span class="chip">${resIcon(r, 1.2)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
     .join('');
 }
 
@@ -138,14 +138,14 @@ function renderGame(g: PublicState) {
         <div class="phead">
           <span class="pname">${esc(names[i])}${seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
           ${waiting.has(i) && g.phase !== 'over' ? '<span class="thinking">deciding…</span>' : ''}
-          <span class="pts"><b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
+          <span class="pts">${icon('points', 1.5)}<b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
         </div>
-        <div class="prow"><span class="cards">${p.handSize} cards</span>${prodChips(p.production)}</div>
+        <div class="prow"><span class="chip cards" title="cards in hand">${icon('cards', 1.25)}${p.handSize}</span>${prodChips(p.production)}</div>
         ${titles ? `<div class="prow">${titles}</div>` : ''}
         <div class="dragons">${dragons}</div>
       </div>`;
   }).join('');
-  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${esc(o.give)}</b> for <b>${esc(o.get)}</b></li>`).join('');
+  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b></li>`).join('');
   const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')})</small></li>`).join('');
   const log = g.log.slice(-7).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
@@ -164,7 +164,7 @@ function renderGame(g: PublicState) {
       </section>
       <aside class="side">
         ${players}
-        ${many ? '' : `<div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>`}
+        ${many ? '' : `<div class="panel"><h3>Titles <small>(${iconText('2 points')} each)</small></h3><ul>${titles}</ul></div>`}
         ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       </aside>
       <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
@@ -186,11 +186,11 @@ function targetCard(t: TargetView, extra = ''): string {
       <b>${esc(u.name)}</b> ${hpBar(u.hp, u.maxHp)} <span class="hp">${u.hp}/${u.maxHp}</span>
       <small>hits ${esc(u.attack)} · chase ${u.chase}${u.weak.length ? ` · <span class="weak">weak: ${u.weak.map(elem).join(' ')}</span>` : ''}${u.strong.length ? ` · <span class="strong">resists: ${u.strong.map(elem).join(' ')}</span>` : ''}</small>
     </div>`).join('');
-  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">Loot ${resChips(t.loot, 22)} <small>split among the winners</small></div></div>`;
+  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">Loot ${resChips(t.loot, 1.4)} <small>split among the winners</small></div></div>`;
 }
 
 function elem(e: string): string {
-  return `<span class="elem" style="--ec:${ELEMENT_COLORS[e]}">${e}</span>`;
+  return elemIcon(e, 1.25);
 }
 
 function check(done: boolean): string {
@@ -268,7 +268,7 @@ function updateOverlay(g: PublicState) {
     const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
     el.className = 'overlay end';
     el.innerHTML = `<div class="endbox"><h1>${playerTag(g.winner!, names)} wins!</h1>
-      <ol>${order.map(([t, p]) => `<li>${playerTag(p, names)} <b>${t}</b> points <small>(${g.players[p].publicPoints} on the board, ${t - g.players[p].publicPoints} hidden)</small></li>`).join('')}</ol>
+      <ol>${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip"><b>${t}</b>${icon('points', 1.8)}</span> <small>(${g.players[p].publicPoints} on the board, ${t - g.players[p].publicPoints} hidden)</small></li>`).join('')}</ol>
       <button class="primary" id="again">New game</button></div>`;
     $('again').onclick = () => (location.href = '/tv');
     return;
