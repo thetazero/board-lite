@@ -737,7 +737,7 @@ export class Board3D {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.append(this.renderer.domElement);
     GRAIN ??= paperTexture();
     this.plateMats.forEach((m) => (m.map = GRAIN));
