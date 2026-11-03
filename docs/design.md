@@ -172,3 +172,26 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 
 - Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
+
+### Filled in provisionally by the first rules engine
+
+The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in `docs/decisions.md` (2026-11-02, first rules engine), and `docs/rules.md` has the rules as played.
+
+- Card picking: cards are dealt (2 building, 1 action), with no choice among them.
+- Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
+- The first player rotates each round.
+- The tower produces 1 of each non-gold resource and houses 1 dragon.
+- Only production buildings are tied to terrain; other buildings go on any free hex.
+- One upgrade per building; the tower counts as a points and a dragon building.
+- Special projects cost double the card: the four production buildings, a roost, or a base egg of any element.
+- Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
+- Healing is 8 health per round; any damage keeps a dragon out of raids. Dragons never die: at 0 health they are knocked out and heal at home.
+- Combat: dragons strike first, then each defender hits random dragons. Fleeing is d6 + dragon speed against d6 + the best defender chase; losing costs 2 damage per point.
+- Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
+- Loot is rounded down per player; the remainder is lost.
+- The bank sells gold at the normal rate.
+- Titles go to the single leader; the holder keeps one on a tie.
+- Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
+- Trade offers expire at the end of the acting player's turn.
+- The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
+- The 10-second flee timer is left to the clients; the CLI waits for every choice.

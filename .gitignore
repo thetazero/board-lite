@@ -1,2 +1,4 @@
 .claude/settings.local.json
 .claude/self-check.sh
+node_modules/
+*.game.json
