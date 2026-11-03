@@ -137,11 +137,11 @@ function renderGame(g: PublicState) {
       </div>`;
   }).join('');
   const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b></li>`).join('');
-  const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')})</small></li>`).join('');
+  const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')}; needs ${t.min})</small></li>`).join('');
   const log = g.log.slice(-7).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
   const legend = Object.keys(TERRAIN_COLORS).map((t) => `<span><i style="background:${TERRAIN_COLORS[t]}"></i>${TERRAIN_NAMES[t]}</span>`).join('');
-  const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'market', 'caravan_post', 'monument'] as const)
+  const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'port', 'monument'] as const)
     .map((b) => `<span>${buildingIcon(b, 18, '#ddd')}${b.replace('_', ' ')}</span>`).join('');
   app.innerHTML = `
     <div class="board">

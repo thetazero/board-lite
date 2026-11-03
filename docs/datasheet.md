@@ -8,9 +8,9 @@ Yardstick for every "value" below: 1 per stone, timber, crystal or livestock, an
 
 - Start: 3 stone, 3 timber, 3 crystal, 3 livestock (value 12). Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round (value 4), no dice.
 - Cards: 2 building + 1 action a round; hand cap 7.
-- Win at 15 points. Titles are 2 points each.
+- Win at 15 points. Titles are 2 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
-- Bank: 4:1, 3:1 with a Market, 2:1 with a Caravan Post.
+- Bank: 4:1, 3:1 with a Port.
 
 ## Production buildings
 
@@ -18,35 +18,55 @@ Payback = value of the cost ÷ average output a round. ⚠ marks under 2 rounds.
 
 | Building | Terrain | Cost | Value | Output a round | Payback (card) | Payback (special project) | Payback with Workshop |
 |---|---|---|---|---|---|---|---|
-| Quarry | mountain | 3 timber, 2 crystal, 3 livestock | 8 | d6 stone (avg 3.5) | 2.3 | 4.6 | 3.8 |
-| Lumber Camp | forest | 3 stone, 3 crystal, 2 livestock | 8 | d6 timber (avg 3.5) | 2.3 | 4.6 | 3.8 |
-| Crystal Mine | ley | 3 stone, 3 timber, 2 livestock | 8 | d6 crystal (avg 3.5) | 2.3 | 4.6 | 3.8 |
-| Pasture | meadow | 2 stone, 3 timber, 3 crystal | 8 | d6 livestock (avg 3.5) | 2.3 | 4.6 | 3.8 |
+| Quarry | mountain | 3 timber, 2 crystal, 3 livestock | 8 | d6 stone (avg 3.5) | 2.3 | 4.6 | 2.5 |
+| Lumber Camp | forest | 3 stone, 3 crystal, 2 livestock | 8 | d6 timber (avg 3.5) | 2.3 | 4.6 | 2.5 |
+| Crystal Mine | ley | 3 stone, 3 timber, 2 livestock | 8 | d6 crystal (avg 3.5) | 2.3 | 4.6 | 2.5 |
+| Pasture | meadow | 2 stone, 3 timber, 3 crystal | 8 | d6 livestock (avg 3.5) | 2.3 | 4.6 | 2.5 |
 
-Workshop (1 timber, 2 gold, value 9) adds 1 a round: it pays for itself in 9 rounds on its own.
+Workshop (2 timber, 1 gold, value 6) adds 2 a round: it pays for itself in 3 rounds on its own.
 
 ## Land
 
-Measured on 300 generated maps per player count. Each cell: share of towers with that terrain on a touching hex / average number of such hexes within 2 steps of the tower. Map radius: 2p 3, 3p 3, 4p 4.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
 
-| Terrain | For | Share of map | 2 players | 3 players | 4 players |
+Measured on 300 generated maps per player count. Each cell: share of towers with that terrain on a touching hex / average number of such hexes within 2 steps of the tower.
+
+| Terrain | For | Share of land | 2 players | 3 players | 4 players |
 |---|---|---|---|---|---|
-| mountain | Quarry | 21% | 74% / 2.7 | 76% / 2.8 | 76% / 2.8 |
-| forest | Lumber Camp | 21% | 78% / 2.8 | 79% / 2.8 | 76% / 2.8 |
-| ley | Crystal Mine | 14% | 61% / 1.9 | 61% / 1.9 | 59% / 1.9 |
-| meadow | Pasture | 21% | 75% / 2.8 | 75% / 2.8 | 77% / 2.8 |
-| plains | — | 21% | 74% / 2.7 | 76% / 2.8 | 75% / 2.7 |
+| mountain | Quarry | 20% | 75% / 2.4 | 75% / 2.4 | 74% / 2.4 |
+| forest | Lumber Camp | 20% | 76% / 2.5 | 77% / 2.4 | 73% / 2.4 |
+| ley | Crystal Mine | 20% | 75% / 2.4 | 75% / 2.4 | 74% / 2.4 |
+| meadow | Pasture | 20% | 71% / 2.4 | 72% / 2.4 | 76% / 2.4 |
+| plains | — | 20% | 72% / 2.4 | 75% / 2.5 | 74% / 2.4 |
+| harbor | Port | coast | 0% / 1 | 0% / 1 | 0% / 0.8 |
+
+## Shortages
+
+What a player's own land can't make, they have to trade for. Measured on the same maps as Land, counting production terrain within 2 steps of each tower. If shortages were fully independent between players, two players would share their scarcest resource 25% of the time.
+
+| Players | Players with no land for some resource | Two players share their scarcest resource | Scarcest resource, how often |
+|---|---|---|---|
+| 2 | 24% | 24% | stone 24%, timber 24%, crystal 25%, livestock 27% |
+| 3 | 25% | 26% | stone 24%, timber 25%, crystal 23%, livestock 27% |
+| 4 | 23% | 26% | stone 25%, timber 24%, crystal 25%, livestock 26% |
+
+Harbors (for ports, the only way to beat the bank's 4:1):
+
+| Players | Harbor touching the tower | Harbor within 2 steps | Average steps to the nearest harbor |
+|---|---|---|---|
+| 2 | 0% | 73% | 2.3 |
+| 3 | 0% | 74% | 2.3 |
+| 4 | 0% | 67% | 2.3 |
 
 ## Dragon and trade buildings and upgrades
 
 | Card | Kind | Cost | Value | Special project value | Does |
 |---|---|---|---|---|---|
-| Roost | building | 3 stone, 1 timber | 4 | 8 | Houses 2 more dragons. |
+| Roost | building | 2 stone, 2 timber | 4 | 8 | Houses 2 more dragons. |
 | Hatchery | building | 2 stone, 2 timber, 2 crystal | 6 | — | Your growing dragons grow one extra step each round. |
-| Market | building | 1 stone, 3 timber, 1 livestock | 5 | — | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
-| Caravan Post | building | 2 stone, 3 timber, 1 gold | 9 | — | You trade with the bank at 2:1. Saves 2 per resource bought vs the bank: pays back after buying 4.5. |
-| Nesting Grounds | upgrade (dragon) | 1 stone, 2 gold | 9 | — | This roost, hatchery or tower houses 1 more dragon. |
-| Trade Charter | upgrade (trade) | 1 crystal, 2 gold | 9 | — | This trade building produces 1 gold each round. Pays back in 2.3 rounds. |
+| Port | building | 1 stone, 3 timber, 1 livestock | 5 | — | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
+| Nesting Grounds | upgrade (dragon) | 1 stone, 1 gold | 5 | — | This roost, hatchery or tower houses 2 more dragons. |
+| Trade Charter | upgrade (trade) | 1 crystal, 2 gold | 9 | — | This port produces 1 gold each round. Pays back in 2.3 rounds. |
 
 ## Points
 
@@ -54,9 +74,9 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 
 | Source | Pays | Points | Value per point | Ready |
 |---|---|---|---|---|
-| Tower Floor | 4 stone, 1 crystal, 1 gold | 1 | 9 | now |
+| Tower Floor | 3 stone, 2 timber, 1 gold | 1 | 9 | now |
 | Monument | 4 stone, 2 timber, 2 gold | 2 | 7 | now |
-| Gilding (upgrade) | 3 gold | 1 | 12 | now |
+| Gilding (upgrade) | 3 gold | 2 | 6 | now |
 | Secret Hoard (action card) | nothing | 1 | 0 | now, uses a hand slot |
 | Base whelp, hatchling | 2 crystal, 1 livestock + 2 livestock | 1 | 5 | 2 rounds |
 | Base whelp, young | 2 crystal, 1 livestock + 4 livestock | 2 | 3.5 | 4 rounds |
@@ -72,11 +92,11 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 | Zephyr Drake, adult | 3 crystal, 1 livestock + 3 livestock | 4 | 1.8 | 3 rounds |
 | Base whelp by special project, adult | 4 crystal, 2 livestock + 6 livestock | 4 | 3 | 6 rounds |
 
-Cheapest paid point: Zephyr Drake, adult at 1.8. Dearest: Gilding (upgrade) at 12, 6.7× as much.
+Cheapest paid point: Zephyr Drake, adult at 1.8. Dearest: Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling at 11, 6.1× as much.
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points, most tower floors and most buildings.
+Titles: 2 points each, for most dragon points (at least 8), most tower floors (at least 3) and most buildings, tower included (at least 7).
 
 ## Dragons
 
@@ -145,46 +165,48 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 96 | 27% | tower 1, Quarry, raid loot (1 of 6 kingdoms) |
-| timber | 70 | 20% | tower 1, Lumber Camp, raid loot (1 of 6 kingdoms) |
-| crystal | 94 | 27% | tower 1, Crystal Mine, raid loot (1 of 6 kingdoms) |
+| stone | 83 | 24% | tower 1, Quarry, raid loot (1 of 6 kingdoms) |
+| timber | 85 | 24% | tower 1, Lumber Camp, raid loot (1 of 6 kingdoms) |
+| crystal | 89 | 26% | tower 1, Crystal Mine, raid loot (1 of 6 kingdoms) |
 | livestock | 46 | 13% | tower 1, Pasture, raid loot (2 of 6 kingdoms) |
-| gold | 46 | 13% | Trade Charter, raid loot (6 of 6 kingdoms) |
+| gold | 45 | 13% | Trade Charter, raid loot (6 of 6 kingdoms) |
 
 ## Decks
 
-Building deck 49 cards, action deck 38. Last column: chance a player is dealt at least one within 5 rounds.
+Building deck 51 cards, action deck 38. Last column: chance a player is dealt at least one within 5 rounds. A player is dealt at least one upgrade in their first 2 rounds 79% of the time.
 
 | Card | Deck | Copies | Share of deck | By round 5 |
 |---|---|---|---|---|
-| Quarry | building | 4 | 8% | 61% |
-| Lumber Camp | building | 4 | 8% | 61% |
-| Crystal Mine | building | 4 | 8% | 61% |
-| Pasture | building | 4 | 8% | 61% |
-| Roost | building | 4 | 8% | 61% |
-| Hatchery | building | 3 | 6% | 50% |
-| Market | building | 3 | 6% | 50% |
-| Caravan Post | building | 2 | 4% | 37% |
-| Tower Floor | building | 6 | 12% | 77% |
-| Monument | building | 3 | 6% | 50% |
-| Workshop | building deck (upgrade) | 3 | 6% | 50% |
-| Gilding | building deck (upgrade) | 3 | 6% | 50% |
-| Nesting Grounds | building deck (upgrade) | 3 | 6% | 50% |
-| Trade Charter | building deck (upgrade) | 3 | 6% | 50% |
+| Quarry | building | 4 | 8% | 59% |
+| Lumber Camp | building | 4 | 8% | 59% |
+| Crystal Mine | building | 4 | 8% | 59% |
+| Pasture | building | 4 | 8% | 59% |
+| Roost | building | 4 | 8% | 59% |
+| Hatchery | building | 3 | 6% | 49% |
+| Port | building | 3 | 6% | 49% |
+| Tower Floor | building | 6 | 12% | 75% |
+| Monument | building | 3 | 6% | 49% |
+| Workshop | building deck (upgrade) | 4 | 8% | 59% |
+| Gilding | building deck (upgrade) | 4 | 8% | 59% |
+| Nesting Grounds | building deck (upgrade) | 4 | 8% | 59% |
+| Trade Charter | building deck (upgrade) | 4 | 8% | 59% |
 | Windfall | action | 5 | 13% | 53% |
 | Buried Treasure | action | 4 | 11% | 45% |
 | Growth Elixir | action | 4 | 11% | 45% |
 | Healing Potion | action | 3 | 8% | 35% |
 | War Horn | action | 3 | 8% | 35% |
 | Secret Hoard | action | 4 | 11% | 45% |
+| Any upgrade (4 kinds) | building deck (upgrade) | 16 | 31% | 99% |
 | Any dragon (15 kinds) | action | 15 | 39% | 93% |
 
 ## Game length (random bots)
 
 30 games per player count between the random bot (`src/bot.ts`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-| Players | Fewest rounds | Median | Most | Stalled |
-|---|---|---|---|---|
-| 2 | 7 | 10 | 14 | 0 |
-| 3 | 6 | 11 | 15 | 0 |
-| 4 | 6 | 10 | 13 | 0 |
+Last three columns: share of games that end with someone holding each title (it needs 8 dragon points, 3 tower floors or 7 buildings).
+
+| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held |
+|---|---|---|---|---|---|---|---|
+| 2 | 8 | 11 | 14 | 0 | 100% | 17% | 23% |
+| 3 | 8 | 10 | 14 | 0 | 100% | 33% | 67% |
+| 4 | 7 | 9 | 14 | 0 | 93% | 33% | 43% |
