@@ -135,6 +135,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Players trade with each other (resources and cards).
 - Bank trades at 4:1, like Catan; markets improve the rate.
+- Trades between players are binding once confirmed.
 
 ## Map generation
 
@@ -149,4 +150,3 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
-- Trading: whether trades between players are binding once confirmed.
