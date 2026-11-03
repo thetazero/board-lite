@@ -63,6 +63,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Dragons eat livestock every round, which keeps trade demand steady and limits how many dragons you can keep.
 - Gold is raid currency, not the score.
 - Resources are tokens, not cards, and are unlimited: they don't count toward the hand cap.
+- Shortages drive trade: "we intend for players to have shortages of a certain resource most of the time, so trading is necessary, and that the shortages should not be too corelated across players".
 
 ## Winning
 
@@ -74,6 +75,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   - Upgrades can add points to their building.
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
   - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
+  - Titles take real investment: "strongest army and largest territory need a larger threshold".
   - Raids give loot only, no points.
 
 ## Buildings
@@ -88,7 +90,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   - Building cards are "special and more interesting, like buildings that scale with number of neighbors of a certain class, regardless of what team they are on. generally adjacency limited."
   - Lots of variety: "I want lots of fun variety."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
+- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (port: a better bank rate). No defense buildings (see Raids).
 
 ### Special projects
 
@@ -101,6 +103,8 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - One building per hex. A hex's terrain decides which production building can go there. Tower floors stack on your tower hex.
 - You expand outward from your tower: a new building must touch one of yours. Players start spread out and grow toward each other.
 - Good land runs out as players grow toward each other, so the map becomes more contested late in the game.
+- Bigger than the first version: "the map needs to be bigger".
+- "Ocean around the outside of the map, only natural harbors support markets which should probably be renamed to ports".
 - Neutral kingdoms are not on the map. Raids against them happen in a separate raiding phase of the game.
 
 ## Dragons
@@ -161,7 +165,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 ## Trading
 
 - Players trade with each other (resources and cards).
-- Bank trades at 4:1, like Catan; markets improve the rate.
+- Bank trades at 4:1, like Catan; ports improve the rate.
 - Trades between players are binding once confirmed.
 
 ## Map generation
@@ -205,7 +209,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Loot is rounded down per player; the remainder is lost.
 - The bank sells gold at the normal rate.
-- Titles go to the single leader; the holder keeps one on a tie.
+- Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.

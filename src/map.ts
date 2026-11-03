@@ -71,10 +71,14 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
   // Towers sit on plains; the land around them is as random as the rest, so
   // players start with different terrain and different things to sell.
   for (const spot of towerSpots(players)) hexes[spot].terrain = 'plains';
-  // One natural harbor on each of the six coasts, somewhere between its corners.
+  // One natural harbor on each of the six coasts, somewhere between its
+  // corners but not touching a tower: a port is something you build towards.
   const coast = ring(radius);
+  const towers = new Set(towerSpots(players));
   for (let side = 0; side < 6; side++) {
-    const [q, r] = coast[side * radius + 1 + Math.floor(next(rng) * (radius - 1))];
+    const between = coast.slice(side * radius + 1, (side + 1) * radius);
+    const open = between.filter(([q, r]) => !neighbors(key(q, r)).some((n) => towers.has(n)));
+    const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
     hexes[key(q, r)].terrain = 'harbor';
   }
   return hexes;

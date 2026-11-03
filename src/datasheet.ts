@@ -44,7 +44,7 @@ Yardstick for every "value" below: 1 per stone, timber, crystal or livestock, an
 
 - Start: ${cost(TUNING.startingResources)} (value ${start}). Tower income: ${cost(TUNING.towerProduction)} a round (value ${tower}), no dice.
 - Cards: ${TUNING.buildingCardsPerRound} building + ${TUNING.actionCardsPerRound} action a round; hand cap ${TUNING.handCap}.
-- Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each.
+- Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Bank: ${TUNING.bankRate}:1${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `, ${b.bankRate}:1 with a ${b.name}`).join('')}.`;
 }
@@ -237,7 +237,7 @@ ${table(['Source', 'Pays', 'Points', 'Value per point', 'Ready'], rows)}
 
 ${spread}${hatcheryNote}
 
-Titles: ${TUNING.titlePoints} points each, for most dragon points, most tower floors and most buildings.`;
+Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most buildings, tower included (at least ${TUNING.titleMinimum.territory}).`;
 }
 
 function dragons(): string {
@@ -355,11 +355,14 @@ function deck(): string {
     ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb), pct(within(c.copies, nb, R * TUNING.buildingCardsPerRound))]),
     ...Object.values(ACTIONS).map((c) => [c.name, 'action', c.copies, pct(c.copies / na), pct(within(c.copies, na, R * TUNING.actionCardsPerRound))]),
   ];
+  const upgradeCopies = Object.values(UPGRADES).reduce((s, u) => s + u.copies, 0);
+  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb), pct(within(upgradeCopies, nb, R * TUNING.buildingCardsPerRound))]);
+  const firstTwo = within(upgradeCopies, nb, 2 * TUNING.buildingCardsPerRound);
   const dragonCopies = Object.values(DRAGONS).reduce((s, d) => s + d.copies, 0);
   rows.push([`Any dragon (${Object.keys(DRAGONS).length} kinds)`, 'action', dragonCopies, pct(dragonCopies / na), pct(within(dragonCopies, na, R * TUNING.actionCardsPerRound))]);
   return `## Decks
 
-Building deck ${nb} cards, action deck ${na}. Last column: chance a player is dealt at least one within ${R} rounds.
+Building deck ${nb} cards, action deck ${na}. Last column: chance a player is dealt at least one within ${R} rounds. A player is dealt at least one upgrade in their first 2 rounds ${pct(firstTwo)} of the time.
 
 ${table(['Card', 'Deck', 'Copies', 'Share of deck', `By round ${R}`], rows)}`;
 }
@@ -393,20 +396,24 @@ function length(): string {
   const rows = [2, 3, 4].map((players) => {
     const rounds: number[] = [];
     let stalled = 0;
+    const held = { army: 0, tower: 0, territory: 0 };
     for (let i = 0; i < GAMES; i++) {
       const g = newGame(players, 1 + i);
       playOut(g, { state: 7919 + i });
       if (g.phase === 'over') rounds.push(g.round);
       else stalled++;
+      for (const t of Object.keys(held) as (keyof typeof held)[]) if (g.titles[t] !== null) held[t]++;
     }
     rounds.sort((a, b) => a - b);
-    return [players, rounds[0] ?? '—', rounds[Math.floor(rounds.length / 2)] ?? '—', rounds[rounds.length - 1] ?? '—', stalled];
+    return [players, rounds[0] ?? '—', rounds[Math.floor(rounds.length / 2)] ?? '—', rounds[rounds.length - 1] ?? '—', stalled, ...Object.values(held).map((n) => pct(n / GAMES))];
   });
   return `## Game length (random bots)
 
 ${GAMES} games per player count between the random bot (\`src/bot.ts\`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled'], rows)}`;
+Last three columns: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points, ${TUNING.titleMinimum.tower} tower floors or ${TUNING.titleMinimum.territory} buildings).
+
+${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Territory held'], rows)}`;
 }
 
 export function datasheet(): string {
