@@ -28,6 +28,7 @@ const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
   --max-minutes N                   stop the game after this long (default 240)
   --stall-minutes N                 stop if nothing happens in the game for this long (default 15)
+  --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
 
 Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
 the game waits its turn when the pool is full or memory is short. See docs/playtest.md.`;
@@ -50,6 +51,7 @@ const effort = opt(args, '--effort');
 const budget = Number(opt(args, '--budget-usd') ?? 5);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? 15);
+const advice = opt(args, '--advice');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const out = resolve(opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
@@ -74,7 +76,7 @@ How to play:
 - Read the rules once at the start (rules tool).
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and raid commitments can be bailed on in secret. Keep messages short, like real table talk, and reply when someone talks to you.
-- Don't stop until the game is over. If you're unsure what to do, call wait.`;
+- Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
 }
 
 interface Seat { p: number; model: string; session: string; proc: ChildProcess | null; starts: number; cost: number; exitedAt: number }
@@ -167,6 +169,7 @@ function writeResults(g: Game, status: string, started: number) {
   const results = {
     status,
     seed,
+    ...(advice ? { advice } : {}),
     rounds: g.round,
     minutes: Math.round((Date.now() - started) / 600) / 100,
     winner: g.winner === null ? null : { seat: pname(g.winner), model: models[g.winner] },
