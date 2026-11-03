@@ -100,7 +100,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // The always-open way to turn gold, which comes from raids, into points.
-  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 4 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },
+  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 2 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },
   // Building cards. Most count their neighbours.
   cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 3, crystal: 3, livestock: 2 }, 2),
   stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 3, crystal: 3, livestock: 2 }, 2),
@@ -139,10 +139,10 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 3, stone: 3, crystal: 3 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 1 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
   gilding: { name: 'Gilding', appliesTo: ['monument'], cost: { gold: 4 }, points: 2, text: 'This tower or monument is worth 2 more points.', copies: 3 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 2, timber: 1 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
-  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 4, crystal: 2 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
+  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 4, stone: 2 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';
@@ -244,7 +244,7 @@ export const DRAGONS: Record<string, DragonDef> = {
   },
   bolt_drake: {
     name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 4, livestock: 2 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 8 }, { hp: 10, targets: 1, dice: 2, sides: 8 }, { hp: 16, targets: 1, dice: 3, sides: 8 }],
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 8 }, { hp: 10, targets: 1, dice: 2, sides: 8 }, { hp: 20, targets: 1, dice: 4, sides: 8 }],
   },
   sky_wyrm: {
     name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
@@ -273,7 +273,7 @@ export interface UnitDef extends Attack {
 // Defenders attack a random dragon still in the fight.
 export const UNITS: Record<string, UnitDef> = {
   militia: { name: 'Militia', hp: 5, targets: 1, dice: 1, sides: 4, strong: [], weak: ['fire'] },
-  archers: { name: 'Archers', hp: 6, targets: 1, dice: 1, sides: 6, strong: ['water'], weak: ['air'] },
+  archers: { name: 'Archers', hp: 6, targets: 1, dice: 1, sides: 6, strong: [], weak: ['air'] },
   knights: { name: 'Knights', hp: 12, targets: 1, dice: 1, sides: 8, strong: ['fire'], weak: ['lightning'] },
   frost_golem: { name: 'Frost Golem', hp: 16, targets: 1, dice: 1, sides: 6, strong: ['ice', 'water'], weak: ['fire'] },
   storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, strong: ['air', 'lightning'], weak: ['ice'] },
@@ -291,7 +291,7 @@ export interface FaunaDef extends UnitDef {
 export const FAUNA: Record<string, FaunaDef> = {
   wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, strong: [], weak: ['fire'], loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, strong: ['ice'], weak: ['lightning'], loot: { livestock: 4 } },
-  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, strong: ['fire', 'lightning'], weak: ['water', 'ice'], loot: { livestock: 6 } },
+  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, strong: ['fire', 'lightning'], weak: ['water', 'ice'], loot: { livestock: 4, gold: 2 } },
 };
 // Great beasts (#67): the top tier of the fauna, one of each on every map.
 // Each holds its hex and every hex around it until it is slain: nothing is
@@ -304,9 +304,9 @@ export interface BeastDef extends FaunaDef {
 
 export const BEASTS: Record<string, BeastDef> = {
   // On the mountain at the centre of the map.
-  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, strong: ['lightning', 'air', 'water'], weak: ['ice'], loot: {}, points: 1 },
+  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, strong: ['lightning', 'air', 'water'], weak: ['ice'], loot: {}, points: 2 },
   // In the ocean off one coast, beside its harbor.
-  leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, strong: ['water', 'fire', 'ice'], weak: ['lightning'], loot: {}, points: 1 },
+  leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, strong: ['water', 'fire', 'ice'], weak: ['lightning'], loot: {}, points: 2 },
 };
 
 // A beast on the map: one of the fauna, or a great beast.
@@ -327,9 +327,10 @@ export interface TargetDef {
 export const TARGETS: Record<string, TargetDef> = {
   // A ladder of combat power (in brackets; a base adult dragon is 17), with
   // loot that grows with its square, about power² ÷ 18 in value: easy kingdoms
-  // give almost nothing, hard ones a lot. Per point of power sent, the hardest
-  // pays about six times the easiest.
-  brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, timber: 1 } }, // 8
+  // give little, hard ones a lot. Per point of power sent, the hardest pays
+  // about three times the easiest. Brindle's one gold is the only gold a
+  // young dragon can win alone (#80).
+  brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, gold: 1 } }, // 8
   archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 4, timber: 4 } }, // 19
   frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24
   knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 10, stone: 4 } }, // 28

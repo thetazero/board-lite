@@ -15,8 +15,8 @@ import { apply, bundleText, newGame, specialProjectCost, type Game } from './eng
 import { distance, generateMap, key, mapRadius, neighbors, parseKey, towerSpots } from './map.ts';
 
 // The owner's target game length (docs/design.md, Winning). Not a rule: the
-// datasheet prices things against it.
-const GAME_ROUNDS = 15;
+// datasheet prices dragon upkeep against it and against the bots' median.
+const TARGET_ROUNDS = 15;
 
 // ---------- the yardstick ----------
 
@@ -269,9 +269,11 @@ function points(): string {
     : '';
   // A dragon keeps eating once grown, so its points cost more the longer the
   // game: here one hatched in round 1 and fed to the end of the owner's
-  // target length (docs/design.md).
+  // target length (docs/design.md), and of the random bots' median game.
   const held = Object.values(DRAGONS).filter((d, i, all) => all.findIndex((x) => `${value(x.cost)}/${x.growthTime}` === `${value(d.cost)}/${d.growthTime}`) === i);
-  const heldNote = `\n\nFed to the end of a ${GAME_ROUNDS}-round game, hatched in round 1: ${held.map((d) => `${d.base ? 'base dragon' : d.name.split(' ').pop()!.toLowerCase()} ${n1((value(d.cost) + GAME_ROUNDS * TUNING.livestockPerDragon) / TUNING.dragonPointsByStage[3])}`).join(', ')} per point. A building's points cost nothing more once built.`;
+  const lengths = [TARGET_ROUNDS, botMedianRounds()];
+  const fedTo = (d: (typeof held)[number]) => lengths.map((n) => n1((value(d.cost) + n * TUNING.livestockPerDragon) / TUNING.dragonPointsByStage[3])).join(' / ');
+  const heldNote = `\n\nFed to the end of the game, hatched in round 1, after ${lengths[0]} rounds (the owner's target) / ${lengths[1]} rounds (the random bots' median, see Game length): ${held.map((d) => `${d.base ? 'base dragon' : d.name.split(' ').pop()!.toLowerCase()} ${fedTo(d)}`).join(', ')} per point. A building's points cost nothing more once built.`;
   const tower = value(TUNING.towerProduction);
   // Spread of what a point costs, free cards aside.
   const priced = rows.filter((r) => Number(r[3]) > 0).sort((a, b) => Number(a[3]) - Number(b[3]));
@@ -639,16 +641,33 @@ How much of each resource every card in both decks costs in total (each card cou
 ${table(['Resource', 'In all card costs', 'Share', 'Comes from'], rows)}`;
 }
 
+// The random-bot games, played once and shared by Points and Game length.
+const BOT_GAMES = 30;
+let botGamesCache: { players: number; games: Game[] }[] | undefined;
+function botGames() {
+  return (botGamesCache ??= [2, 3, 4].map((players) => ({
+    players,
+    games: Array.from({ length: BOT_GAMES }, (_, i) => {
+      const g = newGame(players, 1 + i);
+      playOut(g, { state: 7919 + i });
+      return g;
+    }),
+  })));
+}
+// Median length of the finished bot games, all player counts together.
+function botMedianRounds(): number {
+  const rounds = botGames().flatMap(({ games }) => games.filter((g) => g.phase === 'over').map((g) => g.round)).sort((a, b) => a - b);
+  return rounds[Math.floor(rounds.length / 2)];
+}
+
 function length(): string {
-  const GAMES = 30;
-  const rows = [2, 3, 4].map((players) => {
+  const GAMES = BOT_GAMES;
+  const rows = botGames().map(({ players, games }) => {
     const rounds: number[] = [];
     let stalled = 0;
     const held = { army: 0, tower: 0, territory: 0 };
     const slain: Record<string, number[]> = Object.fromEntries(Object.keys(BEASTS).map((k) => [k, []]));
-    for (let i = 0; i < GAMES; i++) {
-      const g = newGame(players, 1 + i);
-      playOut(g, { state: 7919 + i });
+    for (const g of games) {
       if (g.phase === 'over') rounds.push(g.round);
       else stalled++;
       for (const t of Object.keys(held) as (keyof typeof held)[]) if (g.titles[t] !== null) held[t]++;

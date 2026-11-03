@@ -23,7 +23,7 @@ Anyone may build these, no card needed. Payback = value of the cost ÷ average o
 | Crystal Mine | ley | 4 stone, 4 timber, 3 livestock | 11 | d4 crystal (avg 2.5) | 4.4 | 4.4 |
 | Pasture | meadow | 3 stone, 4 timber, 4 crystal | 11 | d4 livestock (avg 2.5) | 4.4 | 4.4 |
 
-Workshop (3 stone, 3 timber, 3 crystal, value 9) adds 2 a round: it pays for itself in 4.5 rounds on its own.
+Workshop (4 stone, 4 timber, 1 crystal, value 9) adds 2 a round: it pays for itself in 4.5 rounds on its own.
 
 ## Land
 
@@ -89,7 +89,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Hatchery | building card | 3 stone, 3 timber, 3 crystal | 9 | Your dragons grow 1 extra step each round. |
 | Port | building card | 1 stone, 3 timber, 1 livestock | 5 | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
 | Nesting Grounds | upgrade (dragon building) | 2 stone, 1 timber | 3 | This roost, hatchery or tower houses 2 more dragons. |
-| Trade Charter | upgrade (trade building) | 2 crystal, 4 gold | 18 | This port or market makes 1 more gold each round. Pays back in 4.5 rounds. |
+| Trade Charter | upgrade (trade building) | 2 stone, 4 gold | 18 | This port or market makes 1 more gold each round. Pays back in 4.5 rounds. |
 
 ## Points
 
@@ -97,7 +97,7 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 
 | Source | Pays | Points | Value per point | Ready |
 |---|---|---|---|---|
-| Tower Floor | 3 stone, 4 gold | 1 | 19 | now |
+| Tower Floor | 3 stone, 2 gold | 1 | 11 | now |
 | Monument, 2 neighbours | 3 stone, 2 timber, 3 gold | 2 | 8.5 | now |
 | Standing Stones, 2 neighbours | 2 stone, 2 crystal, 3 gold | 2 | 8 | now |
 | Lighthouse, 2 neighbours | 4 stone, 2 timber, 3 gold | 2 | 9 | now |
@@ -115,11 +115,11 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 | Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 4 crystal, 2 livestock + 6 livestock | 3 | 4 | 6 rounds |
 | Base dragon by special project, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 5.3 | 6 rounds |
 
-Cheapest paid point: Base dragon, adult at 3.7. Dearest: Tower Floor at 19, 5.1× as much.
+Cheapest paid point: Base dragon, adult at 3.7. Dearest: Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling at 13, 3.5× as much.
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Fed to the end of a 15-round game, hatched in round 1: base dragon 6.7, wyrm 8.3, drake 7 per point. A building's points cost nothing more once built.
+Fed to the end of the game, hatched in round 1, after 15 rounds (the owner's target) / 20 rounds (the random bots' median, see Game length): base dragon 6.7 / 8.3, wyrm 8.3 / 10, drake 7 / 8.7 per point. A building's points cost nothing more once built.
 
 Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most buildings, tower included (at least 9).
 
@@ -135,7 +135,7 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 | Frost Wyrm | ice | 4 crystal, 2 livestock, 1 gold | 3 | strongest_attacker | **6**: 9hp 1×1d6 (3.5) | **11**: 17hp 1×2d6 (7) | **20**: 30hp 1×3d8 (13.5) |
 | Rime Drake | ice | 4 crystal, 2 livestock | 2 | weak_to_me | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **19**: 20hp 2×2d8 (18) |
 | Storm Wyrm | lightning | 4 crystal, 2 livestock, 1 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **19**: 20hp 4×1d8 (18) |
-| Bolt Drake | lightning | 4 crystal, 2 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **15**: 16hp 1×3d8 (13.5) |
+| Bolt Drake | lightning | 4 crystal, 2 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **19**: 20hp 1×4d8 (18) |
 | Sky Wyrm | air | 4 crystal, 2 livestock, 1 gold | 3 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **11**: 13hp 2×1d8 (9) | **20**: 22hp 2×2d8 (18) |
 | Zephyr Drake | air | 4 crystal, 2 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **13**: 17hp 3×1d6 (10.5) |
 | Abyss Wyrm | water | 4 crystal, 2 livestock, 1 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
@@ -148,7 +148,7 @@ Defenders:
 | Unit | Power | Health | Attack (avg) | Strong vs | Weak vs |
 |---|---|---|---|---|---|
 | Militia | 4 | 5 | 1×1d4 (2.5) | — | fire |
-| Archers | 5 | 6 | 1×1d6 (3.5) | water | air |
+| Archers | 5 | 6 | 1×1d6 (3.5) | — | air |
 | Knights | 7 | 12 | 1×1d8 (4.5) | fire | lightning |
 | Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice, water | fire |
 | Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air, lightning | ice |
@@ -160,7 +160,7 @@ Kingdoms (3 are offered each raid; average damage is the defenders' total a comb
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Loot value | Value per power |
 |---|---|---|---|---|---|---|---|
-| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 1 timber, 2 livestock | 3 | 0.4 |
+| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold | 6 | 0.8 |
 | Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold | 20 | 1.1 |
 | Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold | 32 | 1.3 |
 | Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold | 44 | 1.6 |
@@ -173,26 +173,26 @@ Chance the kingdom falls to one player's raiders fighting to the end, from 100 r
 |---|---|---|---|---|---|---|
 | Base dragon, hatchling (5) | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
 | Base dragon, young (9) | 99% (98%–100%) | 1% (0%–3%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
-| Base dragon, adult (17) | 100% (100%–100%) | 77% (11%–99%) | 21% (0%–64%) | 14% (0%–67%) | 6% (0%–32%) | 0% (0%–0%) |
-| Two young base dragons (18) | 100% | 82% | 29% | 16% | 8% | 0% |
+| Base dragon, adult (17) | 100% (100%–100%) | 93% (89%–99%) | 21% (0%–64%) | 14% (0%–67%) | 6% (0%–32%) | 0% (0%–0%) |
+| Two young base dragons (18) | 100% | 97% | 29% | 16% | 8% | 0% |
 | Ember Wyrm (fire), adult (25) | 100% | 100% | 99% | 0% | 58% | 0% |
 | Cinder Drake (fire), adult (16) | 100% | 86% | 42% | 0% | 0% | 0% |
 | Frost Wyrm (ice), adult (20) | 100% | 98% | 2% | 21% | 0% | 0% |
 | Rime Drake (ice), adult (19) | 100% | 98% | 1% | 14% | 44% | 0% |
 | Storm Wyrm (lightning), adult (19) | 100% | 94% | 22% | 80% | 0% | 2% |
-| Bolt Drake (lightning), adult (15) | 100% | 21% | 1% | 3% | 0% | 0% |
+| Bolt Drake (lightning), adult (19) | 100% | 71% | 23% | 15% | 0% | 0% |
 | Sky Wyrm (air), adult (20) | 100% | 100% | 88% | 17% | 0% | 0% |
 | Zephyr Drake (air), adult (13) | 100% | 95% | 3% | 0% | 0% | 0% |
-| Abyss Wyrm (water), adult (22) | 100% | 86% | 1% | 25% | 20% | 0% |
-| Reef Drake (water), adult (17) | 100% | 18% | 0% | 0% | 0% | 0% |
+| Abyss Wyrm (water), adult (22) | 100% | 100% | 11% | 25% | 20% | 0% |
+| Reef Drake (water), adult (17) | 100% | 93% | 0% | 0% | 0% | 0% |
 
-Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0, young 0, adult 2.2. A Tower Floor takes 4 gold.
+Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.2, young 0.5, adult 2.6. A Tower Floor takes 2 gold.
 
 Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
 
 | Kingdom | Loot value | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
 |---|---|---|---|---|---|---|---|
-| Hamlet of Brindle (8) | 3 | 100% → 100% | 3 | 3 | 0 | about 0 | 0 |
+| Hamlet of Brindle (8) | 6 | 100% → 100% | 6 | 6 | 0 | about 0 | 0 |
 | Stormspire (35) | 68 | 67% → 82% | 45.6 | 52.5 | 3.1 | about 8 | 0.8 |
 
 Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
@@ -207,7 +207,7 @@ Beasts on the map. Nothing is built on a hex with fauna, and a building under fa
 |---|---|---|---|---|---|---|---|
 | Wolf Pack | 8 | 1×1d6 (3.5) | — | fire | 2 livestock | 2 | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | ice | lightning | 4 livestock | 4 | 3 steps from the nearest tower |
-| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 6 livestock | 6 | 4+ steps from the nearest tower |
+| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 4 livestock, 2 gold | 12 | 4+ steps from the nearest tower |
 
 Chance the beast falls, from 100 fights through the engine per cell, averaged over the five base dragons' elements (worst–best element in brackets):
 
@@ -240,8 +240,8 @@ Two on every map, the top tier of the fauna: fought like fauna (on your turn, yo
 
 | Beast | Health | Attack (avg) | Strong vs | Weak vs | Points | Lives in |
 |---|---|---|---|---|---|---|
-| Thunderbird | 70 | 2×2d8 (18) | lightning, air, water | ice | 1 | the mountain peak at the centre |
-| Leviathan | 80 | 1×3d10 (16.5) | water, fire, ice | lightning | 1 | the ocean beside one harbor |
+| Thunderbird | 70 | 2×2d8 (18) | lightning, air, water | ice | 2 | the mountain peak at the centre |
+| Leviathan | 80 | 1×3d10 (16.5) | water, fire, ice | lightning | 2 | the ocean beside one harbor |
 
 Chance it falls, from 200 fights through the engine per cell. "Weakness" is base dragons of the element it is weak to; "other" averages the other four elements (worst–best in brackets). A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 
@@ -253,7 +253,7 @@ Chance it falls, from 200 fights through the engine per cell. "Weakness" is base
 | Three adults | 100% | 13% (0%–54%) | 98% | 12% (0%–48%) |
 | Four adults | 100% | 33% (9%–100%) | 100% | 34% (10%–100%) |
 
-Frost Wyrm adult with a base adult of its element: 99% against the Thunderbird; Rime Drake adult with a base adult of its element: 70% against the Thunderbird. Storm Wyrm adult with a base adult of its element: 23% against the Leviathan; Bolt Drake adult with a base adult of its element: 74% against the Leviathan.
+Frost Wyrm adult with a base adult of its element: 99% against the Thunderbird; Rime Drake adult with a base adult of its element: 70% against the Thunderbird. Storm Wyrm adult with a base adult of its element: 23% against the Leviathan; Bolt Drake adult with a base adult of its element: 93% against the Leviathan.
 
 When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult 6 rounds after it is hatched, 3 with a Hatchery. Two adults of a beast's weakness, hatched in rounds 2–4, are ready in rounds 8–10; the bot games under Game length show when beasts fall with random play.
 
@@ -263,11 +263,11 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 96 | 21% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 89 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (2 of 6 kingdoms) |
-| crystal | 136 | 30% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| stone | 106 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 93 | 20% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 122 | 27% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
 | livestock | 63 | 14% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 73 | 16% | Market, Trade Charter, raid loot (5 of 6 kingdoms) |
+| gold | 73 | 16% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
@@ -318,6 +318,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 15 | 23 | 32 | 0 | 93% | 17% | 93% | 20%, median round 22 | 20%, median round 24 |
-| 3 | 15 | 21 | 29 | 0 | 93% | 20% | 97% | 43%, median round 18 | 47%, median round 20 |
-| 4 | 16 | 20 | 26 | 0 | 93% | 50% | 100% | 50%, median round 18 | 47%, median round 20 |
+| 2 | 15 | 21 | 28 | 0 | 80% | 27% | 93% | 7%, median round 20 | 13%, median round 20 |
+| 3 | 15 | 20 | 31 | 0 | 77% | 57% | 97% | 23%, median round 19 | 20%, median round 21 |
+| 4 | 13 | 19 | 25 | 0 | 77% | 80% | 93% | 20%, median round 17 | 40%, median round 17 |
