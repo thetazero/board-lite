@@ -1,9 +1,9 @@
 // The phone: one player's hidden hand and their choices. Everything public
 // is on the TV, so this stays small: resources, cards, and the decision at hand.
 
-import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts';
+import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure } from './art.ts';
 
@@ -224,7 +224,7 @@ function status(g: PublicState, me: Me): string {
     else if (g.phase === 'cards') what = `Keep 1 ${icon('cards', 1.2)}`;
     else if (g.raid?.step === 'vote') what = `${icon('raid', 1.3)} Vote`;
     else if (g.raid?.step === 'commit') what = `${icon('raid', 1.3)} ${esc(g.raid.target!.name)} <span class="tag">${icon('public', 1.1)}</span>`;
-    else what = `Fight or bail? <span class="tag">${icon('secret', 1.1)}</span>`;
+    else what = `${icon('raid', 1.3)} ${esc(g.raid!.target!.name)} <span class="tag">${icon('secret', 1.1)}</span>`;
     return `<div class="status you"><span>${what}</span></div>`;
   }
   const tags = g.waitingOn.map((p) => playerTag(p, names));
@@ -247,7 +247,7 @@ function render() {
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
-  const dock = !picking && (g.phase === 'action' || g.phase === 'discard' || g.phase === 'cards') ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
+  const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
   document.body.classList.toggle('has-hand', !!dock);
   app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   wire(g, me);
@@ -418,33 +418,45 @@ function hexPicker(g: PublicState): string {
 
 // ---- raid ----
 
+// The kingdom under attack, drawn: its defenders by kind and its loot.
+function targetPanel(t: TargetView): string {
+  return `<section class="ptarget">${foeStack(t.units, 1.8)}<div class="loot">${resChips(t.loot, 1.4)}</div></section>`;
+}
+
 // Each raid step is its choices as buttons. A choice once made stays on screen,
-// lit, so the screen shows what you chose instead of saying it.
+// lit, so the screen shows what you chose instead of saying it. The target is
+// always drawn, so you decide looking at what you'd be fighting.
 function raidView(g: PublicState, me: Me): string {
   const raid = g.raid!;
+  const dragon = (id: string) => g.dragons.find((d) => d.id === id)!;
   if (raid.step === 'vote') {
     const voted = me.myVote !== null;
-    return raid.candidates.map((t, i) => `
-      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)}</b><span>${t.units.map((u) => esc(u.name)).join(', ')}</span><span>${resChips(t.loot)}</span></button>`).join('');
+    return `${roost(g, me)}${raid.candidates.map((t, i) => `
+      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)}</b>${foeStack(t.units, 1.7)}<span class="loot">${resChips(t.loot, 1.3)}</span></button>`).join('')}`;
   }
   if (raid.step === 'commit') {
-    if (!me.raidReady.length) return roost(g, me); // nobody fit to go: the roost shows why
+    if (!me.raidReady.length) return `${roost(g, me)}${targetPanel(raid.target!)}`; // nobody fit to go: the roost shows why
     const committed = new Set(raid.commits[me.seat]);
     const ready = raid.ready[me.seat];
     const list = me.raidReady.map((id) => {
-      const d = g.dragons.find((x) => x.id === id)!;
+      const d = dragon(id);
       return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${esc(d.attack)}</span></span></button>`;
     }).join('');
-    return `${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size}` : 'Stay home'}</button>`}`;
+    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
-    if (!mine.length) return roost(g, me);
-    const sent = mine.map((id) => dragonChip(g.dragons.find((d) => d.id === id)!)).join('');
+    // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
+    const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
+      ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')}</div>`] : [])).join('');
+    if (!mine.length) return `${roost(g, me)}${targetPanel(raid.target!)}${others ? `<div class="allies">${others}</div>` : ''}`;
+    const sent = mine.map((id) => dragonChip(dragon(id), g.dragons)).join('');
     const chose = me.myChoice;
-    return `<div class="sent">${sent}</div>
-      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
-      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Bail</button></div>`;
+    return `${targetPanel(raid.target!)}
+      <div class="sent">${sent}</div>
+      ${others ? `<div class="allies">${others}</div>` : ''}
+      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
+      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#cfd3dc')} Bail</button></div>`;
   }
   return '';
 }

@@ -316,6 +316,17 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2200 }],
   },
   {
+    // A fight one raider bailed out of: they're shown flown home beside it.
+    name: 'raid-fled-4p',
+    players: 4,
+    seed: 5,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c) => c === null),
+    setup: (g) => apply(g, seatWhere(g, (p) => g.raid!.commits[p].length > 0), 'bail'),
+    live: (g) => g.raid === null || g.raid.step === 'vote',
+    liveEnd: (g) => /falls!|holds\./.test(g.log.findLast((e) => /falls!|holds\.|Everyone bailed/.test(e.text))?.text ?? ''), // the rest fought
+    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 2200 }],
+  },
+  {
     name: 'discard-4p',
     players: 4,
     seed: 1,
