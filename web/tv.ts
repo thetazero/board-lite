@@ -153,7 +153,7 @@ function titleRow(g: PublicState, t: PublicState['titles'][number]): string {
   const leaders = t.values.flatMap((v, p) => (v === best ? [p] : []));
   const who = t.holder !== null
     ? `${playerTag(t.holder, names)} <small>${unit(t.values[t.holder])}</small>`
-    : `<span class="none">nobody</span> <small>needs ${unit(t.min)}${best <= 0 ? '' : leaders.length > 2 ? `; ${leaders.length} tied on ${best}` : `; best ${nameList(leaders)} ${best}`}</small>`;
+    : `<span class="none">nobody yet</span> <small>· needs ${unit(t.min)}${best > 0 && leaders.length <= 2 ? ` · ${nameList(leaders)} ${leaders.length > 1 ? 'have' : 'has'} ${best}` : ''}</small>`;
   return `<li><span class="title-badge">${esc(TITLE_SHORT[t.key])}</span><span>${who}</span></li>`;
 }
 
