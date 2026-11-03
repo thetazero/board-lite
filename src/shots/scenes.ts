@@ -8,6 +8,7 @@
 import { botStep } from '../bot.ts';
 import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
 import { apply, newGame, score, waitingOn, type Game } from '../engine.ts';
+import { neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
 import type { Room } from '../server/room.ts';
@@ -751,5 +752,31 @@ export const SCENES: Scene[] = [
       ];
     },
   },
+  {
+    // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
+    // another player's building, a wolf pack beside the acting player's tower.
+    // The acting player holds both fauna cards and has a young dragon to send.
+    name: 'fauna-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action' && Object.values(g.buildings).some((b) => b.owner !== g.turn && b.type !== 'tower'),
+    setup: (g) => {
+      const p = g.turn;
+      const theirs = Object.keys(g.buildings).find((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower')!;
+      g.map[theirs].fauna = 'cave_bear';
+      const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+      g.map[open].fauna = 'wolf_pack';
+      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+      giveHand(g, p, ['wolf_call', 'rouse_bear', 'windfall']);
+      Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 6));
+    },
+    shots: (g) => [
+      { file: 'tv-fauna-3p', caption: 'TV: fauna on the board: wolves by a tower, a bear on a building, beasts out in the wilds', client: 'tv', waitMs: 4800 },
+      { file: 'phone-fauna-turn-3p', caption: 'Phone: your turn, with fauna to clear', client: 'phone', seat: g!.turn },
+      { file: 'phone-fauna-pick-3p', caption: 'Phone: choosing which beast to clear', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
+      { file: 'phone-fauna-send-3p', caption: 'Phone: choosing dragons to send against it', client: 'phone', seat: g!.turn, clicks: ['#hunt', '[data-hex]', '[data-hunter]'] },
+      { file: 'phone-fauna-card-3p', caption: 'Phone: a fauna card opened', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
+      { file: 'phone-fauna-where-3p', caption: 'Phone: choosing where to send the Cave Bear', client: 'phone', seat: g!.turn, clicks: [card('c901'), '[data-pickhex]'] },
+    ],
+  },
 ];
-

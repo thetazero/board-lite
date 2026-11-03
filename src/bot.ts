@@ -3,10 +3,11 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, specialProjectCost,
+  apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, faunaOnMap, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
+import { neighbors } from './map.ts';
 import { type Rng, next, pick, shuffle } from './rng.ts';
 
 // Concrete commands worth trying for player p, best guesses first.
@@ -35,10 +36,17 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
         if (a.effect === 'gain_gold' || a.effect === 'extra_raid') out.push(`play ${c.id}`);
         const growable = mine.filter((d) => d.stage < 3);
         if (a.effect === 'grow_dragon' && growable.length) out.push(`play ${c.id} ${pick(rng, growable).id}`);
-        const hurt = mine.filter((d) => d.damage > 0 || d.resting === 'hurt');
+        // Fauna goes next to, or onto, another player's building.
+        const theirs = Object.keys(g.buildings).filter((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower' && !g.map[k].fauna);
+        if (a.effect === 'send_fauna' && theirs.length) out.push(`play ${c.id} ${pick(rng, theirs)}`);
+        const hurt = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted');
         if (a.effect === 'heal_dragon' && hurt.length) out.push(`play ${c.id} ${pick(rng, hurt).id}`);
       }
     }
+    // Now and then, send the ready dragons at fauna touching its land.
+    const ready = g.dragons.filter((d) => d.owner === p && canRaid(d) && d.stage >= 2).map((d) => d.id);
+    const near = faunaOnMap(g).filter((k) => Object.keys(g.buildings).some((b) => g.buildings[b].owner === p && (b === k || isNeighbour(b, k))));
+    if (ready.length && near.length && next(rng) < 0.4) out.push(`clear ${pick(rng, near)} ${ready.join(' ')}`);
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
     if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
@@ -65,6 +73,10 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
   }
   return [next(rng) < 0.85 ? 'fight' : 'bail'];
+}
+
+function isNeighbour(a: string, b: string): boolean {
+  return neighbors(a).includes(b);
 }
 
 // Makes one move for one waiting player. Returns the command it applied.

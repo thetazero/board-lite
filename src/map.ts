@@ -1,12 +1,13 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
-import { TERRAIN_WEIGHTS, TERRAINS, type Terrain } from './data.ts';
-import { type Rng, next } from './rng.ts';
+import { FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
+import { type Rng, next, shuffle } from './rng.ts';
 
 export interface Hex {
   q: number;
   r: number;
   terrain: Terrain;
+  fauna?: string; // a beast on this hex, a FAUNA key
 }
 
 export const DIRECTIONS: [number, number][] = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
@@ -81,5 +82,19 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
     const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
     hexes[key(q, r)].terrain = 'harbor';
   }
+  placeFauna(rng, hexes, players);
   return hexes;
+}
+
+// Aggressive fauna on the starting map: one beast per TUNING.landHexesPerFauna
+// land hexes, on random hexes at least 2 steps from every tower, so each
+// player's first ring is open. The further from the towers, the stronger.
+function placeFauna(rng: Rng, hexes: Record<string, Hex>, players: number) {
+  const towers = towerSpots(players).map((k) => parseKey(k)!);
+  const land = Object.values(hexes).filter((h) => h.terrain !== 'ocean');
+  const away = (h: Hex) => Math.min(...towers.map(([q, r]) => distance(h.q - q, h.r - r)));
+  const open = shuffle(rng, land.filter((h) => away(h) >= 2));
+  for (const h of open.slice(0, Math.round(land.length / TUNING.landHexesPerFauna))) {
+    h.fauna = FAUNA_BY_DISTANCE[Math.min(away(h) - 2, FAUNA_BY_DISTANCE.length - 1)];
+  }
 }

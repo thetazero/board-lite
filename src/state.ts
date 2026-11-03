@@ -2,9 +2,9 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity,
+  type GameEvent, TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, faunaHexes,
   neighbourCount, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -17,6 +17,12 @@ export interface HexView {
   r: number;
   terrain: string;
   building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; floors: number } | null;
+  fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
+}
+
+export interface FaunaView extends UnitView {
+  key: string;
+  loot: Res;
 }
 
 export interface DragonView {
@@ -30,7 +36,7 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  resting: '' | 'hungry' | 'hurt'; // sitting out this round's raids; a hungry one doesn't grow either
+  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't grow either, a hunted one fought fauna
   canRaid: boolean;
   status: string;
   targeting: string;
@@ -112,6 +118,7 @@ export interface CardView {
   blocked: string | null; // why it can't be played right now, if known
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
+  fauna?: FaunaView; // fauna cards: the beast it sends
   dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
@@ -134,7 +141,7 @@ export interface SeatState {
   deciding: boolean;
   basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean };
-  raidReady: string[]; // my dragons that can be committed
+  raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   myVote: number | null;
   myChoice: 'fight' | 'bail' | null;
   log: EventView[]; // private events for me
@@ -150,7 +157,7 @@ function attackText(a: { targets: number; dice: number; sides: number }) {
 function dragonView(d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
-  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.resting === 'hungry' ? 'hungry' : 'hurt';
+  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.resting === 'hungry' ? 'hungry' : d.resting === 'hunted' ? 'hunted' : 'hurt';
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
@@ -167,6 +174,11 @@ function targetView(key: string, hp?: number[]): TargetView {
       return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), weak: x.weak, strong: x.strong };
     }),
   };
+}
+
+export function faunaView(key: string): FaunaView {
+  const x = FAUNA[key];
+  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), weak: x.weak, strong: x.strong, loot: res(x.loot) };
 }
 
 function sideText(g: Game, s: TradeSide): string {
@@ -211,6 +223,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       return {
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, floors: b.floors } : null,
+        fauna: h.fauna ? faunaView(h.fauna) : null,
       };
     }),
     dragons: g.dragons.map(dragonView),
@@ -267,8 +280,9 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are fully grown.' };
   }
+  if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
-    const ids = mine.filter((d) => d.damage > 0 || d.resting === 'hurt').map((d) => d.id);
+    const ids = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };
   }
   return { ...base, text: a.text, needs: 'none' };

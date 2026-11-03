@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { playOut } from './bot.ts';
 import {
-  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
+  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
   type Attack, type BuildingClass, type Bundle, type Resource, type Terrain,
 } from './data.ts';
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
@@ -393,6 +393,68 @@ ${table(head, rows)}
 ${goldLine}`;
 }
 
+// Clear one beast through the real engine: P1 sends these dragons on their
+// turn. Returns whether it fell.
+function hunt(fauna: string, dragons: { key: string; stage: number }[], seed: number): boolean {
+  if (!template) raid('brindle', [], 0); // builds the template
+  const g = structuredClone(template!);
+  g.rng = { state: seed };
+  g.map = { '0,0': { q: 0, r: 0, terrain: 'plains', fauna } };
+  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
+  g.phase = 'action';
+  g.turn = 0;
+  apply(g, 0, `clear 0,0 ${g.dragons.map((d) => d.id).join(' ')}`);
+  return !g.map['0,0'].fauna;
+}
+
+function fauna(): string {
+  const unitRows = Object.entries(FAUNA).map(([k, f]) => {
+    const at = FAUNA_BY_DISTANCE.indexOf(k);
+    const where = at < 0 ? 'cards only' : `${at + 2}${at === FAUNA_BY_DISTANCE.length - 1 ? '+' : ''} steps from the nearest tower`;
+    return [f.name, f.hp, `${f.targets}×${f.dice}d${f.sides} (${n1(avgAttack(f))})`, f.strong.join(', ') || '—', f.weak.join(', ') || '—', cost(f.loot), value(f.loot), where];
+  });
+  // Clear odds, averaged over the five base dragons' elements (worst–best in brackets).
+  const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
+  const parties: [string, number[]][] = [['One hatchling', [1]], ['One young', [2]], ['One adult', [3]], ['Two young', [2, 2]], ['Two adults', [3, 3]]];
+  let salt = 500;
+  const oddsRows = parties.map(([label, stages]) => [label, ...Object.keys(FAUNA).map((f) => {
+    const all = baseKeys.map((k) => {
+      const s0 = salt++;
+      let won = 0;
+      for (let i = 0; i < RAIDS_PER_CELL; i++) if (hunt(f, stages.map((stage) => ({ key: k, stage })), s0 * 1000 + i)) won++;
+      return won / RAIDS_PER_CELL;
+    });
+    return `${pct(all.reduce((s, o) => s + o, 0) / all.length)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`;
+  })]);
+  // The starting map: how many of each beast, by player count.
+  const mapRows = PLAYER_COUNTS.map((players) => {
+    const maps = sampleMaps(players);
+    const per = (k: string) => maps.reduce((s, m) => s + Object.values(m).filter((h) => h.fauna === k).length, 0) / maps.length;
+    const land = Object.values(maps[0]).filter((h) => h.terrain !== 'ocean').length;
+    return [players, land, ...Object.keys(FAUNA).map((k) => n1(per(k)))];
+  });
+  const basic = Object.values(BUILDINGS).find((b) => b.produces)!;
+  const out = (basic.produces!.base + (basic.produces!.die + 1) / 2);
+  const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), value(a.cost), a.copies]);
+  return `## Fauna
+
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses ${n1(out)} value a round). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player; if not, it stays at full health. New fauna comes only from cards.
+
+${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Loot', 'Loot value', 'Starts'], unitRows)}
+
+Chance the beast falls, from ${RAIDS_PER_CELL} fights through the engine per cell, averaged over the five base dragons' elements (worst–best element in brackets):
+
+${table(['Dragons sent', ...Object.values(FAUNA).map((f) => f.name)], oddsRows)}
+
+On the starting map (one beast per ${TUNING.landHexesPerFauna} land hexes, none within 1 step of a tower), on average:
+
+${table(['Players', 'Land hexes', ...Object.values(FAUNA).map((f) => f.name)], mapRows)}
+
+Cards that send fauna (action cards; see Decks for how often they come):
+
+${table(['Card', 'Sends', 'Cost', 'Value', 'Copies'], cardRows)}`;
+}
+
 function deck(): string {
   const build = [...Object.values(BUILDINGS), ...Object.values(UPGRADES)];
   const act = [...Object.values(ACTIONS), ...Object.values(DRAGONS)];
@@ -438,6 +500,7 @@ function demand(): string {
     for (const u of Object.values(UPGRADES)) if (u.makes?.[r]) s.push(u.name);
     const loot = Object.values(TARGETS).filter((t) => t.loot[r]).length;
     if (loot) s.push(`raid loot (${loot} of ${Object.keys(TARGETS).length} kingdoms)`);
+    if (Object.values(FAUNA).some((f) => f.loot[r])) s.push('clearing fauna');
     return s.join(', ') || 'nothing';
   };
   const rows = RESOURCES.map((r) => [r, spend[r], pct(spend[r] / total), sources(r)]);
@@ -478,7 +541,7 @@ export function datasheet(): string {
 
 Generated from \`src/data.ts\` and the engine by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff: it shows what the change does to payback, cost per point and raid odds.
 
-${[economy(), production(), land(), shortages(), neighbourCards(), others(), points(), dragons(), raids(), demand(), deck(), length()].join('\n\n')}
+${[economy(), production(), land(), shortages(), neighbourCards(), others(), points(), dragons(), raids(), fauna(), demand(), deck(), length()].join('\n\n')}
 `;
 }
 

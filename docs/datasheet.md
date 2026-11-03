@@ -184,21 +184,56 @@ Chance the kingdom falls to one player's raiders fighting to the end, from 100 r
 
 Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.5, young 1.5, adult 3.4. A Tower Floor takes 3 gold.
 
+## Fauna
+
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses 3.5 value a round). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player; if not, it stays at full health. New fauna comes only from cards.
+
+| Beast | Health | Attack (avg) | Strong vs | Weak vs | Loot | Loot value | Starts |
+|---|---|---|---|---|---|---|---|
+| Wolf Pack | 8 | 1×1d6 (3.5) | — | fire | 2 livestock | 2 | 2 steps from the nearest tower |
+| Cave Bear | 16 | 1×1d10 (5.5) | ice | lightning | 4 livestock | 4 | 3 steps from the nearest tower |
+| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 6 livestock | 6 | 4+ steps from the nearest tower |
+
+Chance the beast falls, from 100 fights through the engine per cell, averaged over the five base dragons' elements (worst–best element in brackets):
+
+| Dragons sent | Wolf Pack | Cave Bear | Basilisk |
+|---|---|---|---|
+| One hatchling | 56% (45%–90%) | 5% (0%–21%) | 0% (0%–0%) |
+| One young | 100% (100%–100%) | 59% (2%–100%) | 20% (0%–55%) |
+| One adult | 100% (100%–100%) | 85% (32%–100%) | 39% (0%–89%) |
+| Two young | 100% (100%–100%) | 100% (100%–100%) | 63% (10%–100%) |
+| Two adults | 100% (100%–100%) | 100% (100%–100%) | 90% (73%–100%) |
+
+On the starting map (one beast per 8 land hexes, none within 1 step of a tower), on average:
+
+| Players | Land hexes | Wolf Pack | Cave Bear | Basilisk |
+|---|---|---|---|---|
+| 2 | 61 | 2.4 | 2.8 | 2.8 |
+| 3 | 61 | 4 | 3.3 | 0.6 |
+| 4 | 91 | 4.4 | 3.9 | 2.7 |
+
+Cards that send fauna (action cards; see Decks for how often they come):
+
+| Card | Sends | Cost | Value | Copies |
+|---|---|---|---|---|
+| Wolf Call | Wolf Pack | 1 crystal, 2 gold | 9 | 2 |
+| Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 14 | 1 |
+
 ## Resource demand
 
 How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (1 livestock per dragon a round) comes on top.
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 73 | 24% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 71 | 23% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 84 | 27% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 34 | 11% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms) |
-| gold | 44 | 14% | Market, Trade Charter, raid loot (6 of 6 kingdoms) |
+| stone | 73 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 71 | 22% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 88 | 28% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 34 | 11% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 51 | 16% | Market, Trade Charter, raid loot (6 of 6 kingdoms) |
 
 ## Decks
 
-Building deck 46 cards (18 buildings, 4 upgrades), action deck 38. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 75% of the time.
+Building deck 46 cards (18 buildings, 4 upgrades), action deck 41. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 75% of the time.
 
 | Card | Deck | Copies | Share of deck | By round 5 |
 |---|---|---|---|---|
@@ -224,14 +259,16 @@ Building deck 46 cards (18 buildings, 4 upgrades), action deck 38. Last column: 
 | Gilding | building deck (upgrade) | 3 | 7% | 53% |
 | Nesting Grounds | building deck (upgrade) | 3 | 7% | 53% |
 | Trade Charter | building deck (upgrade) | 3 | 7% | 53% |
-| Windfall | action | 5 | 13% | 53% |
-| Buried Treasure | action | 4 | 11% | 45% |
-| Growth Elixir | action | 4 | 11% | 45% |
-| Healing Potion | action | 3 | 8% | 35% |
-| War Horn | action | 3 | 8% | 35% |
-| Secret Hoard | action | 4 | 11% | 45% |
+| Windfall | action | 5 | 12% | 50% |
+| Buried Treasure | action | 4 | 10% | 42% |
+| Growth Elixir | action | 4 | 10% | 42% |
+| Healing Potion | action | 3 | 7% | 33% |
+| War Horn | action | 3 | 7% | 33% |
+| Secret Hoard | action | 4 | 10% | 42% |
+| Wolf Call | action | 2 | 5% | 23% |
+| Rouse the Bear | action | 1 | 2% | 12% |
 | Any upgrade (4 kinds) | building deck (upgrade) | 13 | 28% | 98% |
-| Any dragon (15 kinds) | action | 15 | 39% | 93% |
+| Any dragon (15 kinds) | action | 15 | 37% | 91% |
 
 ## Game length (random bots)
 
@@ -241,6 +278,6 @@ Last three columns: share of games that end with someone holding each title (it 
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held |
 |---|---|---|---|---|---|---|---|
-| 2 | 8 | 11 | 16 | 0 | 70% | 73% | 60% |
-| 3 | 8 | 11 | 13 | 0 | 63% | 83% | 80% |
-| 4 | 7 | 10 | 13 | 0 | 63% | 80% | 60% |
+| 2 | 9 | 12 | 15 | 0 | 73% | 37% | 73% |
+| 3 | 7 | 11 | 15 | 0 | 90% | 60% | 73% |
+| 4 | 7 | 11 | 14 | 0 | 73% | 60% | 93% |

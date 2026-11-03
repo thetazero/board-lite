@@ -190,7 +190,8 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'hatch': return `${who(ev.p)} ${dragon(ev.d, 0)} ${dname(ev.d)}`;
     case 'play': {
-      const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : '';
+      const on = ev.hex ? g.map.find((h) => h.k === ev.hex)?.building : null;
+      const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : ev.fauna ? `${icon(ev.fauna, 1.5)}${on ? `<span class="arrow">➜</span>${buildingChip(on.type, on.owner, null, 26, on.cls)}` : ''}` : '';
       return `${who(ev.p)} <span class="evcard">${esc(ev.name)}</span> ${what}`;
     }
     case 'bank': return `${who(ev.p)} ${res(ev.give)}<span class="arrow">➜</span>${res(ev.get)}`;
@@ -205,6 +206,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'everyone bailed' : 'nobody went'}</span>`;
     case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
+    case 'cleared': return `${who(ev.p)} ${icon(ev.fauna, 1.5)} ${ev.won ? `<span class="ok">cleared</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
     default: return '';
   }
 }
@@ -229,7 +231,7 @@ export function dragonBadge(d: DragonView, size = 30): string {
 // is. One sitting out the round has already healed, so it shows why it rests
 // instead of a (full) health bar. `all` numbers same-named dragons.
 export function dragonChip(d: DragonView, all: DragonView[] = []): string {
-  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>' : d.resting === 'hurt' ? '<em class="st-healing">healing</em>' : d.stage ? hpBar(d.hp, d.maxHp) : '';
+  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>' : d.resting === 'hurt' ? '<em class="st-healing">healing</em>' : d.resting === 'hunted' ? `<em class="st-hunted">hunted</em>${hpBar(d.hp, d.maxHp)}` : d.stage ? hpBar(d.hp, d.maxHp) : '';
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
   return `<div class="dchip" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${state}</div></div>`;
@@ -334,6 +336,11 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
       cells.push(`<g transform="translate(${x} ${y})">${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
+    }
+    // A beast holding the hex: in its middle, or crouched on the building it shuts down.
+    if (h.fauna) {
+      const [fx, fy, fs] = b ? [x + size * 0.3, y + size * 0.28, size * 0.034] : [x, y, size * 0.05];
+      cells.push(`<g class="fauna" transform="translate(${fx} ${fy})"><circle r="${fs * 11}" fill="#3a2a22" opacity=".55"/><g transform="scale(${fs})">${iconShapes(h.fauna.key)}</g></g>`);
     }
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
     const label = opts.labels?.[h.k];

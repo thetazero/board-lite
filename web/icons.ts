@@ -297,13 +297,53 @@ const ICONS: Record<string, Facet[]> = {
     ['#7fb6e6', P([[-10, 7.5], [-6, 6], [-2, 7.5], [-6, 7.2]])],
     ['#7fb6e6', P([[2, 6], [6, 7.5], [2, 7.2], [-2, 7.5]])],
   ],
+
+  // ---- the fauna: wild beasts holding hexes of the map ----
+  // A grey wolf's head, ears up.
+  wolf_pack: [
+    ['#5d626c', P([[-7.5, -9.5], [-2.5, -5], [-7.8, -2.5]])],
+    ['#4a4e57', P([[7.5, -9.5], [7.8, -2.5], [2.5, -5]])],
+    ['#c4c8cf', P([[-7.8, -4], [0, -6.5], [0, 9.5], [-3.2, 6.5], [-9, 0.5]])],
+    ['#848a95', P([[0, -6.5], [7.8, -4], [9, 0.5], [3.2, 6.5], [0, 9.5]])],
+    ['#eeece6', P([[-3, 1.5], [0, 0.5], [0, 9.5], [-2.2, 7.2]])],
+    ['#cbc6ba', P([[0, 0.5], [3, 1.5], [2.2, 7.2], [0, 9.5]])],
+    ['#1d1f24', P([[-1.4, 6.6], [1.4, 6.6], [0, 8.8]])],
+    ['#f2c230', P([[-4.6, -1.6], [-1.8, -1], [-3.2, 0.2]])],
+    ['#f2c230', P([[4.6, -1.6], [3.2, 0.2], [1.8, -1]])],
+  ],
+  // A brown bear's head, round-eared and broad.
+  cave_bear: [
+    ['#7a5234', P([[-8.5, -8], [-5.5, -9.8], [-3.2, -6.5], [-7.2, -4]])],
+    ['#5e3e26', P([[8.5, -8], [7.2, -4], [3.2, -6.5], [5.5, -9.8]])],
+    ['#a8774c', P([[-8.5, -5], [0, -7.8], [0, 8.5], [-5.5, 7.2], [-9.6, 1]])],
+    ['#74502f', P([[0, -7.8], [8.5, -5], [9.6, 1], [5.5, 7.2], [0, 8.5]])],
+    ['#dcc29a', P([[-3.6, 1], [0, -0.2], [0, 7.6], [-3, 6.2]])],
+    ['#b8986c', P([[0, -0.2], [3.6, 1], [3, 6.2], [0, 7.6]])],
+    ['#2a1a10', P([[-1.8, 1.2], [1.8, 1.2], [0, 3.4]])],
+    ['#1a120b', P([[-4.6, -3], [-2.8, -3], [-2.8, -1.6], [-4.6, -1.6]])],
+    ['#1a120b', P([[2.8, -3], [4.6, -3], [4.6, -1.6], [2.8, -1.6]])],
+  ],
+  // A basilisk's head in profile: a red crest, a yellow slit eye.
+  basilisk: [
+    ['#e5484d', P([[-1.5, -4.6], [-0.2, -9.2], [1.8, -5.2]])],
+    ['#b8363b', P([[1.8, -5.2], [3.8, -9.8], [5, -5.6]])],
+    ['#e5484d', P([[5, -5.6], [7.6, -8.8], [7.6, -4]])],
+    ['#3f8a37', P([[3.5, 0], [9.2, -1], [10, 10], [3, 10]])],
+    ['#6cc05a', P([[-10, 0.2], [-4.5, -4.6], [6, -6], [9.2, -1], [2, 0.2]])],
+    ['#3c7a33', P([[-10, 0.2], [2, 0.2], [9.2, -1], [8, 4.2], [-2, 4.2]])],
+    ['#ffffff', P([[-8, 0.2], [-7, 1.8], [-6, 0.2]])],
+    ['#ffffff', P([[-4.6, 0.2], [-3.6, 1.8], [-2.6, 0.2]])],
+    ['#f2d200', P([[-3.6, -3.4], [-0.4, -3.8], [-1.8, -1.8]])],
+    ['#111111', P([[-2.1, -3.6], [-1.6, -3.6], [-1.8, -2.1]])],
+  ],
 };
 
 export const ICON_NAMES = Object.keys(ICONS);
 
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', gilding: 'Gilding', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
-  militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent' };
+  militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
+  wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {

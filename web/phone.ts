@@ -21,6 +21,8 @@ let stop: (() => void) | null = null;
 // UI state that lives only on this phone (not in the game).
 let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
 let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string> } | null = null;
+// Clearing fauna: the beast's hex, and the dragons picked to send against it.
+let hunting: { hex: string; chosen: Set<string> } | null = null;
 let openCard: string | null = null;
 let selected = new Set<string>(); // discard picks
 let trade = fresh();
@@ -110,6 +112,7 @@ function onSnapshot(s: Snapshot) {
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
   if (key(prev) !== key(s)) {
     picking = null;
+    hunting = null;
     selected = new Set();
     openCard = null;
     if (s.game.phase !== 'action') trade = fresh();
@@ -244,6 +247,7 @@ function render() {
   const me = snap!.you!;
   let body = '';
   if (picking) body = hexPicker(g);
+  else if (hunting && g.phase === 'action' && me.myTurn) body = huntView(g, me);
   else if (g.phase === 'over') body = gameOver(g, me);
   else if (g.phase === 'discard') body = me.deciding ? discardView(me) : '';
   else if (g.phase === 'raid') body = raidView(g, me);
@@ -291,9 +295,13 @@ function actionView(g: PublicState, me: Me): string {
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
   const t = !me.myTurn && tab === 'more' ? 'none' : tab;
   const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
+  // Fauna anywhere on the map, and dragons fit to fight it: clearing is one tap away.
+  const beasts = g.map.filter((h) => h.fauna);
+  const clear = me.myTurn && beasts.length && me.raidReady.length
+    ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} Clear fauna</button>` : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : incoming ? '<button id="end" class="primary big endturn" disabled>Answer the offer to end your turn</button>' : '<button id="end" class="primary big endturn">End turn</button>';
-  return `${incoming}${mine}${tabs}${content}${end}`;
+  return `${incoming}${mine}${tabs}${content}${clear}${end}`;
 }
 
 const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon' };
@@ -340,7 +348,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
   else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch it' : c.kind === 'action' ? 'Play it' : 'Build it'}</button>`;
   else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn" data-play="${c.id} ${r}" aria-label="${r}">${resIcon(r, 1.9)}</button>`).join('')}</div>`;
   else if (c.needs === 'dragon') actions = `<div class="row">${c.dragons.map((id) => `<button data-play="${c.id} ${id}">${esc(dragonLabel(id))}</button>`).join('')}</div>`;
-  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : 'Choose where to build'}</button>`;
+  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : c.kind === 'action' ? 'Choose where to send it' : 'Choose where to build'}</button>`;
   else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build it</button>`;
   else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch it' : 'Play it'}</button>`;
   return `<div class="zoom" id="zoom">
@@ -348,7 +356,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
       <b class="cname">${esc(c.name)}</b>
       <div class="ccost"><span>${costChips(c.cost, me)}</span><small>${KIND_LABEL[c.kind]}</small></div>
-      ${c.dragon ? dragonStats(c) : `<p class="ctext">${iconText(esc(c.text))}</p>`}
+      ${c.dragon ? dragonStats(c) : `${c.fauna ? foeStack([c.fauna], 1.6) : ''}<p class="ctext">${iconText(esc(c.text))}</p>`}
     </div>
     <div class="zoomacts">${actions}</div>
     ${me.hand.length > 1 ? `<div class="zoomnav"><button class="ghost" data-zoomnav="-1" aria-label="Previous card">‹</button><span>${me.hand.indexOf(c) + 1} / ${me.hand.length}</span><button class="ghost" data-zoomnav="1" aria-label="Next card">›</button></div>` : ''}
@@ -425,6 +433,23 @@ function tradeView(g: PublicState, me: Me): string {
       ${cards}
       <button id="offer" class="primary" ${any ? '' : 'disabled'}>Send offer</button>
     </section>`;
+}
+
+// Sending dragons against one beast: the beast drawn as a raid's defenders
+// are, with its loot; your fit dragons to pick from, as for a raid.
+function huntView(g: PublicState, me: Me): string {
+  const h = g.map.find((x) => x.k === hunting!.hex);
+  if (!h?.fauna) return '';
+  const list = me.raidReady.map((id) => {
+    const d = g.dragons.find((x) => x.id === id)!;
+    return `<button class="dragon${hunting!.chosen.has(id) ? ' on' : ''}" data-hunter="${id}">${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
+  }).join('');
+  const on = h.building ? `<p class="hint">On ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}</p>` : '';
+  const n = hunting!.chosen.size;
+  return `<section class="ptarget">${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>${on}
+    ${list}
+    <p class="hint">They miss this round's raids.</p>
+    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} Send ${n || ''}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
 }
 
 function hexPicker(g: PublicState): string {
@@ -619,9 +644,10 @@ function wire(g: PublicState, me: Me) {
   bind('[data-build]', (el) => send(`build ${el.dataset.build}`));
   bind('[data-pickhex]', (el) => {
     const c = me.hand.find((x) => x.id === el.dataset.pickhex)!;
-    const verb = c.kind === 'upgrade' ? 'upgrade' : 'build';
+    const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build';
     const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
-    picking = { title: `${c.kind === 'upgrade' ? 'Put' : 'Build'} ${c.name}${c.kind === 'upgrade' ? ' on…' : ' where?'}`, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels };
+    const title = c.fauna ? `Send the ${c.fauna.name} where?` : `${c.kind === 'upgrade' ? 'Put' : 'Build'} ${c.name}${c.kind === 'upgrade' ? ' on…' : ' where?'}`;
+    picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels };
     render();
   });
   bind('[data-basic]', (el) => {
@@ -635,9 +661,31 @@ function wire(g: PublicState, me: Me) {
   app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => {
     const cmd = picking!.command(el.dataset.hex!);
     picking = null;
+    // Picking a beast to clear opens the dragon choice; everything else is a command.
+    if (cmd.startsWith('hunt ')) hunting = { hex: el.dataset.hex!, chosen: new Set() };
+    render();
+    if (!cmd.startsWith('hunt ')) send(cmd);
+  }));
+  on('hunt', () => {
+    picking = { title: 'Clear which beast?', hexes: g.map.filter((h) => h.fauna).map((h) => h.k), command: (h) => `hunt ${h}` };
+    render();
+  });
+  bind('[data-hunter]', (el) => {
+    const id = el.dataset.hunter!;
+    if (hunting!.chosen.has(id)) hunting!.chosen.delete(id);
+    else hunting!.chosen.add(id);
+    render();
+  });
+  on('huntgo', () => {
+    const cmd = `clear ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
+    hunting = null;
     render();
     send(cmd);
-  }));
+  });
+  on('huntoff', () => {
+    hunting = null;
+    render();
+  });
   // Leafing through the hand from an open card.
   bind('[data-zoomnav]', (el) => {
     const i = me.hand.findIndex((c) => c.id === openCard);
