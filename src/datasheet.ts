@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { playOut } from './bot.ts';
 import {
-  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
+  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
   type Attack, type BuildingClass, type Bundle, type Resource, type Terrain,
 } from './data.ts';
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
@@ -20,7 +20,7 @@ import { distance, generateMap, key, mapRadius, neighbors, parseKey, towerSpots 
 // and gold is worth what the bank charges for it.
 const VALUE: Record<Resource, number> = { stone: 1, timber: 1, crystal: 1, livestock: 1, gold: TUNING.bankRate };
 const value = (b: Bundle) => RESOURCES.reduce((s, r) => s + (b[r] ?? 0) * VALUE[r], 0);
-const avgAttack = (a: Attack) => a.targets * a.dice * (a.sides + 1) / 2;
+const avgAttack = avgDamage;
 const cost = (b: Bundle) => bundleText(b) || 'free';
 const n1 = (x: number) => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toString() : '∞');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -282,21 +282,23 @@ Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TU
 function dragons(): string {
   const rows = Object.values(DRAGONS).filter((d, i, all) => !d.base || all.findIndex((x) => x.base) === i).map((d) => [
     d.base ? 'Base dragon (any element)' : d.name, d.base ? 'any' : d.element, cost(d.cost), d.growthTime, d.targeting,
-    ...d.stages.map((s) => `${s.hp}hp ${s.targets}×${s.dice}d${s.sides} (${n1(avgAttack(s))})`),
+    ...d.stages.map((s) => `**${combatPower(s)}**: ${s.hp}hp ${s.targets}×${s.dice}d${s.sides} (${n1(avgAttack(s))})`),
   ]);
   return `## Dragons
 
-Each stage: health, targets × dice (average damage a combat round, before elements).
+Each stage: combat power (see Raids), health, targets × dice (average damage a combat round, before elements).
 
 ${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}`;
 }
 
-// Run one raid through the real engine: P1 sends these dragons and fights to
-// the end. Returns whether the kingdom fell.
+// Run one raid through the real engine: each dragon fights to the end for its
+// owner (P1 unless given). Returns whether the kingdom fell, what each player
+// took, and each dragon's damage.
 // A small game to copy for each raid: no map, decks or log, so the engine's
 // per-command snapshot stays cheap.
 let template: Game | null = null;
-function raid(target: string, dragons: { key: string; stage: number }[], seed: number): boolean {
+type Raider = { key: string; stage: number; owner?: number };
+function raidOnce(target: string, dragons: Raider[], seed: number): { won: boolean; got: number[]; damage: number[] } {
   if (!template) {
     template = newGame(2, 1);
     template.log = [];
@@ -305,8 +307,9 @@ function raid(target: string, dragons: { key: string; stage: number }[], seed: n
   }
   const g = structuredClone(template);
   g.rng = { state: seed };
-  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
-  const before = RESOURCES.reduce((s, r) => s + g.players[0].resources[r], 0);
+  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: d.owner ?? 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
+  const worth = (p: number) => value(g.players[p].resources);
+  const before = [worth(0), worth(1)];
   g.phase = 'raid';
   g.raidsLeft = 2; // so the engine stops at the next raid's vote, before healing
   g.raid = {
@@ -315,17 +318,72 @@ function raid(target: string, dragons: { key: string; stage: number }[], seed: n
   };
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 1');
-  apply(g, 0, `commit ${g.dragons.map((d) => d.id).join(' ')}`);
-  apply(g, 0, 'ready');
-  apply(g, 0, 'fight');
-  return RESOURCES.reduce((s, r) => s + g.players[0].resources[r], 0) > before; // only loot pays out here
+  const sent = [0, 1].filter((p) => g.dragons.some((d) => d.owner === p));
+  for (const p of sent) apply(g, p, `commit ${g.dragons.filter((d) => d.owner === p).map((d) => d.id).join(' ')}`);
+  for (const p of sent) apply(g, p, 'ready');
+  for (const p of sent) apply(g, p, 'fight');
+  const got = [worth(0) - before[0], worth(1) - before[1]];
+  return { won: g.log.some((e) => e.ev?.k === 'raidEnd' && e.ev.won), got, damage: g.dragons.map((d) => d.damage) };
 }
+const raid = (target: string, dragons: Raider[], seed: number) => raidOnce(target, dragons, seed).won;
 
 const RAIDS_PER_CELL = 100; // about ±5 points of precision at 50%
-function odds(target: string, dragons: { key: string; stage: number }[], salt: number) {
+function odds(target: string, dragons: Raider[], salt: number) {
   let won = 0;
   for (let i = 0; i < RAIDS_PER_CELL; i++) if (raid(target, dragons, salt * 1000 + i)) won++;
   return won / RAIDS_PER_CELL;
+}
+
+// Rounds a dragon with this much damage sits out (it heals at each production).
+const roundsOut = (damage: number) => Math.ceil(damage / TUNING.healPerRound);
+
+// Averages over many raids: the chance it falls, what each player takes (in
+// value), and the raid rounds each dragon then misses.
+function outcome(target: string, dragons: Raider[], salt: number, n = 400) {
+  let won = 0;
+  const got = [0, 0];
+  const out = dragons.map(() => 0);
+  for (let i = 0; i < n; i++) {
+    // A '*' dragon is a base dragon, its element varying from raid to raid.
+    const bases = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
+    const r = raidOnce(target, dragons.map((d, j) => (d.key === '*' ? { ...d, key: bases[(i + j) % bases.length] } : d)), salt * 1000 + i);
+    if (r.won) won++;
+    r.got.forEach((x, p) => (got[p] += x / n));
+    r.damage.forEach((x, d) => (out[d] += roundsOut(x) / n));
+  }
+  return { won: won / n, got, out };
+}
+
+// What a tag-along and the player carrying the raid each take: a base
+// hatchling joins two base adults, on the easiest kingdom and on a hard one.
+function shares(): string {
+  const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
+  const [hatch, adult] = [combatPower(DRAGONS[base].stages[0]), combatPower(DRAGONS[base].stages[2])];
+  const targets = Object.keys(TARGETS).sort((a, b) => targetPower(a) - targetPower(b));
+  const rows = [targets[0], targets[targets.length - 2]].map((t, i) => {
+    const solo = outcome(t, [{ key: '*', stage: 3 }, { key: '*', stage: 3 }], 7000 + i);
+    const tag = outcome(t, [{ key: '*', stage: 3 }, { key: '*', stage: 3 }, { key: '*', stage: 1, owner: 1 }], 7100 + i);
+    const tagIfWon = RESOURCES.reduce((s, r) => s + Math.floor((TARGETS[t].loot[r] ?? 0) * hatch / (2 * adult + hatch)) * VALUE[r], 0);
+    return [`${TARGETS[t].name} (${targetPower(t)})`, value(TARGETS[t].loot), `${pct(solo.won)} → ${pct(tag.won)}`, n1(solo.got[0]), n1(tag.got[0]), n1(tag.got[1]), `about ${tagIfWon}`, n1(tag.out[2])];
+  });
+  return `Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (${2 * adult} power), and a second tags along with a base hatchling (${hatch}). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
+
+${table(['Kingdom', 'Loot value', 'Falls: alone → with the tag-along', 'Carrier alone takes', 'Carrier takes, shared', 'Tag-along takes', 'Tag-along if it falls and the hatchling stands', 'Raid rounds the hatchling then misses'], rows)}`;
+}
+
+// How long a hurt dragon is out, and what being bailed on costs.
+function healing(): string {
+  const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
+  const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsOut(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
+  const big = Object.values(DRAGONS).reduce((m, d) => (d.stages[2].hp > m.stages[2].hp ? d : m));
+  // Two players each send a base adult to a kingdom that needs both; one secretly bails.
+  const targets = Object.keys(TARGETS).sort((a, b) => targetPower(a) - targetPower(b));
+  const hard = targets[targets.length - 3];
+  const both = outcome(hard, [{ key: '*', stage: 3 }, { key: '*', stage: 3, owner: 1 }], 7200);
+  const left = outcome(hard, [{ key: '*', stage: 3 }], 7300);
+  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.
+
+Being bailed on, from 400 raids each (elements varying): two players each send a base adult to ${TARGETS[hard].name} (power ${targetPower(hard)}). If both fight, it falls ${pct(both.won)} of the time, each takes ${n1(both.got[0])} in value, and each dragon misses ${n1(both.out[0])} raid rounds on average. If one secretly bails, the one left alone wins ${pct(left.won)} of the time, takes ${n1(left.got[0])}, and misses ${n1(left.out[0])} raid rounds.`;
 }
 
 function raids(): string {
@@ -334,11 +392,11 @@ function raids(): string {
     const t = TARGETS[k];
     const units = t.units.map((u) => UNITS[u]);
     return [
-      t.name, t.units.map((u) => UNITS[u].name).join(', '), units.reduce((s, u) => s + u.hp, 0),
-      n1(units.reduce((s, u) => s + avgAttack(u), 0)), cost(t.loot), value(t.loot),
+      t.name, t.units.map((u) => UNITS[u].name).join(', '), `**${targetPower(k)}**`, units.reduce((s, u) => s + u.hp, 0),
+      n1(units.reduce((s, u) => s + avgAttack(u), 0)), cost(t.loot), value(t.loot), n1(value(t.loot) / targetPower(k)),
     ];
   });
-  const unitRows = Object.values(UNITS).map((u) => [u.name, u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
+  const unitRows = Object.values(UNITS).map((u) => [u.name, combatPower(u), u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
 
   // A lone dragon of every kind, at every stage, against every kingdom.
   const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
@@ -353,7 +411,7 @@ function raids(): string {
       return { all, mean: all.reduce((s, o) => s + o, 0) / all.length };
     });
     goldEach.push(avg.map((a, i) => a.mean * (TARGETS[targets[i]].loot.gold ?? 0)));
-    rows.push([`Base dragon, ${STAGE_NAMES[stage]}`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
+    rows.push([`Base dragon, ${STAGE_NAMES[stage]} (${combatPower(DRAGONS[baseKeys[0]].stages[stage - 1])})`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
   }
   // Raiding alone, the best of the kingdoms offered: the average over every set of candidates.
   const bestOf = (gold: number[]) => {
@@ -371,26 +429,32 @@ function raids(): string {
     const all = baseKeys.map((k) => odds(t, [{ key: k, stage: 2 }, { key: k, stage: 2 }], salt++));
     return pct(all.reduce((s, o) => s + o, 0) / all.length);
   });
-  rows.push(['Two young base dragons', ...pairCells]);
+  rows.push([`Two young base dragons (${2 * combatPower(DRAGONS[baseKeys[0]].stages[1])})`, ...pairCells]);
   for (const [k, d] of Object.entries(DRAGONS).filter(([, d]) => !d.base)) {
-    rows.push([`${d.name} (${d.element}), adult`, ...targets.map((t) => pct(odds(t, [{ key: k, stage: 3 }], salt++)))]);
+    rows.push([`${d.name} (${d.element}), adult (${combatPower(d.stages[2])})`, ...targets.map((t) => pct(odds(t, [{ key: k, stage: 3 }], salt++)))]);
   }
 
   return `## Raids
 
 Defenders:
 
-${table(['Unit', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], unitRows)}
+${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], unitRows)}
 
-Kingdoms (${TUNING.raidCandidates} are offered each raid; average damage is the defenders' total a combat round):
+Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-${table(['Kingdom', 'Defenders', 'Total health', 'Avg damage a round', 'Loot', 'Loot value'], targetRows)}
+Kingdoms (${TUNING.raidCandidates} are offered each raid; average damage is the defenders' total a combat round). Loot grows with the square of power, so the last column, loot value per point of power sent, rises with difficulty:
 
-Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot', 'Loot value', 'Value per power'], targetRows)}
+
+Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
 
 ${table(head, rows)}
 
-${goldLine}`;
+${goldLine}
+
+${shares()}
+
+${healing()}`;
 }
 
 // Clear one beast through the real engine: P1 sends these dragons on their

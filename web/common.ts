@@ -202,7 +202,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'target': return `${icon('raid', 1.3)} <b>${esc(ev.name)}</b>${ev.coin ? ' <small>coin flip</small>' : ''}`;
     case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
     case 'raidEnd': return ev.won
-      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map(who).join(' ')} ${gainChips(ev.share, 1.2)}`
+      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(' ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'everyone bailed' : 'nobody went'}</span>`;
     case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
@@ -227,14 +227,13 @@ export function dragonBadge(d: DragonView, size = 30): string {
     <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g>${mark}</svg>`;
 }
 
-// A dragon with its stage, growth, health and why it is staying home, if it
-// is. One sitting out the round has already healed, so it shows why it rests
-// instead of a (full) health bar. `all` numbers same-named dragons.
-export function dragonChip(d: DragonView, all: DragonView[] = []): string {
-  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>' : d.resting === 'hurt' ? '<em class="st-healing">healing</em>' : d.resting === 'hunted' ? `<em class="st-hunted">hunted</em>${hpBar(d.hp, d.maxHp)}` : d.stage ? hpBar(d.hp, d.maxHp) : '';
+// A dragon with its stage, growth, combat power, and its health or why it is
+// staying home. `all` numbers same-named dragons.
+export function dragonChip(d: DragonView, all: DragonView[], round: number): string {
+  const state = dragonState(d, round);
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
-  return `<div class="dchip" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${state}</div></div>`;
+  return `<div class="dchip" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
@@ -243,6 +242,19 @@ export function incomeText(x: { base: number; dice: number[] }): string {
   const parts = x.base || !x.dice.length ? [x.base < 0 ? `−${-x.base}` : `+${x.base}`] : [];
   for (const s of [...new Set(x.dice)].sort((a, b) => b - a)) parts.push(`+${x.dice.filter((d) => d === s).length}d${s}`);
   return parts.join(' ');
+}
+
+// Combat power: one rough number per dragon or kingdom; a side's add up.
+export function powerTag(n: number, cls = ''): string {
+  return `<span class="stat power ${cls}" title="combat power">${glyph('power', 'combat power')}${n}</span>`;
+}
+
+// Why a dragon sits out, or its health. A healing one shows the rounds until it can raid.
+export function dragonState(d: DragonView, round: number): string {
+  if (d.resting === 'hungry') return '<em class="st-hungry">hungry</em>';
+  if (d.resting === 'hunted') return `<em class="st-hunted">hunted</em>${hpBar(d.hp, d.maxHp)}`;
+  if (d.backIn !== null && !d.canRaid) { const n = d.backIn - round; return `<em class="st-healing" title="can raid again in ${n} round${n === 1 ? '' : 's'}">healing ${n}</em>`; }
+  return d.stage ? hpBar(d.hp, d.maxHp) : '';
 }
 
 export function hpBar(hp: number, max: number): string {
