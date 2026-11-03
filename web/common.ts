@@ -1,8 +1,9 @@
 // Shared by the TV and phone clients: talking to the server, colours, icons
 // and the hex map. Plain DOM, no framework; the server strips the types.
 
-import type { DragonView, EventView, HexView, PublicState, Res, Snapshot } from '../src/state.ts';
+import type { DragonView, EventView, HexView, PublicState, Res, Snapshot, UnitView } from '../src/state.ts';
 import { icon, iconShapes } from './icons.ts';
+import { glyph } from './art.ts';
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
@@ -232,6 +233,30 @@ export function hpBar(hp: number, max: number): string {
   const pct = max ? Math.max(0, Math.min(100, (hp / max) * 100)) : 0;
   const color = pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d';
   return `<span class="hpbar"><span style="width:${pct}%;background:${color}"></span></span>`;
+}
+
+// ---------- the raid's defenders ----------
+
+// A defender's picture, from its name ("Frost Golem" -> the frost_golem icon).
+export function unitIcon(name: string, size = 2): string {
+  return icon(name.toLowerCase().replace(/[^a-z]+/g, '_'), size, 'ricon unit-art');
+}
+
+// A kingdom's defenders by kind, drawn: each kind's picture with how many
+// there are, its health and attack, and the elements it takes double (×2)
+// or half (½) from. Four Archers are one picture marked ×4, not four lines.
+export function foeStack(units: UnitView[], size = 2): string {
+  const kinds: { u: UnitView; n: number; up: number }[] = [];
+  for (const u of units) {
+    const k = kinds.find((x) => x.u.name === u.name);
+    if (k) { k.n++; if (u.hp > 0) k.up++; } else kinds.push({ u, n: 1, up: u.hp > 0 ? 1 : 0 });
+  }
+  return `<div class="foes">${kinds.map(({ u, n }) => `
+    <div class="foe">
+      <span class="foe-pic">${unitIcon(u.name, size)}${n > 1 ? `<b class="foe-n">×${n}</b>` : ''}</span>
+      <span class="foe-stats"><span class="stat">${glyph('health', 'health')}${u.maxHp}</span><span class="stat">${glyph('attack', 'attack')}${esc(u.attack)}</span></span>
+      <span class="foe-elems">${u.weak.length ? `<span class="weak">×2${u.weak.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}${u.strong.length ? `<span class="strong">½${u.strong.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}</span>
+    </div>`).join('')}</div>`;
 }
 
 export function dieFace(sides: number, value: number, cls = ''): string {
