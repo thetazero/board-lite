@@ -201,27 +201,34 @@ function header(g: PublicState, me: Me): string {
     const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
     return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${incomeText(inc)}</small></div>`;
   }).join('');
-  const pts = me.hiddenPoints ? `${me.totalPoints} <small>(${me.hiddenPoints} secret)</small>` : `${me.totalPoints}`;
+  // Points held as cards in the hand count too: shown as a card with how many.
+  const hidden = me.hiddenPoints ? `<small class="hiddenpts">${icon('cards', 1.1)}${me.hiddenPoints}${icon('points', 0.9)}</small>` : '';
   // Name, points and resources stay on screen together while the page scrolls.
   return `
     <div class="mehead" style="--pc:${PLAYER_COLORS[me.seat]}">
       <header class="me">
         <span class="pname">${esc(me.name)}</span>
-        <span class="pts">${icon('points', 1.4)}${pts} <small>/ ${g.pointsToWin}</small></span>
+        <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
       </header>
       <div class="resbar">${res}</div>
     </div>`;
 }
 
+// The one line that says what's going on. The screen below doesn't say it again.
 function status(g: PublicState, me: Me): string {
-  if (g.phase === 'over') return `<div class="status"><span>Game over: ${playerTag(g.winner!, names)} wins.</span></div>`;
+  if (g.phase === 'over') return `<div class="status you"><span>${g.winner === me.seat ? 'You win!' : `${playerTag(g.winner!, names)} wins`}</span></div>`;
   if (me.deciding) {
-    const what = g.phase === 'action' ? (me.myTurn ? 'Your turn!' : 'An offer for you') : g.phase === 'discard' ? 'Too many cards' : 'Raid: your choice';
-    return `<div class="status you">${what}</div>`;
+    let what = '';
+    if (g.phase === 'action') what = me.myTurn ? 'Your turn!' : 'An offer for you';
+    else if (g.phase === 'discard') what = `Discard ${me.hand.length - me.handCap} <span class="over">${icon('cards', 1.2)}${me.hand.length}/${me.handCap}</span>`;
+    else if (g.raid?.step === 'vote') what = `${icon('raid', 1.3)} Vote`;
+    else if (g.raid?.step === 'commit') what = `${icon('raid', 1.3)} ${esc(g.raid.target!.name)} <span class="tag">${icon('public', 1.1)}</span>`;
+    else what = `Fight or bail? <span class="tag">${icon('secret', 1.1)}</span>`;
+    return `<div class="status you"><span>${what}</span></div>`;
   }
   const tags = g.waitingOn.map((p) => playerTag(p, names));
   const w = tags.length < 2 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`;
-  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn. ${g.offers.length ? '' : 'You can offer them a trade.'}</span></div>`;
+  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>`;
   return `<div class="status"><span>Waiting for ${w || 'the table'}.</span></div>`;
 }
 
@@ -231,19 +238,16 @@ function render() {
   let body = '';
   if (picking) body = hexPicker(g);
   else if (g.phase === 'over') body = gameOver(g, me);
-  else if (g.phase === 'discard') body = me.deciding ? discardView(me) : '<p class="big-note">Waiting for the others to discard…</p>';
+  else if (g.phase === 'discard') body = me.deciding ? discardView(me) : '';
   else if (g.phase === 'raid') body = raidView(g, me);
   else body = actionView(g, me);
   const den = !picking && (g.phase === 'action' || g.phase === 'discard') ? roost(g, me) : '';
-  // Drawn cards fly into the hand, so the log doesn't also say so.
-  // Only this round's news: last round's raid choices don't linger into your turn.
-  const recent = me.log.filter((e) => e.round === g.round && !e.text.startsWith('You draw ')).slice(-2).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
   const dock = !picking && (g.phase === 'action' || g.phase === 'discard') ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
   document.body.classList.toggle('has-hand', !!dock);
-  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${recent && !picking ? `<ul class="mylog">${recent}</ul>` : ''}${dock}${zoom}`;
+  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   wire(g, me);
 }
 
@@ -282,7 +286,7 @@ const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action',
 // What a card costs, with what you're short of marked.
 function costChips(cost: CardView['cost'], me: Me): string {
   const parts = RESOURCES.filter((r) => (cost[r] ?? 0) > 0).map((r) => `<span class="chip${me.resources[r] < cost[r]! ? ' short' : ''}">${cost[r]}${resIcon(r, 1.15)}</span>`);
-  return parts.join('') || '<span class="chip free">free</span>';
+  return parts.join('');
 }
 
 // The card's corner: its kind, or a dragon's element.
@@ -313,9 +317,12 @@ function dragonStats(c: CardView): string {
 // A card tapped open: full size, its rule text, and how to play it.
 function cardZoom(c: CardView, me: Me, playable: boolean): string {
   let actions = '';
-  if (!playable) actions = `<p class="hint">${c.needs === 'unplayable' ? esc(c.blocked ?? '') : 'You can play cards on your turn.'}</p>`;
+  // Off your turn there's nothing to do with a card but read it; one you can't
+  // afford shows its button greyed, the missing resources already red on the cost.
+  if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
+  else if (!playable) actions = '';
   else if (c.blocked) actions = `<p class="blocked">${iconText(esc(c.blocked))}</p>`;
-  else if (!c.affordable) actions = `<p class="blocked">You can't afford it yet.</p>`;
+  else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch it' : c.kind === 'action' ? 'Play it' : 'Build it'}</button>`;
   else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn" data-play="${c.id} ${r}" aria-label="${r}">${resIcon(r, 1.9)}</button>`).join('')}</div>`;
   else if (c.needs === 'dragon') actions = `<div class="row">${c.dragons.map((id) => `<button data-play="${c.id} ${id}">${esc(dragonLabel(id))}</button>`).join('')}</div>`;
   else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : 'Choose where to build'}</button>`;
@@ -337,7 +344,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
 // overlapping when there are many. On your turn the cards you can play now glow.
 function handFan(me: Me, playable: boolean, discarding: boolean): string {
   const n = me.hand.length;
-  if (!n) return '<div class="handfan empty"><p class="hint">No cards. You draw 2 building cards and 1 action card each round.</p></div>';
+  if (!n) return '<div class="handfan empty"></div>';
   const mid = (n - 1) / 2;
   const tilt = Math.min(6, 36 / n); // degrees between neighbours
   const cards = me.hand.map((c, i) => {
@@ -365,10 +372,10 @@ function moreView(me: Me): string {
   // Pick a resource by tapping its icon.
   const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
   return `
-    <section class="panel"><h3>Special projects <small>(no card, double cost)</small></h3>${projects}
+    <section class="panel"><h3>Special projects</h3>${projects}
       <div class="proj${eggOk ? '' : ' dim'}"><b>Base dragon egg</b> ${resChips(egg.cost)}</div>
       <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost.</p>'}</section>
-    <section class="panel"><h3>Bank <small>(${me.bankRate} for 1)</small></h3>
+    <section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Get</span>${pick('get', bank.get)}</div>
       <div class="bank"><span class="stepper"><button data-btimes="-1">−</button><b>${bank.times}</b><button data-btimes="1">+</button></span>
@@ -395,57 +402,58 @@ function tradeView(g: PublicState, me: Me): string {
       ${cards ? `<div class="row tcards">${cards}</div>` : ''}
       <h3>You get</h3><div class="tgrid">${get}</div>
       <button id="offer" class="primary" ${any ? '' : 'disabled'}>Send offer</button>
-      <p class="hint">Offers show on the TV. Accepted trades are binding; open offers end with the turn.</p>
     </section>`;
 }
 
 function hexPicker(g: PublicState): string {
-  return `<section class="picker"><h3>${esc(picking!.title)}</h3><p class="hint">Tap a highlighted hex. It matches the map on the TV.</p>
+  return `<section class="picker"><h3>${esc(picking!.title)}</h3>
     <div class="pmap">${mapSvg(g.map, { size: 40, selectable: picking!.hexes })}</div>
     <button id="cancelpick" class="ghost">Cancel</button></section>`;
 }
 
 // ---- raid ----
 
+// Each raid step is its choices as buttons. A choice once made stays on screen,
+// lit, so the screen shows what you chose instead of saying it.
 function raidView(g: PublicState, me: Me): string {
   const raid = g.raid!;
   if (raid.step === 'vote') {
-    if (me.myVote !== null) return `<p class="big-note">You voted for <b>${esc(raid.candidates[me.myVote].name)}</b>. Waiting for the others…</p>`;
-    return `<h2>Vote for the raid target</h2><p class="hint">Details are on the TV.</p>${raid.candidates.map((t, i) => `
-      <button class="choice" data-vote="${i + 1}"><b>${i + 1}. ${esc(t.name)}</b><span>${t.units.map((u) => esc(u.name)).join(', ')}</span><span>Loot ${resChips(t.loot)}</span></button>`).join('')}`;
+    const voted = me.myVote !== null;
+    return raid.candidates.map((t, i) => `
+      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)}</b><span>${t.units.map((u) => esc(u.name)).join(', ')}</span><span>${resChips(t.loot)}</span></button>`).join('');
   }
   if (raid.step === 'commit') {
-    if (!me.raidReady.length) return `<p class="big-note">None of your dragons can raid this time (eggs, hungry or hurt dragons stay home).</p>`;
+    if (!me.raidReady.length) return roost(g, me); // nobody fit to go: the roost shows why
     const committed = new Set(raid.commits[me.seat]);
     const ready = raid.ready[me.seat];
     const list = me.raidReady.map((id) => {
       const d = g.dragons.find((x) => x.id === id)!;
-      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} · ${d.hp}hp · hits ${esc(d.attack)}</span></button>`;
+      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${esc(d.attack)}</span></span></button>`;
     }).join('');
-    return `<h2>Raid on ${esc(raid.target!.name)}</h2><p class="hint">Everyone sees what you commit. Tap dragons to send them, then lock in.</p>
-      ${list}${ready ? `<p class="big-note">Locked in with ${committed.size || 'no'} dragon${committed.size === 1 ? '' : 's'}.</p>` : `<button id="ready" class="primary big">Lock in ${committed.size ? `${committed.size} dragon${committed.size === 1 ? '' : 's'}` : '(stay home)'}</button>`}`;
+    return `${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size}` : 'Stay home'}</button>`}`;
   }
   if (raid.step === 'bail') {
-    if (!raid.commits[me.seat].length) return `<p class="big-note">You're not in this raid. The others are choosing in secret.</p>`;
-    if (me.myChoice) return `<p class="big-note">You chose to <b>${me.myChoice}</b>. Nobody else knows yet.</p>`;
-    return `<h2>Fight or bail?</h2><p class="hint">Secret. Bailing costs nothing, but you get no loot. Once the fight starts there is no retreat, and a dragon that takes a hit sits out next round.</p>
-      <div class="row big2"><button id="fight" class="primary big">Fight</button><button id="bail" class="big">Bail</button></div>`;
+    const mine = raid.commits[me.seat];
+    if (!mine.length) return roost(g, me);
+    const sent = mine.map((id) => dragonChip(g.dragons.find((d) => d.id === id)!)).join('');
+    const chose = me.myChoice;
+    return `<div class="sent">${sent}</div>
+      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
+      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Bail</button></div>`;
   }
-  return `<p class="big-note">The battle is on the TV.</p>`;
+  return '';
 }
 
 // ---- discard / end ----
 
 function discardView(me: Me): string {
   const n = me.hand.length - me.handCap;
-  return `<h2>Discard ${n} card${n === 1 ? '' : 's'}</h2><p class="hint">The hand limit is ${me.handCap}. Tap cards in your hand to pick them.</p>
-    <button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
+  return `<button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
 }
 
 function gameOver(g: PublicState, me: Me): string {
   const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
-  return `<h2>${g.winner === me.seat ? 'You win!' : `${esc(names[g.winner!])} wins.`}</h2>
-    <ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip">${t}${icon('points', 1.25)}</span></li>`).join('')}</ol>
+  return `<ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip">${t}${icon('points', 1.25)}</span></li>`).join('')}</ol>
     <button id="newgame" class="primary">Join another game</button>`;
 }
 
@@ -459,7 +467,7 @@ const talk = (() => {
   const el = document.createElement('div');
   el.className = 'talkbar';
   el.innerHTML = `
-    <button class="latest" type="button"><span>Table talk</span><b class="unread" hidden></b></button>
+    <button class="latest" type="button"><span></span><b class="unread" hidden></b></button>
     <div class="sheet">
       <header><b>Table talk</b><button class="ghost small close" type="button">Close</button></header>
       <ul></ul>
@@ -519,7 +527,7 @@ function renderTalk() {
   const last = lines.at(-1);
   if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
   const unread = lines.filter((e) => e.i > talk.read && !mine(e.text)).length;
-  talk.latest.innerHTML = last ? talkHtml(last.text, g) : 'Table talk: tap to talk to the other players';
+  talk.latest.innerHTML = `${icon('talk', 1.3)} ${last ? talkHtml(last.text, g) : '<span class="none">Table talk</span>'}`;
   talk.unread.hidden = !unread;
   talk.unread.textContent = String(unread);
   const prevLast = talk.el.dataset.last;

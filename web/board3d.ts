@@ -946,6 +946,8 @@ export class Board3D {
       const a = (Math.PI / 3) * i;
       return new THREE.Vector3(center.x + Math.cos(a) * (far + 1.35), 0, center.z + Math.sin(a) * (far + 1.35));
     });
+    // The whole tray stays in view, so the board looks placed on the table, not cropped.
+    this.fitPoints.push(...corners);
     const tray = trayGeometry(corners.map((c) => c.clone().sub(new THREE.Vector3(center.x, 0, center.z))), 0.45, 0.25);
     // Its floor is the sea, the land pasted on it; a map without an ocean gets plain paper.
     const sea = map.some((h) => h.terrain === 'ocean');
