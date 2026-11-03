@@ -20,7 +20,7 @@ npm run serve -- --flee-seconds 60
    node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
    ```
 
-   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name. They join the lobby as "Opus", "Haiku" and so on. Leave it running (it's the Claude players' host process; Ctrl-C takes them out of the game).
+   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name. They join the lobby as "Opus", "Haiku" and so on. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats.
 4. **Start:** press **Start game** on the TV (or on the first player's phone). Bots can fill seats too ("Add a bot").
 
 Claude players start the moment the game does. Each is a `claude -p` process of 300 to 400 MB, and they share the machine-wide limit of 6 Claude seats with any playtests running (see [`playtest.md`](playtest.md#how-many-games-run-at-once)). If the slots aren't free, the runner prints `Waiting to start: ...` and only joins the lobby once they are, so wait for the Claude players to show up on the TV before you press Start.
