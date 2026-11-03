@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { botMove } from '../bot.ts';
 import { RuleError, newGame, pname, score, waitingOn, type Game } from '../engine.ts';
 import { load, save, withLock } from '../store.ts';
+import { FLOOR_MB, defaultPool, release, tryAcquire } from './slots.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 
@@ -26,7 +27,10 @@ const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
   --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
   --max-minutes N                   stop the game after this long (default 240)
-  --stall-minutes N                 stop if nothing happens in the game for this long (default 15)`;
+  --stall-minutes N                 stop if nothing happens in the game for this long (default 15)
+
+Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
+the game waits its turn when the pool is full or memory is short. See docs/playtest.md.`;
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -173,20 +177,46 @@ function writeResults(g: Game, status: string, started: number) {
   return results;
 }
 
-async function main() {
-  const started = Date.now();
-  note(`Playtest in ${out}: ${models.map((m, p) => `${pname(p)} ${m}`).join(', ')}; seed ${seed}.`);
-  for (const s of seats) if (s.model !== 'bot') startSeat(s);
-  let lastLen = -1, lastChange = Date.now();
-  let status = 'running';
-  const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
-  process.on('SIGINT', () => { status = 'interrupted'; stopAll(); });
+const pool = defaultPool();
+
+/** Blocks until this game's Claude seats fit in the machine-wide pool. */
+async function admit(): Promise<boolean> {
+  const claudeSeats = seats.filter((s) => s.model !== 'bot').length;
+  let said = '';
   for (;;) {
+    const r = tryAcquire(pool, claudeSeats, out);
+    if (r.ok) return true;
+    const kind = r.why.replace(/[\d.]+/g, '#'); // don't log every change in a number
+    if (kind !== said) { note(`Waiting to start: ${r.why}.`); said = kind; }
+    await new Promise((res) => setTimeout(res, 5000));
+    if (interrupted) return false;
+  }
+}
+
+let interrupted = false;
+
+async function main() {
+  note(`Playtest in ${out}: ${models.map((m, p) => `${pname(p)} ${m}`).join(', ')}; seed ${seed}.`);
+  const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
+  process.on('SIGINT', () => { interrupted = true; stopAll(); });
+  process.on('SIGTERM', () => { interrupted = true; stopAll(); });
+  process.on('exit', () => release(pool));
+  let status = 'running';
+  if (!(await admit())) status = 'interrupted';
+  const started = Date.now();
+  if (status === 'running') for (const s of seats) if (s.model !== 'bot') startSeat(s);
+  let lastLen = -1, lastChange = Date.now(), lowSince = 0;
+  for (;;) {
+    if (status !== 'running') break;
     await new Promise((r) => setTimeout(r, 1000));
     playBots();
     const g = load(gameFile);
     if (g.log.length !== lastLen) { lastLen = g.log.length; lastChange = Date.now(); }
-    if (status === 'interrupted') break;
+    if (interrupted) { status = 'interrupted'; break; }
+    // Free memory under the floor for 10 s: stop this game before the machine OOMs.
+    if (pool.memAvailableMb() >= FLOOR_MB) lowSince = 0;
+    else if (!lowSince) lowSince = Date.now();
+    else if (Date.now() - lowSince > 10000) { status = 'low memory'; break; }
     if (g.phase === 'over') {
       // Give the players a moment to see the end and sign off.
       const until = Date.now() + 120000;
@@ -201,7 +231,6 @@ async function main() {
       if (s.starts >= 30) { status = `${pname(s.p)} kept stopping`; break; }
       if (Date.now() - s.exitedAt > 3000) startSeat(s);
     }
-    if (status !== 'running') break;
   }
   if (status === 'running') status = 'over';
   stopAll();

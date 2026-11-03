@@ -2,6 +2,10 @@
 
 Provisional design calls made without the owner present, newest first. Each entry: the call, why, and what would change it. The owner reviews these; any can be reversed.
 
+## 2026-11-03: playtest memory limit
+
+- **Call:** playtests take seat slots from one machine-wide pool (6 Claude seats at once by default, plus a free-memory check), and games beyond it queue instead of starting. **Why:** on 2026-11-02 two tabs each started an 8-game batch all at once, about 40 Claude processes, and systemd-oomd killed the terminal holding every tab. A per-batch limit can't stop that, because tabs don't know about each other's batches; a pool in `~/.cache` shared through files can, with no daemon. 6 seats is about 2.7 GB, which fits next to the ~9 GB the tabs, orchestrator and browser already use on the 14 GB machine. **What would change it:** a bigger machine, or measurements showing seats use much less memory than 450 MB.
+
 ## 2026-11-02: table talk and sandboxed playtests
 
 - **Call:** talk is an engine command (`say`, `tell P2`), allowed for anyone at any time, binding no one. **Why:** at a real table people talk whenever they like, so "when the game allows talk" is simply always; one rule with no timing questions. Putting it in the game log means the TV can show table talk later and playtest logs carry the conversation next to the moves. It adds no rule beyond "promises don't bind; only accepted trades do", which the design already implied. **What would change it:** playtests where unlimited private talk during the secret bail step makes raids pointless.
