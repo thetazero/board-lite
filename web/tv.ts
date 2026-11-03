@@ -4,9 +4,11 @@
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
   PLAYER_COLORS, RESOURCES, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, elemIcon, esc, eventHtml, gainChips, hpBar,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
-import { glyph } from './art.ts';
+import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
+
+document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 import { Board3D } from './board3d.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -76,29 +78,36 @@ function tailscaleUrl(): string | null {
 
 function renderLobby() {
   const l = snap!.lobby;
+  const seated = l.seats.map((_, i) => PLAYER_COLORS[i]);
+  // Each seat a place card with its tower; empty places wait, dashed, up to a full table.
   const seats = l.seats.map((s, i) => `
-    <li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.kind === 'bot' ? ' <small>(bot)</small>' : s.kind === 'open' ? ' <small>(open seat)</small>' : ''}${!s.connected ? ' <small>(away)</small>' : ''}
-      <button class="ghost small" data-remove="${i}">remove</button></li>`).join('');
+    <li class="seatcard" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}
+      <span class="pname">${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
+      <button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button></li>`).join('')
+    + Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join('');
   const canStart = l.seats.length >= l.minPlayers;
   app.innerHTML = `
     <div class="lobby">
-      <h1 class="title">board-lite</h1>
-      <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
-      <div class="join-box">
-        <div>On your phone, open</div>
-        <div class="url">${esc(joinUrl())}</div>
-        ${tailscaleUrl() ? `<div class="alt">or over Tailscale: <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
-        <div>room code</div>
-        <div class="code">${esc(l.code)}</div>
-        <div class="cli">At a terminal: <code>node src/cli.ts join http://${esc(joinUrl())} &lt;name&gt;</code></div>
-        <div class="cli">Claude players: <code>node src/playtest/run.ts --room http://${esc(joinUrl('localhost'))} --models opus,haiku</code></div>
+      <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}
+        <div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p></div>
       </div>
-      <ul class="seats">${seats || '<li class="empty">Waiting for players to join…</li>'}</ul>
-      <div class="lobby-actions">
-        <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
-        <button id="start" class="primary" ${canStart ? '' : 'disabled'}>Start game (${l.seats.length} players)</button>
+      <div class="lobby-main">
+        <div class="join-box">
+          <div class="step">Join on your phone</div>
+          <div class="url">${esc(joinUrl())}</div>
+          ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
+          <div class="step">room code</div>
+          <div class="code">${[...l.code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+        </div>
+        <div class="table">
+          <ul class="seatcards">${seats}</ul>
+          <div class="lobby-actions">
+            <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
+            <button id="start" class="primary" ${canStart ? '' : 'disabled'}>Start game</button>
+          </div>
+          <p class="hint">${canStart ? 'Or start from the first player\'s phone.' : `${l.minPlayers - l.seats.length > 1 ? `${l.minPlayers - l.seats.length} more players` : 'One more player'} to start (a bot counts).`}</p>
+        </div>
       </div>
-      <p class="hint">${canStart ? 'Start here, or the first player can start from their phone.' : `Need at least ${l.minPlayers} players (bots count).`}</p>
     </div>`;
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
   $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
@@ -132,7 +141,7 @@ function renderGame(g: PublicState) {
     return `
       <div class="pcard${turn ? ' turn' : ''}${many ? ' compact' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
-          <span class="pname">${esc(names[i])}${seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
+          <span class="pname">${esc(names[i])}${seat?.kind === 'open' ? ' <small>(open seat)</small>' : seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
           ${waiting.has(i) && g.phase !== 'over' ? '<span class="thinking">deciding…</span>' : ''}
           <span class="pts">${icon('points', 1.5)}<b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
         </div>
@@ -326,10 +335,11 @@ function updateOverlay(g: PublicState) {
   const next = banners.shift();
   if (next) return showBanner(next);
   if (g.phase === 'over') {
-    const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
+    const w = g.standings![0].p;
     el.className = 'overlay end';
-    el.innerHTML = `<div class="endbox"><h1>${playerTag(g.winner!, names)} wins!</h1>
-      <ol>${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip"><b>${t}</b>${icon('points', 1.8)}</span> ${t > g.players[p].publicPoints ? `<small class="hiddenpts">${icon('cards', 1.3)}+${t - g.players[p].publicPoints}</small>` : ''}</li>`).join('')}</ol>
+    el.innerHTML = `<div class="endbox" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
+      <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
+      ${standingsHtml(g, names)}
       <button class="primary" id="again">New game</button></div>`;
     $('again').onclick = () => (location.href = '/tv');
     return;

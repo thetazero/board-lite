@@ -5,8 +5,8 @@
 import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity,
-  neighbourCount, production, score, specialProjectCost, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
-  type Card, type Die, type Dragon, type Game, type TradeSide, type Title,
+  neighbourCount, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 
 export type Res = Partial<Record<Resource, number>>;
@@ -90,6 +90,7 @@ export interface PublicState {
   raidsLeft: number;
   winner: number | null;
   finalTotals: number[] | null;
+  standings: Standing[] | null; // once it's over: the final order, ties marked
   log: EventView[]; // public events, talk aside
   talk: EventView[]; // the latest public talk
 }
@@ -228,6 +229,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     raidsLeft: g.raidsLeft,
     winner: g.winner,
     finalTotals: g.phase === 'over' ? g.players.map((_, p) => score(g, p).total) : null,
+    standings: g.phase === 'over' ? standings(g) : null,
     log: events(g, (e) => !e.to && !isTalk(e.text), logLines),
     talk: events(g, (e) => !e.to && isTalk(e.text), 12),
   };

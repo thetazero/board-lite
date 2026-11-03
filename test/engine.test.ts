@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
-import { RuleError, apply, bankRate, buildingClass, buildingPoints, newGame, production, score, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, bankRate, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
 import { BUILDINGS, TUNING } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
 import { mapRadius, neighbors } from '../src/map.ts';
@@ -34,6 +34,36 @@ test('bot games reach a winner for every player count', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(g)), g);
     }
   }
+});
+
+test('the final standings put the winner first and mark ties', () => {
+  let tiedWins = 0;
+  let sharedPlaces = 0;
+  for (let players = 2; players <= 6; players++) {
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = newGame(players, seed);
+      playOut(g, { state: seed * 31 + players });
+      const st = standings(g);
+      assert.equal(st[0].p, g.winner, `${players}p seed ${seed}: the list names someone else first`);
+      assert.equal(st[0].place, 1);
+      for (const [i, s] of st.entries()) {
+        assert.equal(s.total, score(g, s.p).total);
+        if (i === 0) continue;
+        assert.ok(s.total <= st[i - 1].total, 'most points first');
+        assert.ok(s.place > 1, 'first place is never shared');
+        const level = s.total === st[i - 1].total;
+        if (level) assert.ok(s.tied && st[i - 1].tied);
+        if (level && i > 1) sharedPlaces++;
+        assert.equal(s.place, level && i > 1 ? st[i - 1].place : i + 1);
+      }
+      if (st[0].tiebreak) {
+        tiedWins++;
+        assert.equal(st[0].total, st[1].total);
+        assert.ok(g.players[st[0].p].resources.gold >= g.players[st[1].p].resources.gold);
+      }
+    }
+  }
+  assert.ok(tiedWins > 0 && sharedPlaces > 0, `the seeds should cover a tied win (${tiedWins}) and a shared place (${sharedPlaces})`);
 });
 
 test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {

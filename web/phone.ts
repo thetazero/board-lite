@@ -3,9 +3,9 @@
 
 import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
-import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure } from './art.ts';
+import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -58,16 +58,20 @@ async function boot() {
   renderJoin();
 }
 
-function renderJoin(err = '') {
-  const last = localStorage.getItem('name') ?? '';
+// What was typed survives a failed join, so a wrong code doesn't cost the name too.
+function renderJoin(err = '', typed?: { code: string; name: string }) {
+  const name = typed?.name ?? localStorage.getItem('name') ?? '';
   app.innerHTML = `
-    <form class="joinform" id="join">
-      <h1 class="title">board-lite</h1>
-      <label>Room code <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(code)}" required></label>
-      <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(last)}" required></label>
-      <button class="primary big" type="submit">Join</button>
-      <p class="error">${esc(err)}</p>
-    </form>`;
+    <div class="joinpage">
+      <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
+      <form class="joinform" id="join">
+        <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
+        <label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(typed?.code ?? code)}" required></label>
+        <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
+        <button class="primary big" type="submit">Join</button>
+        <p class="error">${esc(err)}</p>
+      </form>
+    </div>`;
   const form = document.getElementById('join') as HTMLFormElement;
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -80,7 +84,7 @@ function renderJoin(err = '') {
       localStorage.setItem('seat', JSON.stringify({ code: c, token: r.token }));
       enter(c, String(r.token));
     } catch (er) {
-      renderJoin(er instanceof Error ? er.message : String(er));
+      renderJoin(er instanceof Error ? er.message : String(er), { code: c, name: n });
     }
   };
 }
@@ -151,15 +155,17 @@ function renderLobby() {
   const l = snap!.lobby;
   const me = seatIndex();
   const first = me === 0;
+  const pc = PLAYER_COLORS[me] ?? '#888';
+  // Your tower in your colour stands at the front: that's your colour for the game.
   app.innerHTML = `
-    <div class="plobby" style="--pc:${PLAYER_COLORS[me] ?? '#888'}">
+    <div class="plobby" style="--pc:${pc}">
+      <div class="hero">${tableScene([pc])}</div>
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
-      <p>Room <b>${esc(l.code)}</b>. Your colour:</p>
-      <div class="swatch"></div>
-      <ul class="seats">${l.seats.map((s, i) => `<li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.kind === 'bot' ? ' <small>(bot)</small>' : ''}</li>`).join('')}</ul>
-      ${first ? `<button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
-        <button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>`
-      : '<p class="hint">Waiting for the first player (or the TV) to start…</p>'}
+      <p class="muted">Room <b>${esc(l.code)}</b></p>
+      <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
+      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>
+        <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
+      : '<p class="hint">The first player or the TV starts the game.</p>'}
       <button id="leave" class="ghost">Leave</button>
     </div>`;
   if (first) {
@@ -249,7 +255,7 @@ function render() {
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
   const dock = !picking && (g.phase === 'action' || g.phase === 'discard' || g.phase === 'cards') ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
   document.body.classList.toggle('has-hand', !!dock);
-  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
+  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   wire(g, me);
 }
 
@@ -472,10 +478,21 @@ function discardView(me: Me): string {
   return `<button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
 }
 
+// The end: the winner's moment, then where everyone finished. Nothing from the
+// game in progress (resources, income, the last decision) is left on screen.
 function gameOver(g: PublicState, me: Me): string {
-  const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
-  return `<ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip">${t}${icon('points', 1.25)}</span></li>`).join('')}</ol>
-    <button id="newgame" class="primary">Join another game</button>`;
+  const w = g.standings![0].p;
+  const mine = g.standings!.find((s) => s.p === me.seat)!;
+  const place = ['1st', '2nd', '3rd', '4th', '5th', '6th'][mine.place - 1];
+  const note = tiebreakNote(g);
+  return `<div class="pover" style="--pc:${PLAYER_COLORS[w]}">
+    <div class="hero">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]))}</div>
+    <h1>${w === me.seat ? 'You win!' : `${playerTag(w, names)} wins!`}</h1>
+    ${note ? `<p class="tiebreak">${note}</p>` : ''}
+    ${w === me.seat ? '' : `<p class="mine">You came ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
+    ${standingsHtml(g, names, me.seat)}
+    <button id="newgame" class="primary big">New game</button>
+  </div>`;
 }
 
 // ---------- table talk ----------
