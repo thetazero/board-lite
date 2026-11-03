@@ -465,10 +465,10 @@ function huntView(g: PublicState, me: Me): string {
     const d = g.dragons.find((x) => x.id === id)!;
     return `<button class="dragon${hunting!.chosen.has(id) ? ' on' : ''}" data-hunter="${id}">${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
   }).join('');
-  const on = h.building ? `<p class="hint">On ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}</p>` : '';
+  const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
   const n = hunting!.chosen.size;
   const sent = [...hunting!.chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
-  return `<section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>${on}
+  return `<h3 class="huntname">Fight the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>
     ${list}
     <p class="hint">They miss this round's raids.</p>
     <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} Send ${n || ''}${n ? ` ${powerTag(sent)}` : ''}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
