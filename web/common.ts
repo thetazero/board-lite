@@ -333,14 +333,15 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      cells.push(`<g transform="translate(${x} ${y})">${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
+      // Shut down by a beast on it: the building's mark goes grey (the hex's rim keeps its owner).
+      cells.push(`<g transform="translate(${x} ${y})"${h.fauna ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
-    // A beast holding the hex: in its middle, or crouched on the building it shuts down.
+    // A beast holding the hex, on its dark lair: in its middle, or in front of the building it shuts down.
     if (h.fauna) {
-      const [fx, fy, fs] = b ? [x + size * 0.3, y + size * 0.28, size * 0.034] : [x, y, size * 0.05];
-      cells.push(`<g class="fauna" transform="translate(${fx} ${fy})"><circle r="${fs * 11}" fill="#3a2a22" opacity=".55"/><g transform="scale(${fs})">${iconShapes(h.fauna.key)}</g></g>`);
+      const [fx, fy, fs] = b ? [x + size * 0.12, y + size * 0.3, size * 0.042] : [x, y, size * 0.05];
+      cells.push(`<g class="fauna" transform="translate(${fx} ${fy})"><circle r="${fs * 11}" fill="#2b2420" stroke="#efe5cf" stroke-width="${fs * 1.2}" opacity=".9"/><g transform="scale(${fs})">${iconShapes(h.fauna.key)}</g></g>`);
     }
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
     const label = opts.labels?.[h.k];
