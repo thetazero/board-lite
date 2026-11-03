@@ -3,7 +3,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, esc, eventHtml, foeStack, gainChips, hpBar,
+  ELEMENT_COLORS, PLAYER_COLORS, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, esc, eventHtml, foeStack, gainChips, hpBar, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
 } from './common.ts';
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
@@ -143,13 +143,9 @@ function doing(g: PublicState, p: number): string {
 
 // A dragon on the TV: always its name, then its stage and how it is. A dragon
 // sitting out the round says why instead of showing its (full) health.
-function tvDragon(d: DragonView, all: DragonView[], roomy: boolean): string {
+function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: number): string {
   const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>'
-    : d.resting === 'hurt' ? '<em class="st-healing">healing</em>'
-    : d.resting === 'hunted' ? `<em class="st-hunted">hunted</em> ${hpBar(d.hp, d.maxHp)}`
-    : d.stage ? hpBar(d.hp, d.maxHp) : '';
-  return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow} ${state}</span></div></div>`;
+  return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
 }
 
 function renderGame(g: PublicState) {
@@ -157,7 +153,7 @@ function renderGame(g: PublicState) {
   const players = g.players.map((p, i) => {
     const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge" title="${esc(t.name)}">${icon(TITLE_ICON[t.key], 1.1)}</span>`).join('')
       + g.beasts.filter((b) => b.slainBy === i).map((b) => `<span class="title-badge" title="${esc(b.name)} slain">${icon(b.key, 1.1)}</span>`).join('');
-    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => tvDragon(d, g.dragons, n <= 4)).join('') || '<div class="none">no dragons</div>';
+    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => tvDragon(d, g.dragons, n <= 4, g.round)).join('') || '<div class="none">no dragons</div>';
     const seat = snap!.lobby.seats[i];
     const turn = g.phase === 'action' && g.turn === i;
     const what = doing(g, i);
@@ -253,7 +249,7 @@ function talkLine(text: string, g: PublicState): string {
 // The raid takes over the screen while it runs. Every step is the same
 // arena: the raiders on the left, the kingdom's defenders on the right.
 function targetCard(t: TargetView, extra = ''): string {
-  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${foeStack(t.units, 2.6)}<div class="loot">${resChips(t.loot, 1.6)}</div></div>`;
+  return `<div class="target">${extra}<h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}<div class="loot">${resChips(t.loot, 1.6)}</div></div>`;
 }
 
 function check(done: boolean): string {
@@ -280,6 +276,7 @@ function renderRaid(g: PublicState) {
   if (!raid) return;
   el.className = 'overlay raid';
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
+  const sum = (ids: string[]) => ids.reduce((s, id) => s + dragonById(id).power, 0);
   const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
   let body = '';
   if (raid.step === 'vote') {
@@ -294,13 +291,13 @@ function renderRaid(g: PublicState) {
       const sent = new Set(raid.commits[p]);
       const home = !able.length || (raid.ready[p] && !sent.size);
       const ds = home ? `<span class="home">${HOME}</span>` : able.map((d) => raiderDragon(d, sent.has(d.id), g.dragons)).join('');
-      return `<li class="raider${home ? ' out' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${ds}</span>${able.length ? check(raid.ready[p]) : ''}</li>`;
+      return `<li class="raider${home ? ' out' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${ds}</span>${sent.size ? powerTag(sum(raid.commits[p])) : ''}${able.length ? check(raid.ready[p]) : ''}</li>`;
     };
     body = `<h1>Who's going? ${raidPips(g)}<span class="tag">${icon('public', 1)}</span></h1>${arena(names.map((_, p) => row(p)).join(''))}`;
   } else if (raid.step === 'bail') {
     // Who's in, with what; a tick once they've chosen (not what they chose).
     const rows = names.flatMap((_, p) => (raid.commits[p].length
-      ? [`<li class="raider" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${check(raid.decided[p])}</li>`]
+      ? [`<li class="raider" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${check(raid.decided[p])}</li>`]
       : [])).join('');
     body = `<h1>Fight or bail? ${raidPips(g)}<span class="tag">${icon('secret', 1)}</span></h1>${arena(rows)}`;
   }
@@ -381,7 +378,7 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
     return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
   }).join('');
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls!</span></h1><div class="spoils">${end.winners.map((p) => `<span>${playerTag(p, names)} ${gainChips(end.share, 1.6)}</span>`).join('')}</div>`
+    ? `<h1>${esc(end.name)} <span class="ok">falls!</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   return battle(g, head, dragons, fled, ev.units, rounds, outcome, true);

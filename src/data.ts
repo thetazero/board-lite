@@ -30,6 +30,9 @@ export const TUNING = {
   // A title needs at least this much: dragon points, tower floors, buildings (tower included).
   titleMinimum: { army: 8, tower: 3, territory: 9 },
   raidCandidates: 3,
+  // A hurt dragon heals this much health at each production and sits out
+  // raids until it is whole, so a big hit costs several rounds.
+  healPerRound: 7,
   towerDragonCapacity: 1,
   // The base-egg special project costs this many times the base dragon card.
   specialProjectMultiplier: 2,
@@ -175,6 +178,15 @@ export interface Attack {
 }
 export type DragonStage = Attack;
 
+export const avgDamage = (a: Attack) => a.targets * a.dice * (a.sides + 1) / 2;
+// Combat power: one rough number for how much a dragon or defender is worth in
+// a fight, √(health × average damage a combat round). By Lanchester's square
+// law a side's strength is the square of the sum of these, so they add up:
+// raiders whose powers sum past a kingdom's usually win. It ignores elements
+// and targeting on purpose, so it misleads (the owner: "the single number
+// misleads is literally the point").
+export const combatPower = (a: Attack) => Math.round(Math.sqrt(a.hp * avgDamage(a)));
+
 export interface DragonDef {
   name: string;
   element: Element;
@@ -305,16 +317,19 @@ export interface TargetDef {
 }
 
 export const TARGETS: Record<string, TargetDef> = {
-  // Brindle is a solo raid. Archer's Hold is a coin flip for one adult. The
-  // four rich kingdoms need two adults (one alone wins 10-25% of the time),
-  // and a third makes the fight shorter, so each fighter is less likely to be hit.
-  brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { gold: 3, livestock: 2 } },
-  archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'archers', 'militia'], loot: { gold: 7, timber: 2 } },
-  knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 14, stone: 3 } },
-  frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 14, crystal: 3 } },
-  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 16 } },
-  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'knights', 'knights'], loot: { gold: 16, livestock: 3 } },
+  // A ladder of combat power (in brackets; a base adult dragon is 17), with
+  // loot that grows with its square, about power² ÷ 18 in value: easy kingdoms
+  // give almost nothing, hard ones a lot. Per point of power sent, the hardest
+  // pays about six times the easiest.
+  brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, timber: 1 } }, // 8
+  archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 4, timber: 4 } }, // 19
+  frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24
+  knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 10, stone: 4 } }, // 28
+  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 17 } }, // 35
+  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 27, livestock: 4 } }, // 45
 };
+
+export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => s + combatPower(UNITS[u]), 0);
 
 // Share of each terrain on the generated land. The ocean rings the land, and
 // each of its six coasts has one natural harbor (src/map.ts).

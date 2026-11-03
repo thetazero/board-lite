@@ -616,6 +616,32 @@ function roost(): THREE.Group {
 }
 
 // ---------- the fauna ----------
+
+// A beast's lair: a dark, torn paper scrap under it with a pale edge, so the
+// beast stands out from any terrain (grey wolves on grey mountains) and from
+// the plate of a building it sits on.
+const LAIR = '#2b2420', LAIR_EDGE = '#efe5cf';
+function lair(r: number): THREE.Group {
+  return group(
+    part(cyl(r, r, 0.016, 7), LAIR_EDGE, { at: [0, 0.008, 0], rot: [0, 0.2, 0], crease: false }),
+    part(cyl(r * 0.88, r * 0.88, 0.03, 7), LAIR, { at: [0, 0.015, 0], rot: [0, 0.6, 0] }),
+  );
+}
+
+// A building's paper gone dull grey: what a shut-down building is made of.
+const SHUT = new Map<THREE.Material, THREE.MeshLambertMaterial>();
+function shutPaper(m: THREE.MeshLambertMaterial): THREE.MeshLambertMaterial {
+  let s = SHUT.get(m);
+  if (!s) {
+    const c = m.color.clone();
+    const grey = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
+    s = m.clone();
+    s.color = new THREE.Color(grey, grey, grey).multiplyScalar(0.8).lerp(new THREE.Color('#4d4843'), 0.5);
+    s.emissiveIntensity = 0;
+    SHUT.set(m, s);
+  }
+  return s;
+}
 // Wild beasts holding hexes, folded like everything else: chunky shapes that
 // read from the TV's tilted camera. Each faces +x; the board turns it.
 
@@ -1525,7 +1551,7 @@ export class Board3D {
     }
     for (const h of g.map) {
       const b = h.building;
-      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}` : '';
+      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${h.fauna ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
@@ -1534,13 +1560,14 @@ export class Board3D {
         this.built.delete(h.k);
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0), h);
-      // Pop up from the page when it's new; a new floor or upgrade pops up too.
-      const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig !== bsig);
+      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
+      // Pop up from the page when it's new; a new floor or upgrade pops up too
+      // (a beast arriving or leaving only greys or colours it).
+      const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
     }
-    // Fauna: in the middle of an open hex, or crouched at the front of the
-    // building it shuts down. It folds up like a building when it arrives.
+    // Fauna: on its dark lair in the middle of an open hex, or out in front
+    // of the building it shuts down. It folds up like a building when it arrives.
     for (const h of g.map) {
       const f = h.fauna;
       const fsig = f ? `${f.key}|${h.building ? 1 : 0}` : '';
@@ -1582,14 +1609,21 @@ export class Board3D {
     return dx || dz ? Math.atan2(dx, dz) : 0;
   }
 
-  private buildingGroup(b: NonNullable<HexView['building']>, facing: number): THREE.Group {
+  private buildingGroup(b: NonNullable<HexView['building']>, facing: number, shut: boolean): THREE.Group {
     const g = plate(b.owner, b.upgrade, this.plateMats);
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
+    // Shut down by a beast: the building goes to dull grey paper (its plate
+    // keeps its owner's colour) and sits back, so the beast in front is whole.
+    if (shut) {
+      model.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.material = shutPaper(o.material as THREE.MeshLambertMaterial);
+      });
+    }
     const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
     pop.position.set(0, GROUND, -0.6);
-    model.scale.setScalar(1.15);
-    model.position.set(offset[0], 0, offset[1] + 0.6);
+    model.scale.setScalar(shut ? 0.95 : 1.15);
+    model.position.set(offset[0], 0, offset[1] + 0.6 - (shut ? 0.2 : 0));
     model.rotation.y = facing;
     pop.add(model);
     g.add(pop);
@@ -1601,11 +1635,13 @@ export class Board3D {
     const g = new THREE.Group();
     const model = bake(beastModel(key));
     const pop = new THREE.Group();
-    const [x, z] = onBuilding ? [0.32, 0.42] : [0, 0.05];
-    // The Thunderbird on its peak's summit; the Leviathan in the sea.
+    const great = key === 'thunderbird' || key === 'leviathan';
+    const [x, z] = onBuilding ? [0.08, 0.4] : [0, 0.05];
+    // The Thunderbird on its peak's summit; the Leviathan in the sea. Neither has a lair.
     const y = key === 'thunderbird' ? TOP + PEAK_H - 0.2 : key === 'leviathan' ? -0.01 : onBuilding ? GROUND : TOP;
     pop.position.set(x, y, z);
-    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : onBuilding ? 0.85 : 1.15);
+    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : onBuilding ? 1 : 1.15);
+    if (!great) pop.add(lair(onBuilding ? 0.42 : 0.58));
     // Three-quarters to the room, half of them looking left.
     const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
     model.rotation.y = face;

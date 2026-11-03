@@ -821,6 +821,40 @@ export const SCENES: Scene[] = [
     },
     shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
   },
+  {
+    // Fauna on every terrain and on buildings (#72): a wolf pack, a cave bear
+    // and a basilisk on open hexes of each land terrain, and one of each on a
+    // building it shuts down. The acting player has dragons to send.
+    name: 'fauna-terrain-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action' && Object.values(g.buildings).filter((b) => b.type !== 'tower').length >= 3,
+    setup: (g) => {
+      const p = g.turn;
+      for (const h of Object.values(g.map)) delete h.fauna;
+      const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
+      Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
+      for (const t of ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor']) {
+        const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k]);
+        open.slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
+      }
+      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+    },
+    shots: (g) => {
+      const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
+      const hexOf = (kind: string, built: boolean) => Object.keys(g!.map).find((k) => g!.map[k].fauna === kind && !!g!.buildings[k] === built)!;
+      const send = (kind: string, built: boolean) => ({
+        file: `phone-fauna-send-${kind.replace('_', '-')}${built ? '-built' : ''}-3p`,
+        caption: `Phone: sending dragons against a ${kind.replace('_', ' ')}${built ? ' on a building' : ''}`,
+        client: 'phone' as const, seat: g!.turn, clicks: ['#hunt', `[data-hex="${hexOf(kind, built)}"]`, '[data-hunter]'],
+      });
+      return [
+        { file: 'tv-fauna-terrain-3p', caption: 'TV: each beast on each terrain, and one of each shutting down a building', client: 'tv', waitMs: 4800 },
+        { file: 'phone-fauna-terrain-pick-3p', caption: 'Phone: choosing which beast to clear, every beast on the map', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
+        ...kinds.flatMap((k) => [send(k, false), send(k, true)]),
+      ];
+    },
+  },
 ];
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).

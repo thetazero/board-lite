@@ -1,10 +1,10 @@
 // What one player is allowed to see, as text. Everything here is either
 // public (the TV) or this player's own hidden state (their phone).
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
 import {
-  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, faunaOnMap, huntable, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
+  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
+  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
 import { PEAK, mapRadius, nearBeast } from './map.ts';
@@ -40,7 +40,7 @@ export function cardText(c: Card): string {
 
 export function dragonCardText(k: string): string {
   const d = DRAGONS[k];
-  const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides}`).join(' / ');
+  const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides} power ${combatPower(s)}`).join(' / ');
   return `${d.element}, grows every ${d.growthTime === 1 ? 'step' : `${d.growthTime} steps`}, ${TARGETING_TEXT[d.targeting]}; ${st}`;
 }
 
@@ -49,9 +49,10 @@ function dragonLine(g: Game, d: Dragon): string {
   const def = DRAGONS[d.key];
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${def.growthTime}`;
   const health = st ? `${st.hp - d.damage}/${st.hp}hp` : 'egg';
-  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: 'healing from a fight: no raids this round', hunted: 'fought fauna: no raids this round' };
-  const status = canRaid(d) ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : 'hurt, cannot raid';
-  return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
+  const healing = `healing: raids again in round ${backInRound(g, d)}`;
+  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought fauna: no raids this round${d.damage ? `; ${healing}` : ''}` };
+  const status = canRaid(d) ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : healing;
+  return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${st ? `power ${dragonPower(d)}, ` : ''}${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
 }
 
 function productionText(g: Game, p: number): string {
@@ -95,9 +96,9 @@ function raidText(g: Game, p: number): string[] {
   out.push(`Raid target: ${targetText(raid.target!)}`);
   if (raid.step === 'commit') {
     out.push(`Commitments (public, not locked until everyone is ready):`);
-    for (let q = 0; q < g.players.length; q++) out.push(`  ${pname(q)}: ${raid.commits[q].join(' ') || 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`);
+    for (let q = 0; q < g.players.length; q++) out.push(`  ${pname(q)}: ${raid.commits[q].length ? `${raid.commits[q].join(' ')} (power ${commitPower(g, raid.commits[q])})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`);
   } else {
-    out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${pname(q)} ${c.join(' ')}` : '')).filter(Boolean).join(', ')}`);
+    out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${pname(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
   }
   if (raid.step === 'bail') {
     out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${pname(q)} ${raid.choices[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
@@ -106,19 +107,23 @@ function raidText(g: Game, p: number): string[] {
   return out;
 }
 
+function commitPower(g: Game, ids: string[]): number {
+  return ids.reduce((s, id) => s + dragonPower(g.dragons.find((d) => d.id === id)!), 0);
+}
+
 export function targetText(t: string): string {
   const def = TARGETS[t];
   const units = def.units.map((u) => {
     const x = UNITS[u];
-    return `${x.name} (${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
+    return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
   });
-  return `${def.name} — defenders: ${units.join(', ')}; loot ${bundleText(def.loot)} (split among winners)`;
+  return `${def.name} — combat power ${targetPower(t)}; defenders: ${units.join(', ')}; loot ${bundleText(def.loot)} (split by the combat power each player still has fighting at the end)`;
 }
 
 export function faunaText(k: string): string {
   const x = faunaDef(k);
   const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; one try a round each` : `loot ${bundleText(x.loot)}`;
-  return `${x.name} (${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
+  return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
 }
 
 // Command hints for this player right now. Empty if they have nothing to decide.

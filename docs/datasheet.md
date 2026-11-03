@@ -123,66 +123,79 @@ Titles: 2 points each, for most dragon points (at least 8), most tower floors (a
 
 ## Dragons
 
-Each stage: health, targets × dice (average damage a combat round, before elements).
+Each stage: combat power (see Raids), health, targets × dice (average damage a combat round, before elements).
 
 | Dragon | Element | Cost | Growth time | Targets | Hatchling | Young | Adult |
 |---|---|---|---|---|---|---|---|
-| Base dragon (any element) | any | 2 crystal, 1 livestock | 2 | random | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d6 (14) |
-| Ember Wyrm | fire | 3 crystal, 1 livestock, 1 gold | 3 | weak_to_me | 7hp 1×1d8 (4.5) | 14hp 1×2d8 (9) | 24hp 2×3d8 (27) |
-| Cinder Drake | fire | 3 crystal, 1 livestock | 2 | lowest_health | 6hp 1×1d6 (3.5) | 11hp 2×1d6 (7) | 18hp 3×1d8 (13.5) |
-| Frost Wyrm | ice | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 9hp 1×1d6 (3.5) | 17hp 1×2d6 (7) | 30hp 1×3d8 (13.5) |
-| Rime Drake | ice | 3 crystal, 1 livestock | 2 | weak_to_me | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d8 (18) |
-| Storm Wyrm | lightning | 3 crystal, 1 livestock, 1 gold | 3 | random | 6hp 2×1d4 (5) | 12hp 3×1d6 (10.5) | 20hp 4×1d8 (18) |
-| Bolt Drake | lightning | 3 crystal, 1 livestock | 2 | strongest_attacker | 5hp 1×1d8 (4.5) | 10hp 1×2d8 (9) | 16hp 1×3d8 (13.5) |
-| Sky Wyrm | air | 3 crystal, 1 livestock, 1 gold | 3 | lowest_health | 6hp 1×1d6 (3.5) | 13hp 2×1d8 (9) | 22hp 2×2d8 (18) |
-| Zephyr Drake | air | 3 crystal, 1 livestock | 2 | random | 5hp 1×1d6 (3.5) | 10hp 2×1d6 (7) | 17hp 3×1d6 (10.5) |
-| Abyss Wyrm | water | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 8hp 1×1d8 (4.5) | 16hp 2×1d8 (9) | 28hp 2×2d8 (18) |
-| Reef Drake | water | 3 crystal, 1 livestock | 2 | weak_to_me | 7hp 1×1d6 (3.5) | 13hp 1×2d6 (7) | 21hp 2×2d6 (14) |
+| Base dragon (any element) | any | 2 crystal, 1 livestock | 2 | random | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **17**: 20hp 2×2d6 (14) |
+| Ember Wyrm | fire | 3 crystal, 1 livestock, 1 gold | 3 | weak_to_me | **6**: 7hp 1×1d8 (4.5) | **11**: 14hp 1×2d8 (9) | **25**: 24hp 2×3d8 (27) |
+| Cinder Drake | fire | 3 crystal, 1 livestock | 2 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **9**: 11hp 2×1d6 (7) | **16**: 18hp 3×1d8 (13.5) |
+| Frost Wyrm | ice | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | **6**: 9hp 1×1d6 (3.5) | **11**: 17hp 1×2d6 (7) | **20**: 30hp 1×3d8 (13.5) |
+| Rime Drake | ice | 3 crystal, 1 livestock | 2 | weak_to_me | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **19**: 20hp 2×2d8 (18) |
+| Storm Wyrm | lightning | 3 crystal, 1 livestock, 1 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **19**: 20hp 4×1d8 (18) |
+| Bolt Drake | lightning | 3 crystal, 1 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **15**: 16hp 1×3d8 (13.5) |
+| Sky Wyrm | air | 3 crystal, 1 livestock, 1 gold | 3 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **11**: 13hp 2×1d8 (9) | **20**: 22hp 2×2d8 (18) |
+| Zephyr Drake | air | 3 crystal, 1 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **13**: 17hp 3×1d6 (10.5) |
+| Abyss Wyrm | water | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
+| Reef Drake | water | 3 crystal, 1 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
 
 ## Raids
 
 Defenders:
 
-| Unit | Health | Attack (avg) | Strong vs | Weak vs |
-|---|---|---|---|---|
-| Militia | 5 | 1×1d4 (2.5) | — | fire |
-| Archers | 6 | 1×1d6 (3.5) | water | air |
-| Knights | 12 | 1×1d8 (4.5) | fire | lightning |
-| Frost Golem | 16 | 1×1d6 (3.5) | ice, water | fire |
-| Storm Griffin | 10 | 1×1d8 (4.5) | air, lightning | ice |
-| Sea Serpent | 14 | 2×1d4 (5) | water, fire | lightning |
-
-Kingdoms (3 are offered each raid; average damage is the defenders' total a combat round):
-
-| Kingdom | Defenders | Total health | Avg damage a round | Loot | Loot value |
+| Unit | Power | Health | Attack (avg) | Strong vs | Weak vs |
 |---|---|---|---|---|---|
-| Hamlet of Brindle | Militia, Militia | 10 | 5 | 2 livestock, 3 gold | 14 |
-| Archer's Hold | Archers, Archers, Archers, Archers, Militia | 29 | 16.5 | 2 timber, 7 gold | 30 |
-| Knightsgate | Knights, Knights, Knights, Knights | 48 | 18 | 3 stone, 14 gold | 59 |
-| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | 44 | 14 | 3 crystal, 14 gold | 59 |
-| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | 40 | 18 | 16 gold | 64 |
-| Tidewatch | Sea Serpent, Sea Serpent, Knights, Knights | 52 | 19 | 3 livestock, 16 gold | 67 |
+| Militia | 4 | 5 | 1×1d4 (2.5) | — | fire |
+| Archers | 5 | 6 | 1×1d6 (3.5) | water | air |
+| Knights | 7 | 12 | 1×1d8 (4.5) | fire | lightning |
+| Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice, water | fire |
+| Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air, lightning | ice |
+| Sea Serpent | 8 | 14 | 2×1d4 (5) | water, fire | lightning |
 
-Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-| Raider | Hamlet of Brindle | Archer's Hold | Knightsgate | Frostpeak | Stormspire | Tidewatch |
+Kingdoms (3 are offered each raid; average damage is the defenders' total a combat round). Loot grows with the square of power, so the last column, loot value per point of power sent, rises with difficulty:
+
+| Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Loot value | Value per power |
+|---|---|---|---|---|---|---|---|
+| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 1 timber, 2 livestock | 3 | 0.4 |
+| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold | 20 | 1.1 |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold | 32 | 1.3 |
+| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold | 44 | 1.6 |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold | 68 | 1.9 |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold | 112 | 2.5 |
+
+Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
+
+| Raider | Hamlet of Brindle | Archer's Hold | Frostpeak | Knightsgate | Stormspire | Tidewatch |
 |---|---|---|---|---|---|---|
-| Base dragon, hatchling | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
-| Base dragon, young | 99% (98%–100%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
-| Base dragon, adult | 100% (100%–100%) | 50% (0%–89%) | 13% (0%–65%) | 23% (0%–66%) | 21% (0%–88%) | 9% (0%–44%) |
-| Two young base dragons | 100% | 62% | 16% | 28% | 22% | 13% |
-| Ember Wyrm (fire), adult | 100% | 99% | 0% | 100% | 91% | 0% |
-| Cinder Drake (fire), adult | 100% | 37% | 0% | 50% | 0% | 0% |
-| Frost Wyrm (ice), adult | 100% | 31% | 21% | 1% | 63% | 12% |
-| Rime Drake (ice), adult | 100% | 70% | 11% | 5% | 89% | 5% |
-| Storm Wyrm (lightning), adult | 100% | 74% | 82% | 10% | 0% | 57% |
-| Bolt Drake (lightning), adult | 100% | 0% | 0% | 2% | 0% | 0% |
-| Sky Wyrm (air), adult | 100% | 93% | 12% | 87% | 0% | 7% |
-| Zephyr Drake (air), adult | 100% | 61% | 0% | 0% | 0% | 0% |
-| Abyss Wyrm (water), adult | 100% | 29% | 28% | 4% | 65% | 0% |
-| Reef Drake (water), adult | 100% | 0% | 1% | 0% | 6% | 0% |
+| Base dragon, hatchling (5) | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base dragon, young (9) | 99% (98%–100%) | 1% (0%–3%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base dragon, adult (17) | 100% (100%–100%) | 77% (11%–99%) | 21% (0%–64%) | 14% (0%–67%) | 6% (0%–32%) | 0% (0%–0%) |
+| Two young base dragons (18) | 100% | 82% | 29% | 16% | 8% | 0% |
+| Ember Wyrm (fire), adult (25) | 100% | 100% | 99% | 0% | 58% | 0% |
+| Cinder Drake (fire), adult (16) | 100% | 86% | 42% | 0% | 0% | 0% |
+| Frost Wyrm (ice), adult (20) | 100% | 98% | 2% | 21% | 0% | 0% |
+| Rime Drake (ice), adult (19) | 100% | 98% | 1% | 14% | 44% | 0% |
+| Storm Wyrm (lightning), adult (19) | 100% | 94% | 22% | 80% | 0% | 2% |
+| Bolt Drake (lightning), adult (15) | 100% | 21% | 1% | 3% | 0% | 0% |
+| Sky Wyrm (air), adult (20) | 100% | 100% | 88% | 17% | 0% | 0% |
+| Zephyr Drake (air), adult (13) | 100% | 95% | 3% | 0% | 0% | 0% |
+| Abyss Wyrm (water), adult (22) | 100% | 86% | 1% | 25% | 20% | 0% |
+| Reef Drake (water), adult (17) | 100% | 18% | 0% | 0% | 0% | 0% |
 
-Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.5, young 1.5, adult 3.4. A Tower Floor takes 3 gold.
+Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0, young 0, adult 2.2. A Tower Floor takes 3 gold.
+
+Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
+
+| Kingdom | Loot value | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
+|---|---|---|---|---|---|---|---|
+| Hamlet of Brindle (8) | 3 | 100% → 100% | 3 | 3 | 0 | about 0 | 0 |
+| Stormspire (35) | 68 | 67% → 82% | 45.6 | 52.5 | 3.1 | about 8 | 0.8 |
+
+Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
+
+Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 19.7 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 6.4, and misses 2.9 raid rounds.
 
 ## Fauna
 
@@ -249,10 +262,10 @@ How much of each resource every card in both decks costs in total (each card cou
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
 | stone | 73 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 71 | 22% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| timber | 71 | 22% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (2 of 6 kingdoms) |
 | crystal | 88 | 28% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
 | livestock | 34 | 11% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 51 | 16% | Market, Trade Charter, raid loot (6 of 6 kingdoms) |
+| gold | 51 | 16% | Market, Trade Charter, raid loot (5 of 6 kingdoms) |
 
 ## Decks
 
@@ -303,6 +316,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 9 | 12 | 18 | 0 | 77% | 40% | 80% | 7%, median round 13 | 3%, median round 9 |
-| 3 | 8 | 11 | 16 | 0 | 87% | 63% | 80% | 10%, median round 13 | 7%, median round 10 |
-| 4 | 7 | 11 | 15 | 0 | 77% | 70% | 67% | 7%, median round 12 | 3%, median round 11 |
+| 2 | 10 | 12 | 15 | 0 | 87% | 23% | 90% | 7%, median round 13 | 3%, median round 11 |
+| 3 | 8 | 12 | 17 | 0 | 83% | 23% | 90% | 7%, median round 10 | 7%, median round 14 |
+| 4 | 7 | 11 | 15 | 0 | 90% | 60% | 87% | 10%, median round 10 | 3%, median round 10 |
