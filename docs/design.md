@@ -103,12 +103,12 @@ Living design doc. Decisions here were made in conversation with the project own
 - The game is played in large global rounds. Each global round has, in order:
   1. Production phase
   2. Card picking phase
-  3. Action card playing phase
+  3. Action phase: playing action cards, trading, and building all happen here
   4. Raid phase
 
 ## Open questions
 
-- Within the global round: how production works (dice?), how card picking works (what cards, from where), how building and trading fit in, and whether phases are simultaneous or in turn order.
+- Within the global round: how production works (dice?), how card picking works (what cards, from where), whether phases are simultaneous or in turn order.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
