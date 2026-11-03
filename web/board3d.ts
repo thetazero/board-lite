@@ -611,46 +611,176 @@ function nest(): THREE.Mesh {
   return part(new THREE.TorusGeometry(0.16, 0.05, 3, 7), WOOD_DARK, { at: [0, 0.03, 0], rot: [Math.PI / 2, 0, 0] });
 }
 
-function hatchery(pc: string): THREE.Group {
-  const g = new THREE.Group();
-  g.add(part(cyl(0.4, 0.42, 0.3, 8), WALL, { at: [-0.1, 0.15, -0.15] }));
-  g.add(part(new THREE.SphereGeometry(0.4, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), pc, { at: [-0.1, 0.3, -0.15] }));
-  g.add(part(new THREE.IcosahedronGeometry(0.09, 0), GOLD, { at: [-0.1, 0.76, -0.15], scale: [1, 1.3, 1] }));
-  g.add(part(box(0.14, 0.2, 0.02), DARK, { at: [0.02, 0.1, 0.23], rot: [0, 0.3, 0], crease: false }));
-  const n = nest();
-  n.position.set(0.35, 0, 0.3);
-  g.add(n);
+// ---------- batch 3: the dragon, trade and monument cards ----------
+// Dragon buildings carry a twig nest with eggs (the roost's). Trade buildings
+// carry crates of the goods in their own colours under a red-and-cream awning.
+// Monuments are pale dressed stone tipped with gold.
+
+const CLAY = '#c9774a';
+const TRADE_RED = '#c8463d';
+const MONUMENT_STONE = mix(STONE, WALL, 0.55);
+const MONUMENT_DARK = mix(STONE, WALL, 0.25);
+const EGGS = ['#ff7a59', '#8fd8ff', '#ffd23f'];
+
+// A dragon's egg, standing.
+const dragonEgg = (c: string, at: [number, number, number], s = 1) =>
+  part(new THREE.IcosahedronGeometry(0.1 * s, 0), mix(c, '#fff8ea', 0.15), { at, scale: [1, 1.3, 1] });
+
+// A crate of one of the goods: a box of its colour with a darker band.
+function crate(c: string, s: number, at: [number, number, number], spin = 0): THREE.Group {
+  const g = group(part(box(s, s, s), c), part(box(s * 1.02, s * 0.18, s * 1.02), mix(c, DARK, 0.3), { crease: false }));
+  g.position.set(at[0], at[1] + s / 2, at[2]);
+  g.rotation.y = spin;
   return g;
 }
 
-// A port, built facing the sea (+z): a warehouse, a pier out over the water
-// and a sailboat in the owner's colour moored beside it.
-function port(pc: string): THREE.Group {
+// The goods, a crate of each: stone, timber, crystal, wool, gold.
+const TRADE_GOODS = ['#c6cad0', '#b97a44', '#b88bff', '#fbf7ee', '#f5c542'];
+
+// A striped awning: panels sloping down to the front, red and cream in turn.
+function awning(w: number, d: number, n: number, y: number, z: number): THREE.Group {
   const g = new THREE.Group();
-  const shed = cottage(0.42, 0.32, 0.28, WALL, pc);
-  shed.position.set(-0.18, 0, -0.3);
+  const pw = w / n;
+  for (let i = 0; i < n; i++) {
+    g.add(part(box(pw, 0.02, d), i % 2 ? WALL : TRADE_RED, { at: [-w / 2 + pw * (i + 0.5), y, z], rot: [0.35, 0, 0] }));
+    // A scalloped flap hanging off the front edge.
+    g.add(part(cone(pw * 0.55, 0.08, 3), i % 2 ? WALL : TRADE_RED, { at: [-w / 2 + pw * (i + 0.5), y - Math.sin(0.35) * d / 2 - 0.04, z + Math.cos(0.35) * d / 2], rot: [Math.PI, 0, 0], crease: false }));
+  }
+  return g;
+}
+
+// A clay brooding house: a domed kiln with a glowing mouth, a big nest of
+// eggs in front of it where a dragon's egg is kept warm.
+function hatchery(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(cyl(0.36, 0.4, 0.26, 9), CLAY, { at: [-0.12, 0.13, -0.22] }));
+  g.add(part(new THREE.SphereGeometry(0.37, 9, 4, 0, Math.PI * 2, 0, Math.PI / 2), mix(CLAY, WALL, 0.2), { at: [-0.12, 0.26, -0.22] }));
+  g.add(part(cyl(0.06, 0.07, 0.22, 6), mix(CLAY, DARK, 0.2), { at: [0.0, 0.66, -0.3] }));
+  // The mouth, glowing.
+  g.add(part(box(0.2, 0.18, 0.04), '#ff9a3c', { at: [-0.12, 0.11, 0.17], glow: 0.6, crease: false }));
+  g.add(part(box(0.11, 0.1, 0.045), '#ffd23f', { at: [-0.12, 0.08, 0.175], glow: 0.7, crease: false }));
+  // The nest: a big twig ring with three eggs.
+  g.add(part(cyl(0.2, 0.18, 0.04, 9), '#a8743e', { at: [0.32, 0.03, 0.26], crease: false }));
+  g.add(part(new THREE.TorusGeometry(0.22, 0.06, 3, 9), WOOD_DARK, { at: [0.32, 0.05, 0.26], rot: [Math.PI / 2, 0, 0] }));
+  EGGS.forEach((c, i) => g.add(dragonEgg(c, [0.26 + (i % 2) * 0.13, 0.15, 0.2 + (i === 2 ? 0.12 : 0)], 0.9)));
+  return g;
+}
+
+// A port, built facing the sea (+z): a red-roofed warehouse, crates of the
+// goods under its awning, a pier out over the water and a boat moored by it.
+function port(): THREE.Group {
+  const g = new THREE.Group();
+  const shed = cottage(0.46, 0.32, 0.3, WALL, TRADE_RED);
+  shed.position.set(-0.18, 0, -0.32);
   g.add(shed);
+  g.add(awning(0.46, 0.18, 4, 0.27, -0.08).translateX(-0.18));
+  TRADE_GOODS.forEach((c, i) => g.add(crate(c, 0.11, [-0.36 + (i % 3) * 0.13, i < 3 ? 0 : 0.11, 0.04 + (i < 3 ? 0 : -0.01)], (i * 0.3) % 0.4)));
   // The pier: planks on posts, running out past the hex's edge.
-  g.add(part(box(0.22, 0.04, 1.05), WOOD, { at: [0.22, 0.1, 0.35] }));
-  for (const z of [0, 0.35, 0.7]) for (const x of [0.12, 0.32]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
-  GOODS.forEach((c, i) => g.add(part(box(0.1, 0.1, 0.1), c, { at: [-0.3 + (i % 2) * 0.13, 0.05 + Math.floor(i / 2) * 0.1, 0.12] })));
+  g.add(part(box(0.22, 0.04, 1.05), WOOD, { at: [0.24, 0.1, 0.35] }));
+  for (const z of [0, 0.35, 0.7]) for (const x of [0.14, 0.34]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
+  g.add(crate(TRADE_GOODS[4], 0.1, [0.24, 0.12, 0.5], 0.4));
   const boat = new THREE.Group();
   boat.add(part(cyl(0.12, 0.06, 0.4, 4), WOOD, { at: [0, 0, 0], rot: [Math.PI / 2, Math.PI / 4, 0], scale: [1, 1, 0.55] }));
   boat.add(part(box(0.02, 0.5, 0.02), DARK, { at: [0, 0.27, 0], crease: false }));
-  boat.add(part(sheet([[0, 0.5, 0], [0, 0.05, 0.02], [0, 0.08, 0.26]], [[0, 1, 2]]), pc, { two: true }));
-  boat.position.set(0.55, 0.0, 0.7);
+  boat.add(part(sheet([[0, 0.5, 0], [0, 0.05, 0.02], [0, 0.08, 0.26]], [[0, 1, 2]]), WALL, { two: true }));
+  boat.add(part(sheet([[0.003, 0.3, 0.008], [0.003, 0.22, 0.013], [0.003, 0.24, 0.15], [0.003, 0.32, 0.1]], [[0, 1, 2], [0, 2, 3]]), TRADE_RED, { two: true, crease: false }));
+  boat.position.set(0.58, 0.0, 0.7);
   g.add(boat);
   return g;
 }
 
+// A market: two stalls under striped awnings, crates of the goods on their
+// counters and a stack of gold coins between them.
+function market(): THREE.Group {
+  const g = new THREE.Group();
+  for (const [x, z, spin] of [[-0.25, -0.12, 0.25], [0.3, -0.2, -0.3]] as [number, number, number][]) {
+    const st = new THREE.Group();
+    for (const px of [-0.2, 0.2]) for (const pz of [-0.12, 0.12]) st.add(part(box(0.03, 0.42, 0.03), WOOD, { at: [px, 0.21, pz], crease: false }));
+    st.add(part(box(0.44, 0.1, 0.2), WOOD_DARK, { at: [0, 0.1, 0.02] }));
+    st.add(awning(0.46, 0.32, 4, 0.44, 0));
+    st.position.set(x, 0, z);
+    st.rotation.y = spin;
+    g.add(st);
+  }
+  const counter = (x: number, z: number, spin: number, goods: string[]) =>
+    goods.forEach((c, i) => g.add(crate(c, 0.09, [x + Math.cos(spin) * (i - (goods.length - 1) / 2) * 0.11, 0.2, z - Math.sin(spin) * (i - (goods.length - 1) / 2) * 0.11], spin)));
+  counter(-0.25, -0.1, 0.25, TRADE_GOODS.slice(0, 3));
+  counter(0.3, -0.18, -0.3, TRADE_GOODS.slice(2, 4));
+  // Crates on the ground in front, and the gold.
+  g.add(crate(TRADE_GOODS[1], 0.13, [-0.4, 0, 0.3], 0.3));
+  g.add(crate(TRADE_GOODS[0], 0.11, [-0.26, 0, 0.36], -0.2));
+  for (let i = 0; i < 4; i++) g.add(part(cyl(0.08, 0.08, 0.035, 8), i % 2 ? '#f5c542' : GOLD, { at: [0.12, 0.02 + i * 0.037, 0.24], crease: false }));
+  for (let i = 0; i < 2; i++) g.add(part(cyl(0.08, 0.08, 0.035, 8), GOLD, { at: [0.3, 0.02 + i * 0.037, 0.32], crease: false }));
+  return g;
+}
+
+// An obelisk on a stepped plinth, tipped with gold.
 function monument(gilded: boolean): THREE.Group {
-  const stone = mix(STONE, WALL, 0.55);
   return group(
-    part(box(0.6, 0.1, 0.6), stone, { at: [0, 0.05, 0] }),
-    part(box(0.42, 0.1, 0.42), stone, { at: [0, 0.15, 0] }),
-    part(cyl(0.07, 0.15, 1.15, 4), gilded ? mix(GOLD, WALL, 0.35) : stone, { at: [0, 0.775, 0], rot: [0, Math.PI / 4, 0] }),
+    part(box(0.6, 0.1, 0.6), MONUMENT_DARK, { at: [0, 0.05, 0] }),
+    part(box(0.42, 0.1, 0.42), MONUMENT_STONE, { at: [0, 0.15, 0] }),
+    part(cyl(0.07, 0.15, 1.15, 4), gilded ? mix(GOLD, WALL, 0.35) : MONUMENT_STONE, { at: [0, 0.775, 0], rot: [0, Math.PI / 4, 0] }),
     part(cone(0.1, 0.18, 4), GOLD, { at: [0, 1.44, 0], rot: [0, Math.PI / 4, 0], glow: 0.15 }),
   );
+}
+
+// A ring of standing stones round a glowing ley stone; at the back a
+// trilithon, its lintel carrying a gold sun.
+function standingStones(gilded: boolean): THREE.Group {
+  const g = new THREE.Group();
+  const n = 6, R = 0.44;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.PI / 6;
+    const back = Math.sin(a) < -0.6; // the trilithon's place
+    if (back) continue;
+    const h = 0.4 + ((i * 37) % 10) / 50;
+    g.add(part(box(0.13, h, 0.09), i % 2 ? MONUMENT_STONE : MONUMENT_DARK, { at: [Math.cos(a) * R, h / 2, Math.sin(a) * R], rot: [0, -a + Math.PI / 2, (i % 3 - 1) * 0.07] }));
+    g.add(part(cone(0.07, 0.06, 4), gilded ? GOLD : MONUMENT_STONE, { at: [Math.cos(a) * R, h + 0.03, Math.sin(a) * R], rot: [0, -a + Math.PI / 4, 0], crease: false }));
+  }
+  for (const x of [-0.2, 0.2]) g.add(part(box(0.15, 0.7, 0.12), MONUMENT_STONE, { at: [x, 0.35, -0.4] }));
+  g.add(part(box(0.62, 0.13, 0.15), gilded ? mix(GOLD, WALL, 0.3) : MONUMENT_DARK, { at: [0, 0.76, -0.4] }));
+  g.add(part(cyl(0.11, 0.11, 0.04, 8), GOLD, { at: [0, 0.58, -0.33], rot: [Math.PI / 2, 0, 0], glow: 0.2 }));
+  // The ley stone in the middle, and the violet line it sits on.
+  g.add(part(box(0.5, 0.012, 0.06), CRYSTAL, { at: [0, 0.006, 0.05], rot: [0, 0.5, 0], glow: 0.4, crease: false }));
+  const c = crystal(0.26, CRYSTAL);
+  c.position.set(0, 0.24, 0.05);
+  g.add(c);
+  return g;
+}
+
+// A lighthouse on a rock, facing the sea: a tall pale tower, a gold lantern
+// lit at its top under a cap.
+function lighthouse(gilded: boolean): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(new THREE.DodecahedronGeometry(0.34, 0), STONE, { at: [0, 0.08, 0], scale: [1.3, 0.55, 1.2] }));
+  g.add(part(cyl(0.15, 0.24, 1.0, 8), MONUMENT_STONE, { at: [0, 0.6, 0] }));
+  for (const y of [0.45, 0.8]) g.add(part(cyl(0.2 - (y - 0.45) * 0.17, 0.21 - (y - 0.45) * 0.17, 0.07, 8), MONUMENT_DARK, { at: [0, y, 0], crease: false }));
+  g.add(part(cyl(0.21, 0.21, 0.04, 8), MONUMENT_DARK, { at: [0, 1.12, 0] }));
+  g.add(part(cyl(0.12, 0.12, 0.18, 8), '#ffd23f', { at: [0, 1.23, 0], glow: 0.8 }));
+  g.add(part(cone(0.17, 0.18, 8), gilded ? GOLD : MONUMENT_DARK, { at: [0, 1.41, 0] }));
+  g.add(part(cone(0.04, 0.1, 4), GOLD, { at: [0, 1.54, 0], glow: 0.15 }));
+  // The door, toward the land.
+  g.add(part(box(0.1, 0.16, 0.02), DARK, { at: [0, 0.3, -0.2], crease: false }));
+  return g;
+}
+
+// A guildhall: a pale stone hall behind a columned porch, a gold finial on
+// its roof and banners in the goods' colours hung between the columns (the
+// trade it honours).
+function guildhall(gilded: boolean): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(box(0.8, 0.07, 0.62), MONUMENT_DARK, { at: [0, 0.035, -0.05] }));
+  g.add(part(box(0.66, 0.42, 0.36), MONUMENT_STONE, { at: [0, 0.28, -0.16] }));
+  g.add(gable(0.74, 0.62, 0.26, MONUMENT_DARK, 0.6).translateZ(-0.06));
+  // The pediment's face over the porch.
+  g.add(part(sheet([[-0.36, 0, 0], [0.36, 0, 0], [0, 0.22, 0]], [[0, 1, 2]]), gilded ? mix(GOLD, WALL, 0.25) : MONUMENT_STONE, { at: [0, 0.53, 0.25], two: true }));
+  for (let i = 0; i < 4; i++) g.add(part(cyl(0.035, 0.04, 0.42, 6), WALL, { at: [-0.27 + i * 0.18, 0.28, 0.21] }));
+  g.add(part(box(0.7, 0.05, 0.1), MONUMENT_STONE, { at: [0, 0.51, 0.21] }));
+  // Banners in three of the goods' colours between the columns.
+  [TRADE_GOODS[2], TRADE_RED, TRADE_GOODS[4]].forEach((c, i) => g.add(part(sheet([[0, 0, 0], [0.11, 0, 0], [0.11, -0.2, 0], [0.055, -0.15, 0], [0, -0.2, 0]], [[0, 1, 2], [0, 2, 3], [0, 3, 4]]), c, { at: [-0.235 + i * 0.18, 0.47, 0.2], two: true, crease: false })));
+  g.add(part(box(0.12, 0.2, 0.02), DARK, { at: [0, 0.17, 0.025], crease: false }));
+  g.add(part(cone(0.06, 0.16, 4), GOLD, { at: [0, 0.82, -0.06], glow: 0.15 }));
+  return g;
 }
 
 // ---------- batch 2: the production cards ----------
@@ -919,7 +1049,7 @@ function fishery(): THREE.Group {
 }
 
 // Buildings that turn to face the sea.
-const SEAWARD = new Set(['port', 'driftwood_yard', 'fishery']);
+const SEAWARD = new Set(['port', 'driftwood_yard', 'fishery', 'lighthouse']);
 
 // Where a building's dragons sit, in the building's own frame.
 interface Perch { x: number; y: number; z: number; face: number }
@@ -928,22 +1058,28 @@ const PERCHES: Record<string, Perch[]> = {
   // Side-on to the room, so each shows its profile: neck, wings, tail.
   tower: [{ x: 0.3, y: 0, z: 0.42, face: 1.75 }, { x: -0.5, y: 0, z: 0.3, face: -1.4 }],
   roost: [{ x: 0.05, y: ROOST_TOP + 0.04, z: 0.26, face: 1.65 }, { x: -0.1, y: ROOST_TOP + 0.04, z: -0.28, face: -1.5 }, { x: 0.32, y: ROOST_TOP + 0.04, z: -0.05, face: 2.6 }],
-  hatchery: [{ x: 0.35, y: 0, z: 0.3, face: 0.6 }],
+  hatchery: [{ x: 0.32, y: 0, z: 0.26, face: 0.6 }],
 };
+// Nesting Grounds' nest, at the plate's front corner (UPGRADE_AT): the two more dragons it houses sit by it.
+const NESTING_PERCHES: Perch[] = [{ x: -0.42, y: 0, z: 0.52, face: 1.7 }, { x: -0.7, y: 0, z: 0.22, face: -1.2 }];
 
 function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Group; offset: [number, number] } {
   const pc = PLAYER_COLORS[b.owner];
-  const up = !!b.upgrade;
+  const gilded = b.upgrade === 'gilding';
   switch (b.type) {
-    case 'tower': return { model: tower(pc, b.floors, up && b.upgrade === 'gilding'), offset: [-0.15, -0.2] };
+    case 'tower': return { model: tower(pc, b.floors, gilded), offset: [-0.15, -0.2] };
     case 'quarry': return { model: quarry(), offset: [0, 0] };
     case 'lumber_camp': return { model: lumberCamp(), offset: [0, 0] };
     case 'crystal_mine': return { model: crystalMine(), offset: [0, 0] };
     case 'pasture': return { model: pasture(), offset: [0, 0] };
     case 'roost': return { model: roost(), offset: [0, 0] };
-    case 'hatchery': return { model: hatchery(pc), offset: [0, 0] };
-    case 'port': return { model: port(pc), offset: [0, 0] };
-    case 'monument': return { model: monument(up), offset: [0, 0] };
+    case 'hatchery': return { model: hatchery(), offset: [0, 0] };
+    case 'port': return { model: port(), offset: [0, 0] };
+    case 'market': return { model: market(), offset: [0, 0] };
+    case 'monument': return { model: monument(gilded), offset: [0, 0] };
+    case 'standing_stones': return { model: standingStones(gilded), offset: [0, 0] };
+    case 'lighthouse': return { model: lighthouse(gilded), offset: [0, 0] };
+    case 'guildhall': return { model: guildhall(gilded), offset: [0, 0] };
     case 'cliff_works': return { model: cliffWorks(), offset: [0, 0] };
     case 'stonemason': return { model: stonemason(), offset: [0, 0] };
     case 'woodcutter': return { model: woodcutter(), offset: [0, 0] };
@@ -955,30 +1091,88 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'shepherds_fold': return { model: shepherdsFold(), offset: [0, 0] };
     case 'drovers_barn': return { model: droversBarn(), offset: [0, 0] };
     case 'fishery': return { model: fishery(), offset: [0, 0] };
-    default: {
-      // Until a building has its own model it borrows its class's.
-      const stand: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
-      const like = stand[b.cls];
-      if (like && like !== b.type) return buildingModel({ ...b, type: like });
-      return { model: group(part(box(0.4, 0.4, 0.4), pc, { at: [0, 0.2, 0] })), offset: [0, 0] };
-    }
+    default: return { model: group(part(box(0.4, 0.4, 0.4), pc, { at: [0, 0.2, 0] })), offset: [0, 0] }; // every building has its own model; this is a missing one
   }
 }
 
-// The owner's coloured card under a building; an upgrade puts a gold rim round it
-// and a gold pennant beside it.
-function plate(owner: number, upgraded: boolean, mats: THREE.MeshLambertMaterial[]): THREE.Group {
+// Where an upgrade's mark stands: the plate's front-left corner, toward the room.
+const UPGRADE_AT: [number, number] = [-0.56, 0.4];
+
+// What each upgrade puts beside the building it's on, as its card and icon
+// show it (icons.ts): a workshop's cog, gilding's crown, nesting grounds' nest
+// (the dragons it houses sit by it), a trade charter's sealed scroll.
+function upgradeMark(key: string): THREE.Group {
   const g = new THREE.Group();
-  if (upgraded) g.add(part(cyl(0.87, 0.88, PLATE_H * 0.8, 6), GOLD, { at: [0, TOP + PLATE_H * 0.4 - 0.005, 0] }));
-  const m = new THREE.Mesh(cyl(upgraded ? 0.78 : 0.84, upgraded ? 0.79 : 0.85, PLATE_H, 6), mats[owner]);
+  switch (key) {
+    case 'workshop': {
+      // A cog on a trestle, upright to the room.
+      for (const x of [-0.1, 0.1]) g.add(part(box(0.035, 0.16, 0.035), WOOD, { at: [x, 0.08, 0], crease: false }));
+      g.add(part(box(0.28, 0.035, 0.1), WOOD_DARK, { at: [0, 0.16, 0] }));
+      const cog = new THREE.Group();
+      cog.add(part(cyl(0.13, 0.13, 0.05, 10), '#c9ced6', { rot: [Math.PI / 2, 0, 0] }));
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        cog.add(part(box(0.06, 0.06, 0.05), '#8d949e', { at: [Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0], rot: [0, 0, a], crease: false }));
+      }
+      cog.add(part(cyl(0.045, 0.045, 0.06, 8), DARK, { rot: [Math.PI / 2, 0, 0], crease: false }));
+      cog.position.set(0, 0.36, 0);
+      cog.rotation.x = -0.7; // tipped back to face the camera
+      g.add(cog);
+      break;
+    }
+    case 'gilding': {
+      // A gold crown on a cream cushion.
+      g.add(part(box(0.24, 0.07, 0.24), WALL, { at: [0, 0.035, 0], rot: [0, Math.PI / 4, 0] }));
+      g.add(part(cyl(0.12, 0.11, 0.09, 10), GOLD, { at: [0, 0.115, 0] }));
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + Math.PI / 2;
+        g.add(part(cone(0.04, 0.1, 4), GOLD, { at: [Math.cos(a) * 0.1, 0.21, Math.sin(a) * 0.1], glow: 0.12 }));
+      }
+      g.add(part(new THREE.OctahedronGeometry(0.03, 0), '#d64545', { at: [0, 0.12, 0.115], crease: false }));
+      break;
+    }
+    case 'nesting_grounds': {
+      g.add(part(cyl(0.2, 0.18, 0.04, 9), '#a8743e', { at: [0, 0.02, 0], crease: false }));
+      g.add(part(new THREE.TorusGeometry(0.22, 0.065, 3, 9), WOOD_DARK, { at: [0, 0.05, 0], rot: [Math.PI / 2, 0, 0] }));
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + 0.3;
+        g.add(part(box(0.16, 0.02, 0.02), '#c48a52', { at: [Math.cos(a) * 0.24, 0.07, Math.sin(a) * 0.24], rot: [0, -a + 0.6, 0.3], crease: false }));
+      }
+      g.add(dragonEgg(EGGS[0], [-0.05, 0.13, 0]), dragonEgg(EGGS[1], [0.07, 0.12, 0.04], 0.85));
+      break;
+    }
+    case 'trade_charter': {
+      // A charter on a lectern: a cream sheet between its rolled ends, a red seal.
+      g.add(part(box(0.04, 0.2, 0.04), WOOD_DARK, { at: [0, 0.1, -0.02], crease: false }));
+      const sheetG = new THREE.Group();
+      sheetG.add(part(box(0.26, 0.2, 0.012), '#f3ead7'));
+      for (const y of [-0.1, 0.1]) sheetG.add(part(cyl(0.025, 0.025, 0.3, 6), '#e3d6b8', { at: [0, y, 0.01], rot: [0, 0, Math.PI / 2] }));
+      for (const y of [-0.04, 0.0, 0.04]) sheetG.add(part(box(0.17, 0.012, 0.004), '#8a7a66', { at: [-0.02, y + 0.02, 0.008], crease: false }));
+      sheetG.add(part(cyl(0.04, 0.04, 0.02, 8), TRADE_RED, { at: [0.07, -0.05, 0.012], rot: [Math.PI / 2, 0, 0] }));
+      sheetG.position.set(0, 0.3, 0);
+      sheetG.rotation.x = -0.9;
+      g.add(sheetG);
+      break;
+    }
+  }
+  return g;
+}
+
+// The owner's coloured card under a building; an upgrade puts a gold rim round
+// it and its mark (upgradeMark) at the front corner.
+function plate(owner: number, upgrade: string | null, mats: THREE.MeshLambertMaterial[]): THREE.Group {
+  const g = new THREE.Group();
+  if (upgrade) g.add(part(cyl(0.87, 0.88, PLATE_H * 0.8, 6), GOLD, { at: [0, TOP + PLATE_H * 0.4 - 0.005, 0] }));
+  const m = new THREE.Mesh(cyl(upgrade ? 0.78 : 0.84, upgrade ? 0.79 : 0.85, PLATE_H, 6), mats[owner]);
   m.position.y = TOP + PLATE_H / 2;
   m.receiveShadow = true;
   m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), CREASE));
   g.add(m);
-  if (upgraded) {
-    const f = flag(GOLD, 0.45);
-    f.position.set(-0.55, GROUND, 0.42);
-    g.add(f);
+  if (upgrade) {
+    const mark = bake(upgradeMark(upgrade));
+    mark.scale.setScalar(1.6);
+    mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
+    g.add(mark);
   }
   return g;
 }
@@ -1226,7 +1420,7 @@ export class Board3D {
   }
 
   private buildingGroup(b: NonNullable<HexView['building']>, facing: number): THREE.Group {
-    const g = plate(b.owner, !!b.upgrade, this.plateMats);
+    const g = plate(b.owner, b.upgrade, this.plateMats);
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
     const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
@@ -1319,13 +1513,14 @@ export class Board3D {
     const towers = new Map<number, THREE.Vector3>();
     for (const h of g.map) {
       const b = h.building;
-      if (!b || !PERCHES[b.type]) continue;
+      if (!b || !(PERCHES[b.type] || b.upgrade === 'nesting_grounds')) continue;
       const [x, z] = hexXZ(h.q, h.r);
       const center = new THREE.Vector3(x, 0, z);
       if (b.type === 'tower') towers.set(b.owner, center);
-      const n = b.type === 'tower' ? 1 + (b.upgrade === 'nesting_grounds' ? 1 : 0) : b.type === 'roost' ? 2 + (b.upgrade === 'nesting_grounds' ? 1 : 0) : 1;
+      const n = b.type === 'tower' ? 1 : b.type === 'roost' ? 2 : 1;
       const list = perches.get(b.owner) ?? [];
-      PERCHES[b.type].slice(0, n).forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: b.type === 'hatchery' }));
+      (PERCHES[b.type] ?? []).slice(0, n).forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: b.type === 'hatchery' }));
+      if (b.upgrade === 'nesting_grounds') NESTING_PERCHES.forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: false }));
       perches.set(b.owner, list);
     }
     const want = new Map<string, { pos: THREE.Vector3; face: number; home: THREE.Vector3 }>();

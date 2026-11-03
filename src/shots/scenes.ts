@@ -142,6 +142,8 @@ function most(g: Game, p: number, not = ''): string {
 
 // The production cards (building art, batch 2).
 const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
+// The dragon, trade and monument cards and the upgrades (building art, batch 3).
+const CIVIC_CARDS = ['hatchery', 'port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'gilding', 'nesting_grounds', 'trade_charter'];
 
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
@@ -281,6 +283,41 @@ export const SCENES: Scene[] = [
       { file: 'tv-production-2p', caption: 'TV: the eleven production cards, each by its class\'s basic building', client: 'tv', waitMs: 4800 },
       { file: 'phone-production-map-2p', caption: 'Phone: the map with the production cards, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-production-hand-2p', caption: 'Phone: a hand of the eleven production cards (staged)', client: 'phone', seat: g!.turn },
+    ],
+  },
+  {
+    // The dragon, trade and monument cards and the four upgrades (building art,
+    // batch 3). One player has the dragon and trade buildings, the other the
+    // monuments; each upgrade sits on two buildings it fits, one per player, so
+    // the board shows every upgrade on a building and the same building without
+    // it. Their phone hand holds the twelve cards.
+    name: 'civic-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 1 && g.phase === 'action',
+    setup: (g) => {
+      const dist = (a: string, b: string) => { const [q, r] = a.split(',').map(Number), [q2, r2] = b.split(',').map(Number); return Math.max(Math.abs(q - q2), Math.abs(r - r2), Math.abs(q + r - q2 - r2)); };
+      const by = (t: string) => (k: string) => Object.keys(g.map).some((o) => g.map[o].terrain === t && dist(o, k) === 1);
+      const near = (p: number, ok: (k: string) => boolean) => Object.keys(g.map).filter((k) => !g.buildings[k] && g.map[k].terrain !== 'ocean' && ok(k))
+        .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
+      const land = (k: string) => g.map[k].terrain !== 'harbor';
+      const want: [string, (k: string) => boolean, string | null][][] = [
+        [['port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, 'gilding']],
+        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), 'gilding'], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
+      ];
+      for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
+        const k = near(p, ok);
+        if (k) g.buildings[k] = { type, owner: p, upgrade, floors: 0 };
+      }
+      g.buildings[g.towers[0]].floors = 2;
+      g.buildings[g.towers[0]].upgrade = 'gilding';
+      g.buildings[g.towers[1]].upgrade = 'nesting_grounds';
+      giveHand(g, g.turn, CIVIC_CARDS);
+    },
+    shots: (g) => [
+      { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
+      { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
+      { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the four upgrades (staged)', client: 'phone', seat: g!.turn },
     ],
   },
   {

@@ -302,6 +302,7 @@ const ICONS: Record<string, Facet[]> = {
 export const ICON_NAMES = Object.keys(ICONS);
 
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+  workshop: 'Workshop', gilding: 'Gilding', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
@@ -316,7 +317,7 @@ export function icon(name: string, size = 1.25, cls = 'ricon'): string {
 }
 
 // ---- buildings ----
-// The tower, the basic buildings and the production cards, drawn as the TV board's paper models
+// Every building (and the tower's floors), drawn as the TV board's paper models
 // look from the room. How a building shows its class, here and on the board:
 // it carries its class's goods (cut stone blocks for a quarry, a log pile for a
 // lumber camp, violet crystals for a mine, white sheep for a pasture, a nest for
@@ -365,6 +366,43 @@ function spire(x: number, y: number, h: number, w: number, tilt = 0): Facet[] {
 // A facet list moved and scaled, to place one drawing inside another.
 const moved = (fs: Facet[], dx: number, dy: number, s = 1): Facet[] =>
   fs.map(([c, p]) => [c, p.split(' ').map((xy) => { const [x, y] = xy.split(',').map(Number); return `${+(x * s + dx).toFixed(2)},${+(y * s + dy).toFixed(2)}`; }).join(' ')]);
+
+// Batch 3's class colours: clay for the hatchery, the trade buildings' red, monuments' pale stone.
+const CLAY = '#c9774a';
+const TRADE_RED = '#c8463d';
+const MON = '#d6cfc0';
+
+// A twig nest with three eggs, centred on (cx, cy).
+// A dragon's egg standing on (cx, cy), h tall: its lit and shaded halves, as on the roost.
+const EGG = (cx: number, cy: number, h: number, light: string, dark: string): Facet[] => {
+  const e = (x: number, y: number): [number, number] => [cx + x * h, cy + y * h];
+  return [
+    [light, P([e(0, -1), e(-0.29, -0.86), e(-0.4, -0.5), e(-0.31, -0.14), e(0, 0)])],
+    [dark, P([e(0, -1), e(0, 0), e(0.31, -0.14), e(0.4, -0.5), e(0.29, -0.86)])],
+  ];
+};
+
+// A twig nest with three eggs, centred on (cx, cy).
+const NEST = (cx: number, cy: number): Facet[] => [
+  ...EGG(cx - 2.6, cy - 0.6, 4.6, '#ffb08a', '#d9542e'),
+  ...EGG(cx + 2.6, cy - 0.6, 4.6, '#d6f2ff', '#5aa8e0'),
+  ...EGG(cx, cy - 0.2, 5.6, '#fff1b0', '#e0b020'),
+  ['#a8743e', P([[cx - 5.8, cy - 1.4], [cx + 5.8, cy - 1.4], [cx + 4.2, cy + 1.6], [cx - 4.2, cy + 1.6]])],
+  ['#7f4b23', P([[cx - 4.2, cy + 1.6], [cx + 4.2, cy + 1.6], [cx + 3, cy + 2.8], [cx - 3, cy + 2.8]])],
+  ['#d9a066', P([[cx - 5, cy - 0.8], [cx + 3.8, cy + 0.4], [cx + 3.8, cy + 1], [cx - 5, cy - 0.2]])],
+];
+
+// Crates of the goods (stone, timber, crystal, wool, gold in turn), each a block seen corner-on.
+const GOODS_COLORS = ['#c6cad0', '#b97a44', '#b88bff', '#f4eedc', '#f5c542'];
+const CRATES = (at: [number, number][], s: number, from = 0): Facet[] => at.flatMap(([x, y], i) => block(x, y, s, GOODS_COLORS[(from + i) % GOODS_COLORS.length]));
+
+// The sea along an icon's foot.
+const WAVES: Facet[] = [
+  ['#3d7fbf', P([[-10, 6.5], [-6, 5], [-2, 6.5], [2, 5], [6, 6.5], [10, 5], [10, 10], [-10, 10]])],
+  ['#7fb6e6', P([[-10, 6.5], [-6, 5], [-2, 6.5], [-6, 6.2]])],
+  ['#7fb6e6', P([[2, 5], [6, 6.5], [2, 6.2], [-2, 6.5]])],
+  ['#7fb6e6', P([[-6, 8.2], [-2, 9.2], [2, 8.2], [-2, 8.8]])],
+];
 
 // The tower's roof when its owner isn't known (the Tallest Tower title).
 const TOWER_ROOF = '#8d96aa';
@@ -564,7 +602,108 @@ export function buildingFacets(type: string, pc = TOWER_ROOF): Facet[] | null {
       ['#7fb6e6', P([[-10, 6.5], [-6, 5], [-2, 6.5], [-6, 6.2]])],
       ['#7fb6e6', P([[2, 5], [6, 6.5], [2, 6.2], [-2, 6.5]])],
       ['#7fb6e6', P([[-6, 8.2], [-2, 9.2], [2, 8.2], [-2, 8.8]])],
-    ];  }
+    ];
+
+    // ---- batch 3: dragon, trade and monument cards ----
+    // Dragon buildings: a twig nest with eggs. Trade buildings: crates of the
+    // goods under red and cream. Monuments: pale dressed stone tipped with gold.
+    // A clay brooding dome with a glowing mouth, a nest of three eggs in front.
+    case 'hatchery': return [
+      [shade(CLAY, 0.3), P([[-9.6, 4], [-9, -2.4], [-6.4, -6.6], [-2.6, -8], [-2.6, 4]])],
+      [shade(CLAY, -0.2), P([[-2.6, -8], [1.2, -6.6], [3.8, -2.4], [4.4, 4], [-2.6, 4]])],
+      [shade(CLAY, -0.35), P([[-1.6, -7.8], [-1.6, -10], [0.4, -10], [0.4, -7.2]])],
+      ['#ff9a3c', P([[-5.4, 4], [-5.4, 0.2], [-2.6, -1.8], [0.2, 0.2], [0.2, 4]])],
+      ['#ffd23f', P([[-4, 4], [-4, 1.2], [-2.6, 0.2], [-1.2, 1.2], [-1.2, 4]])],
+      ...NEST(3.6, 6.2),
+    ];
+    // A red-roofed warehouse on the quay, crates of the goods, a sail on the sea.
+    case 'port': return [
+      ['#f3ece0', P([[-9.6, 4], [-9.6, -2.8], [-1.4, -2.8], [-1.4, 4]])],
+      ['#3a302b', P([[-6.6, 4], [-6.6, -0.2], [-4.4, -0.2], [-4.4, 4]])],
+      [shade(TRADE_RED, 0.2), P([[-10, -2.4], [-7.4, -8], [-4, -8], [-5.6, -2.4]])],
+      [shade(TRADE_RED, -0.2), P([[-5.6, -2.4], [-4, -8], [-1, -2.4]])],
+      ['#a0673a', P([[-10, 4], [10, 4], [10, 5.4], [-10, 5.4]])],
+      ...CRATES([[-0.2, 1.2], [3.4, 1.2], [1.6, -2.2]], 1.8),
+      ['#7f4b23', P([[6.6, 4], [6.6, -9], [7.3, -9], [7.3, 4]])],
+      ['#f3ece0', P([[7.3, -9], [7.3, 2.4], [10, 2.4]])],
+      ['#c9bfae', P([[6.6, -8], [6.6, 2.4], [3.8, 2.4]])],
+      [TRADE_RED, P([[7.3, -3.6], [7.3, -1.8], [9, -1.8], [8.4, -3.6]])],
+      ...WAVES,
+    ];
+    // A stall under a striped awning, crates of the goods on its counter, a stack of gold.
+    case 'market': return [
+      ...[-8.2, 6.8].map((x): Facet => ['#7f4b23', P([[x, 9.5], [x, -3], [x + 1.4, -3], [x + 1.4, 9.5]])]),
+      ...Array.from({ length: 5 }, (_, i): Facet[] => {
+        const x = -9.5 + i * 3.8, c = i % 2 ? '#f3ece0' : TRADE_RED;
+        return [[shade(c, 0.15), P([[x, -2.6], [x + 1.2, -8.6], [x + 5, -8.6], [x + 3.8, -2.6]])], [shade(c, -0.2), P([[x, -2.6], [x + 3.8, -2.6], [x + 1.9, -0.6]])]];
+      }).flat(),
+      ['#7f4b23', P([[-7, 5], [5.6, 5], [5.6, 9.5], [-7, 9.5]])],
+      ['#a0673a', P([[-7.6, 3.8], [6.2, 3.8], [6.2, 5], [-7.6, 5]])],
+      ...CRATES([[-4.6, 0.6], [-1, 0.6], [2.6, 0.6]], 1.7),
+      ...[8.6, 7.2, 5.8, 4.4].map((y, i): Facet => [i % 2 ? '#f2c040' : '#ffe08a', P([[6.2, y], [7.1, y - 0.9], [9.5, y - 0.9], [10, y], [9.1, y + 0.9], [6.7, y + 0.9]])]),
+    ];
+    // An obelisk on stepped stones, its point gold.
+    case 'monument': return [
+      [shade(MON, -0.15), P([[-7.5, 9.5], [-6.5, 7.4], [6.5, 7.4], [7.5, 9.5]])],
+      [MON, P([[-5, 7.4], [-4.2, 5.6], [4.2, 5.6], [5, 7.4]])],
+      [shade(MON, 0.35), P([[-2.6, 5.6], [-1.5, -5.6], [0, -5.6], [0, 5.6]])],
+      [shade(MON, -0.25), P([[0, 5.6], [0, -5.6], [1.5, -5.6], [2.6, 5.6]])],
+      ['#ffe08a', P([[-1.5, -5.6], [0, -9.8], [0, -5.6]])],
+      ['#d9a21e', P([[0, -9.8], [1.5, -5.6], [0, -5.6]])],
+    ];
+    // A trilithon carrying a gold sun, standing stones either side, a ley crystal between.
+    case 'standing_stones': return [
+      ...[-5, 2.6].map((x): Facet[] => [[shade(MON, 0.3), P([[x, 9.5], [x + 0.2, -3.6], [x + 1.2, -3.6], [x + 1.2, 9.5]])], [shade(MON, -0.2), P([[x + 1.2, 9.5], [x + 1.2, -3.6], [x + 2.2, -3.6], [x + 2.4, 9.5]])]]).flat(),
+      [shade(MON, 0.15), P([[-6, -3.6], [-5.6, -6.6], [5.6, -6.6], [6, -3.6]])],
+      [shade(MON, 0.5), P([[-6.4, -6.6], [-5.6, -7.6], [5.6, -7.6], [6.4, -6.6]])],
+      ...moved([...bevel(8, 2.2, 1.2, 22.5, '#ffe9a3', '#f2c040', '#b98813'), ['#f5c542', P(Array.from({ length: 8 }, (_, i) => polar(1.2, 22.5 + 45 * i)))]], 0, -1.2),
+      ...[[-9.6, 4.6], [7.2, 3.8]].map(([x, h]): Facet[] => [[shade(MON, 0.2), P([[x, 9.5], [x + 0.4, h], [x + 1.4, h - 1], [x + 1.4, 9.5]])], [shade(MON, -0.3), P([[x + 1.4, 9.5], [x + 1.4, h - 1], [x + 2.4, h], [x + 2.6, 9.5]])]]).flat(),
+      ...spire(0, 9, 6, 1.6),
+    ];
+    // A pale tower on a rock over the sea, its gold lantern lit.
+    case 'lighthouse': return [
+      ['#fff1b0', P([[1.6, -6.4], [10, -9.4], [10, -3.4]])],
+      ['#fff1b0', P([[-1.6, -6.4], [-10, -9.4], [-10, -3.4]])],
+      [shade(MON, 0.35), P([[-3.6, 6], [-2.2, -3.6], [0, -3.6], [0, 6]])],
+      [shade(MON, -0.2), P([[0, 6], [0, -3.6], [2.2, -3.6], [3.6, 6]])],
+      ...[3.4, 0].map((y): Facet => [shade(MON, -0.45), P([[-3.3 + (3.4 - y) * 0.12, y], [3.3 - (3.4 - y) * 0.12, y], [3.2 - (3.4 - y) * 0.12, y - 1.2], [-3.2 + (3.4 - y) * 0.12, y - 1.2]])]),
+      [shade(MON, -0.4), P([[-3, -3.6], [3, -3.6], [3, -4.6], [-3, -4.6]])],
+      ['#ffd23f', P([[-1.8, -4.6], [1.8, -4.6], [1.8, -7.6], [-1.8, -7.6]])],
+      ['#ffe08a', P([[-1.8, -4.6], [0, -4.6], [0, -7.6], [-1.8, -7.6]])],
+      [shade(MON, -0.35), P([[-2.8, -7.6], [0, -10], [2.8, -7.6]])],
+      ['#a1958a', P([[-7, 8], [-4.6, 4.4], [0, 4], [4.6, 4.4], [7, 8]])],
+      ...WAVES,
+    ];
+    // A columned hall: a pediment over four columns, banners hung between them, a gold finial.
+    case 'guildhall': return [
+      [shade(MON, -0.2), P([[-9.6, 9.5], [-9, 7.6], [9, 7.6], [9.6, 9.5]])],
+      [shade(MON, 0.1), P([[-8.4, 7.6], [-8.4, -1.4], [8.4, -1.4], [8.4, 7.6]])],
+      ['#3a302b', P([[-1.2, 7.6], [-1.2, 2.8], [1.2, 2.8], [1.2, 7.6]])],
+      ...[-7.6, -4, 2.8, 6.4].map((x): Facet[] => [[shade(MON, 0.55), P([[x, 7.6], [x, -1.4], [x + 0.6, -1.4], [x + 0.6, 7.6]])], [shade(MON, 0.15), P([[x + 0.6, 7.6], [x + 0.6, -1.4], [x + 1.2, -1.4], [x + 1.2, 7.6]])]]).flat(),
+      ...([[-6.2, '#b88bff'], [-2.4, TRADE_RED], [4.6, '#f5c542']] as [number, string][]).map(([x, c]): Facet => [c, P([[x - 0.3, -0.6], [x + 1.5, -0.6], [x + 1.5, 3.8], [x + 0.6, 2.8], [x - 0.3, 3.8]])]),
+      [shade(MON, -0.1), P([[-9.4, -1.4], [9.4, -1.4], [9.4, -2.8], [-9.4, -2.8]])],
+      [shade(MON, 0.4), P([[-9.4, -2.8], [0, -7.6], [0, -2.8]])],
+      [shade(MON, -0.15), P([[0, -7.6], [9.4, -2.8], [0, -2.8]])],
+      ['#ffe08a', P([[-0.9, -7.4], [0, -10], [0, -7.4]])],
+      ['#d9a21e', P([[0, -10], [0.9, -7.4], [0, -7.4]])],
+    ];
+    // A tower floor: the tower with a new floor lifted above it, about to go on.
+    // A tower floor: the tower opened up, a new floor (banded in the owner's colour) lifted in under its roof.
+    case 'tower_floor': return [
+      ['#f6f0e2', P([[-4.6, 9.5], [-4.3, 3.6], [0, 3.6], [0, 9.5]])],
+      ['#cfc6b0', P([[0, 9.5], [0, 3.6], [4.3, 3.6], [4.6, 9.5]])],
+      ['#3a302b', P([[-1.5, 9.5], [-1.5, 6.9], [0, 5.9], [1.5, 6.9], [1.5, 9.5]])],
+      ['#f6f0e2', P([[-4.3, 2.2], [-4.3, -3.6], [0, -3.6], [0, 2.2]])],
+      ['#cfc6b0', P([[0, 2.2], [0, -3.6], [4.3, -3.6], [4.3, 2.2]])],
+      [shade(pc, 0.15), P([[-4.3, -0.2], [-4.3, -1.8], [0, -1.8], [0, -0.2]])],
+      [shade(pc, -0.25), P([[0, -0.2], [0, -1.8], [4.3, -1.8], [4.3, -0.2]])],
+      ['#3a302b', P([[-0.65, 1.6], [0.65, 1.6], [0.65, 0.4], [-0.65, 0.4]])],
+      [shade(pc, 0.2), P([[-6.2, -5], [0, -10], [0, -5]])],
+      [shade(pc, -0.3), P([[0, -5], [0, -10], [6.2, -5]])],
+      ['#ffe08a', P([[-9.6, 0.6], [-7.4, -2.6], [-5.2, 0.6]])],
+      ['#ffe08a', P([[5.2, 0.6], [7.4, -2.6], [9.6, 0.6]])],
+    ];
+  }
   return null;
 }
 
@@ -575,3 +714,41 @@ export function buildingShapes(type: string, pc?: string): string {
 
 // The Tallest Tower title is the tower itself, as the board shows it.
 ICONS.tower = buildingFacets('tower')!;
+
+// ---- upgrades: what each puts beside its building on the TV board ----
+// A workshop's cog.
+ICONS.workshop = [
+  ...Array.from({ length: 8 }, (_, i): Facet => {
+    const a = i * 45, lit = Math.cos(((a - 225) * Math.PI) / 180);
+    return [lit > 0.4 ? '#eef1f5' : lit < -0.4 ? '#7d848e' : '#b4bac3', P([polar(9.6, a - 9), polar(9.6, a + 9), polar(6.6, a + 13), polar(6.6, a - 13)])];
+  }),
+  ...bevel(16, 7.2, 3.2, 0, '#eef1f5', '#c9ced6', '#8d949e'),
+  ['#3a302b', P(Array.from({ length: 8 }, (_, i) => polar(3.2, 22.5 + i * 45)))],
+];
+// Gilding's crown, a red stone set in its band.
+ICONS.gilding = [
+  ['#ffe9a3', P([[-8.6, 4], [-8.6, -6.6], [-4.6, -1.6], [0, -9], [0, 4]])],
+  ['#e0a820', P([[0, -9], [4.6, -1.6], [8.6, -6.6], [8.6, 4], [0, 4]])],
+  ['#c79314', P([[-8.6, 4], [8.6, 4], [8.6, 7.6], [-8.6, 7.6]])],
+  ['#f5c542', P([[-8.6, 4], [0, 4], [0, 7.6], [-8.6, 7.6]])],
+  ['#e5484d', P([[0, 3.6], [1.8, 5.8], [0, 8], [-1.8, 5.8]])],
+  ['#3e7bfa', P([[-5.4, 4.6], [-4.2, 5.8], [-5.4, 7], [-6.6, 5.8]])],
+  ['#30a46c', P([[5.4, 4.6], [6.6, 5.8], [5.4, 7], [4.2, 5.8]])],
+  ['#fffbe6', P([[-8.6, -6.6], [-7.6, -7.8], [-9.6, -7.8]])],
+  ['#fffbe6', P([[0, -9], [1, -10], [-1, -10]])],
+  ['#fffbe6', P([[8.6, -6.6], [9.6, -7.8], [7.6, -7.8]])],
+];
+// Nesting grounds' nest, with eggs in it.
+ICONS.nesting_grounds = moved(NEST(0, 2.4), 0, 0, 1.55);
+// A trade charter: a scroll between its rolled ends, a red wax seal.
+ICONS.trade_charter = [
+  ['#f3ead7', P([[-7, -6.4], [7, -6.4], [7, 6.4], [-7, 6.4]])],
+  ['#ddd0b2', P([[-7, -6.4], [-7, 6.4], [-5.6, 6.4], [-5.6, -6.4]])],
+  ['#e3d6b8', P([[-9, -8.6], [9, -8.6], [9, -6], [-9, -6]])],
+  ['#b9a982', P([[-9, -6], [9, -6], [9, -5.2], [-9, -5.2]])],
+  ['#e3d6b8', P([[-9, 6], [9, 6], [9, 8.6], [-9, 8.6]])],
+  ['#b9a982', P([[-9, 8.6], [9, 8.6], [9, 9.4], [-9, 9.4]])],
+  ...[-3, -0.6, 1.8].map((y): Facet => ['#8a7a66', P([[-4.4, y], [4.6, y], [4.6, y + 1], [-4.4, y + 1]])]),
+  ['#e5484d', P(Array.from({ length: 8 }, (_, i) => { const [x, y] = polar(2.6, 22.5 + i * 45); return [x + 4.2, y + 3.4] as [number, number]; }))],
+  ['#a33236', P(Array.from({ length: 8 }, (_, i) => { const [x, y] = polar(1.3, 22.5 + i * 45); return [x + 4.2, y + 3.4] as [number, number]; }))],
+];
