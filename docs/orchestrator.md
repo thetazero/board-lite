@@ -8,7 +8,13 @@ Standing instructions from the project owner to board-lite's orchestrator (the C
 - Nothing will be one-shot: "this will not be one shot, it will take lots and lots of work. I fully expect almost every first attempt to go wrong and require reworking, and basic things like 'are the graphics coherent and consistent' to be hard to accomplish."
 - Playtest: "you (the orchestrator) should do claude playtests via subagents to get a sense for the game, and improve it over many iterations." Running playtests without asking first is expected: "you literally have to otherwise you will accomplish nothing."
 - Depth test: "does haiku regularly lose to opus? If not, the game has no depth." Run mixed Haiku/Opus games, each player a subagent seeing only its own player view, over a batch of games, and track win rates.
+- Playtests are social: "this is a social game the agents should communicate when appropriate that is super duper intentional". Player agents talk to each other (negotiate, trade, scheme, bluff) during playtests; a playtest without table talk doesn't test the game.
+- Playtest agents run sandboxed: "there should be a pr that configures sub agents with appropriate permissions (just the game cli, + some safe way to communicate) so that they can scheme without causing any issues to my machine".
 - Look at the TV and phone clients in the browser, play them, take screenshots, and judge them as a player would. File what's wrong with screenshots attached.
+
+## Self-check
+
+"every 5 turns pls ask yourself if you are actually following these rules". A UserPromptSubmit hook (`.claude/settings.local.json`, gitignored, counter in `~/.cache/board-lite/orchestrator-turns`) injects the reminder every 5th prompt; when it fires, re-read this file and answer honestly.
 
 ## The most important rule: fix systems, don't patch symptoms
 
