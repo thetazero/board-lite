@@ -25,7 +25,7 @@ Standing instructions from the project owner to board-lite's orchestrator (the C
 
 ## Design calls
 
-- "you should just make provisional calls as needed, but definitely record any major design calls in a doc, with reasoning." That doc is `docs/decisions.md`.
+- "you should just make provisional calls as needed, but definitely record any major design calls in a doc, with reasoning." Later (2026-11-03) the owner moved that reasoning out of a doc: "git/pr descriptions are the right home for this, I don't want a decision log stored in a large always increaisng file." No decision log: reasoning goes in commits and PR descriptions (#14 removes `docs/decisions.md`).
 - `docs/design.md` records the owner's decisions in their words; open questions stay marked open.
 
 ## Workstreams and order
