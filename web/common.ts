@@ -52,18 +52,29 @@ export function esc(s: string): string {
 // The engine's log is written for the CLI: players are P1, P2..., dragons and
 // cards have ids. The clients show names instead and drop the ids.
 export function named(text: string, names: string[], dragons: DragonView[] = []): string {
-  return iconText(esc(text))
+  let html = iconText(esc(text));
+  // "Fire Whelp (d7)" -> that dragon's own label, "Fire Whelp II" when its owner has two.
+  for (const d of dragons) html = html.split(`${esc(d.name)} (${d.id})`).join(esc(dragonLabel(d, dragons)));
+  return html
     .replace(/ \((?:c|o|d)\d+\)/g, '')
     .replace(/\boffer o\d+/g, 'the offer')
     .replace(/^Offer o\d+ expires\./, 'An open offer expires.')
     .replace(/\bd(\d+)\b/g, (m) => {
       const d = dragons.find((x) => x.id === m);
-      return d ? `<b style="color:${PLAYER_COLORS[d.owner]}">${esc(d.name)}</b>` : m;
+      return d ? `<b style="color:${PLAYER_COLORS[d.owner]}">${esc(dragonLabel(d, dragons))}</b>` : m;
     })
     .replace(/\bP(\d)\b/g, (m, n) => {
       const i = Number(n) - 1;
       return names[i] ? `<b style="color:${PLAYER_COLORS[i]}">${esc(names[i])}</b>` : m;
     });
+}
+
+// A dragon's name, numbered when its owner has more than one of the same kind
+// ("Fire Whelp", "Fire Whelp II"), oldest first, so the table can tell them apart.
+export function dragonLabel(d: DragonView, all: DragonView[]): string {
+  const same = all.filter((x) => x.owner === d.owner && x.name === d.name).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+  const k = same.findIndex((x) => x.id === d.id);
+  return k > 0 ? `${d.name} ${['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][k] ?? k + 1}` : d.name;
 }
 
 export function playerTag(i: number, names: string[]): string {
@@ -153,12 +164,12 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     return d ? dragonBadge(stage === undefined ? d : { ...d, stage }, size) : '';
   };
   const owner = (id: string) => g.dragons.find((x) => x.id === id)?.owner ?? 0;
-  const dname = (id: string) => esc(g.dragons.find((x) => x.id === id)?.name ?? '');
+  const dname = (id: string) => { const d = g.dragons.find((x) => x.id === id); return d ? esc(dragonLabel(d, g.dragons)) : ''; };
   const res = (b: Res) => resChips(b, 1.2);
   switch (ev.k) {
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
-    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} <em class="st-${ev.why}">${ev.why}</em>`;
+    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">healing</em>' : `<em class="st-${ev.why}">${ev.why}</em>`}`;
     case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, false, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
     case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, true, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
@@ -199,13 +210,14 @@ export function dragonBadge(d: DragonView, size = 30): string {
     <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g>${mark}</svg>`;
 }
 
-// A dragon with its stage, growth, health and why it is staying home, if it is.
-export function dragonChip(d: DragonView, compact = false): string {
-  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
-  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
-  const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
+// A dragon with its stage, growth, health and why it is staying home, if it
+// is. One sitting out the round has already healed, so it shows why it rests
+// instead of a (full) health bar. `all` numbers same-named dragons.
+export function dragonChip(d: DragonView, all: DragonView[] = []): string {
+  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>' : d.resting === 'hurt' ? '<em class="st-healing">healing</em>' : d.stage ? hpBar(d.hp, d.maxHp) : '';
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
+  const name = dragonLabel(d, all);
+  return `<div class="dchip" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${state}</div></div>`;
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
