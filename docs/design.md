@@ -119,7 +119,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
 - Loot is split evenly (among those who play; see Combat for fled dragons).
 - Targets have units with stats and with elemental strengths and weaknesses.
-- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost. *(Provisionally removed: the secret bail is the only way out of a raid. See `docs/decisions.md`, 2026-11-02, raids.)*
+- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost. *(Provisionally removed: the secret bail is the only way out of a raid. Reasoning in the pull request for issue #5.)*
 
 ### Combat
 
@@ -185,7 +185,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a points and a dragon building.
 - Special projects cost double the card: the four production buildings, a roost, or a base egg of any element.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing is half a dragon's full health per round; any damage keeps a dragon out of raids, so a knocked-out dragon misses exactly the next round's raid. Dragons never die: at 0 health they are knocked out and heal at home.
+- Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round: no growth, no raid. Any hit in a raid costs a round, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Loot is rounded down per player; the remainder is lost.
