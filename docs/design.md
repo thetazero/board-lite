@@ -103,7 +103,7 @@ Living design doc. Decisions here were made in conversation with the project own
 - The game is played in large global rounds. Each global round has, in order:
   1. Production phase
   2. Card picking phase
-  3. Action phase: playing action cards, trading, and building all happen here
+  3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
 ## Open questions
