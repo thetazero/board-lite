@@ -252,7 +252,7 @@ export function powerTag(n: number, cls = ''): string {
 // Why a dragon sits out, or its health. A healing one shows the rounds until it can raid.
 export function dragonState(d: DragonView, round: number): string {
   if (d.resting === 'hungry') return '<em class="st-hungry">Hungry</em>';
-  if (d.resting === 'hunted') return `<em class="st-hunted">Fought fauna</em>${hpBar(d.hp, d.maxHp)}`;
+  if (d.resting === 'hunted') return `<em class="st-hunted">Fought</em>${hpBar(d.hp, d.maxHp)}`;
   if (d.backIn !== null && !d.canRaid) { const n = d.backIn - round; return `<em class="st-healing" title="Raid-ready again in ${n} round${n === 1 ? '' : 's'}">Healing ${n}</em>`; }
   return d.stage ? hpBar(d.hp, d.maxHp) : '';
 }
