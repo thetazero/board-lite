@@ -329,3 +329,27 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
   }
   return `<svg class="map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">${cells.join('')}</svg>`;
 }
+
+// ---------- the final standings ----------
+
+const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+
+// The final order as a list: place, name, points, and a mark on everyone level
+// on points with someone. Points that were secret (cards in hand) show as such.
+export function standingsHtml(g: PublicState, names: string[], me = -1): string {
+  const rows = g.standings!.map((s) => {
+    const secret = s.total - g.players[s.p].publicPoints;
+    return `<li class="${s.place === 1 ? 'won' : ''}${s.p === me ? ' you' : ''}">
+      <span class="place">${ORDINAL[s.place - 1]}</span>
+      <span class="who">${playerTag(s.p, names)}${s.tied ? ' <span class="tie">tie</span>' : ''}</span>
+      ${secret > 0 ? `<small class="hiddenpts" title="secret points">${icon('cards', 1.1)}+${secret}</small>` : '<span></span>'}
+      <b class="total">${s.total}${icon('points', 1.25)}</b></li>`;
+  }).join('');
+  return `<ol class="standings">${rows}</ol>`;
+}
+
+// How the winner won a tie, if they did.
+export function tiebreakNote(g: PublicState): string {
+  const w = g.standings![0];
+  return w.tiebreak === 'gold' ? `Won the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Won the tie by going first this round' : '';
+}

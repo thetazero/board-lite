@@ -568,9 +568,7 @@ function maybeEndRound(g: Game) {
   const totals = g.players.map((_, p) => score(g, p).total);
   const best = Math.max(...totals);
   if (best >= TUNING.pointsToWin) {
-    // Ties: most gold, then earliest in this round's turn order.
-    const contenders = turnOrder(g).filter((p) => totals[p] === best);
-    const winner = contenders.reduce((a, b) => (g.players[b].resources.gold > g.players[a].resources.gold ? b : a));
+    const winner = standings(g)[0].p;
     g.winner = winner;
     g.phase = 'over';
     log(g, `Final scores: ${totals.map((t, p) => `${pname(p)} ${t}`).join(', ')}.`, { k: 'final', totals, winner });
@@ -578,6 +576,31 @@ function maybeEndRound(g: Game) {
     return;
   }
   startRound(g);
+}
+
+// The final order: most points first. Ties for the win go to the most gold,
+// then to whoever is earliest in this round's turn order; that decides the
+// winner, who is always first. Other ties share their place.
+export interface Standing {
+  p: number;
+  total: number;
+  place: number; // 1 for the winner; players level on points share a place
+  tied: boolean; // level on points with someone else
+  tiebreak: 'gold' | 'turn order' | null; // the winner's, when they won a tie
+}
+
+export function standings(g: Game): Standing[] {
+  const totals = g.players.map((_, p) => score(g, p).total);
+  const order = turnOrder(g);
+  const sorted = [...order].sort((a, b) => totals[b] - totals[a] || g.players[b].resources.gold - g.players[a].resources.gold || order.indexOf(a) - order.indexOf(b));
+  const out: Standing[] = sorted.map((p) => ({ p, total: totals[p], place: 0, tied: totals.filter((t) => t === totals[p]).length > 1, tiebreak: null }));
+  // First place is never shared: the winner took the tie.
+  for (const [i, s] of out.entries()) s.place = i > 1 && s.total === out[i - 1].total ? out[i - 1].place : i + 1;
+  if (out.length > 1 && out[0].total === out[1].total) {
+    const gold = (s: Standing) => g.players[s.p].resources.gold;
+    out[0].tiebreak = gold(out[0]) > gold(out[1]) ? 'gold' : 'turn order';
+  }
+  return out;
 }
 
 // ---------- raid ----------

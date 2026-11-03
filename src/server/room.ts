@@ -113,8 +113,10 @@ export class Room {
   }
 
   addBot(): Seat {
-    const names = ['Bot Ada', 'Bot Bram', 'Bot Cora', 'Bot Dax', 'Bot Eve', 'Bot Finn'];
-    return this.join(names.find((n) => !this.seats.some((s) => s.name === n)) ?? `Bot ${this.seats.length + 1}`, 'bot');
+    // Clockwork names, so a bot never shares a name with a person at the table.
+    const names = ['Tick', 'Gizmo', 'Widget', 'Pinion', 'Cog', 'Ratchet', 'Bolt'];
+    const taken = (n: string) => this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === n.toLowerCase());
+    return this.join(names.find((n) => !taken(n)) ?? `Cog ${this.seats.length + 1}`, 'bot');
   }
 
   // Before the game starts a player (or bot) can be removed from the lobby.

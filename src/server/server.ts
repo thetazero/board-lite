@@ -99,6 +99,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     if (parts.length === 1 && req.method === 'POST') {
       const room = new Room(Room.newCode((c) => rooms.has(c), opts.dir), opts);
       rooms.set(room.code, room);
+      server.emit('room', room); // for whoever runs the server: how to seat terminal and Claude players
       return json(res, 200, { code: room.code, hostToken: room.hostToken });
     }
     const room = getRoom(parts[1] ?? '');
@@ -237,5 +238,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const h of hosts) console.log(`  Phones: http://${h}:${port}/`);
     for (const h of tail) console.log(`  Phones over Tailscale: http://${h}:${port}/`);
     if (!hosts.length && !tail.length) console.log('  No network address found: phones need to be on the same network as this machine.');
+  });
+  // The TV shows only what the people in the room need; the ways to seat other
+  // players go to this terminal, once per room.
+  server.on('room', (room: Room) => {
+    const url = `http://localhost:${port}/${room.code}`;
+    console.log(`Room ${room.code} is open.`);
+    console.log(`  At a terminal:  node src/cli.ts join ${url} <name>`);
+    console.log(`  Claude players: node src/playtest/run.ts --room ${url} --models opus,haiku`);
   });
 }

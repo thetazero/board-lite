@@ -14,7 +14,7 @@ npm run serve -- --flee-seconds 60
 
 1. **TV:** open `http://localhost:8080/tv` on the laptop (or the TV it's plugged into). It shows the room code and the addresses phones can use: the local network one, and the Tailscale one if this machine is on a tailnet.
 2. **Your phone:** open the address the TV shows and join with your name. Over Tailscale, use the `100.x.y.z` address; the phone must be signed in to the same tailnet. That works from anywhere, not only on the same Wi-Fi. If the laptop runs a firewall, let the tailnet in (with ufw: `sudo ufw allow in on tailscale0`).
-3. **Claude players:** in the repo on the laptop, with the room code the TV shows:
+3. **Claude players:** in the repo on the laptop, with the room code the TV shows (the server's terminal prints this command with the room filled in when the TV opens the room):
 
    ```
    node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
