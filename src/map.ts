@@ -1,7 +1,7 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
 import { TERRAIN_WEIGHTS, TERRAINS, type Terrain } from './data.ts';
-import { type Rng, next, shuffle } from './rng.ts';
+import { type Rng, next } from './rng.ts';
 
 export interface Hex {
   q: number;
@@ -53,13 +53,8 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
       hexes[key(q, r)] = { q, r, terrain: randomTerrain(rng) };
     }
   }
-  // Fair starts: every tower sits on plains with one of each terrain around it.
-  for (const spot of towerSpots(players)) {
-    hexes[spot].terrain = 'plains';
-    const ring = shuffle(rng, ['mountain', 'forest', 'ley', 'meadow', 'plains', 'plains'] as Terrain[]);
-    neighbors(spot).forEach((n, i) => {
-      if (hexes[n]) hexes[n].terrain = ring[i];
-    });
-  }
+  // Towers sit on plains; the land around them is as random as the rest, so
+  // players start with different terrain and different things to sell.
+  for (const spot of towerSpots(players)) hexes[spot].terrain = 'plains';
   return hexes;
 }

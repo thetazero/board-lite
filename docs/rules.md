@@ -4,11 +4,11 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your resources and your hand. **Public** (the TV): the map, buildings, dragons, titles, hand sizes, trade offers.
 
-**Setup.** Each player has a tower (fixed spot by player count; the six hexes around it always hold one of each terrain), 2 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
+**Setup.** Each player has a tower (fixed spot by player count; the land around it is random, like the rest of the map), 2 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
 
 ## A round: four phases
 
-1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each production building gives its base amount plus its own die (e.g. a quarry: 1 + d3 stone). Then hurt dragons heal 8 health, and every dragon eats 1 livestock: a fed dragon grows one step (plus one per hatchery you own); a hungry one doesn't grow and can't raid this round. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
+1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each production building rolls its own die (a quarry: d6 stone; a Workshop adds 1). Then hurt dragons heal 8 health, and every dragon eats 1 livestock: a fed dragon grows one step (plus one per hatchery you own); a hungry one doesn't grow and can't raid this round. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
 2. **Cards** (all at once). Draw 2 building cards and 1 action card. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
    - **Build** a building card on an empty hex touching one of your buildings (production buildings need their terrain; tower floors stack on your tower). One building per hex.

@@ -100,9 +100,10 @@ test('buildings must touch your territory and match terrain', () => {
   assert.throws(() => apply(g, 0, `project quarry ${tower}`), RuleError); // occupied
   const far = Object.keys(g.map).find((k) => g.map[k].terrain === 'mountain' && !neighbors(k).some((n) => g.buildings[n]))!;
   assert.throws(() => apply(g, 0, `project quarry ${far}`), RuleError); // not touching
-  const wrong = neighbors(tower).find((k) => g.map[k]?.terrain === 'forest')!;
+  const [wrong, right] = neighbors(tower).filter((k) => g.map[k]); // the land around a tower is random, so set it
+  g.map[wrong].terrain = 'forest';
+  g.map[right].terrain = 'mountain';
   assert.throws(() => apply(g, 0, `project quarry ${wrong}`), RuleError); // wrong terrain
-  const right = neighbors(tower).find((k) => g.map[k]?.terrain === 'mountain')!; // fair starts have one
   apply(g, 0, `project quarry ${right}`);
   assert.equal(g.buildings[right].type, 'quarry');
   // Special projects cost double the card.
