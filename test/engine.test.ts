@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -122,6 +122,8 @@ test('waitingOn always names someone until the game ends', () => {
 });
 
 test('separate CLI processes can share one game', () => {
+  // On disk, not /tmp (which is RAM on the dev machine).
+  mkdirSync(join(homedir(), '.cache'), { recursive: true });
   const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
   try {
     const file = join(dir, 'g.json');
