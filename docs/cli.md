@@ -35,14 +35,17 @@ Repeat: `status` to see whose decision it is, `view` that seat, `do` its decisio
 
 ## Decision commands
 
+Cards phase, at the start of each round (everyone at once): `keep c12` keeps one of the two building cards you drew; the other is discarded.
+
 Action phase, on your turn:
 
 | Command | Does |
 |---|---|
 | `build c12 2,-1` | build the building card c12 on hex 2,-1 (tower floors take no hex: `build c12`) |
+| `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost` |
 | `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
 | `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
-| `project quarry 2,-1` / `project fire` | special project: a basic building or a base dragon egg, no card, double cost |
+| `project fire` | special project: a base dragon egg of that element, no card, double cost |
 | `bank stone gold 2` | pay 2× your bank rate in stone for 2 gold |
 | `offer P2 give 2 stone c12 get 1 gold` | propose a trade; items are `<n> <resource>` and card ids |
 | `cancel o40` | withdraw your offer |

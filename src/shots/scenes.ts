@@ -81,7 +81,7 @@ const best = (g: Game) => Math.max(...g.players.map((_, p) => score(g, p).total)
 const dragonsOf = (g: Game, p: number) => g.dragons.filter((d) => d.owner === p);
 const buildingsOf = (g: Game, p: number) => Object.values(g.buildings).filter((b) => b.owner === p).length;
 // The acting player can play a building card on a hex right now.
-const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
+const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.kind === 'building' && c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
 const committed = (g: Game) => g.raid!.commits.filter((c) => c.length).length;
 const fightingPlayers = (g: Game) => new Set(g.raid!.fighters.map((id) => g.dragons.find((d) => d.id === id)!.owner)).size;
 
@@ -130,9 +130,19 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv' },
-      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)'] },
-      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card[data-card]:not(.dim)', '[data-pickhex]'] },
-      { file: 'phone-build-bank-3p', caption: 'Phone: special projects and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
+      { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'] },
+      { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'] },
+      { file: 'phone-build-bank-3p', caption: 'Phone: basic buildings, the egg project and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
+    ],
+  },
+  {
+    name: 'keep-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'cards' && waitingOn(g).length === 2,
+    shots: (g) => [
+      { file: 'tv-keep-3p', caption: 'TV: everyone keeping one of two building cards', client: 'tv' },
+      { file: 'phone-keep-3p', caption: 'Phone: keep one of the two building cards drawn', client: 'phone', seat: waitingOn(g!)[0] },
     ],
   },
   {
@@ -178,7 +188,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
-      const keys = [...Object.keys(BUILDINGS), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
+      const keys = [...Object.keys(BUILDINGS).filter((k) => !BUILDINGS[k].basic), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
       g.players[g.turn].hand = keys.map((key, i) => ({ id: `c${900 + i}`, deck: DRAGONS[key] || ACTIONS[key] ? 'action' : 'building', key }));
     },
     shots: (g) => [

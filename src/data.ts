@@ -17,7 +17,8 @@ export type Terrain = (typeof TERRAINS)[number];
 export const TUNING = {
   pointsToWin: 15,
   handCap: 7,
-  buildingCardsPerRound: 2,
+  // Each round a player draws this many building cards and keeps one.
+  buildingCardsDrawn: 2,
   actionCardsPerRound: 1,
   startingResources: { stone: 3, timber: 3, crystal: 3, livestock: 3 } as Bundle,
   // The tower produces this every round, no dice.
@@ -27,62 +28,104 @@ export const TUNING = {
   dragonPointsByStage: [0, 1, 2, 4], // egg, hatchling, young, adult
   titlePoints: 2,
   // A title needs at least this much: dragon points, tower floors, buildings (tower included).
-  titleMinimum: { army: 8, tower: 3, territory: 7 },
+  titleMinimum: { army: 8, tower: 3, territory: 9 },
   raidCandidates: 3,
   towerDragonCapacity: 1,
-  // Special projects cost this many times the equivalent card's cost.
+  // The base-egg special project costs this many times the base dragon card.
   specialProjectMultiplier: 2,
 };
 
-export type BuildingClass = 'production' | 'dragon' | 'points' | 'trade';
+// A building's class is what upgrades and other buildings' effects refer to.
+// The four resource classes each hold a basic building and the special
+// buildings that make the same resource.
+export const CLASSES = ['quarry', 'lumber', 'mine', 'pasture', 'dragon', 'monument', 'trade'] as const;
+export type BuildingClass = (typeof CLASSES)[number];
+// How card text names one building of a class.
+export const CLASS_NAMES: Record<BuildingClass, string> = {
+  quarry: 'quarry', lumber: 'lumber camp', mine: 'mine', pasture: 'pasture', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
+};
+// The tower is a monument (it holds floors) and a dragon building (it houses one).
+export const TOWER_CLASSES: BuildingClass[] = ['monument', 'dragon'];
+
+// What a building's effect counts among its six neighbouring hexes: buildings
+// of a class (whoever owns them), or hexes of a terrain (built on or not).
+export type Counted = BuildingClass | Terrain;
 
 export interface BuildingDef {
   name: string;
   class: BuildingClass;
   cost: Bundle;
   text: string;
-  terrain?: Terrain; // must go on this terrain (production buildings, the port)
-  produces?: { resource: Resource; base: number; die: number };
+  basic?: boolean; // anyone may build it without a card
+  copies?: number; // cards in the building deck (not basic buildings)
+  terrain?: Terrain; // must go on this terrain
+  onTower?: boolean; // stacks on your tower hex instead of taking a hex
+  // Effects. With `per`, each is multiplied by the number of neighbouring
+  // hexes that match it, counted fresh whenever it matters.
+  produces?: { resource: Resource; base: number; die: number }; // a die rolled each round
+  makes?: Bundle; // each round, no dice
   points?: number;
   dragonCapacity?: number;
   growthBonus?: number;
   bankRate?: number;
-  onTower?: boolean; // stacks on your tower hex instead of taking a hex
-  copies: number; // in the building deck
-  specialProject?: boolean; // can be built without a card, at a premium
+  per?: Counted;
 }
 
+const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = per as string): BuildingDef =>
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} a round for each neighbouring ${noun}.` });
+const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} a round for each neighbouring ${CLASS_NAMES[per]}.` });
+
 export const BUILDINGS: Record<string, BuildingDef> = {
-  quarry: { name: 'Quarry', class: 'production', cost: { timber: 3, livestock: 3, crystal: 2 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 6 }, text: 'Produces a d6 stone each round.', copies: 4, specialProject: true },
-  lumber_camp: { name: 'Lumber Camp', class: 'production', cost: { stone: 3, crystal: 3, livestock: 2 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 6 }, text: 'Produces a d6 timber each round.', copies: 4, specialProject: true },
-  crystal_mine: { name: 'Crystal Mine', class: 'production', cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Produces a d6 crystal each round.', copies: 4, specialProject: true },
-  pasture: { name: 'Pasture', class: 'production', cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.', copies: 4, specialProject: true },
-  roost: { name: 'Roost', class: 'dragon', cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.', copies: 4, specialProject: true },
-  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 3 },
+  // Basic buildings: no card needed.
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 3, livestock: 3, crystal: 2 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 6 }, text: 'Produces a d6 stone each round.' },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 3, crystal: 3, livestock: 2 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 6 }, text: 'Produces a d6 timber each round.' },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 3, timber: 3, livestock: 2 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 6 }, text: 'Produces a d6 crystal each round.' },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.' },
+  roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
+  // Building cards. Most count their neighbours.
+  cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 2, crystal: 2, livestock: 1 }, 2),
+  stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 2, crystal: 2, livestock: 1 }, 2),
+  woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 2, crystal: 2, livestock: 1 }, 2),
+  sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 2, crystal: 2, livestock: 1 }, 2),
+  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 3, crystal: 2, livestock: 2 }, 1, 'ocean hex'),
+  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 2, timber: 2, livestock: 1 }, 2, 'ley line'),
+  gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 2, timber: 2, livestock: 1 }, 2),
+  smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 2, stone: 1, livestock: 2 }, 1),
+  shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 2, timber: 2, crystal: 1 }, 2),
+  drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 2, crystal: 2, stone: 1 }, 2),
+  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 2, timber: 3, crystal: 2 }, 1, 'ocean hex'),
+  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
-  tower_floor: { name: 'Tower Floor', class: 'points', cost: { stone: 3, timber: 2, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
-  monument: { name: 'Monument', class: 'points', cost: { stone: 4, timber: 2, gold: 2 }, points: 2, text: 'Worth 2 points.', copies: 3 },
+  market: { name: 'Market', class: 'trade', cost: { stone: 2, timber: 2, crystal: 2, gold: 1 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold a round for each neighbouring trade building.', copies: 2 },
+  tower_floor: { name: 'Tower Floor', class: 'monument', cost: { stone: 3, timber: 2, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
+  monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 2 }, points: 1, per: 'monument', text: 'Worth 1 point for each neighbouring monument.', copies: 2 },
+  // Point cards count only what can't be bought without limit: terrain, or
+  // classes that hold no basic building (monuments, trade buildings).
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 2, crystal: 2, gold: 2 }, points: 1, per: 'ley', text: 'Worth 1 point for each neighbouring ley line.', copies: 2 },
+  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 4, timber: 2, gold: 2 }, points: 1, per: 'ocean', text: 'Worth 1 point for each neighbouring ocean hex.', copies: 2 },
+  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 2, timber: 2, gold: 2 }, points: 1, per: 'trade', text: 'Worth 1 point for each neighbouring trade building.', copies: 1 },
 };
+
+export const BASIC_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].basic);
 
 export interface UpgradeDef {
   name: string;
-  appliesTo: BuildingClass;
+  appliesTo: BuildingClass[];
   cost: Bundle;
   text: string;
-  baseBonus?: number; // production
+  baseBonus?: number; // more of what the building makes
   points?: number;
   dragonCapacity?: number;
-  goldPerRound?: number;
+  makes?: Bundle;
   copies: number;
 }
 
-// The tower itself counts as a 'points' class building (for Gilding) and
-// a 'dragon' class building (for Nesting Grounds).
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: 'production', cost: { gold: 1, timber: 2 }, baseBonus: 2, text: 'This production building produces 2 more.', copies: 4 },
-  gilding: { name: 'Gilding', appliesTo: 'points', cost: { gold: 3 }, points: 2, text: 'This tower or monument is worth 2 more points.', copies: 4 },
-  nesting_grounds: { name: 'Nesting Grounds', appliesTo: 'dragon', cost: { gold: 1, stone: 1 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 4 },
-  trade_charter: { name: 'Trade Charter', appliesTo: 'trade', cost: { gold: 2, crystal: 1 }, goldPerRound: 1, text: 'This port produces 1 gold each round.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 3, stone: 2 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
+  gilding: { name: 'Gilding', appliesTo: ['monument'], cost: { gold: 3 }, points: 2, text: 'This tower or monument is worth 2 more points.', copies: 3 },
+  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 2, timber: 1 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
+  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 2, crystal: 1 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point';

@@ -1,9 +1,9 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
-import { ACTIONS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  PROJECT_BUILDINGS, apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, specialProjectCost,
+  apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -41,10 +41,10 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
     if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
-    for (const b of shuffle(rng, PROJECT_BUILDINGS.slice())) {
+    for (const b of shuffle(rng, BASIC_BUILDINGS.slice())) {
       if (b === 'roost' && roomForDragon) continue;
       const hexes = buildableHexes(g, p, b);
-      if (hexes.length && canAfford(pl, specialProjectCost(BUILDINGS[b].cost))) out.push(`project ${b} ${pick(rng, hexes)}`);
+      if (hexes.length && canAfford(pl, BUILDINGS[b].cost)) out.push(`build ${b} ${pick(rng, hexes)}`);
     }
     const rate = bankRate(g, p);
     const rich = RESOURCES.filter((r) => pl.resources[r] >= rate + 2);
@@ -52,6 +52,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     out.push('end');
     return out;
   }
+  if (g.phase === 'cards') return pl.choice.length ? [`keep ${pick(rng, pl.choice).id}`] : [];
   if (g.phase === 'discard') {
     const over = pl.hand.length - TUNING.handCap;
     return [`discard ${shuffle(rng, pl.hand.map((c) => c.id)).slice(0, over).join(' ')}`];
