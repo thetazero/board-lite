@@ -105,11 +105,22 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
-    '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu',
+    '--force-color-profile=srgb', '--font-render-hinting=none',
+    '--use-angle=swiftshader', '--enable-unsafe-swiftshader', // WebGL for the TV's 3D board, on the CPU
+    '--disable-gpu-rasterization', // the rest of the page rasterized in software, the same every run
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  proc.on('exit', () => rmSync(profile, { recursive: true, force: true }));
+  // Chrome's helper processes can still be writing the profile for a moment after it exits.
+  const removeProfile = (tries: number) => {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch (e) {
+      if (tries > 0) setTimeout(() => removeProfile(tries - 1), 300);
+      else console.error(`Couldn't remove Chrome's profile ${profile}: ${(e as Error).message}`);
+    }
+  };
+  proc.on('exit', () => removeProfile(10));
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
@@ -128,10 +139,11 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
 
 // ---------- a browser tab ----------
 
-// Runs before every page's own scripts: a frozen clock, no animations, a fresh
-// phone (no remembered seat; a seat comes in the address).
+// Runs before every page's own scripts: a frozen clock (the 3D board's too),
+// no animations, a fresh phone (no remembered seat; a seat comes in the address).
 const PAGE_SETUP = `
   Date.now = () => ${FROZEN_NOW};
+  window.boardClock = 0;
   try { localStorage.clear(); } catch {}
   addEventListener('DOMContentLoaded', () => {
     const s = document.createElement('style');
@@ -379,19 +391,29 @@ async function main() {
             for (const sel of shot.clicks ?? []) await tab.click(sel);
             if (shot.waitFor) await tab.waitFor(`document.querySelector(${JSON.stringify(shot.waitFor)})`, shot.waitFor, 30000);
             if (shot.waitMs) await sleep(shot.waitMs);
-            if (!shot.loading) await tab.settle();
-            const pngs = await tab.pngs(device);
+            // A moving 3D board is shot frame by frame, at board clock times.
+            const frames: (string | null)[] = shot.frames ? shot.frames.map((f) => (shot.flight ? `window.boardFlightAt?.(${f})` : String(f))) : [null];
+            for (const [fi, clockAt] of frames.entries()) {
+              const name = clockAt === null ? file : `${file}-${fi + 1}`;
+              if (clockAt !== null) {
+                const ok = await tab.eval<boolean>(`(() => { const t = ${clockAt}; if (t == null) return false; window.boardClock = t; return true; })()`);
+                if (!ok) throw new Error('No dragon on the board can fly');
+              }
+              if (!shot.loading) await tab.settle();
+              const pngs = await tab.pngs(device);
+              let changed: boolean | null = null;
+              pngs.forEach((png, i) => {
+                writeFileSync(join(out, pngName(name, i)), png);
+                const before = join(prev, pngName(name, i));
+                const differs = existsSync(before) ? !readFileSync(before).equals(png) : existsSync(prev) ? true : null;
+                changed = changed || differs;
+              });
+              if (existsSync(join(prev, pngName(name, pngs.length)))) changed = true; // it used to be longer
+              const caption = clockAt === null ? shot.caption : `${shot.caption} (frame ${fi + 1} of ${frames.length})`;
+              done.push({ ...shot, file: name, caption, scene: st.scene.name, size, width: device.width, screens: pngs.length, ms: Date.now() - ts, changed });
+              console.log(`${changed ? '* ' : '  '}${name}.png${pngs.length > 1 ? ` (${pngs.length} screens)` : ''}  ${Date.now() - ts} ms`);
+            }
             if (shot.offline) await tab.offline(false);
-            let changed: boolean | null = null;
-            pngs.forEach((png, i) => {
-              writeFileSync(join(out, pngName(file, i)), png);
-              const before = join(prev, pngName(file, i));
-              const differs = existsSync(before) ? !readFileSync(before).equals(png) : existsSync(prev) ? true : null;
-              changed = changed || differs;
-            });
-            if (existsSync(join(prev, pngName(file, pngs.length)))) changed = true; // it used to be longer
-            done.push({ ...shot, file, scene: st.scene.name, size, width: device.width, screens: pngs.length, ms: Date.now() - ts, changed });
-            console.log(`${changed ? '* ' : '  '}${file}.png${pngs.length > 1 ? ` (${pngs.length} screens)` : ''}  ${Date.now() - ts} ms`);
           } catch (e) {
             failures++;
             await tab.offline(false).catch(() => {});

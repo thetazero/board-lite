@@ -2,14 +2,14 @@
 // and the hex map. Plain DOM, no framework; the server strips the types.
 
 import type { DragonView, HexView, Res, Snapshot } from '../src/state.ts';
-import { icon } from './icons.ts';
+import { icon, iconShapes } from './icons.ts';
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
 export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Ley line', meadow: 'Meadow', plains: 'Plains', harbor: 'Harbor (ports)', ocean: 'Ocean' };
-export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#cfd8dc', water: '#2f8fff' };
+export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#9fe3c4', water: '#2f8fff' };
 
 // ---------- server ----------
 
@@ -91,12 +91,14 @@ export function resChips(b: Res, size = 1.25): string {
 // Game text (the log, card rules, offers) with the things it names over and
 // over drawn as icons: "gains 3 livestock" reads "gains 3" and a sheep. Takes
 // text that is already escaped HTML.
-const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b/g;
-const POINTS_WORD = /\b(\d+) (?:more )?points?\b/g;
+const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]?)/g;
+const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
+// Punctuation right after an icon stays on its line, not wrapped alone onto the next.
+const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
 export function iconText(html: string, size = 1.2): string {
   return html
-    .replace(RES_WORD, (_, n, r) => `<span class="tchip">${n ?? ''}${icon(r, size)}</span>`)
-    .replace(POINTS_WORD, (m, n) => `<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`);
+    .replace(RES_WORD, (_, n, r, p) => glue(`<span class="tchip">${n ?? ''}${icon(r, size)}</span>`, p))
+    .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
 
 export const BUILDING_ICON: Record<string, string> = {
@@ -118,18 +120,20 @@ export function buildingIcon(type: string, size = 22, color = '#fff'): string {
 
 export const STAGE_LABEL = ['Egg', 'Hatchling', 'Young', 'Adult'];
 
-// A dragon as a small badge: element colour, a size by life stage.
+// A dragon as a small badge: element colour, a size by life stage, and its
+// element's icon in the corner so it reads by shape as well as colour.
 export function dragonBadge(d: DragonView, size = 30): string {
   const c = ELEMENT_COLORS[d.element];
   const s = [0.55, 0.7, 0.85, 1][d.stage];
+  const mark = `<g transform="translate(6 6) scale(0.4)">${iconShapes(d.element)}</g>`;
   if (d.stage === 0) {
-    return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><ellipse cx="0" cy="1" rx="${5 * s + 2}" ry="${7 * s + 2}" fill="${c}" stroke="#0008" stroke-width="1"/><path d="M-3 -1 l2 2 l2 -3 l2 2" stroke="#0007" fill="none"/></svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><ellipse cx="0" cy="1" rx="${5 * s + 2}" ry="${7 * s + 2}" fill="${c}" stroke="#0008" stroke-width="1"/><path d="M-3 -1 l2 2 l2 -3 l2 2" stroke="#0007" fill="none"/>${mark}</svg>`;
   }
   // A simple dragon head-and-wings mark, scaled by stage.
   return `<svg width="${size}" height="${size}" viewBox="-10 -10 20 20"><g transform="scale(${s})" fill="${c}" stroke="#0009" stroke-width="0.8">
     <path d="M-9 -2 L-3 -7 L-2 0 Z"/><path d="M9 -2 L3 -7 L2 0 Z"/>
     <path d="M0 -6 C4 -6 5 -1 4 3 L2 8 L0 6 L-2 8 L-4 3 C-5 -1 -4 -6 0 -6 Z"/>
-    <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g></svg>`;
+    <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g>${mark}</svg>`;
 }
 
 // A dragon with its stage, growth, health and why it is staying home, if it is.

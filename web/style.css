@@ -78,6 +78,8 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .topbar .roomcode b { color: var(--text); letter-spacing: .1em; }
 .mapwrap { grid-area: map; position: relative; min-height: 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
+.board3d { flex: 1; min-height: 0; position: relative; }
+.board3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .legend { display: flex; gap: 1.1em; justify-content: center; color: var(--muted); font-size: .9em; flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: .3em; text-transform: capitalize; }
 .legend i { width: 1em; height: 1em; border-radius: 3px; display: inline-block; }
@@ -218,7 +220,7 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
 .handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); }
 .handfan.discarding .card:not(.picked) { filter: none; }
-body.phone.has-hand { padding-bottom: 14.5em; } /* more specific than the talk bar's body.phone padding below, which would otherwise win */
+body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk bar: room for both */
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -269,7 +271,7 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* more specific than the talk b
 .offer.in { background: #3b3214; border: 2px solid var(--accent); }
 .offer.out { background: var(--panel); border: 1px dashed var(--line); }
 .proj { display: flex; align-items: center; gap: .5em; margin: .35em 0; }
-.proj b { min-width: 7em; }
+.proj b { min-width: 7em; margin-right: .4em; }
 .proj button { margin-left: auto; }
 .proj.dim b { opacity: .5; }
 .elembtn { border-color: var(--ec); }
@@ -285,6 +287,7 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* more specific than the talk b
 .stepper button { padding: .15em .6em; font-weight: 800; }
 .stepper b { min-width: 1.3em; text-align: center; }
 .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .3em .8em; }
+#offer { margin: .6em 0; }
 .tres { display: flex; align-items: center; gap: .3em; }
 .who button.on { background: var(--pc); color: #111; font-weight: 800; }
 .tcard { display: flex; flex-direction: column; gap: .2em; width: 6.4em; padding: 3px 3px 4px; background: #f4ecd8; color: #2b2228; border: 0; border-bottom: 4px solid var(--kc); border-radius: 6px; font-size: .8em; font-weight: 700; line-height: 1.1; }
@@ -304,7 +307,7 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* more specific than the talk b
 .final { font-size: 1.2em; }
 
 /* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
-body.phone { padding-bottom: 3.6em; }
+body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100% tall, or the padding sits at the first screen's bottom, not after the page */
 .talkbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--panel2); border-top: 1px solid var(--line); }
 .talkbar > .latest { display: flex; align-items: center; gap: .5em; width: 100%; background: none; border: 0; border-radius: 0; padding: .75em .9em; text-align: left; color: var(--text); font: inherit; }
 .talkbar > .latest span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -324,5 +327,6 @@ body.phone { padding-bottom: 3.6em; }
 .join-box .alt { color: var(--muted); margin-top: -.3em; }
 
 /* Icons inside game text ("gains 3" and a sheep): no gap after them. */
+.nobr { white-space: nowrap; }
 .tchip { display: inline-flex; align-items: center; gap: .1em; font-weight: 700; white-space: nowrap; vertical-align: bottom; }
 .ricon { flex: none; }

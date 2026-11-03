@@ -34,6 +34,8 @@ export interface Shot {
   waitMs?: number; // extra settle time, for the TV's timed banners
   live?: boolean; // TV: load the page, then let the scene's `live` moves happen, then shoot
   sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
+  frames?: number[]; // TV: one shot per time on the 3D board's clock (seconds; the page opens at 0)
+  flight?: boolean; // and the frames are fractions (0 to 1) of the way through the first dragon flight instead
 }
 
 export interface Scene {
@@ -193,6 +195,21 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'build-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    live: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
+    shots: () => [{ file: 'tv-build-3p', caption: 'TV: a new building pops up from the page', client: 'tv', live: true, frames: [0, 0.15, 0.3, 0.45, 0.7, 1.2] }],
+  },
+  {
+    name: 'port-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.phase === 'action' && Object.values(g.buildings).some((b) => b.type === 'port'),
+    shots: () => [{ file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' }],
+  },
+  {
     name: 'trade-4p',
     players: 4,
     seed: 1,
@@ -315,7 +332,10 @@ export const SCENES: Scene[] = [
     players: 2,
     seed: 1,
     until: (g) => g.phase === 'action' && best(g) >= 11 && g.players.every((_, p) => buildingsOf(g, p) >= 5),
-    shots: () => [{ file: 'tv-late-2p', caption: 'TV, late game (2 players)', client: 'tv' }],
+    shots: () => [
+      { file: 'tv-late-2p', caption: 'TV, late game (2 players)', client: 'tv' },
+      { file: 'tv-flight-2p', caption: "TV: a dragon's flight round its home", client: 'tv', flight: true, frames: [0.08, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95] },
+    ],
   },
   {
     name: 'late-5p',
