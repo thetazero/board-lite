@@ -249,14 +249,15 @@ export function titleValues(g: Game, t: Title): number[] {
   return g.players.map((_, p) => titleValue(g, p, t));
 }
 
-// A title goes to the single strict leader; the holder keeps it on a tie.
+// A title goes to the single strict leader, once they reach its minimum; the
+// holder keeps it on a tie.
 function updateTitles(g: Game) {
   for (const t of Object.keys(g.titles) as Title[]) {
     const vals = titleValues(g, t);
     const best = Math.max(...vals);
     const leaders = vals.flatMap((v, p) => (v === best ? [p] : []));
     const holder = g.titles[t];
-    const next = best <= 0 ? null : holder !== null && leaders.includes(holder) ? holder : leaders.length === 1 ? leaders[0] : null;
+    const next = best < TUNING.titleMinimum[t] ? null : holder !== null && leaders.includes(holder) ? holder : leaders.length === 1 ? leaders[0] : null;
     if (next !== holder) {
       g.titles[t] = next;
       log(g, next === null ? `Nobody holds ${TITLE_NAMES[t]} now.` : `${pname(next)} takes ${TITLE_NAMES[t]}.`);
@@ -665,6 +666,7 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   const k = key(...coords!);
   const hex = g.map[k];
   if (!hex) fail(`${k} is not on the map.`);
+  if (hex.terrain === 'ocean') fail(`${k} is ocean; nothing is built on the ocean.`);
   if (g.buildings[k]) fail(`${k} already has a building.`);
   if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${def.terrain}; ${k} is ${hex.terrain}.`);
   if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} doesn't touch any of your buildings.`);
@@ -677,7 +679,7 @@ export function buildableHexes(g: Game, p: number, type: string): string[] {
   const out = new Set<string>();
   for (const [k] of ownedBuildings(g, p)) {
     for (const n of neighbors(k)) {
-      if (g.map[n] && !g.buildings[n] && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
+      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
     }
   }
   return [...out].sort();

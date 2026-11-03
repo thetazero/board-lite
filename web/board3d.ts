@@ -329,7 +329,7 @@ function crystal(h: number, color = '#c3aefc'): THREE.Mesh {
 }
 
 // What grows on a hex. With a building on it, only a little at the rim.
-function decor(h: HexView): THREE.Group {
+function decor(h: HexView, seaward: number): THREE.Group {
   const r = rng(h.k);
   const g = new THREE.Group();
   const built = !!h.building;
@@ -384,6 +384,26 @@ function decor(h: HexView): THREE.Group {
         if (r() < 0.5) place(part(cone(0.14, 0.24, 6), '#d6ad55', { at: [0, 0.12, 0] }), spot(0.45, 0.6));
       } else if (h.building!.type !== 'tower') {
         place(part(cone(0.1, 0.17, 6), '#d6ad55', { at: [0, 0.085, 0] }), rim());
+      }
+      break;
+    case 'ocean': {
+      // Folded wave crests on the sea.
+      for (let i = 0; i < 3; i++) {
+        const crest = part(cyl(0.05, 0.05, 0.3 + r() * 0.15, 3), '#eaf4fb', { rot: [0, 0, Math.PI / 2], crease: false });
+        crest.position.y = -TOP + 0.01; // on the sea, the tray's floor
+        place(group(crest), spot(0.1, 0.6), r() * 0.6 - 0.3);
+      }
+      break;
+    }
+    case 'harbor':
+      if (!built) {
+        // A little jetty, pointing out to sea: somewhere a port could go.
+        const jetty = group(
+          part(box(0.24, 0.05, 0.9), WOOD, { at: [0, 0.08, 0.4] }),
+          ...[0.05, 0.45, 0.82].flatMap((z) => [-0.1, 0.1].map((x) => part(box(0.05, 0.2, 0.05), WOOD_DARK, { at: [x, 0.02, z], crease: false }))),
+          part(cyl(0.05, 0.05, 0.16, 6), WOOD_DARK, { at: [0.2, 0.13, 0.75] }),
+        );
+        place(jetty, [0, 0], seaward);
       }
       break;
     case 'ley': {
@@ -550,36 +570,23 @@ function hatchery(pc: string): THREE.Group {
   return g;
 }
 
-function market(pc: string): THREE.Group {
+// A port, built facing the sea (+z): a warehouse, a pier out over the water
+// and a sailboat in the owner's colour moored beside it.
+function port(pc: string): THREE.Group {
   const g = new THREE.Group();
-  g.add(part(box(0.72, 0.24, 0.32), WOOD, { at: [0, 0.12, 0.05] }));
-  for (const [x, z] of [[-0.34, -0.12], [0.34, -0.12], [-0.34, 0.2], [0.34, 0.2]]) g.add(part(box(0.035, 0.62, 0.035), WOOD_DARK, { at: [x, 0.31, z], crease: false }));
-  // A striped awning.
-  const awning = new THREE.Group();
-  for (let i = 0; i < 6; i++) awning.add(part(box(0.14, 0.02, 0.5), i % 2 ? WALL : pc, { at: [-0.35 + i * 0.14, 0, 0] }));
-  awning.position.set(0, 0.66, 0.06);
-  awning.rotation.x = 0.32;
-  g.add(awning);
-  // Goods on the counter, in the resources' colours.
-  GOODS.forEach((c, i) => g.add(part(box(0.1, 0.08, 0.1), c, { at: [-0.24 + i * 0.16, 0.28, 0.08] })));
-  g.add(part(box(0.16, 0.16, 0.16), WOOD, { at: [0.28, 0.08, 0.42], rot: [0, 0.4, 0] }));
-  g.add(part(cyl(0.08, 0.08, 0.18, 8), WOOD_DARK, { at: [-0.3, 0.09, 0.42] }));
-  return g;
-}
-
-function caravanPost(pc: string): THREE.Group {
-  const g = new THREE.Group();
-  g.add(part(cone(0.34, 0.55, 4), pc, { at: [-0.22, 0.275, -0.2], rot: [0, Math.PI / 4, 0] }));
-  const wagon = new THREE.Group();
-  wagon.add(part(box(0.5, 0.12, 0.26), WOOD, { at: [0, 0.16, 0] }));
-  wagon.add(part(new THREE.CylinderGeometry(0.14, 0.14, 0.46, 6, 1, false, -Math.PI / 2, Math.PI), WALL, { at: [0, 0.22, 0], rot: [0, 0, Math.PI / 2], two: true }));
-  for (const [x, z] of [[-0.16, 0.14], [0.16, 0.14], [-0.16, -0.14], [0.16, -0.14]]) wagon.add(part(cyl(0.09, 0.09, 0.03, 8), WOOD_DARK, { at: [x, 0.09, z], rot: [Math.PI / 2, 0, 0] }));
-  wagon.position.set(0.15, 0, 0.22);
-  wagon.rotation.y = -0.35;
-  g.add(wagon);
-  const f = flag(pc, 0.55);
-  f.position.set(0.38, 0, -0.25);
-  g.add(f);
+  const shed = cottage(0.42, 0.32, 0.28, WALL, pc);
+  shed.position.set(-0.18, 0, -0.3);
+  g.add(shed);
+  // The pier: planks on posts, running out past the hex's edge.
+  g.add(part(box(0.22, 0.04, 1.05), WOOD, { at: [0.22, 0.1, 0.35] }));
+  for (const z of [0, 0.35, 0.7]) for (const x of [0.12, 0.32]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
+  GOODS.forEach((c, i) => g.add(part(box(0.1, 0.1, 0.1), c, { at: [-0.3 + (i % 2) * 0.13, 0.05 + Math.floor(i / 2) * 0.1, 0.12] })));
+  const boat = new THREE.Group();
+  boat.add(part(cyl(0.12, 0.06, 0.4, 4), WOOD, { at: [0, 0, 0], rot: [Math.PI / 2, Math.PI / 4, 0], scale: [1, 1, 0.55] }));
+  boat.add(part(box(0.02, 0.5, 0.02), DARK, { at: [0, 0.27, 0], crease: false }));
+  boat.add(part(sheet([[0, 0.5, 0], [0, 0.05, 0.02], [0, 0.08, 0.26]], [[0, 1, 2]]), pc, { two: true }));
+  boat.position.set(0.55, 0.0, 0.7);
+  g.add(boat);
   return g;
 }
 
@@ -614,8 +621,7 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'pasture': return { model: pasture(pc), offset: [0, 0] };
     case 'roost': return { model: roost(pc), offset: [0, 0] };
     case 'hatchery': return { model: hatchery(pc), offset: [0, 0] };
-    case 'market': return { model: market(pc), offset: [0, 0] };
-    case 'caravan_post': return { model: caravanPost(pc), offset: [0, 0] };
+    case 'port': return { model: port(pc), offset: [0, 0] };
     case 'monument': return { model: monument(up), offset: [0, 0] };
     default: return { model: group(part(box(0.4, 0.4, 0.4), pc, { at: [0, 0.2, 0] })), offset: [0, 0] };
   }
@@ -830,7 +836,7 @@ export class Board3D {
       dispose(this.decor);
       const all = new THREE.Group();
       for (const h of g.map) {
-        const d = decor(h);
+        const d = decor(h, this.seaward(g.map, h));
         const [x, z] = hexXZ(h.q, h.r);
         d.position.set(x, 0, z);
         all.add(d);
@@ -849,7 +855,7 @@ export class Board3D {
         this.built.delete(h.k);
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b), h);
+      const obj = this.placed(this.buildingGroup(b, b.type === 'port' ? this.seaward(g.map, h) : 0), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too.
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig !== bsig);
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
@@ -868,7 +874,20 @@ export class Board3D {
     return g;
   }
 
-  private buildingGroup(b: NonNullable<HexView['building']>): THREE.Group {
+  // Which way is the sea from a hex (the heading of +z, for rotation.y).
+  private seaward(map: HexView[], h: HexView): number {
+    let dx = 0, dz = 0;
+    const [x, z] = hexXZ(h.q, h.r);
+    for (const o of map) {
+      if (o.terrain !== 'ocean' || Math.max(Math.abs(o.q - h.q), Math.abs(o.r - h.r), Math.abs(o.q + o.r - h.q - h.r)) !== 1) continue;
+      const [ox, oz] = hexXZ(o.q, o.r);
+      dx += ox - x;
+      dz += oz - z;
+    }
+    return dx || dz ? Math.atan2(dx, dz) : 0;
+  }
+
+  private buildingGroup(b: NonNullable<HexView['building']>, facing: number): THREE.Group {
     const g = plate(b.owner, !!b.upgrade, this.plateMats);
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
@@ -876,6 +895,7 @@ export class Board3D {
     pop.position.set(0, GROUND, -0.6);
     model.scale.setScalar(1.15);
     model.position.set(offset[0], 0, offset[1] + 0.6);
+    model.rotation.y = facing;
     pop.add(model);
     g.add(pop);
     g.userData.pop = pop;
@@ -894,6 +914,10 @@ export class Board3D {
     const geo = tileGeometry();
     const tiles = new THREE.Group();
     for (const h of map) {
+      if (h.terrain === 'ocean') {
+        this.tiles.set(h.k, { hex: h, decorSig: '-' });
+        continue; // the sea is the tray's floor
+      }
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
       const color = mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12);
@@ -911,6 +935,7 @@ export class Board3D {
     // Every hex's outline, the tops of tall buildings, and the sky where dragons fly.
     this.fitPoints = map.flatMap((h) => {
       const [x, z] = hexXZ(h.q, h.r);
+      if (h.terrain === 'ocean') return [new THREE.Vector3(x, 0, z)]; // half the sea ring may go
       return [[0.95, 0, 0], [-0.95, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1.6, 0]].map(([dx, y, dz]) => new THREE.Vector3(x + dx, y, z + dz));
     });
     const size = this.bounds.getSize(new THREE.Vector3());
@@ -922,7 +947,9 @@ export class Board3D {
       return new THREE.Vector3(center.x + Math.cos(a) * (far + 1.35), 0, center.z + Math.sin(a) * (far + 1.35));
     });
     const tray = trayGeometry(corners.map((c) => c.clone().sub(new THREE.Vector3(center.x, 0, center.z))), 0.45, 0.25);
-    const floor = part(tray.floor, '#efe5cf', { at: [center.x, -0.01, center.z] });
+    // Its floor is the sea, the land pasted on it; a map without an ocean gets plain paper.
+    const sea = map.some((h) => h.terrain === 'ocean');
+    const floor = part(tray.floor, sea ? mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2) : '#efe5cf', { at: [center.x, -0.01, center.z] });
     floor.castShadow = false;
     const walls = part(tray.walls, '#e9dec5', { at: [center.x, -0.01, center.z], two: true });
     this.world.add(floor, walls);

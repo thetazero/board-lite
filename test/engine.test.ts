@@ -5,10 +5,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
-import { RuleError, apply, newGame, score, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, bankRate, newGame, score, waitingOn, type Game } from '../src/engine.ts';
 import { BUILDINGS, TUNING } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
-import { neighbors } from '../src/map.ts';
+import { mapRadius, neighbors } from '../src/map.ts';
 
 function advanceToRaidVote(g: Game) {
   while (g.phase === 'action') apply(g, g.turn, 'end');
@@ -111,6 +111,41 @@ test('buildings must touch your territory and match terrain', () => {
   assert.equal(g.buildings[right].type, 'quarry');
   // Special projects cost double the card.
   assert.equal(g.players[0].resources.timber, 50 - BUILDINGS.quarry.cost.timber! * 2);
+});
+
+test('the ocean rings the land, with one harbor per coast; ports go only on harbors', () => {
+  const g = newGame(2, 4);
+  const hexes = Object.values(g.map);
+  assert.equal(hexes.filter((h) => h.terrain === 'harbor').length, 6);
+  for (const h of hexes) {
+    const d = Math.max(Math.abs(h.q), Math.abs(h.r), Math.abs(h.q + h.r));
+    assert.equal(h.terrain === 'ocean', d === mapRadius(2) + 1, `${h.q},${h.r}`);
+  }
+  g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
+  const tower = g.towers[0];
+  const [sea, harbor, land] = neighbors(tower);
+  g.map[sea].terrain = 'ocean';
+  g.map[harbor].terrain = 'harbor';
+  g.map[land].terrain = 'plains';
+  assert.throws(() => apply(g, 0, `project roost ${sea}`), RuleError); // nothing on the ocean
+  g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'port' });
+  assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
+  apply(g, 0, `build cport ${harbor}`);
+  assert.equal(g.buildings[harbor].type, 'port');
+  assert.equal(bankRate(g, 0), BUILDINGS.port.bankRate);
+});
+
+test('a title needs its minimum as well as the lead', () => {
+  const g = newGame(2, 6);
+  g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
+  const free = Object.keys(g.map).filter((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k]);
+  const own = (n: number) => { for (const k of free.slice(0, n)) g.buildings[k] = { type: 'roost', owner: 0, upgrade: null, floors: 0 }; };
+  own(TUNING.titleMinimum.territory - 2); // with the tower, one short of the minimum
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.territory, null);
+  own(TUNING.titleMinimum.territory - 1);
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.territory, 0);
 });
 
 test('waitingOn always names someone until the game ends', () => {

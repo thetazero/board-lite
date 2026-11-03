@@ -9,9 +9,9 @@ import {
 } from './engine.ts';
 import { mapRadius } from './map.ts';
 
-const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.' };
+const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
 const BUILDING_LETTER: Record<string, string> = {
-  tower: 'T', quarry: 'q', lumber_camp: 'l', crystal_mine: 'c', pasture: 'p', roost: 'r', hatchery: 'h', market: 'm', caravan_post: 'v', tower_floor: 'T', monument: 'o',
+  tower: 'T', quarry: 'q', lumber_camp: 'l', crystal_mine: 'c', pasture: 'p', roost: 'r', hatchery: 'h', port: 'a', tower_floor: 'T', monument: 'o',
 };
 
 export function cardText(c: Card): string {
@@ -55,10 +55,10 @@ function productionText(g: Game, p: number): string {
 }
 
 function mapText(g: Game): string[] {
-  const R = mapRadius(g.players.length);
+  const R = mapRadius(g.players.length) + 1;
   const lines: string[] = [];
-  lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains.');
-  lines.push('Buildings show as <owner><letter>: T tower, q quarry, l lumber camp, c crystal mine, p pasture, r roost, h hatchery, m market, v caravan post, o monument (lowercase=no upgrade, +=upgraded).');
+  lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
+  lines.push('Buildings show as <owner><letter>: T tower, q quarry, l lumber camp, c crystal mine, p pasture, r roost, h hatchery, a port (anchor), o monument (lowercase=no upgrade, +=upgraded).');
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -193,7 +193,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
     const extra = q === p ? ` + ${s.hidden} hidden = ${s.total}` : '';
     out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
   }
-  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'nobody' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}]`).join('; ')}`);
+  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'nobody' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
   out.push('');
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${RESOURCES.map((r) => `${pl.resources[r]} ${r}`).join(', ')}`);

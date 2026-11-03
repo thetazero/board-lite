@@ -81,7 +81,7 @@ export interface PublicState {
   pointsToWin: number;
   waitingOn: number[];
   players: { publicPoints: number; dragons: number; buildings: number; titles: number; handSize: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
-  titles: { key: Title; name: string; holder: number | null; values: number[] }[];
+  titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   map: HexView[];
   dragons: DragonView[];
   offers: { id: string; from: number; to: number; give: string; get: string }[];
@@ -106,6 +106,8 @@ export interface CardView {
   hexes: string[];
   dragons: string[];
   blocked: string | null; // why it can't be played right now, if known
+  element?: string; // dragon cards: the dragon's element, for the card's art
+  dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
 export interface SeatState {
@@ -197,7 +199,7 @@ export function publicState(g: Game, logLines = 40): PublicState {
       const s = score(g, p);
       return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, handSize: pl.hand.length, production: production(g, p), bankRate: bankRate(g, p) };
     }),
-    titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t) })),
+    titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     map: Object.entries(g.map).map(([k, h]) => {
       const b = g.buildings[k];
       return {
@@ -247,7 +249,8 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
-    return { ...base, text, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
+    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st) })) };
+    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];
   if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep it: it scores while in your hand.' };
