@@ -53,7 +53,7 @@ export function esc(s: string): string {
 // cards have ids. The clients show names instead and drop the ids.
 export function named(text: string, names: string[], dragons: DragonView[] = []): string {
   return esc(text)
-    .replace(/ \((?:c|o)\d+\)/g, '')
+    .replace(/ \((?:c|o|d)\d+\)/g, '')
     .replace(/\boffer o\d+/g, 'the offer')
     .replace(/^Offer o\d+ expires\./, 'An open offer expires.')
     .replace(/\bd(\d+)\b/g, (m) => {
