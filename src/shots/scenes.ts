@@ -6,6 +6,7 @@
 // the scene's seed, the next seeds are tried, in order.
 
 import { botStep } from '../bot.ts';
+import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
 import { apply, newGame, score, waitingOn, type Game } from '../engine.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -149,8 +150,24 @@ export const SCENES: Scene[] = [
       { file: 'phone-trade-acting-4p', caption: "Phone, acting player: an offer in, and their own out", client: 'phone', seat: g!.turn },
       {
         file: 'phone-trade-compose-4p', caption: 'Phone, acting player: putting an offer together', client: 'phone', seat: g!.turn,
-        clicks: ['[data-tab=trade]', '[data-to]:last-child', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]'],
+        clicks: ['[data-tab=trade]', '[data-to]:last-child', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '[data-tcard]'],
       },
+    ],
+  },
+  {
+    // Not a real game moment: the acting player holds one of every card, to see the whole deck at once.
+    name: 'every-card',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const keys = [...Object.keys(BUILDINGS), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
+      g.players[g.turn].hand = keys.map((key, i) => ({ id: `c${900 + i}`, deck: DRAGONS[key] || ACTIONS[key] ? 'action' : 'building', key }));
+    },
+    shots: (g) => [
+      { file: 'phone-every-card', caption: 'Phone: one of every card in the deck (staged, not a real hand)', client: 'phone', seat: g!.turn },
+      { file: 'phone-card-open-dragon', caption: 'Phone: a dragon card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-dragon'] },
+      { file: 'phone-card-open-action', caption: 'Phone: an action card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-action'] },
     ],
   },
   {

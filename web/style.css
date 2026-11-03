@@ -193,16 +193,44 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .tabs { display: flex; gap: .3em; }
 .tabs button { flex: 1; padding: .6em .3em; }
 .tabs button.on { background: var(--text); color: var(--bg); font-weight: 800; }
-.hand { display: flex; flex-direction: column; gap: .45em; }
-.card { background: var(--panel); border: 1px solid var(--line); border-left: .35em solid #888; border-radius: 10px; padding: .55em .7em; cursor: pointer; }
-.card.k-building { border-left-color: #a0673a; } .card.k-upgrade { border-left-color: var(--accent); }
-.card.k-action { border-left-color: #b07cff; } .card.k-dragon { border-left-color: #ff5a36; }
-.card.open { border-color: var(--text); }
-.card.dim .ctop b { opacity: .6; }
-.card.picked { outline: 3px solid var(--bad); background: #3a1d20; }
-.ctop { display: flex; justify-content: space-between; gap: .5em; align-items: center; }
-.ckind { font-size: .75em; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-.ctext { margin: .35em 0; font-size: .95em; }
+/* Cards: illustrated paper. Cream card stock, the picture in a window, the
+   name on a strip of the kind's coloured paper (dragons: their element), the
+   cost on the stock below. A faint grain sits over all of it. */
+.hand { display: grid; grid-template-columns: 1fr 1fr; gap: .7em .6em; }
+.card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
+.card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.cart { position: relative; aspect-ratio: 10 / 7; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px #0002, 0 1px 2px #0003 inset; }
+.cart svg.art { display: block; width: 100%; height: 100%; }
+.ckind { position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--kc); border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper), 0 1px 3px #0006; }
+.cname { position: relative; margin: -9px -8px 0; padding: .32em .5em .38em; background: var(--kc); color: #fff; font: 700 1em/1.15 "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; text-align: center; text-shadow: 0 1px 0 #0005; box-shadow: 0 2px 3px #0004;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%, 6px 50%); }
+.card.k-dragon .cname, .card.k-upgrade .cname { color: #2b2228; text-shadow: 0 1px 0 #fff6; }
+.ccost { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .15em; margin-top: .4em; min-height: 1.5em; font-size: .95em; }
+.card .chip { color: var(--ink); margin: 0 .15em; }
+.card .chip.free { color: #8a7d70; font-style: italic; }
+.card .chip.short { color: #c0392b; }
+/* Icons drawn for the dark table get a thin ink outline on paper (livestock is cream). */
+.card .ricon, .tcard .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
+.card.dim .cart { filter: saturate(.7) brightness(.9); }
+.card.picked { transform: translateY(-4px) rotate(-1.5deg); box-shadow: 0 0 0 3px var(--bad), 0 8px 16px #000a; }
+.card.picked::before { content: '✕'; position: absolute; z-index: 2; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; background: var(--bad); color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+/* New cards fly in from above, one after another. */
+.card.dealt { animation: deal .65s cubic-bezier(.2, .9, .3, 1.15) both; }
+@keyframes deal { from { transform: translateY(-70vh) rotate(-14deg) scale(.7); opacity: 0; } 30% { opacity: 1; } }
+/* A card tapped open, over the hand. */
+.zoom { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em; padding: 1em; background: #0b0c10e8; overflow-y: auto; animation: fadein .15s; }
+.card.big { width: min(19em, 88vw); cursor: default; padding: 8px 8px 10px; animation: zoomin .2s ease-out; }
+.card.big .cname { margin: -12px -11px 0; font-size: 1.45em; }
+.card.big .ckind { width: 30px; height: 30px; top: 6px; left: 6px; }
+.card.big .ckind svg { width: 18px; height: 18px; }
+.card.big .ccost { font-size: 1.1em; justify-content: space-between; padding: 0 .3em; }
+.card.big .ccost small { color: #8a7d70; text-transform: uppercase; letter-spacing: .06em; font-size: .7em; }
+.card.big .ctext { margin: .5em .3em 0; font-size: 1em; line-height: 1.35; }
+@keyframes zoomin { from { transform: scale(.8) rotate(-3deg); opacity: 0; } }
+.zoomacts { width: min(19em, 88vw); display: flex; flex-direction: column; gap: .4em; text-align: center; }
+.zoomacts .row { justify-content: center; }
+.zoomacts .hint { color: #c9cdd8; }
 .blocked { color: #f2a33a; margin: .3em 0; font-size: .9em; }
 .row { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .3em; }
 .row.big2 > button { flex: 1; }
@@ -222,7 +250,9 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .3em .8em; }
 .tres { display: flex; align-items: center; gap: .3em; }
 .who button.on { background: var(--pc); color: #111; font-weight: 800; }
-.tcard.on { background: var(--accent); color: #111; }
+.tcard { display: flex; flex-direction: column; gap: .2em; width: 6.4em; padding: 3px 3px 4px; background: #f4ecd8; color: #2b2228; border: 0; border-bottom: 4px solid var(--kc); border-radius: 6px; font-size: .8em; font-weight: 700; line-height: 1.1; }
+.tcard svg.art { width: 100%; aspect-ratio: 10 / 7; border-radius: 2px; }
+.tcard.on { box-shadow: 0 0 0 3px var(--accent); transform: translateY(-3px); }
 .trade h3 { margin: .6em 0 .2em; }
 .picker h3 { margin: .2em 0; }
 .pmap { background: var(--panel); border-radius: 12px; padding: .3em; }
