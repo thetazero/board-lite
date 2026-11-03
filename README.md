@@ -2,7 +2,7 @@
 
 A "board game lite" for one room: wizards raise dragons, build out from their towers, trade, and raid neutral kingdoms. The shared board will be on a TV and each player's hand on their phone.
 
-- Design: [`docs/design.md`](docs/design.md); provisional calls and why: [`docs/decisions.md`](docs/decisions.md)
+- Design: [`docs/design.md`](docs/design.md); the reasoning behind each provisional call is in the commit and PR that made it
 - Rules as the engine plays them: [`docs/rules.md`](docs/rules.md)
 - Play from the command line: [`docs/cli.md`](docs/cli.md)
 - Sandboxed Claude playtests (one Claude per seat, game tools only): [`docs/playtest.md`](docs/playtest.md)
