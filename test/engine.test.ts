@@ -20,6 +20,9 @@ function advanceToRaidVote(g: Game) {
   while (g.phase === 'action') apply(g, g.turn, 'end');
 }
 
+// Everyone starts with an egg; tests that raid in round 1 hatch them first.
+const hatchAll = (g: Game) => g.dragons.forEach((d) => (d.stage = Math.max(d.stage, 1)));
+
 const rich = (g: Game, p: number) => (g.players[p].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 });
 
 test('bot games reach a winner for every player count', () => {
@@ -98,6 +101,7 @@ test('a view shows only your own hand and resources', () => {
 
 test('votes and fight-or-bail choices stay secret until revealed', () => {
   const g = newGame(2, 3);
+  hatchAll(g);
   advanceToRaidVote(g);
   apply(g, 0, 'vote 2');
   const v1 = playerView(g, 1, 1000);
@@ -117,6 +121,17 @@ test('votes and fight-or-bail choices stay secret until revealed', () => {
   // There is no retreat: the fight plays out to the end with no more choices.
   assert.equal(g.raid, null);
   assert.match(playerView(g, 1, 1000), /falls!|holds\./);
+});
+
+test('everyone starts with an egg, and a raid nobody can fight is skipped', () => {
+  const g = newGame(3, 5);
+  assert.ok(g.dragons.every((d) => d.stage === TUNING.startingDragonStage));
+  advanceToRaidVote(g);
+  if (TUNING.startingDragonStage === 0) {
+    assert.equal(g.raid, null);
+    assert.equal(g.round, 2);
+    assert.equal(g.phase, 'cards');
+  }
 });
 
 test('illegal moves are refused without changing the game', () => {
@@ -247,6 +262,7 @@ test('separate CLI processes can share one game', () => {
 
 test('table talk is allowed any time, private talk reaches only the two players, and nothing else changes', () => {
   const g = newGame(3, 13);
+  hatchAll(g);
   const before = JSON.stringify({ ...g, log: [] });
   apply(g, 2, 'say anyone want   timber?'); // not P3's turn: talk is still fine
   apply(g, 1, 'tell P1 I will bail, trust me');
@@ -281,6 +297,7 @@ test('a dragon hurt in a raid heals and grows but sits out the next raid', () =>
 
 test('a hungry dragon neither grows nor raids', () => {
   const g = newGame(2, 7);
+  hatchAll(g);
   const a = g.dragons[0];
   const ga = a.growth + a.stage * 10;
   advanceToRaidVote(g);
@@ -300,7 +317,7 @@ test('a tower floor is built without a card, for gold', () => {
   const before = score(g, p).buildings;
   g.players[p].resources.gold = 0;
   assert.throws(() => apply(g, p, 'build tower_floor'), RuleError);
-  g.players[p].resources = { ...g.players[p].resources, stone: 2, gold: 3 };
+  g.players[p].resources = { ...g.players[p].resources, ...BUILDINGS.tower_floor.cost };
   apply(g, p, 'build tower_floor');
   assert.equal(g.buildings[g.towers[p]].floors, 1);
   assert.equal(score(g, p).buildings, before + 1);
@@ -418,12 +435,15 @@ test('raid loot is split by the combat power still fighting at the end, the rest
   let shared = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
+    hatchAll(g);
     keepAll(g);
     while (g.phase === 'action') apply(g, g.turn, 'end');
     g.dragons = [
       { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
       { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
       { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0, resting: '' },
+      // Stays home, so the next raid has a raider and isn't skipped.
+      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0, resting: '' },
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2; // stop at the next raid's vote, before the next production
@@ -546,6 +566,7 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
 // fauna on the hex beyond it.
 function faunaGame() {
   const g = newGame(2, 5);
+  hatchAll(g);
   keepAll(g);
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
   rich(g, 0);

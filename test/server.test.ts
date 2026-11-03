@@ -163,9 +163,11 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
     assert.match(await cli('do', url, token!, 'build', 'c999', '0,0'), /Not allowed: Build a card from your hand/);
     const ended = await cli('do', url, token!, 'end');
     assert.match(ended, /P1 ends their turn/);
-    // The bot plays its turn; wait returns when it's our decision again (the raid vote).
+    // The bot plays its turn. Everyone's dragon is still an egg, so there is no
+    // raid: wait returns at our next decision, the next round's cards.
     assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/);
-    assert.equal(room.game!.raid?.step, 'vote');
+    assert.equal(room.game!.round, 2);
+    assert.equal(room.game!.phase, 'cards');
     assert.match(await cli('status', url), /Room \w{4}: P1 Claude, P2 Tick \(bot\)/);
   } finally {
     for (const r of rooms.values()) r.close();

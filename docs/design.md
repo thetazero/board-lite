@@ -93,6 +93,8 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 - Victory points decide the winner (not the size of the gold hoard).
 - The game ends when a player reaches N points (first to N).
+- Game length: about 15 rounds. The owner, 2026-11-03, told Claude games ran 6–7 rounds: "6-7 rounds feels way too short?", then "I'd raise the point target a bit tbh. Let's target 15 rounds, and increase the ROI time on buildings".
+- N is 20 (it was 15), raised "a bit" as the owner asked. Buildings pay back more slowly to match: a basic production building in about 4.5 rounds, so one built early pays for itself by the middle of the game and earns about twice its cost by the end (`docs/datasheet.md`).
 - Point sources:
   - Dragons, by life stage.
   - Buildings: some building cards are worth points (e.g. tower floors, monuments).
@@ -219,7 +221,7 @@ The owner's calls (2026-11-03), after playing the first clients:
 
 ## Open questions
 
-- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length. `docs/datasheet.md` shows the current numbers and what they add up to.
+- Tuning numbers (deferred; not answerable yet): points per title, costs, dice, unit stats, player count. Game length and N are set (see Winning); the rest are tuned to fit them. `docs/datasheet.md` shows the current numbers and what they add up to.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
 
 ### Filled in provisionally by the first rules engine
