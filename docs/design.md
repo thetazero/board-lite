@@ -68,12 +68,16 @@ Living design doc. Decisions here were made in conversation with the project own
 - Each dragon has an element and a life stage. Its combat stats and its victory points are a function of its life stage.
 - Elements: fire, ice, lightning, air, water.
 - Upkeep: dragons eat livestock. If you run out of food, the dragon stops growing and can't raid. That is the only penalty.
+- From card to board: a dragon card is held hidden in your hand, like any action card, and played to hatch the dragon publicly on the board.
+- Life stages: egg → hatchling → young → adult.
+- Growth is automatic while the dragon is fed, but different dragons take different amounts of time to grow.
+- Roosts house dragons and cap how many you can keep.
 
 ## Open questions
 
 - Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
-- Dragons: how a dragon card becomes a dragon on the board; how growth between life stages happens and what it costs; how many life stages; whether roosts cap dragons; what elements do in raids.
+- Dragons: what elements do in raids; how players get dragon cards.
 - Raids and the raiding phase: targets, joint raids, loot splits, retaliation.
 - Action cards: what they do.
 - Player count and game length.
