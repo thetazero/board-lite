@@ -3,7 +3,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, esc, eventHtml, foeStack, gainChips, hpBar,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, esc, eventHtml, foeStack, gainChips, hpBar,
   icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, unitIcon, watch,
 } from './common.ts';
 import { Board3D } from './board3d.ts';
