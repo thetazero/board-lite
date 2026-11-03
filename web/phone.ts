@@ -261,8 +261,29 @@ function render() {
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
   app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
+  fitHand();
   wire(g, me);
 }
+
+// The hand grows into the free screen below the buttons, so a turn with nothing
+// open isn't a few buttons up top, the cards at the bottom and nothing between.
+// It never shrinks below its usual size (an open panel scrolls above it instead),
+// and a card never gets wider than about two fifths of the screen.
+function fitHand() {
+  const fan = app.querySelector<HTMLElement>('.handfan:not(.empty)');
+  const main = app.querySelector<HTMLElement>('.pbody');
+  if (!fan || !main) return document.body.style.removeProperty('--hs');
+  const em = parseFloat(getComputedStyle(document.body).fontSize);
+  const width = Math.min(innerWidth, 34 * em);
+  const top = main.getBoundingClientRect().bottom + scrollY; // where the page's content ends
+  const room = innerHeight - top - 3.9 * em - 0.6 * em; // down to the talk bar, a little air above the cards
+  const byHeight = room / (9.4 * em);
+  const byWidth = (0.42 * width) / (6.6 * 0.78 * em);
+  const hs = Math.max(1, Math.min(byHeight, byWidth));
+  document.body.style.setProperty('--hs', hs.toFixed(3));
+}
+addEventListener('resize', () => { if (snap?.game && snap.you) fitHand(); });
+document.fonts?.ready.then(() => { if (snap?.game && snap.you) fitHand(); }); // the buttons' height changes once the web fonts are in
 
 // The trade form is open, so tapping a card in the hand offers it.
 function tradeOpen(g: PublicState, me: Me): boolean {
