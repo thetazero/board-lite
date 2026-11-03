@@ -292,13 +292,16 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
 }
 
 // What a TV or phone receives on every change.
+export type SeatKind = 'player' | 'bot' | 'open';
+
 export interface Lobby {
   code: string;
   started: boolean;
-  seats: { name: string; bot: boolean; connected: boolean }[];
+  seats: { name: string; kind: SeatKind; connected: boolean }[];
   minPlayers: number;
   maxPlayers: number;
   fleeDeadline: number | null; // ms epoch, while the flee choice is open
+  file: string; // where the server saves the game
 }
 
 export interface Snapshot {

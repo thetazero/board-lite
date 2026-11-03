@@ -60,15 +60,16 @@ function onSnapshot(s: Snapshot) {
 
 // ---------- lobby ----------
 
+// The room's address: phones open it, and CLI players use it as the game.
 function joinUrl(): string {
   const host = lan.lan[0] ?? location.hostname;
-  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}`;
+  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}/${code}`;
 }
 
 function renderLobby() {
   const l = snap!.lobby;
   const seats = l.seats.map((s, i) => `
-    <li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.bot ? ' <small>(bot)</small>' : ''}${!s.connected ? ' <small>(away)</small>' : ''}
+    <li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.kind === 'bot' ? ' <small>(bot)</small>' : s.kind === 'open' ? ' <small>(open seat)</small>' : ''}${!s.connected ? ' <small>(away)</small>' : ''}
       <button class="ghost small" data-remove="${i}">remove</button></li>`).join('');
   const canStart = l.seats.length >= l.minPlayers;
   app.innerHTML = `
@@ -78,8 +79,9 @@ function renderLobby() {
       <div class="join-box">
         <div>On your phone, open</div>
         <div class="url">${esc(joinUrl())}</div>
-        <div>and enter the room code</div>
+        <div>room code</div>
         <div class="code">${esc(l.code)}</div>
+        <div class="cli">At a terminal: <code>node src/cli.ts join http://${esc(joinUrl())} &lt;name&gt;</code></div>
       </div>
       <ul class="seats">${seats || '<li class="empty">Waiting for players to join…</li>'}</ul>
       <div class="lobby-actions">
@@ -147,7 +149,7 @@ function renderGame(g: PublicState) {
       <header class="topbar">
         <span class="round">Round ${g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
-        <span class="roomcode">Join: ${esc(joinUrl())} · code <b>${esc(code)}</b></span>
+        <span class="roomcode">Join: <b>${esc(joinUrl())}</b></span>
       </header>
       <section class="mapwrap">${mapSvg(g.map, { size: 40, highlight: g.phase === 'action' ? g.turn : null })}
         <div class="legend">${legend}</div><div class="legend">${bLegend}</div>

@@ -31,6 +31,9 @@ function fresh() {
 // ---------- joining ----------
 
 async function boot() {
+  // http://host:port/ABCD is a room's address: the code comes filled in.
+  const path = /^\/([A-Za-z]{4})\/?$/.exec(location.pathname);
+  if (path) code = path[1].toUpperCase();
   const hash = new URLSearchParams(location.hash.slice(1));
   if (hash.get('code') && hash.get('token')) {
     localStorage.setItem('seat', JSON.stringify({ code: hash.get('code'), token: hash.get('token') }));
@@ -123,7 +126,7 @@ function renderLobby() {
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
       <p>Room <b>${esc(l.code)}</b>. Your colour:</p>
       <div class="swatch"></div>
-      <ul class="seats">${l.seats.map((s, i) => `<li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.bot ? ' <small>(bot)</small>' : ''}</li>`).join('')}</ul>
+      <ul class="seats">${l.seats.map((s, i) => `<li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.kind === 'bot' ? ' <small>(bot)</small>' : ''}</li>`).join('')}</ul>
       ${first ? `<button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
         <button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>`
       : '<p class="hint">Waiting for the first player (or the TV) to start…</p>'}

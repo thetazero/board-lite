@@ -1,16 +1,26 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
-import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { after, test } from 'node:test';
+import { promisify } from 'node:util';
 import { candidateCommands } from '../src/bot.ts';
-import { waitingOn } from '../src/engine.ts';
+import { newGame, waitingOn } from '../src/engine.ts';
 import { Room, RoomError } from '../src/server/room.ts';
+import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
 import type { Snapshot } from '../src/state.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const dir = mkdtempSync(join(tmpdir(), 'board-lite-test-')); // a few small game files
+after(() => rmSync(dir, { recursive: true, force: true }));
+const run = promisify(execFile);
+const cli = (...args: string[]) => run(process.execPath, ['src/cli.ts', ...args]).then((r) => r.stdout, (e) => `${e.stdout}${e.stderr}`);
 
 test('phones can play a whole game through a room, and see only their own hand', async () => {
-  const room = new Room('TEST', { fleeSeconds: 0.02 });
+  const room = new Room('TEST', { fleeSeconds: 0.02, dir });
   const seats = ['Ada', 'Bram', 'Cora'].map((n) => room.join(n));
   assert.throws(() => room.start(seats[1].token), RoomError, 'only the first player or the TV starts');
   room.start(seats[0].token, 11);
@@ -50,6 +60,7 @@ test('phones can play a whole game through a room, and see only their own hand',
     }
   }
   assert.equal(g.phase, 'over');
+  assert.equal(load(room.file).phase, 'over', 'the game is saved as it goes');
   const end = room.snapshot(seats[0].token);
   assert.equal(end.game!.winner, g.winner);
   assert.equal(end.game!.finalTotals!.length, 3);
@@ -58,7 +69,7 @@ test('phones can play a whole game through a room, and see only their own hand',
 });
 
 test('a room of bots plays itself to the end', async () => {
-  const room = new Room('BOTS', { botDelayMs: 0, fleeSeconds: 5 });
+  const room = new Room('BOTS', { botDelayMs: 0, fleeSeconds: 5, dir });
   room.addBot();
   room.addBot();
   room.start(room.hostToken, 3);
@@ -68,7 +79,7 @@ test('a room of bots plays itself to the end', async () => {
 });
 
 test('lobby rules: names, size, joining late', () => {
-  const room = new Room('LOBY');
+  const room = new Room('LOBY', { dir });
   room.join('Ada');
   assert.throws(() => room.join('ada'), /already called/);
   assert.throws(() => room.join('   '), /Pick a name/);
@@ -83,7 +94,7 @@ test('lobby rules: names, size, joining late', () => {
 });
 
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
-  const { server, rooms } = startServer(0);
+  const { server, rooms } = startServer(0, { dir });
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => {
@@ -98,7 +109,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${made.code.toLowerCase()}/join`, { name: 'Ada' })).status, 400, 'codes are case-insensitive; names unique');
     assert.equal((await post('/api/rooms/ZZZZ/join', { name: 'X' })).status, 400);
     assert.equal((await post(`/api/rooms/${made.code}/start`, { token: ada })).status, 200);
-    rooms.get(made.code)!.seats[1].bot = false; // keep the game still while we look at it
+    rooms.get(made.code)!.seats[1].kind = 'open'; // keep the game still while we look at it
 
     // Server-sent events: the first message is the current snapshot.
     const ctrl = new AbortController();
@@ -131,4 +142,48 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     server.closeAllConnections();
     server.close();
   }
+});
+
+test('one game, any client: a CLI player and a bot at a server-hosted table', async () => {
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 });
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const code = String(((await (await fetch(`${base}/api/rooms`, { method: 'POST' })).json()) as { code: string }).code);
+    const url = `${base}/${code}`;
+    const joined = await cli('join', url, 'Claude');
+    const token = /token: (\w+)/.exec(joined)?.[1];
+    assert.ok(token, joined);
+    const room = rooms.get(code)!;
+    room.addBot();
+    assert.match(await cli('start', url, token!), /started/);
+    const view = await cli('view', url, token!);
+    assert.match(view, /You are P1/);
+    assert.match(view, /Your options/);
+    assert.match(await cli('do', url, token!, 'build', 'c999', '0,0'), /Not allowed: You have no card/);
+    const ended = await cli('do', url, token!, 'end');
+    assert.match(ended, /P1 ends their turn/);
+    // The bot plays its turn; wait returns when it's our decision again (the raid vote).
+    assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/);
+    assert.equal(room.game!.raid?.step, 'vote');
+    assert.match(await cli('status', url), /Room \w{4}: P1 Claude, P2 Bot Ada \(bot\)/);
+  } finally {
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
+test("a game from the CLI's file mode can be hosted; players claim its open seats", () => {
+  const file = join(dir, 'hosted.json');
+  save(file, newGame(2, 4));
+  const room = new Room('HOST', { file });
+  assert.deepEqual(room.seats.map((s) => s.kind), ['open', 'open']);
+  const ada = room.join('Ada');
+  assert.equal(room.seats.indexOf(ada), 0);
+  room.command(ada.token, 'end');
+  assert.equal(load(file).turn, 1, 'moves are saved to the same file');
+  room.join('Bram');
+  assert.throws(() => room.join('Cora'), /every seat is taken/);
+  room.close();
 });

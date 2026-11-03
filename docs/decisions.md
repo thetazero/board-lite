@@ -4,6 +4,8 @@ Provisional design calls made without the owner present, newest first. Each entr
 
 ## 2026-11-03: first TV and phone clients
 
+- **Call (the owner's):** it's one game whatever the client. "it's the same game regardless of cli clients or phone client... the host/server just has the option to spin up a webserver for the ui, or not"; "this isn't a problem to solve, if every client uses the same interface". So the server hosts the game, and phones, the TV and the CLI all go through the same room API (join for a seat token, then the engine's commands). The CLI's file mode stays for offline play and the current playtest runner; a game saved from it can be hosted by the server.
+
 - **Call:** the 10-second flee clock lives in the server; anyone who hasn't chosen when it runs out stays. **Why:** the design gives 10 seconds and the engine left the timer to the clients; "stay" is the choice that changes nothing, so a distracted player is never dragged out of a fight. No other step has a clock: votes, commitments and fight-or-bail wait for everyone, as at a real table. **What would change it:** playtests where one slow player stalls every raid.
 - **Call:** no chat on the phones. **Why:** everyone is in one room, and eyes should stay on the TV and the people; talking is talking. The engine's `say`/`tell` stay for the CLI and Claude playtests.
 - **Call:** bots can fill seats from the lobby. **Why:** the random test bot already exists; it lets one person try the clients and lets a group of two test a three-seat game. It is not meant to play well.

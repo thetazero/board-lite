@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { stripTypeScriptTypes } from 'node:module';
 import { networkInterfaces } from 'node:os';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Room, RoomError, type RoomOptions } from './room.ts';
 
@@ -29,13 +29,18 @@ const TYPES: Record<string, string> = {
 
 const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html' };
 
-export function startServer(port: number, opts: RoomOptions = {}): { server: Server; rooms: Map<string, Room> } {
+export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = []): { server: Server; rooms: Map<string, Room> } {
   const rooms = new Map<string, Room>();
+  // Saved games to host (e.g. one started in the CLI's file mode): every seat starts open.
+  for (const file of hostFiles) {
+    const room = new Room(Room.newCode((c) => rooms.has(c)), { ...opts, file });
+    rooms.set(room.code, room);
+  }
   const stripped = new Map<string, { src: string; js: string }>();
 
   setInterval(() => {
     for (const [code, room] of rooms) {
-      if (Date.now() - room.lastActive > ROOM_IDLE_MS) {
+      if (Date.now() - room.lastActive > ROOM_IDLE_MS && !hostFiles.includes(room.file)) {
         room.close();
         rooms.delete(code);
       }
@@ -89,13 +94,21 @@ export function startServer(port: number, opts: RoomOptions = {}): { server: Ser
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
     // POST /api/rooms -> a new room, for the TV
     if (parts.length === 1 && req.method === 'POST') {
-      const room = new Room(Room.newCode((c) => rooms.has(c)), opts);
+      const room = new Room(Room.newCode((c) => rooms.has(c), opts.dir), opts);
       rooms.set(room.code, room);
       return json(res, 200, { code: room.code, hostToken: room.hostToken });
     }
     const room = getRoom(parts[1] ?? '');
     const action = parts[2];
     if (action === 'events' && req.method === 'GET') return events(req, res, room, query.get('token'));
+    // Plain text, for players at the command line (src/cli.ts with a room URL).
+    if (req.method === 'GET' && action === 'view') return text(res, room.viewText(query.get('token') ?? '', Number(query.get('log') ?? 25)));
+    if (req.method === 'GET' && action === 'status') return text(res, room.statusText());
+    if (req.method === 'GET' && action === 'wait') {
+      const secs = Math.min(Number(query.get('timeout') ?? 60) || 60, 3600);
+      const r = await room.wait(query.get('token') ?? '', secs * 1000);
+      return json(res, 200, r);
+    }
     // GET /api/rooms/CODE?token=... -> does the room exist, and is this token seated in it
     if (!action && req.method === 'GET') return json(res, 200, { seated: room.seatOf(query.get('token') ?? '') >= 0, host: query.get('token') === room.hostToken });
     if (req.method !== 'POST') return json(res, 404, { error: 'Not found.' });
@@ -105,7 +118,7 @@ export function startServer(port: number, opts: RoomOptions = {}): { server: Ser
     switch (action) {
       case 'join': {
         const seat = room.join(str(b.name));
-        return json(res, 200, { token: seat.token });
+        return json(res, 200, { token: seat.token, seat: room.seats.indexOf(seat) + 1 });
       }
       case 'bot':
         if (!room.canStart(tok)) throw new RoomError('Only the TV or the first player can add bots.');
@@ -123,10 +136,14 @@ export function startServer(port: number, opts: RoomOptions = {}): { server: Ser
         return json(res, 200, {});
       case 'do':
         if (host) throw new RoomError('The TV has no seat.');
-        room.command(tok, str(b.command));
-        return json(res, 200, {});
+        return json(res, 200, { text: room.command(tok, str(b.command)) });
     }
     return json(res, 404, { error: 'Not found.' });
+  }
+
+  function text(res: ServerResponse, body: string) {
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(body.endsWith('\n') ? body : `${body}\n`);
   }
 
   async function file(res: ServerResponse, path: string) {
@@ -158,6 +175,7 @@ export function startServer(port: number, opts: RoomOptions = {}): { server: Ser
     try {
       if (parts[0] === 'api') return await api(req, res, parts.slice(1), url.searchParams);
       if (PAGES[url.pathname]) return await file(res, PAGES[url.pathname]);
+      if (/^\/[A-Za-z]{4}\/?$/.test(url.pathname)) return await file(res, 'phone.html'); // a room's address
       return await file(res, url.pathname);
     } catch (e) {
       if (e instanceof RoomError) return json(res, 400, { error: e.message });
@@ -177,12 +195,17 @@ export function lanAddresses(): string[] {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const i = process.argv.indexOf('--port');
-  const port = Number(i > 0 ? process.argv[i + 1] : process.env.PORT ?? 8080);
-  const { server } = startServer(port);
+  const flag = (name: string) => {
+    const i = process.argv.indexOf(name);
+    return i > 0 ? process.argv[i + 1] : undefined;
+  };
+  const port = Number(flag('--port') ?? process.env.PORT ?? 8080);
+  const game = flag('--game');
+  const { server, rooms } = startServer(port, {}, game ? [resolve(game)] : []);
   server.on('listening', () => {
     const hosts = lanAddresses();
     console.log(`board-lite is running on port ${port}.`);
+    for (const r of rooms.values()) console.log(`  Hosting ${r.file} as room ${r.code}: TV http://localhost:${port}/tv?room=${r.code}`);
     console.log(`  TV:     http://localhost:${port}/tv${hosts.length ? `   (or http://${hosts[0]}:${port}/tv)` : ''}`);
     for (const h of hosts) console.log(`  Phones: http://${h}:${port}/`);
     if (!hosts.length) console.log('  No network address found: phones need to be on the same network as this machine.');

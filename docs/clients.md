@@ -1,6 +1,8 @@
 # Playing on a TV and phones
 
-The shared board runs in a browser on the TV; each player joins from their phone's browser with a room code. One machine runs the server; the TV and phones only need a browser on the same network.
+The shared board runs in a browser on the TV; each player joins from their phone's browser with a room code. One machine runs the server, which hosts the game; the TV and phones only need a browser on the same network.
+
+It's one game whatever the client: phones, the TV and the command line all use the same room interface, so a table can mix phone players, CLI players (people, or Claude playtest seats) and bots. See "Playing from the command line" below.
 
 ## Run it
 
@@ -20,19 +22,32 @@ board-lite is running on port 8080.
 ```
 
 1. **TV:** open the TV address in a browser on the TV (or on a laptop plugged into it), full screen (F11). It makes a room and shows its 4-letter code and the address phones should open.
-2. **Phones:** open the phone address (`http://<that machine's address>:8080/`), type the room code and a name, and join. Each player gets a colour.
+2. **Phones:** open the room's address the TV shows (`http://<that machine's address>:8080/ABCD`), type a name, and join. (The bare address works too; then type the code.) Each player gets a colour.
 3. **Start:** with 2 to 6 players in, press **Start game** on the TV or on the first player's phone. **Add a bot** fills an empty seat with the random test bot (handy for trying it alone).
 
 If phones can't connect: they must be on the same Wi-Fi as the server machine, and its firewall must allow the port (on Linux with ufw: `sudo ufw allow 8080/tcp`). Some guest Wi-Fi networks block devices from reaching each other.
 
-A phone that reloads or drops its connection rejoins its seat on its own (the seat is remembered in that browser). A TV that reloads keeps its room (the code is in its address). The server keeps games in memory: restarting it ends them.
+A phone that reloads or drops its connection rejoins its seat on its own (the seat is remembered in that browser). A TV that reloads keeps its room (the code is in its address). The server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change; `npm run serve -- --game <file>` hosts a saved game again (after a restart, or one started in the CLI's file mode), with every seat open for players to claim by joining.
+
+## Playing from the command line
+
+A CLI player sits at the same table. Use the room's address in place of a game file, and the seat token `join` gives you in place of the seat number:
+
+```
+node src/cli.ts join http://192.168.1.20:8080/ABCD Claude    # prints your seat and token
+node src/cli.ts view http://192.168.1.20:8080/ABCD <token>
+node src/cli.ts do   http://192.168.1.20:8080/ABCD <token> build c12 2,-1
+node src/cli.ts wait http://192.168.1.20:8080/ABCD <token>
+```
+
+Everything else is as in [`cli.md`](cli.md): the same view, the same commands, the same replies. The TV and phones update the moment a CLI player moves, and the other way round. If the first player to join is at the CLI, `node src/cli.ts start <room> <token>` starts the game.
 
 ## What's where
 
 - **TV** (everything public): the hex map with every building, each player's points, cards in hand, production per round (`2 +d3` is 2 plus a d3 roll), dragons with life stage, growth and health, the titles, open trade offers, and the last few events. Each round opens with the production dice rolling on screen. The raid takes over the screen: the three candidate kingdoms during the vote, everyone's public commitments, who has decided to fight or bail (not what), then the battle with health bars, rolls and the 10-second flee clock. A raid's result and the final scores get their own banners.
 - **Phone** (only yours): your resources, your points including secret ones, your hand, and whatever you're being asked right now. On your turn: play cards (pick the hex on a small copy of the map), special projects, the bank, trades and **End turn**. Out of turn: offer the acting player a trade, and accept or decline offers made to you. In the raid: vote, commit dragons and lock in, fight or bail in secret, stay or flee.
 
-Table talk is just talking: there's no chat, everyone is in the room.
+Table talk is just talking: there's no chat on the phones, everyone is in the room. CLI players can still `say` and `tell`; it shows in the TV's events.
 
 ## Trying it without a group
 
@@ -44,7 +59,7 @@ starts a server with a game already in round 3, played by bots except for the fi
 
 ## How it's built
 
-- `src/server/server.ts`: one `node:http` server with no dependencies. It serves `web/` and the room API (create, join, add bot, start, do a command) and pushes a fresh snapshot to every TV and phone over server-sent events whenever anything changes. The browser code is TypeScript; the server strips its types as it serves it (Node's `stripTypeScriptTypes`), so there's no build step here either.
-- `src/server/room.ts`: a room's lobby, its seats (each phone holds a secret token for its seat), the bots, and the flee clock. Every decision goes through the engine's `apply`, as in the CLI.
+- `src/server/server.ts`: one `node:http` server with no dependencies. It serves `web/` and the room API (create, join, add bot, start, do a command, plus text `view`/`wait`/`status` for the CLI) and pushes a fresh snapshot to every TV and phone over server-sent events whenever anything changes. The browser code is TypeScript; the server strips its types as it serves it (Node's `stripTypeScriptTypes`), so there's no build step here either.
+- `src/server/room.ts`: a room's game, its seats (each player, phone or CLI, holds a secret token for its seat), the bots, and the flee clock. Every decision goes through the engine's `apply`, as in the CLI's file mode.
 - `src/state.ts`: the JSON each client gets. The TV's part holds only public state; a phone's part adds that one player's resources, hand and private events. Nothing else about other players is ever sent to a phone.
 - `web/`: `tv.ts`, `phone.ts`, the shared `common.ts` (map, icons, connection) and `style.css`. `npm run typecheck` checks them too.
