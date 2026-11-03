@@ -16,8 +16,20 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--budget-usd N` | 5 | spending cap per Claude seat for the whole game |
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
+| `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
 
-It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs.
+It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.
+
+## How many games run at once
+
+Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine has 14 GB shared with everything else, including every vibrant tab. Several tabs and the orchestrator may each run a batch at the same time, so the limit is machine-wide, not per batch:
+
+- **At most 6 Claude seats run at once on the machine**, across every playtest from every tab: two 3-seat games, three 2-seat games, or one 6-seat game. `bot` seats don't count.
+- A game takes one slot per Claude seat before it starts any of them. If the slots aren't free, or free memory (`MemAvailable`) would drop under 2 GB once its seats start (counting 450 MB a seat), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once the slots free up. `--max-minutes` counts from the start, not from the wait.
+- A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Rerun it later.
+- So start a whole batch at once (all 8 games in the background is fine): the pool runs them a few at a time. Expect a batch to take about (games × seats ÷ 6) game-lengths.
+- Slots live in `~/.cache/board-lite/seat-slots/`, one file per running game naming its `--out`, so `ls` there shows who holds them. A game that dies without cleaning up frees its slots automatically (its process is gone).
+- `BOARD_LITE_MAX_SEATS=N` changes the limit, and every playtest on the machine must use the same N for it to hold; leave it alone unless the owner says so. A game with more Claude seats than the limit is refused.
 
 ## Results
 

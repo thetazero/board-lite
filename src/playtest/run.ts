@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { botMove } from '../bot.ts';
 import { RuleError, newGame, pname, score, waitingOn, type Game } from '../engine.ts';
 import { load, save, withLock } from '../store.ts';
+import { FLOOR_MB, defaultPool, release, tryAcquire } from './slots.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 
@@ -26,7 +27,11 @@ const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
   --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
   --max-minutes N                   stop the game after this long (default 240)
-  --stall-minutes N                 stop if nothing happens in the game for this long (default 15)`;
+  --stall-minutes N                 stop if nothing happens in the game for this long (default 15)
+  --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
+
+Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
+the game waits its turn when the pool is full or memory is short. See docs/playtest.md.`;
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -46,6 +51,7 @@ const effort = opt(args, '--effort');
 const budget = Number(opt(args, '--budget-usd') ?? 5);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? 15);
+const advice = opt(args, '--advice');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const out = resolve(opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
@@ -70,7 +76,7 @@ How to play:
 - Read the rules once at the start (rules tool).
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and raid commitments can be bailed on in secret. Keep messages short, like real table talk, and reply when someone talks to you.
-- Don't stop until the game is over. If you're unsure what to do, call wait.`;
+- Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
 }
 
 interface Seat { p: number; model: string; session: string; proc: ChildProcess | null; starts: number; cost: number; exitedAt: number }
@@ -163,6 +169,7 @@ function writeResults(g: Game, status: string, started: number) {
   const results = {
     status,
     seed,
+    ...(advice ? { advice } : {}),
     rounds: g.round,
     minutes: Math.round((Date.now() - started) / 600) / 100,
     winner: g.winner === null ? null : { seat: pname(g.winner), model: models[g.winner] },
@@ -173,20 +180,46 @@ function writeResults(g: Game, status: string, started: number) {
   return results;
 }
 
-async function main() {
-  const started = Date.now();
-  note(`Playtest in ${out}: ${models.map((m, p) => `${pname(p)} ${m}`).join(', ')}; seed ${seed}.`);
-  for (const s of seats) if (s.model !== 'bot') startSeat(s);
-  let lastLen = -1, lastChange = Date.now();
-  let status = 'running';
-  const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
-  process.on('SIGINT', () => { status = 'interrupted'; stopAll(); });
+const pool = defaultPool();
+
+/** Blocks until this game's Claude seats fit in the machine-wide pool. */
+async function admit(): Promise<boolean> {
+  const claudeSeats = seats.filter((s) => s.model !== 'bot').length;
+  let said = '';
   for (;;) {
+    const r = tryAcquire(pool, claudeSeats, out);
+    if (r.ok) return true;
+    const kind = r.why.replace(/[\d.]+/g, '#'); // don't log every change in a number
+    if (kind !== said) { note(`Waiting to start: ${r.why}.`); said = kind; }
+    await new Promise((res) => setTimeout(res, 5000));
+    if (interrupted) return false;
+  }
+}
+
+let interrupted = false;
+
+async function main() {
+  note(`Playtest in ${out}: ${models.map((m, p) => `${pname(p)} ${m}`).join(', ')}; seed ${seed}.`);
+  const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
+  process.on('SIGINT', () => { interrupted = true; stopAll(); });
+  process.on('SIGTERM', () => { interrupted = true; stopAll(); });
+  process.on('exit', () => release(pool));
+  let status = 'running';
+  if (!(await admit())) status = 'interrupted';
+  const started = Date.now();
+  if (status === 'running') for (const s of seats) if (s.model !== 'bot') startSeat(s);
+  let lastLen = -1, lastChange = Date.now(), lowSince = 0;
+  for (;;) {
+    if (status !== 'running') break;
     await new Promise((r) => setTimeout(r, 1000));
     playBots();
     const g = load(gameFile);
     if (g.log.length !== lastLen) { lastLen = g.log.length; lastChange = Date.now(); }
-    if (status === 'interrupted') break;
+    if (interrupted) { status = 'interrupted'; break; }
+    // Free memory under the floor for 10 s: stop this game before the machine OOMs.
+    if (pool.memAvailableMb() >= FLOOR_MB) lowSince = 0;
+    else if (!lowSince) lowSince = Date.now();
+    else if (Date.now() - lowSince > 10000) { status = 'low memory'; break; }
     if (g.phase === 'over') {
       // Give the players a moment to see the end and sign off.
       const until = Date.now() + 120000;
@@ -201,7 +234,6 @@ async function main() {
       if (s.starts >= 30) { status = `${pname(s.p)} kept stopping`; break; }
       if (Date.now() - s.exitedAt > 3000) startSeat(s);
     }
-    if (status !== 'running') break;
   }
   if (status === 'running') status = 'over';
   stopAll();

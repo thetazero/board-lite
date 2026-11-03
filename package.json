@@ -10,6 +10,7 @@
   "scripts": {
     "game": "node src/cli.ts",
     "serve": "node src/server/server.ts",
+    "datasheet": "node src/datasheet.ts",
     "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts",
     "ci": "npm run typecheck && npm test"

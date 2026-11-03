@@ -8,11 +8,11 @@ Living design doc. Decisions here were made in conversation with the project own
 - When a playtest shows a problem, assume a poorly designed system first, not a bug to patch. In the owner's words: "often times 'x' happens due to poorly designed game systems, not because of bugs that need to be patched away... design simple core system that work well, not add a million edge cases."
 - A fix should make the rules simpler or keep them the same size. A fix that adds a special case, exception or extra rule is the wrong fix unless nothing simpler works, and then something else should go.
 - Depth test: Haiku players should regularly lose to Opus players. If they don't, the game has no depth.
-- Provisional design calls made without the owner are recorded, with reasoning, in `docs/decisions.md`.
+- Provisional design calls made without the owner carry their reasoning in the commit message and PR description that make them. There is no separate decision log.
 
 ### Complexity budget
 
-Hard ceilings, set provisionally by the orchestrator at the owner's request ("try to force this by asserting certain complexity maximums"). Changes must stay within them; raising one is a design decision recorded in `docs/decisions.md`.
+Hard ceilings, set provisionally by the orchestrator at the owner's request ("try to force this by asserting certain complexity maximums"). Changes must stay within them; raising one is a design call, with its reasoning in the commit and PR that raise it.
 
 - The full rules, not counting individual card text, fit on one printed page.
 - 5 resources (stone, timber, crystal, livestock, gold). No more.
@@ -170,12 +170,12 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 
 ## Open questions
 
-- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
+- Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length. `docs/datasheet.md` shows the current numbers and what they add up to.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
 
 ### Filled in provisionally by the first rules engine
 
-The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in `docs/decisions.md` (2026-11-02, first rules engine), and `docs/rules.md` has the rules as played.
+The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in the first rules engine's PR (#3), and `docs/rules.md` has the rules as played.
 
 - Card picking: cards are dealt (2 building, 1 action), with no choice among them.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
