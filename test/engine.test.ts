@@ -70,7 +70,7 @@ test('the final standings put the winner first and mark ties', () => {
 });
 
 test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {
-  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls! \S+ each take|\ba (adult|egg)\b/;
+  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls\. \S+ each take|\ba (adult|egg)\b/;
   for (let players = 2; players <= 6; players++) {
     for (let seed = 1; seed <= 10; seed++) {
       const g = newGame(players, seed);
@@ -117,10 +117,10 @@ test('votes and fight-or-bail choices stay secret until revealed', () => {
   assert.ok(!playerView(g, 1, 1000).includes('bail!'));
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
   apply(g, 1, 'fight');
-  assert.ok(playerView(g, 1, 1000).includes('P1 bails!'));
+  assert.ok(playerView(g, 1, 1000).includes('P1 bails.'));
   // There is no retreat: the fight plays out to the end with no more choices.
   assert.equal(g.raid, null);
-  assert.match(playerView(g, 1, 1000), /falls!|holds\./);
+  assert.match(playerView(g, 1, 1000), /falls\.|holds\./);
 });
 
 test('everyone starts with an egg, and a raid nobody can fight is skipped', () => {
@@ -354,7 +354,7 @@ test('building cards count their neighbours, whoever owns them', () => {
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
   for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
   g.map[spot].terrain = 'plains';
-  // Cliff Works makes 1 stone a round for each neighbouring mountain.
+  // Cliff Works makes 1 stone each round for each adjacent mountain.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);
   const stone = () => production(g, 0).stone.base;
@@ -363,7 +363,7 @@ test('building cards count their neighbours, whoever owns them', () => {
   g.map[around[0]].terrain = 'mountain';
   g.map[around[1]].terrain = 'mountain';
   assert.equal(stone(), base + 2);
-  // A monument counts neighbouring monuments: the tower is one, and so is anyone else's monument.
+  // A monument counts adjacent monuments: the tower is one, and so is anyone else's monument.
   g.players[0].hand.push({ id: 'cmo', deck: 'building', key: 'monument' });
   const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
   apply(g, 0, `build cmo ${next}`);
@@ -547,7 +547,7 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
   g.dragons.push(extra);
   apply(g, 0, `clear ${PEAK} ${d.id}`);
   assert.equal(g.map[PEAK].fauna, 'thunderbird');
-  assert.throws(() => apply(g, 0, `clear ${PEAK} d90`), /one try a round/);
+  assert.throws(() => apply(g, 0, `clear ${PEAK} d90`), /1 try each round/);
   // Next round: three adult ice dragons, its weakness.
   g.round++;
   g.dragons = g.dragons.filter((x) => x.owner !== 0);
@@ -623,7 +623,7 @@ test('a lost fight leaves the beast at full health on its hex', () => {
   assert.equal(d.damage, DRAGONS[d.key].stages[0].hp); // knocked out
 });
 
-test('fauna cards put a beast on any land hex but a tower, shutting down a building', () => {
+test('fauna cards place a beast on any land hex with no tower or beast, shutting down a building', () => {
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
   apply(g, 0, 'end');

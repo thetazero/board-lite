@@ -86,7 +86,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Card | Kind | Cost | Value | Does |
 |---|---|---|---|---|
 | Roost | basic building | 2 stone, 2 timber | 4 | Houses 2 more dragons. |
-| Hatchery | building card | 3 stone, 3 timber, 3 crystal | 9 | Your growing dragons grow one extra step each round. |
+| Hatchery | building card | 3 stone, 3 timber, 3 crystal | 9 | Your dragons grow 1 extra step each round. |
 | Port | building card | 1 stone, 3 timber, 1 livestock | 5 | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
 | Nesting Grounds | upgrade (dragon building) | 2 stone, 1 timber | 3 | This roost, hatchery or tower houses 2 more dragons. |
 | Trade Charter | upgrade (trade building) | 2 stone, 4 gold | 18 | This port or market makes 1 more gold each round. Pays back in 4.5 rounds. |

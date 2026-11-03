@@ -187,7 +187,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
   switch (ev.k) {
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
-    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">healing</em>' : `<em class="st-${ev.why}">${ev.why}</em>`}`;
+    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">Healing</em>' : '<em class="st-hungry">Hungry</em>'}`;
     case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
     case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
@@ -202,14 +202,14 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'decline': return `${who(ev.p)} <span class="no">✗</span> ${who(ev.from)}`;
     case 'title': return `<span class="title-badge">${icon(TITLE_ICON[ev.t], 1.1)}${esc(g.titles.find((t) => t.key === ev.t)?.name ?? '')}</span><span class="arrow">➜</span>${ev.p === null ? '<span class="none">—</span>' : who(ev.p)}`;
     case 'discard': return `${who(ev.p)} −${ev.n}${icon('cards', 1.2)}`;
-    case 'target': return `${icon('raid', 1.3)} <b>${esc(ev.name)}</b>${ev.coin ? ' <small>coin flip</small>' : ''}`;
+    case 'target': return `${icon('raid', 1.3)} <b>${esc(ev.name)}</b>${ev.coin ? ' <small>by coin flip</small>' : ''}`;
     case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
     case 'raidEnd': return ev.won
       ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(' ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'everyone bailed' : 'nobody went'}</span>`;
+    case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}</span>`;
     case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
-    case 'cleared': return `${who(ev.p)} ${icon(ev.fauna, 1.5)} ${ev.won ? ev.points ? `<span class="ok">slain</span> +${ev.points}${icon('points', 1.2)}` : `<span class="ok">cleared</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
+    case 'cleared': return `${who(ev.p)} ${icon(ev.fauna, 1.5)} ${ev.won ? ev.points ? `<span class="ok">slain</span> +${ev.points}${icon('points', 1.2)}` : `<span class="ok">falls</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
     default: return '';
   }
 }
@@ -254,9 +254,9 @@ export function powerTag(n: number, cls = ''): string {
 
 // Why a dragon sits out, or its health. A healing one shows the rounds until it can raid.
 export function dragonState(d: DragonView, round: number): string {
-  if (d.resting === 'hungry') return '<em class="st-hungry">hungry</em>';
-  if (d.resting === 'hunted') return `<em class="st-hunted">hunted</em>${hpBar(d.hp, d.maxHp)}`;
-  if (d.backIn !== null && !d.canRaid) { const n = d.backIn - round; return `<em class="st-healing" title="can raid again in ${n} round${n === 1 ? '' : 's'}">healing ${n}</em>`; }
+  if (d.resting === 'hungry') return '<em class="st-hungry">Hungry</em>';
+  if (d.resting === 'hunted') return `<em class="st-hunted">Fought</em>${hpBar(d.hp, d.maxHp)}`;
+  if (d.backIn !== null && !d.canRaid) { const n = d.backIn - round; return `<em class="st-healing" title="Raid-ready again in ${n} round${n === 1 ? '' : 's'}">Healing ${n}</em>`; }
   return d.stage ? hpBar(d.hp, d.maxHp) : '';
 }
 
@@ -392,5 +392,5 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
 // How the winner won a tie, if they did.
 export function tiebreakNote(g: PublicState): string {
   const w = g.standings![0];
-  return w.tiebreak === 'gold' ? `Won the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Won the tie by going first this round' : '';
+  return w.tiebreak === 'gold' ? `Wins the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
 }

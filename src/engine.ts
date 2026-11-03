@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -369,7 +369,7 @@ function updateTitles(g: Game) {
     const next = best < TUNING.titleMinimum[t] ? null : holder !== null && leaders.includes(holder) ? holder : leaders.length === 1 ? leaders[0] : null;
     if (next !== holder) {
       g.titles[t] = next;
-      log(g, next === null ? `Nobody holds ${TITLE_NAMES[t]} now.` : `${pname(next)} takes ${TITLE_NAMES[t]}.`, { k: 'title', t, p: next });
+      log(g, next === null ? `No one holds ${TITLE_NAMES[t]} now.` : `${pname(next)} takes ${TITLE_NAMES[t]}.`, { k: 'title', t, p: next });
     }
   }
 }
@@ -484,7 +484,7 @@ function startRound(g: Game) {
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
     d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
-    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? "is healing: it won't raid this round" : "goes hungry: it won't grow or raid this round"}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
+    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing and sits out this round\'s raids' : 'goes hungry: it doesn\'t grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
@@ -562,7 +562,7 @@ function startRaid(g: Game) {
   g.phase = 'raid';
   const n = g.players.length;
   if (!g.dragons.some(canRaid)) {
-    log(g, 'Nobody has a dragon that can raid: no raid this time.', { k: 'noRaid', why: 'nobody' });
+    log(g, 'No one has a raid-ready dragon: no raid this round.', { k: 'noRaid', why: 'nobody' });
     finishRaid(g);
     return;
   }
@@ -657,7 +657,7 @@ function resolveCommit(g: Game) {
   const raid = g.raid!;
   const committed = raid.commits.flatMap((c, p) => (c.length ? [p] : []));
   if (committed.length === 0) {
-    log(g, 'Nobody commits to the raid.', { k: 'noRaid', why: 'nobody' });
+    log(g, 'No one raids.', { k: 'noRaid', why: 'nobody' });
     return finishRaid(g);
   }
   log(g, `Commitments lock in: ${committed.map((p) => `${pname(p)} (${raid.commits[p].join(' ')})`).join(', ')}. Each now secretly chooses to fight or bail.`, { k: 'locked', ps: committed });
@@ -669,10 +669,10 @@ function resolveBail(g: Game) {
   const fighters: number[] = [];
   for (let p = 0; p < g.players.length; p++) {
     if (raid.choices[p] === 'fight') fighters.push(p);
-    if (raid.choices[p] === 'bail') log(g, `${pname(p)} bails!`, { k: 'bail', p });
+    if (raid.choices[p] === 'bail') log(g, `${pname(p)} bails.`, { k: 'bail', p });
   }
   if (fighters.length === 0) {
-    log(g, 'Everyone bailed. The raid is off.', { k: 'noRaid', why: 'bailed' });
+    log(g, 'Everyone bails. The raid is off.', { k: 'noRaid', why: 'bailed' });
     return finishRaid(g);
   }
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
@@ -782,7 +782,7 @@ function checkRaidOver(g: Game): boolean {
     }
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
-    log(g, `${TARGETS[raid.target!].name} falls! ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
+    log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
     finishRaid(g);
     return true;
   }
@@ -805,7 +805,7 @@ function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   const def = faunaDef(f);
   const great = BEASTS[f];
   if (great) {
-    if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: one try a round.`);
+    if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: 1 try each round.`);
     g.beastTried[p] = g.round;
   }
   for (const d of ds) d.resting = 'hunted';
@@ -820,8 +820,8 @@ function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   }
   const prize = great ? `${great.points} point${great.points === 1 ? '' : 's'}, for good` : bundleText(def.loot);
   const text = won
-    ? great ? `The ${def.name} is slain! ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and around its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} is cleared! ${pname(p)} takes ${prize}.`
-    : `The ${def.name} at ${k} drives ${pname(p)}'s dragons off.`;
+    ? great ? `The ${def.name} is slain. ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} falls. ${pname(p)} gains ${prize}.`
+    : `The ${def.name} at ${k} holds. ${pname(p)}'s dragons fall back.`;
   log(g, text, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? def.loot : {}, ...(great && won ? { points: great.points } : {}) });
 }
 
@@ -889,10 +889,10 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (!hex) fail(`${k} is not on the map.`);
   if (hex.terrain === 'ocean') fail(`${k} is ocean; nothing is built on the ocean.`);
   if (g.buildings[k]) fail(`${k} already has a building.`);
-  if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it with your dragons first.`);
-  if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from next door: slay it first.`);
-  if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${def.terrain}; ${k} is ${hex.terrain}.`);
-  if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} doesn't touch any of your buildings.`);
+  if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it first.`);
+  if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from an adjacent hex: slay it first.`);
+  if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${TERRAIN_NOUN[def.terrain]}; ${k} is ${TERRAIN_NOUN[hex.terrain]}.`);
+  if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} isn't adjacent to any of your buildings.`);
   return k;
 }
 
@@ -934,7 +934,7 @@ export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object
 
 function hatch(g: Game, p: number, dragonKey: string, project = false) {
   const mine = g.dragons.filter((d) => d.owner === p).length;
-  if (mine >= dragonCapacity(g, p)) fail(`You have no room for another dragon (${mine}/${dragonCapacity(g, p)}). Build a roost first.`);
+  if (mine >= dragonCapacity(g, p)) fail(`No room for another dragon (${mine}/${dragonCapacity(g, p)}): build a roost first.`);
   const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, resting: '' };
   g.dragons.push(d);
   log(g, `${pname(p)} hatches an egg: ${dragonName(d)} (${d.id}), a ${DRAGONS[dragonKey].element} dragon${project ? ', as a special project' : ''}.`, { k: 'hatch', p, d: d.id, ...(project ? { project } : {}) });
@@ -1039,7 +1039,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const el = ELEMENTS.find((e) => e === what);
       if (el) {
         const dk = PROJECT_DRAGONS[el];
-        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`You have no room for another dragon.`);
+        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`No room for another dragon: build a roost first.`);
         pay(pl, specialProjectCost(DRAGONS[dk].cost));
         return hatch(g, p, dk, true);
       }
@@ -1049,7 +1049,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const c = handCard(g, p, args[0]);
       const kind = cardKind(c);
       if (kind === 'dragon') {
-        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`You have no room for another dragon. Build a roost first.`);
+        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`No room for another dragon: build a roost first.`);
         pay(pl, DRAGONS[c.key].cost);
         discardCard(g, p, c);
         return hatch(g, p, c.key);
@@ -1100,13 +1100,13 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         case 'send_fauna': {
           const coords = parseKey(args[1] ?? '');
           const k = coords ? key(...coords) : '';
-          if (!faunaHexes(g).includes(k)) fail(`Say where to put the ${FAUNA[def.fauna!].name}: a land hex without fauna or a tower, like "play ${c.id} 2,-1".`);
+          if (!faunaHexes(g).includes(k)) fail(`Say where to place the ${FAUNA[def.fauna!].name}: a land hex with no tower or beast, like "play ${c.id} 2,-1".`);
           pay(pl, def.cost);
           g.map[k].fauna = def.fauna!;
           ev.hex = k;
           ev.fauna = def.fauna!;
           const b = g.buildings[k];
-          what = `puts a ${FAUNA[def.fauna!].name} on ${k}${b ? `, on ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}`;
+          what = `places a ${FAUNA[def.fauna!].name} on ${k}${b ? `, on ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}`;
           break;
         }
         case 'extra_raid':

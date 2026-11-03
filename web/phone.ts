@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -20,7 +20,8 @@ let stop: (() => void) | null = null;
 
 // UI state that lives only on this phone (not in the game).
 let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
-let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string> } | null = null;
+// Picking a hex: what for (`about`: what's being placed, shown under the map).
+let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string } | null = null;
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
 let hunting: { hex: string; chosen: Set<string> } | null = null;
 let openCard: string | null = null;
@@ -166,7 +167,7 @@ function renderLobby() {
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
       <p class="muted">Room <b>${esc(l.code)}</b></p>
       <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
-      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>
+      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start game</button>
         <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
       : '<p class="hint">The first player or the TV starts the game.</p>'}
       <button id="leave" class="ghost">Leave</button>
@@ -228,7 +229,7 @@ function status(g: PublicState, me: Me): string {
   if (g.phase === 'over') return `<div class="status you"><span>${g.winner === me.seat ? 'You win!' : `${playerTag(g.winner!, names)} wins`}</span></div>`;
   if (me.deciding) {
     let what = '';
-    if (g.phase === 'action') what = me.myTurn ? 'Your turn!' : 'An offer for you';
+    if (g.phase === 'action') what = me.myTurn ? 'Your turn' : 'An offer for you';
     else if (g.phase === 'discard') what = `Discard ${me.hand.length - me.handCap} <span class="over">${icon('cards', 1.2)}${me.hand.length}/${me.handCap}</span>`;
     else if (g.phase === 'cards') what = `Keep 1 ${icon('cards', 1.2)}`;
     else if (g.raid?.step === 'vote') what = `${icon('raid', 1.3)} Vote`;
@@ -260,8 +261,10 @@ function render() {
   const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
-  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
+  // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
+  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   fitHand();
+  fitMap(g);
   wire(g, me);
 }
 
@@ -282,8 +285,13 @@ function fitHand() {
   const hs = Math.max(1, Math.min(byHeight, byWidth));
   document.body.style.setProperty('--hs', hs.toFixed(3));
 }
-addEventListener('resize', () => { if (snap?.game && snap.you) fitHand(); });
-document.fonts?.ready.then(() => { if (snap?.game && snap.you) fitHand(); }); // the buttons' height changes once the web fonts are in
+function refit() {
+  if (!snap?.game || !snap.you) return;
+  fitHand();
+  fitMap(snap.game);
+}
+addEventListener('resize', refit);
+document.fonts?.ready.then(refit); // the buttons' height changes once the web fonts are in
 
 // The trade form is open, so tapping a card in the hand offers it.
 function tradeOpen(g: PublicState, me: Me): boolean {
@@ -324,6 +332,9 @@ function actionView(g: PublicState, me: Me): string {
   const end = !me.myTurn ? '' : incoming ? '<button id="end" class="primary big endturn" disabled>Answer the offer to end your turn</button>' : '<button id="end" class="primary big endturn">End turn</button>';
   return `${incoming}${mine}${tabs}${content}${clear}${end}`;
 }
+
+// "1 dragon", "2 dragons".
+const dragons = (n: number) => `${n} dragon${n === 1 ? '' : 's'}`;
 
 const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon' };
 
@@ -366,12 +377,12 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
   if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
   else if (!playable) actions = '';
   else if (c.blocked) actions = `<p class="blocked">${iconText(esc(c.blocked))}</p>`;
-  else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch it' : c.kind === 'action' ? 'Play it' : 'Build it'}</button>`;
+  else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch' : c.kind === 'action' ? 'Play' : c.kind === 'upgrade' ? 'Upgrade' : 'Build'}</button>`;
   else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn" data-play="${c.id} ${r}" aria-label="${r}">${resIcon(r, 1.9)}</button>`).join('')}</div>`;
   else if (c.needs === 'dragon') actions = `<div class="row">${c.dragons.map((id) => `<button data-play="${c.id} ${id}">${esc(dragonLabel(id))}</button>`).join('')}</div>`;
-  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : c.kind === 'action' ? 'Choose where to send it' : 'Choose where to build'}</button>`;
-  else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build it</button>`;
-  else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch it' : 'Play it'}</button>`;
+  else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Upgrade' : c.fauna ? 'Place' : c.kind === 'action' ? 'Play' : 'Build'}</button>`;
+  else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build</button>`;
+  else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch' : 'Play'}</button>`;
   return `<div class="zoom" id="zoom">
     <div class="card big k-${c.kind}" style="--kc:${frameColor(c.kind, c.element)}">
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
@@ -421,7 +432,7 @@ function moreView(me: Me): string {
     <section class="panel"><h3>Basic buildings</h3>${basics}</section>
     <section class="panel"><h3>Special projects</h3>
       <div class="proj${eggOk ? '' : ' dim'}"><b>Base dragon egg</b> ${resChips(egg.cost)}</div>
-      <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost.</p>'}</section>
+      <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost first.</p>'}</section>
     <section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Get</span>${pick('get', bank.get)}</div>
@@ -468,19 +479,77 @@ function huntView(g: PublicState, me: Me): string {
   const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
   const n = hunting!.chosen.size;
   const sent = [...hunting!.chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
-  // A great beast pays in points, for good; it's one try a round, to the end.
+  // A great beast pays in points, for good; it's 1 try each round, to the end.
   const great = h.fauna.points !== undefined;
   const prize = great ? iconText(`${h.fauna.points} point`, 1.4) : resChips(h.fauna.loot, 1.4);
-  return `<h3 class="huntname">Fight the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${prize}</div></section>
+  return `<h3 class="huntname">${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${prize}</div></section>
     ${list}
-    <p class="hint">They miss this round's raids.${great ? ' One try a round.' : ''}</p>
-    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} Send ${n || ''}${n ? ` ${powerTag(sent)}` : ''}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
+    <p class="hint">Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}</p>
+    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
 }
 
+// Picking a hex: the map, what you're placing and Cancel, on one screen. The
+// map takes all the height the rest leaves (fitMap), so it isn't a small map
+// up top with a third of the screen empty under it.
 function hexPicker(g: PublicState): string {
   return `<section class="picker"><h3>${esc(picking!.title)}</h3>
-    <div class="pmap">${mapSvg(g.map, { size: 40, selectable: picking!.hexes, labels: picking!.labels })}</div>
-    <button id="cancelpick" class="ghost">Cancel</button></section>`;
+    <div class="pmap">${mapSvg(g.map, { size: MAP_SIZE, selectable: picking!.hexes, labels: picking!.labels })}</div>
+    ${picking!.about}
+    <button id="cancelpick" class="ghost big">Cancel</button></section>`;
+}
+
+// What a pick is for, under the map: the card (or basic building) being placed,
+// small, with its rule text, so the numbers on the hexes have their reason in view.
+function pickAbout(art: string, name: string, text: string, color: string): string {
+  return `<div class="pabout" style="--kc:${color}"><span class="pabart">${art}</span><span><b>${esc(name)}</b><small>${iconText(esc(text))}</small></span></div>`;
+}
+
+const MAP_SIZE = 40;
+const SIDEWAYS = '(orientation: landscape) and (max-height: 600px)'; // as in style.css
+// The picker's map fills the room below the page's content, down to the talk
+// bar. Where the hexes to pick sit in one part of the map, it zooms in on them
+// (with a sliver of what lies around them) as far as the room allows; where
+// they're spread over all of it, it shows all of it but the outer sea. It never
+// shrinks below a screen's worth, so a short or sideways screen scrolls to it instead.
+function fitMap(g: PublicState) {
+  const svg = app.querySelector<SVGSVGElement>('.pmap svg');
+  const main = app.querySelector<HTMLElement>('.pbody');
+  if (!svg || !main || !picking) return;
+  const box = svg.parentElement!;
+  const pad = parseFloat(getComputedStyle(box).paddingTop) + parseFloat(getComputedStyle(box).paddingBottom);
+  svg.style.height = '0px';
+  // Sideways, the map stands beside the rest (style.css), taking up to three fifths of the width.
+  const beside = matchMedia(SIDEWAYS).matches;
+  const w = beside ? 0.6 * box.parentElement!.clientWidth - pad : box.clientWidth - pad;
+  const free = innerHeight - parseFloat(getComputedStyle(document.body).paddingBottom) - (main.getBoundingClientRect().bottom + scrollY);
+  // The least it gets: what shows between the header (it stays put) and the talk bar, scrolled to.
+  const head = app.querySelector<HTMLElement>('.mehead')?.offsetHeight ?? 0;
+  const screen = innerHeight - head - parseFloat(getComputedStyle(document.body).paddingBottom) - pad - 8;
+  const h = Math.max(free, Math.min(0.7 * w, screen));
+  const bounds = (keys: Set<string> | null, mx: number, my = mx) => {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const hx of g.map) {
+      if (keys && !keys.has(hx.k)) continue;
+      const [x, y] = hexCenter(hx.q, hx.r, MAP_SIZE);
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    return { x0: x0 - mx, x1: x1 + mx, y0: y0 - my, y1: y1 + my };
+  };
+  const all = bounds(null, MAP_SIZE * 1.1); // as mapSvg frames it
+  const picks = picking.hexes.length ? bounds(new Set(picking.hexes), MAP_SIZE, MAP_SIZE * 1.3) : all; // the picks whole, a sliver around
+  // At least about six hexes across and five rows down, so a lone pick still shows where it is.
+  const tw = Math.max(picks.x1 - picks.x0, MAP_SIZE * 10.4), th = Math.max(picks.y1 - picks.y0, MAP_SIZE * 8);
+  const W = all.x1 - all.x0, H = all.y1 - all.y0;
+  const s = Math.max(Math.min(w / tw, h / th), Math.min(w / W, h / H)); // px per map unit
+  const vh = Math.min(H, h / s);
+  // Beside the panel, width the map can't fill goes to the panel instead.
+  const vw = Math.min(W, w / s, beside ? Math.max(tw, vh) : Infinity);
+  const clamp = (c: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, c));
+  const cx = clamp((picks.x0 + picks.x1) / 2, all.x0 + vw / 2, all.x1 - vw / 2);
+  const cy = clamp((picks.y0 + picks.y1) / 2, all.y0 + vh / 2, all.y1 - vh / 2);
+  svg.setAttribute('viewBox', `${cx - vw / 2} ${cy - vh / 2} ${vw} ${vh}`);
+  svg.style.width = `${vw * s}px`;
+  svg.style.height = `${vh * s}px`;
 }
 
 // ---- raid ----
@@ -510,7 +579,7 @@ function raidView(g: PublicState, me: Me): string {
       const d = dragon(id);
       return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
     }).join('');
-    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
+    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${dragons(committed.size)} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
@@ -563,7 +632,7 @@ function gameOver(g: PublicState, me: Me): string {
     <div class="hero">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]))}</div>
     <h1>${w === me.seat ? 'You win!' : `${playerTag(w, names)} wins!`}</h1>
     ${note ? `<p class="tiebreak">${note}</p>` : ''}
-    ${w === me.seat ? '' : `<p class="mine">You came ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
+    ${w === me.seat ? '' : `<p class="mine">You finish ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
     ${standingsHtml(g, names, me.seat)}
     <button id="newgame" class="primary big">New game</button>
   </div>`;
@@ -634,7 +703,7 @@ function renderTalk() {
   const lines = me.talk;
   const mine = (text: string) => text.startsWith(`P${me.seat + 1} `);
   const atBottom = talk.list.scrollHeight - talk.list.scrollTop - talk.list.clientHeight < 40;
-  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>Nobody has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
+  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>No one has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
   if (atBottom) talk.list.scrollTop = talk.list.scrollHeight;
   const last = lines.at(-1);
   if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
@@ -672,14 +741,16 @@ function wire(g: PublicState, me: Me) {
     const c = me.hand.find((x) => x.id === el.dataset.pickhex)!;
     const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build';
     const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
-    const title = c.fauna ? `Send the ${c.fauna.name} where?` : `${c.kind === 'upgrade' ? 'Put' : 'Build'} ${c.name}${c.kind === 'upgrade' ? ' on…' : ' where?'}`;
-    picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels };
+    const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
+    const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
+    picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about };
     render();
   });
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
     if (b.onTower) return send(`build ${b.key}`);
-    picking = { title: `Build a ${b.name} where?`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}` };
+    const about = pickAbout(cardArt('building', b.key, undefined, b.cls), b.name, b.text, frameColor('building'));
+    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}`, about };
     render();
   });
   bind('[data-keep]', (el) => send(`keep ${el.dataset.keep}`));
@@ -693,7 +764,8 @@ function wire(g: PublicState, me: Me) {
     if (!cmd.startsWith('hunt ')) send(cmd);
   }));
   on('hunt', () => {
-    picking = { title: 'Clear which beast?', hexes: me.huntable, command: (h) => `hunt ${h}` };
+    const about = '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is free and its loot is yours.</p>';
+    picking = { title: 'Choose a beast to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });
   bind('[data-hunter]', (el) => {
