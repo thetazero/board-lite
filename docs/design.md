@@ -45,7 +45,13 @@ Living design doc. Decisions here were made in conversation with the project own
 ## Winning
 
 - Victory points decide the winner (not the size of the gold hoard).
-- Where points come from is still open; see open questions.
+- The game ends when a player reaches N points (first to N).
+- Point sources:
+  - Dragons, by life stage.
+  - Buildings: some building cards are worth points (e.g. tower floors, monuments).
+  - Upgrades can add points to their building.
+  - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
+  - Titles that change hands, like Catan's "longest road": e.g. "strongest dragon army", and others.
 
 ## Buildings
 
@@ -53,6 +59,7 @@ Living design doc. Decisions here were made in conversation with the project own
 - Two kinds of cards for them:
   1. Building cards.
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
+- Costs: upgrades skew gold-heavy; raw builds skew resource-heavy.
 - Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
 ### Special projects
@@ -118,7 +125,7 @@ Living design doc. Decisions here were made in conversation with the project own
 ## Open questions
 
 - Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
-- Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
+- Victory points: the value of N; which titles exist; whether raids also give points (raid trophies) or only loot.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
 - Action cards: what they do.
