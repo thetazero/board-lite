@@ -7,7 +7,7 @@
 
 import { botStep } from '../bot.ts';
 import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
-import { apply, newGame, score, waitingOn, type Game } from '../engine.ts';
+import { apply, newGame, score, turnOrder, waitingOn, type Game } from '../engine.ts';
 import { PEAK, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -131,7 +131,7 @@ function blockedReasons(g: Game, p: number) {
   return [...seen.values()];
 }
 // How the last raid ended, as the log says it.
-const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone bails|No one raids/.test(e.text))?.text ?? '';
+const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone bails|No one raids|no raid this round/.test(e.text))?.text ?? '';
 const raidOver = (g: Game) => g.raid === null || g.raid.step === 'vote';
 const drain = (g: Game, p: number) => Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 0));
 
@@ -696,7 +696,7 @@ export const SCENES: Scene[] = [
   {
     name: 'raid-bailed-2p',
     players: 2,
-    seed: 1,
+    seed: 77,
     until: (g) => step(g) === 'bail' && committed(g) >= 1,
     live: raidOver,
     liveEnd: (g) => /Everyone bails/.test(raidOutcome(g)),
@@ -706,11 +706,11 @@ export const SCENES: Scene[] = [
     name: 'raid-nobody-3p',
     players: 3,
     seed: 1,
-    // With no dragon able to raid, the commit step is skipped: the raid ends on the last vote.
-    until: (g) => step(g) === 'vote' && g.raid!.votes.filter((v) => v === null).length === 1 && g.players.every((_, p) => !seatState(g, p).raidReady.length),
-    live: (g) => g.raid === null || g.raid.votes.every((v) => v === null), // this raid is over (the next one, if any, hasn't had a vote)
-    liveEnd: (g) => /No one raids/.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-nobody-3p', caption: 'TV: nobody commits to the raid', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    // Everyone starts with an egg, so round 1 has no raid: it ends on the last player's turn.
+    until: (g) => g.round === 1 && g.phase === 'action' && g.turn === turnOrder(g).at(-1),
+    live: (g) => g.round > 1,
+    liveEnd: (g) => /no raid this round/.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-nobody-3p', caption: 'TV: no one has a raid-ready dragon yet, so there is no raid', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
     // The round's last raid is fought, then the next round opens: two banners back to back.

@@ -439,7 +439,7 @@ export function newGame(players: number, seed: number): Game {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [], choice: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: 1, growth: 0, damage: 0, resting: '' });
+    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: TUNING.startingDragonStage, growth: 0, damage: 0, resting: '' });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins (checked at the end of each round).`, { k: 'begin', players });
   startRound(g);
@@ -561,6 +561,11 @@ function endTurn(g: Game) {
 function startRaid(g: Game) {
   g.phase = 'raid';
   const n = g.players.length;
+  if (!g.dragons.some(canRaid)) {
+    log(g, 'No one has a raid-ready dragon: no raid this round.', { k: 'noRaid', why: 'nobody' });
+    finishRaid(g);
+    return;
+  }
   g.raid = {
     step: 'vote',
     candidates: shuffle(g.rng, Object.keys(TARGETS)).slice(0, TUNING.raidCandidates),
