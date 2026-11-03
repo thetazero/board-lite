@@ -395,24 +395,24 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 /* Cards: illustrated paper. Cream card stock, the picture in a window, the
    name on a strip of the kind's coloured paper (dragons: their element), the
    cost on the stock below. A faint grain sits over all of it. */
-.handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.9em; z-index: 15; width: min(100vw, 34em); height: 9.4em; transform: translateX(-50%); pointer-events: none; }
+.handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.9em; z-index: 15; width: min(100vw, 34em); height: calc(9.4em * var(--hs, 1)); transform: translateX(-50%); pointer-events: none; }
 .handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: linear-gradient(to top, var(--bg) 55%, transparent); }
 .handfan.empty { height: auto; pointer-events: auto; text-align: center; }
 .handfan.empty .hint { position: relative; margin: 0 1em .8em; }
 /* Each card: placed by its share of the spread (--x), tilted (--r) and dropped along the arc (--y). */
-.handfan .card { position: absolute; left: calc(50% - var(--cw) / 2 + var(--x) * min(37% - var(--cw) / 2, (var(--n) - 1) * 2.6em)); top: .6em; width: var(--cw); font-size: .78em; pointer-events: auto;
-  transform: translateY(var(--y)) rotate(var(--r)); transform-origin: 50% 160%; transition: transform .15s; }
+.handfan .card { position: absolute; left: calc(50% - var(--cw) / 2 + var(--x) * min(37% - var(--cw) / 2, (var(--n) - 1) * var(--cw) * .45)); top: .6em; width: var(--cw); font-size: calc(.78em * var(--hs, 1)); pointer-events: auto;
+  transform: translateY(var(--y)) rotate(calc(var(--r) / var(--hs, 1))); transform-origin: 50% 160%; transition: transform .15s; }
 .handfan .card .cname { font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .handfan .card.longname .cname { font-size: .8em; letter-spacing: -.02em; padding-top: .42em; padding-bottom: .48em; }
 .handfan .card .ccost { flex-wrap: nowrap; white-space: nowrap; }
-.handfan .card .ckind { width: 18px; height: 18px; }
-.handfan .card .ckind svg { width: 11px; height: 11px; }
+.handfan .card .ckind { width: calc(18px * var(--hs, 1)); height: calc(18px * var(--hs, 1)); }
+.handfan .card .ckind svg { width: calc(11px * var(--hs, 1)); height: calc(11px * var(--hs, 1)); }
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
-.handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); }
+.handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(calc(var(--r) / var(--hs, 1))); }
 .handfan.discarding .card:not(.picked) { filter: none; }
 /* Offering cards in a trade: tapped cards rise out of the fan, outlined like any other choice. */
-.handfan .card.offered { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); box-shadow: 0 0 0 3px var(--accent), 0 8px 16px #000a; }
-body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk bar: room for both */
+.handfan .card.offered { transform: translateY(calc(var(--y) - 1.6em)) rotate(calc(var(--r) / var(--hs, 1))); box-shadow: 0 0 0 3px var(--accent), 0 8px 16px #000a; }
+body.phone.has-hand { padding-bottom: calc(5.1em + 9.4em * var(--hs, 1)); } /* the fan sits over the talk bar: room for both; --hs is how far the hand has grown into free space (phone.ts fitHand) */
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
