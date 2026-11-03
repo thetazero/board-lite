@@ -249,6 +249,7 @@ function render() {
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
   const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
   document.body.classList.toggle('has-hand', !!dock);
+  document.body.classList.toggle('raiding', g.phase === 'raid');
   app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   wire(g, me);
 }

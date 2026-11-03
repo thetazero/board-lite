@@ -452,3 +452,14 @@ button.on:disabled { opacity: 1; }
 .ally { display: inline-flex; align-items: center; gap: .2em; background: var(--panel); border-radius: 10px; padding: .2em .6em; }
 .row.big2 > button { flex-direction: column; }
 #ready { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
+/* Narrow phones: a defender's stats wrap under its picture, the loot under the defenders */
+.ptarget { flex-wrap: wrap; }
+.ptarget .foes, .choice .foes { min-width: 0; }
+.ptarget .foe, .choice .foe { display: flex; flex-wrap: wrap; white-space: normal; gap: .2em .6em; }
+.ptarget .foe > span, .choice .foe > span { white-space: nowrap; }
+@media (max-width: 360px) { .ptarget .loot { flex-direction: row; gap: .6em; } }
+/* In the raid the hand is only to look at: on a short screen it gives way to the choice */
+@media (max-height: 700px) {
+  body.phone.raiding .handfan { display: none; }
+  body.phone.raiding.has-hand { padding-bottom: 3.6em; }
+}
