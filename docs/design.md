@@ -62,11 +62,18 @@ Living design doc. Decisions here were made in conversation with the project own
 - Good land runs out as players grow toward each other, so the map becomes more contested late in the game.
 - Neutral kingdoms are not on the map. Raids against them happen in a separate raiding phase of the game.
 
+## Dragons
+
+- Dragons fit into action cards as well ("I feel like dragons fit into 'action cards' as well").
+- Each dragon has an element and a life stage. Its combat stats and its victory points are a function of its life stage.
+- Elements: fire, ice, lightning, air, water.
+- Upkeep: dragons eat livestock. If you run out of food, the dragon stops growing and can't raid. That is the only penalty.
+
 ## Open questions
 
 - Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
-- Where victory points come from. Candidates raised: tower floors, adult dragons, raid trophies, hidden points on action cards, a title that changes hands.
-- Dragons: hatching, growth stages, feeding, roosts, elements.
+- Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
+- Dragons: how a dragon card becomes a dragon on the board; how growth between life stages happens and what it costs; how many life stages; whether roosts cap dragons; what elements do in raids.
 - Raids and the raiding phase: targets, joint raids, loot splits, retaliation.
 - Action cards: what they do.
 - Player count and game length.
