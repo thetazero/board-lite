@@ -435,9 +435,12 @@ export function frameColor(kind: string, element?: string): string {
   return { building: '#c0703f', upgrade: '#d9a13a', action: '#7a5cc8' }[kind] ?? '#888';
 }
 
-// Small kind marks for the card's corner (icons, not words).
+// Small kind marks for the card's corner (icons, not words). The corner disc and
+// the name ribbon share one colour per kind (frameColor): rust buildings, gold
+// upgrades, purple actions, and a dragon in its element's colour.
 export const KIND_ICON: Record<string, string> = {
-  building: '<path d="M-7 8 V-1 L0 -8 L7 -1 V8 Z"/><path d="M-2 8 V3 H2 V8 Z" fill="#0004"/>',
+  // A building card goes on a hex of the map: its mark is the hex, not a house (a house reads as one building, like the Market).
+  building: '<path d="M0 -9 L7.8 -4.5 V4.5 L0 9 L-7.8 4.5 V-4.5 Z"/><path d="M0 -4.5 L3.9 -2.25 V2.25 L0 4.5 L-3.9 2.25 V-2.25 Z" fill="#0003"/>',
   upgrade: '<path d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z"/>',
   action: '<path d="M0 -9 L2 -2 L9 0 L2 2 L0 9 L-2 2 L-9 0 L-2 -2 Z"/>',
   dragon: '<ellipse cx="0" cy="1" rx="6" ry="8"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0005" stroke-width="1.4"/>',
@@ -465,4 +468,85 @@ export function stageFigure(key: string, element: string, stage: number): string
   const c = element === 'air' ? '#7fb2c2' : element === 'ice' ? '#6fc2ea' : element === 'lightning' ? '#f2c230' : ELEMENT_COLORS[element] ?? '#ff5a36';
   const s = [0.5, 0.72, 0.95][stage];
   return `<svg class="stagefig" viewBox="-40 -42 80 56" aria-hidden="true">${at(0, 6, s, dragonFigure(c, BUILDS[build]))}</svg>`;
+}
+
+// ---------- the table: lobby and game-over scenes ----------
+
+// A wizard's tower: folded grey walls, a roof and pennant in its owner's colour.
+// Drawn standing on (0, 0), about 60 tall.
+function wizardTower(c: string): string {
+  const wall = '#c7c1d6';
+  return f([[-9, 0], [-9, -30], [0, -28], [0, 3]], wall, 0.12) + f([[0, -28], [9, -30], [9, 0], [0, 3]], wall, -0.22)
+    + f([[-3, 1.8], [-3, -7], [0, -6.4], [0, 2.6]], '#3a2a40', 0)
+    + f([[3, -18], [3, -23], [6, -23.6], [6, -18.6]], '#ffd23f', 0)
+    + f([[-12, -29], [0, -54], [0, -27]], c, 0.22) + f([[0, -54], [12, -29], [0, -27]], c, -0.2)
+    + f([[-0.6, -54], [0.6, -54], [0.6, -63], [-0.6, -63]], '#6b4527', 0)
+    + f([[0.6, -63], [10, -60], [0.6, -57]], c, 0.1);
+}
+
+// The night sky over the table, a far range and the ground the towers stand on.
+function tableBackdrop(w: number, h: number, moonX = 0.86): string {
+  const sky = `<rect width="${w}" height="${h}" fill="#2b2452"/>`;
+  const stars = Array.from({ length: Math.round(w / 22) }, (_, i) => star((i * 97) % w, 8 + ((i * 37) % (h * 0.4)), 1.6 + (i % 3) * 0.7, '#fff1c4')).join('');
+  const moon = lift(f(poly(moonX * w, h * 0.2, h * 0.09, 8), '#fff1c4', 0.1));
+  const peaks: [number, number, number][] = Array.from({ length: Math.ceil(w / 50) + 1 }, (_, i) => [i * 50 + (i % 2) * 14, 30 + ((i * 13) % 22), 30]);
+  const hills = (ys: number[], c: string, t: number) => {
+    const step = w / (ys.length - 1);
+    return f([...ys.map((y, i) => [i * step, y] as Pt), [w, h], [0, h]], c, t);
+  };
+  return sky + stars + moon
+    + lift(ridges(peaks, '#4a3f7a', h * 0.72))
+    + lift(hills([h * 0.74, h * 0.7, h * 0.75, h * 0.69, h * 0.74, h * 0.7, h * 0.75], '#5d7a4a', 0))
+    + lift(hills([h * 0.88, h * 0.85, h * 0.9, h * 0.84, h * 0.89, h * 0.86, h * 0.9], '#4f6b3e', -0.1));
+}
+
+// The title picture: one tower per seat in its player's colour, each with a dragon
+// flying over it. With nobody seated yet, three towers in plain paper wait.
+// `w` x `h` is the picture's shape; the towers stand between `from` and `to` across it.
+export function tableScene(colors: string[], w = 360, h = 140, from = 0, to = 1): string {
+  const cs = colors.length ? colors : ['#8a8496', '#9a94a6', '#8a8496'];
+  const span = (to - from) * w;
+  const step = span / (cs.length + 1);
+  const s = Math.min(1, (h / 140) * (cs.length > 4 ? 0.85 : 1));
+  const towers = cs.map((c, i) => {
+    const x = from * w + step * (i + 1);
+    const y = h * 0.86 + (i % 2 ? 3 : 0) * s;
+    const dragon = colors.length ? lift(at(x + (i % 2 ? -13 : 13) * s, y - (88 - (i % 3) * 5) * s, 0.6 * s, dragonFigure(c, BUILDS.drake), i % 2 === 1), true) : '';
+    return shadowUnder(x, y + 1, 14 * s) + lift(at(x, y, s, wizardTower(c)), true) + dragon;
+  }).join('');
+  return `<svg class="scene" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMax slice" aria-hidden="true">${tableBackdrop(w, h, from > 0.2 ? from * 0.85 : 0.86)}${towers}</svg>`;
+}
+
+// The winner's moment: their tower at the top of the hill, their dragon over it,
+// and paper stars falling in every player's colour.
+export function winnerScene(color: string, colors: string[], w = 240, h = 120): string {
+  const cx = w / 2;
+  const base = h * 0.8;
+  const s = h / 120;
+  const rays = Array.from({ length: 16 }, (_, i) => {
+    const a = (Math.PI * 2 * i) / 16;
+    const b = a + Math.PI / 16;
+    const r = w + h;
+    return f([[cx, base - 30 * s], [cx + r * Math.cos(a), base - 30 * s + r * Math.sin(a)], [cx + r * Math.cos(b), base - 30 * s + r * Math.sin(b)]], '#f5c542', i % 2 ? 0.25 : 0.05);
+  }).join('');
+  const confetti = Array.from({ length: Math.round(w / 10) }, (_, i) => {
+    const c = colors[i % colors.length] ?? color;
+    const x = (i * 53 + 11) % w;
+    const y = 6 + ((i * 29) % (h * 0.6));
+    return `<g transform="rotate(${(i * 47) % 90} ${x} ${y})">${star(x, y, (2.2 + (i % 3)) * s, c)}</g>`;
+  }).join('');
+  return `<svg class="scene" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <rect width="${w}" height="${h}" fill="#e9a23b"/>${rays}
+    ${lift(f([[0, h], [0, base + 10 * s], [cx - 60 * s, base + 2 * s], [cx, base - 2 * s], [cx + 60 * s, base + 2 * s], [w, base + 10 * s], [w, h]], '#5d7a4a', 0))}
+    ${lift(f([[0, h], [0, h - 6 * s], [cx - 20 * s, h - 9 * s], [w, h - 5 * s], [w, h]], '#4f6b3e', -0.1))}
+    ${shadowUnder(cx, base, 20 * s)}${lift(at(cx, base, 1.1 * s, wizardTower(color)), true)}
+    ${lift(at(cx + 50 * s, base - 70 * s, 0.85 * s, dragonFigure(color, BUILDS.wyrm), true), true)}
+    ${lift(at(cx - 50 * s, base - 58 * s, 0.6 * s, dragonFigure(color, BUILDS.drake)), true)}
+    ${lift(confetti)}
+  </svg>`;
+}
+
+// A player's tower on its own, as a seat's token.
+export function towerToken(color: string, size = 2.2): string {
+  return `<svg class="token" style="height:${size}em;width:${size * 0.5}em" viewBox="-14 -66 28 70" aria-hidden="true">${wizardTower(color)}</svg>`;
 }

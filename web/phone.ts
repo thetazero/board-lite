@@ -3,9 +3,9 @@
 
 import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
-import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure } from './art.ts';
+import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -58,16 +58,20 @@ async function boot() {
   renderJoin();
 }
 
-function renderJoin(err = '') {
-  const last = localStorage.getItem('name') ?? '';
+// What was typed survives a failed join, so a wrong code doesn't cost the name too.
+function renderJoin(err = '', typed?: { code: string; name: string }) {
+  const name = typed?.name ?? localStorage.getItem('name') ?? '';
   app.innerHTML = `
-    <form class="joinform" id="join">
-      <h1 class="title">board-lite</h1>
-      <label>Room code <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(code)}" required></label>
-      <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(last)}" required></label>
-      <button class="primary big" type="submit">Join</button>
-      <p class="error">${esc(err)}</p>
-    </form>`;
+    <div class="joinpage">
+      <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
+      <form class="joinform" id="join">
+        <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
+        <label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(typed?.code ?? code)}" required></label>
+        <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
+        <button class="primary big" type="submit">Join</button>
+        <p class="error">${esc(err)}</p>
+      </form>
+    </div>`;
   const form = document.getElementById('join') as HTMLFormElement;
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -80,7 +84,7 @@ function renderJoin(err = '') {
       localStorage.setItem('seat', JSON.stringify({ code: c, token: r.token }));
       enter(c, String(r.token));
     } catch (er) {
-      renderJoin(er instanceof Error ? er.message : String(er));
+      renderJoin(er instanceof Error ? er.message : String(er), { code: c, name: n });
     }
   };
 }
@@ -151,15 +155,17 @@ function renderLobby() {
   const l = snap!.lobby;
   const me = seatIndex();
   const first = me === 0;
+  const pc = PLAYER_COLORS[me] ?? '#888';
+  // Your tower in your colour stands at the front: that's your colour for the game.
   app.innerHTML = `
-    <div class="plobby" style="--pc:${PLAYER_COLORS[me] ?? '#888'}">
+    <div class="plobby" style="--pc:${pc}">
+      <div class="hero">${tableScene([pc])}</div>
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
-      <p>Room <b>${esc(l.code)}</b>. Your colour:</p>
-      <div class="swatch"></div>
-      <ul class="seats">${l.seats.map((s, i) => `<li style="--pc:${PLAYER_COLORS[i]}"><span class="dot"></span>${esc(s.name)}${s.kind === 'bot' ? ' <small>(bot)</small>' : ''}</li>`).join('')}</ul>
-      ${first ? `<button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
-        <button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>`
-      : '<p class="hint">Waiting for the first player (or the TV) to start…</p>'}
+      <p class="muted">Room <b>${esc(l.code)}</b></p>
+      <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
+      ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start the game</button>
+        <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
+      : '<p class="hint">The first player or the TV starts the game.</p>'}
       <button id="leave" class="ghost">Leave</button>
     </div>`;
   if (first) {
@@ -199,7 +205,7 @@ function header(g: PublicState, me: Me): string {
   const res = RESOURCES.map((r) => {
     const inc = me.income[r];
     const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
-    return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${incomeText(inc)}</small></div>`;
+    return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}</small></div>`;
   }).join('');
   // Points held as cards in the hand count too: shown as a card with how many.
   const hidden = me.hiddenPoints ? `<small class="hiddenpts">${icon('cards', 1.1)}${me.hiddenPoints}${icon('points', 0.9)}</small>` : '';
@@ -247,23 +253,28 @@ function render() {
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
-  const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
+  const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
-  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
+  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
   wire(g, me);
 }
 
+// The trade form is open, so tapping a card in the hand offers it.
+function tradeOpen(g: PublicState, me: Me): boolean {
+  return g.phase === 'action' && tab === 'trade' && !picking && me.hand.length > 0;
+}
+
 // Your dragons at home: one place in the roost per dragon you can house,
-// empty places drawn as empty nests.
+// empty places drawn as empty nests. The nests are the count: no "1/3".
+const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
+  <path d="M-10 -1 Q0 3 10 -1 L8 5 Q0 10 -8 5 Z" fill="#8a5a32"/><path d="M-10 -1 Q0 -5 10 -1 Q0 3 -10 -1 Z" fill="#3b2a1c"/>
+  <path d="M-9 1 L7 4 M-8 4 L9 1 M-6 6.5 L6 6" stroke="#c48a52" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`;
 function roost(g: PublicState, me: Me): string {
   const mine = g.dragons.filter((d) => d.owner === me.seat);
   const empty = Math.max(0, me.dragonCapacity - mine.length);
-  const full = !empty;
-  return `<section class="roost${full ? ' full' : ''}">
-    <div class="rhead">${buildingIcon('roost', 22, '#cfd3dc')}<b>${mine.length}/${me.dragonCapacity}</b></div>
-    <div class="nests">${mine.map((d) => dragonChip(d, g.dragons)).join('')}${'<div class="nest" aria-label="room for a dragon"></div>'.repeat(empty)}</div>
-  </section>`;
+  if (!mine.length && !empty) return '';
+  return `<section class="roost"><div class="nests">${mine.map((d) => dragonChip(d, g.dragons)).join('')}${NEST.repeat(empty)}</div></section>`;
 }
 
 // ---- action phase ----
@@ -284,7 +295,7 @@ function actionView(g: PublicState, me: Me): string {
   return `${incoming}${mine}${tabs}${content}${end}`;
 }
 
-const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon egg' };
+const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon' };
 
 // What a card costs, with what you're short of marked.
 function costChips(cost: CardView['cost'], me: Me): string {
@@ -308,11 +319,11 @@ function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''):
   </div>`;
 }
 
-// A dragon card's text is its numbers: each life stage drawn small with its
-// health and attack, how fast it grows, and one sentence on how it picks targets.
+// A dragon card's text is its numbers: each life stage drawn small, named as
+// the roost names it, with its health and attack, how fast it grows, and one sentence on how it picks targets.
 function dragonStats(c: CardView): string {
   const d = c.dragon!;
-  const rows = d.stages.map((st, i) => `<div class="drow">${stageFigure(c.key, c.element ?? 'fire', i)}<span>${glyph('health', 'health')}${st.hp}</span><span>${glyph('attack', 'attack')}${esc(st.attack)}</span></div>`).join('');
+  const rows = d.stages.map((st, i) => `<div class="drow"><span class="sfig">${stageFigure(c.key, c.element ?? 'fire', i)}<small>${STAGE_LABEL[i + 1]}</small></span><span>${glyph('health', 'health')}${st.hp}</span><span>${glyph('attack', 'attack')}${iconText(esc(st.attack))}</span></div>`).join('');
   const sentence = `${d.targeting[0].toUpperCase()}${d.targeting.slice(1)}.`;
   return `<div class="dstats">${rows}<div class="dgrow" title="Growth steps per life stage (a fed dragon grows a step each round)">${glyph('growth', 'growth steps per stage')}${d.growth} per stage</div></div><p class="ctext">${esc(sentence)}</p>`;
 }
@@ -345,7 +356,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
 
 // The hand, held like real cards: fanned along the bottom edge of the screen,
 // overlapping when there are many. On your turn the cards you can play now glow.
-function handFan(me: Me, playable: boolean, discarding: boolean): string {
+function handFan(me: Me, playable: boolean, discarding: boolean, offering = false): string {
   const n = me.hand.length;
   if (!n) return '<div class="handfan empty"></div>';
   const mid = (n - 1) / 2;
@@ -355,9 +366,9 @@ function handFan(me: Me, playable: boolean, discarding: boolean): string {
     const ready = playable && c.affordable && !c.blocked && c.needs !== 'unplayable';
     // --x: offset from the centre as a share of the spread; --r: tilt; --y: the arc's drop.
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
-    return cardFace(c, me, playable, `${pos}`, `${ready ? ' ready' : ''}${c.name.length >= 10 ? ' longname' : ''}`);
+    return cardFace(c, me, playable, `${pos}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}`);
   }).join('');
-  return `<div class="handfan${discarding ? ' discarding' : ''}" style="--n:${n}">${cards}</div>`;
+  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" style="--n:${n}">${cards}</div>`;
 }
 
 function dragonLabel(id: string): string {
@@ -389,7 +400,7 @@ function moreView(me: Me): string {
 }
 
 function stepper(side: 'give' | 'get', r: string, n: number, max: number): string {
-  return `<div class="tres">${resIcon(r, 1.4)}<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span></div>`;
+  return `<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span>`;
 }
 
 function tradeView(g: PublicState, me: Me): string {
@@ -397,16 +408,20 @@ function tradeView(g: PublicState, me: Me): string {
   const others = me.myTurn ? names.map((_, i) => i).filter((i) => i !== me.seat) : [g.turn];
   if (!others.includes(trade.to)) trade.to = others[0];
   const who = others.map((i) => `<button data-to="${i}" class="${trade.to === i ? 'on' : ''}" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i])}</button>`).join('');
-  const give = RESOURCES.map((r) => stepper('give', r, trade.give[r] ?? 0, me.resources[r])).join('');
-  const get = RESOURCES.map((r) => stepper('get', r, trade.get[r] ?? 0, 99)).join('');
-  const cards = me.hand.map((c) => `<button class="tcard${trade.cards.has(c.id) ? ' on' : ''}" data-tcard="${c.id}" style="--kc:${frameColor(c.kind, c.element)}">${cardArt(c.kind, c.key, c.element, c.cls)}<span>${esc(c.name)}</span></button>`).join('');
+  // One row per resource: what you give and what you get side by side.
+  const rows = RESOURCES.map((r) => `${resIcon(r, 1.4)}${stepper('give', r, trade.give[r] ?? 0, me.resources[r])}${stepper('get', r, trade.get[r] ?? 0, 99)}`).join('');
+  // Cards are offered from the hand itself, the same cards as everywhere: tapped
+  // ones rise out of the fan and are named here.
+  const offered = me.hand.filter((c) => trade.cards.has(c.id));
+  const cards = me.hand.length
+    ? `<p class="tpick">${offered.length ? `${icon('cards', 1.2)} ${offered.map((c) => `<b>${esc(c.name)}</b>`).join(', ')}` : '<small>Tap cards in your hand to offer them too.</small>'}</p>`
+    : '';
   const any = Object.values(trade.give).some(Boolean) || trade.cards.size || Object.values(trade.get).some(Boolean);
   return `
     <section class="panel trade">
       <h3>Offer a trade to</h3><div class="row who">${who}</div>
-      <h3>You give</h3><div class="tgrid">${give}</div>
-      ${cards ? `<div class="row tcards">${cards}</div>` : ''}
-      <h3>You get</h3><div class="tgrid">${get}</div>
+      <div class="tgrid"><span></span><h3>You give</h3><h3>You get</h3>${rows}</div>
+      ${cards}
       <button id="offer" class="primary" ${any ? '' : 'disabled'}>Send offer</button>
     </section>`;
 }
@@ -441,7 +456,7 @@ function raidView(g: PublicState, me: Me): string {
     const ready = raid.ready[me.seat];
     const list = me.raidReady.map((id) => {
       const d = dragon(id);
-      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${esc(d.attack)}</span></span></button>`;
+      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
     }).join('');
     return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${committed.size}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
@@ -485,10 +500,21 @@ function discardView(me: Me): string {
   return `<button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
 }
 
+// The end: the winner's moment, then where everyone finished. Nothing from the
+// game in progress (resources, income, the last decision) is left on screen.
 function gameOver(g: PublicState, me: Me): string {
-  const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
-  return `<ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip">${t}${icon('points', 1.25)}</span></li>`).join('')}</ol>
-    <button id="newgame" class="primary">Join another game</button>`;
+  const w = g.standings![0].p;
+  const mine = g.standings!.find((s) => s.p === me.seat)!;
+  const place = ['1st', '2nd', '3rd', '4th', '5th', '6th'][mine.place - 1];
+  const note = tiebreakNote(g);
+  return `<div class="pover" style="--pc:${PLAYER_COLORS[w]}">
+    <div class="hero">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]))}</div>
+    <h1>${w === me.seat ? 'You win!' : `${playerTag(w, names)} wins!`}</h1>
+    ${note ? `<p class="tiebreak">${note}</p>` : ''}
+    ${w === me.seat ? '' : `<p class="mine">You came ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
+    ${standingsHtml(g, names, me.seat)}
+    <button id="newgame" class="primary big">New game</button>
+  </div>`;
 }
 
 // ---------- table talk ----------
@@ -582,6 +608,9 @@ function wire(g: PublicState, me: Me) {
       const n = me.hand.length - me.handCap;
       if (selected.has(id)) selected.delete(id);
       else if (selected.size < n) selected.add(id);
+    } else if (tradeOpen(g, me)) {
+      if (trade.cards.has(id)) trade.cards.delete(id);
+      else trade.cards.add(id);
     } else openCard = openCard === id ? null : id;
     render();
   });
@@ -651,15 +680,9 @@ function wire(g: PublicState, me: Me) {
     m[r] = Math.max(0, (m[r] ?? 0) + Number(d));
     render();
   });
-  bind('[data-tcard]', (el) => {
-    const id = el.dataset.tcard!;
-    if (trade.cards.has(id)) trade.cards.delete(id);
-    else trade.cards.add(id);
-    render();
-  });
   on('offer', () => {
     const side = (m: Record<string, number>, cards: string[] = []) => [...RESOURCES.filter((r) => m[r]).map((r) => `${m[r]} ${r}`), ...cards].join(' ');
-    const cmd = `offer P${trade.to + 1} give ${side(trade.give, [...trade.cards])} get ${side(trade.get)}`;
+    const cmd = `offer P${trade.to + 1} give ${side(trade.give, [...trade.cards].filter((id) => me.hand.some((c) => c.id === id)))} get ${side(trade.get)}`;
     trade = fresh();
     tab = 'none';
     send(cmd);
@@ -683,7 +706,8 @@ function wire(g: PublicState, me: Me) {
 function toast(e: unknown) {
   const t = document.createElement('div');
   t.className = 'toast';
-  t.textContent = e instanceof Error ? e.message : String(e);
+  // The engine names players P1, P2...; the toast names them as every other screen does.
+  t.innerHTML = named(e instanceof Error ? e.message : String(e), names);
   document.body.append(t);
   setTimeout(() => t.remove(), 3500);
 }

@@ -187,11 +187,11 @@ function baseDragon(element: Element, name: string): DragonDef {
 }
 
 export const DRAGONS: Record<string, DragonDef> = {
-  fire_whelp: baseDragon('fire', 'Fire Whelp'),
-  ice_whelp: baseDragon('ice', 'Ice Whelp'),
-  lightning_whelp: baseDragon('lightning', 'Spark Whelp'),
-  air_whelp: baseDragon('air', 'Gust Whelp'),
-  water_whelp: baseDragon('water', 'Tide Whelp'),
+  fire_whelp: baseDragon('fire', 'Fire Dragon'),
+  ice_whelp: baseDragon('ice', 'Ice Dragon'),
+  lightning_whelp: baseDragon('lightning', 'Lightning Dragon'),
+  air_whelp: baseDragon('air', 'Air Dragon'),
+  water_whelp: baseDragon('water', 'Water Dragon'),
   ember_wyrm: {
     name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
     stages: [{ hp: 7, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 1, dice: 2, sides: 8 }, { hp: 24, targets: 2, dice: 3, sides: 8 }],

@@ -54,7 +54,7 @@ export function esc(s: string): string {
 // cards have ids. The clients show names instead and drop the ids.
 export function named(text: string, names: string[], dragons: DragonView[] = []): string {
   let html = iconText(esc(text));
-  // "Fire Whelp (d7)" -> that dragon's own label, "Fire Whelp II" when its owner has two.
+  // "Fire Dragon (d7)" -> that dragon's own label, "Fire Dragon II" when its owner has two.
   for (const d of dragons) html = html.split(`${esc(d.name)} (${d.id})`).join(esc(dragonLabel(d, dragons)));
   return html
     .replace(/ \((?:c|o|d)\d+\)/g, '')
@@ -71,7 +71,7 @@ export function named(text: string, names: string[], dragons: DragonView[] = [])
 }
 
 // A dragon's name, numbered when its owner has more than one of the same kind
-// ("Fire Whelp", "Fire Whelp II"), oldest first, so the table can tell them apart.
+// ("Fire Dragon", "Fire Dragon II"), oldest first, so the table can tell them apart.
 export function dragonLabel(d: DragonView, all: DragonView[]): string {
   const same = all.filter((x) => x.owner === d.owner && x.name === d.name).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
   const k = same.findIndex((x) => x.id === d.id);
@@ -106,8 +106,14 @@ const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]
 const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
 // Punctuation right after an icon stays on its line, not wrapped alone onto the next.
 const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
+// Dice to roll, "2d6", read as a count and the die: "2" and a white square.
+const DICE_WORD = /\b(\d+)d(4|6|8)\b/g;
+export function diceChip(n: number | string, sides: number, size = 1.2): string {
+  return `<span class="tchip dicechip">${n}${icon(`d${sides}`, size)}</span>`;
+}
 export function iconText(html: string, size = 1.2): string {
   return html
+    .replace(DICE_WORD, (_, n, s) => diceChip(n, Number(s), size))
     .replace(RES_WORD, (_, n, r, p) => glue(`<span class="tchip">${n ?? ''}${icon(r, size)}</span>`, p))
     .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
@@ -118,7 +124,8 @@ export const BUILDING_ICON: Record<string, string> = {
   lumber_camp: '<path d="M0 -8 L6 0 H2 L6 5 H-6 L-2 0 H-6 Z"/><rect x="-1.2" y="5" width="2.4" height="3"/>',
   crystal_mine: '<path d="M0 -8 L6 -2 L0 8 L-6 -2 Z"/>',
   pasture: '<rect x="-7" y="-5" width="2" height="12"/><rect x="5" y="-5" width="2" height="12"/><rect x="-7" y="-3" width="14" height="2"/><rect x="-7" y="2" width="14" height="2"/>',
-  roost: '<path d="M-8 1 Q0 10 8 1 Z"/><ellipse cx="0" cy="-2" rx="3.5" ry="4.5"/>',
+  // A twig nest with an egg sitting in it (the phone's empty nests are the same nest).
+  roost: '<ellipse cx="0" cy="-2.5" rx="4.6" ry="6"/><path d="M-7.5 1.5 L-5 2.8 L-2.5 1.5 L0 2.8 L2.5 1.5 L5 2.8 L7.5 1.5 Q7 8.5 0 8.5 Q-7 8.5 -7.5 1.5 Z" stroke="#0009" stroke-width=".6"/><path d="M-6 4.5 L5.5 6.5 M-5 7 L6.5 4" stroke="#0008" stroke-width="1" fill="none"/>',
   hatchery: '<ellipse cx="0" cy="0.5" rx="5.5" ry="7.5"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0007" stroke-width="1.4"/>',
   port: '<circle cx="0" cy="-5.5" r="2.6"/><circle cx="0" cy="-5.5" r="1.1" fill="#0006"/><rect x="-0.9" y="-3.5" width="1.8" height="11"/><rect x="-4" y="-1.5" width="8" height="1.8"/><path d="M-7 2 Q-6 8 0 8 Q6 8 7 2 L5 3.5 Q4 6 0 6 Q-4 6 -5 3.5 Z"/>',
   tower_floor: '<rect x="-6" y="-6" width="12" height="12"/>',
@@ -254,13 +261,14 @@ export function foeStack(units: UnitView[], size = 2): string {
   return `<div class="foes">${kinds.map(({ u, n }) => `
     <div class="foe">
       <span class="foe-pic">${unitIcon(u.name, size)}${n > 1 ? `<b class="foe-n">×${n}</b>` : ''}</span>
-      <span class="foe-stats"><span class="stat">${glyph('health', 'health')}${u.maxHp}</span><span class="stat">${glyph('attack', 'attack')}${esc(u.attack)}</span></span>
+      <span class="foe-stats"><span class="stat">${glyph('health', 'health')}${u.maxHp}</span><span class="stat">${glyph('attack', 'attack')}${iconText(esc(u.attack))}</span></span>
       <span class="foe-elems">${u.weak.length ? `<span class="weak">×2${u.weak.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}${u.strong.length ? `<span class="strong">½${u.strong.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}</span>
     </div>`).join('')}</div>`;
 }
 
+// A rolled die: the same white shape as a die to roll, with what it landed on.
 export function dieFace(sides: number, value: number, cls = ''): string {
-  return `<span class="die ${cls}" data-sides="${sides}"><b>${value}</b><small>d${sides}</small></span>`;
+  return `<span class="die ${cls}" data-sides="${sides}">${icon(`d${sides}face`, 2.4, 'dieicon')}<b>${value}</b></span>`;
 }
 
 // ---------- hex map ----------
@@ -328,4 +336,28 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     cells.push('</g>');
   }
   return `<svg class="map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">${cells.join('')}</svg>`;
+}
+
+// ---------- the final standings ----------
+
+const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+
+// The final order as a list: place, name, points, and a mark on everyone level
+// on points with someone. Points that were secret (cards in hand) show as such.
+export function standingsHtml(g: PublicState, names: string[], me = -1): string {
+  const rows = g.standings!.map((s) => {
+    const secret = s.total - g.players[s.p].publicPoints;
+    return `<li class="${s.place === 1 ? 'won' : ''}${s.p === me ? ' you' : ''}">
+      <span class="place">${ORDINAL[s.place - 1]}</span>
+      <span class="who">${playerTag(s.p, names)}${s.tied ? ' <span class="tie">tie</span>' : ''}</span>
+      ${secret > 0 ? `<small class="hiddenpts" title="secret points">${icon('cards', 1.1)}+${secret}</small>` : '<span></span>'}
+      <b class="total">${s.total}${icon('points', 1.25)}</b></li>`;
+  }).join('');
+  return `<ol class="standings">${rows}</ol>`;
+}
+
+// How the winner won a tie, if they did.
+export function tiebreakNote(g: PublicState): string {
+  const w = g.standings![0];
+  return w.tiebreak === 'gold' ? `Won the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Won the tie by going first this round' : '';
 }

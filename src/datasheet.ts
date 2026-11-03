@@ -249,7 +249,7 @@ function points(): string {
     const sig = `${value(d.cost)}/${d.growthTime}`;
     if (seen.has(sig)) continue;
     seen.add(sig);
-    const label = d.base ? 'Base whelp' : `${Object.values(DRAGONS).filter((x) => !x.base && `${value(x.cost)}/${x.growthTime}` === sig).map((x) => x.name).join(', ')}`;
+    const label = d.base ? 'Base dragon' : `${Object.values(DRAGONS).filter((x) => !x.base && `${value(x.cost)}/${x.growthTime}` === sig).map((x) => x.name).join(', ')}`;
     for (const stage of [1, 2, 3]) {
       const rounds = growth(d.growthTime, 1, stage);
       const total = value(d.cost) + rounds * TUNING.livestockPerDragon;
@@ -258,7 +258,7 @@ function points(): string {
   }
   const sp = specialProjectCost(base.cost);
   const r3 = growth(base.growthTime, 1, 3);
-  rows.push([`Base whelp by special project, adult`, `${cost(sp)} + ${r3} livestock`, TUNING.dragonPointsByStage[3], n1((value(sp) + r3) / TUNING.dragonPointsByStage[3]), `${r3} rounds`]);
+  rows.push([`Base dragon by special project, adult`, `${cost(sp)} + ${r3} livestock`, TUNING.dragonPointsByStage[3], n1((value(sp) + r3) / TUNING.dragonPointsByStage[3]), `${r3} rounds`]);
   const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus);
   const hatcheryNote = hatchery
     ? `\n\nWith a ${hatchery.name} (+${hatchery.growthBonus} growth a round), a growth-time-${base.growthTime} dragon reaches adult in ${growth(base.growthTime, 1 + hatchery.growthBonus!, 3)} rounds instead of ${r3}.`
@@ -281,7 +281,7 @@ Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TU
 
 function dragons(): string {
   const rows = Object.values(DRAGONS).filter((d, i, all) => !d.base || all.findIndex((x) => x.base) === i).map((d) => [
-    d.base ? 'Base whelp (any element)' : d.name, d.base ? 'any' : d.element, cost(d.cost), d.growthTime, d.targeting,
+    d.base ? 'Base dragon (any element)' : d.name, d.base ? 'any' : d.element, cost(d.cost), d.growthTime, d.targeting,
     ...d.stages.map((s) => `${s.hp}hp ${s.targets}×${s.dice}d${s.sides} (${n1(avgAttack(s))})`),
   ]);
   return `## Dragons
@@ -345,7 +345,7 @@ function raids(): string {
   const head = ['Raider', ...targets.map((k) => TARGETS[k].name)];
   const rows: string[][] = [];
   let salt = 1;
-  // Gold a lone base whelp expects from each kingdom, by stage.
+  // Gold a lone base dragon expects from each kingdom, by stage.
   const goldEach: number[][] = [];
   for (const stage of [1, 2, 3]) {
     const avg = targets.map((t) => {
@@ -353,7 +353,7 @@ function raids(): string {
       return { all, mean: all.reduce((s, o) => s + o, 0) / all.length };
     });
     goldEach.push(avg.map((a, i) => a.mean * (TARGETS[targets[i]].loot.gold ?? 0)));
-    rows.push([`Base whelp, ${STAGE_NAMES[stage]}`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
+    rows.push([`Base dragon, ${STAGE_NAMES[stage]}`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
   }
   // Raiding alone, the best of the kingdoms offered: the average over every set of candidates.
   const bestOf = (gold: number[]) => {
@@ -366,12 +366,12 @@ function raids(): string {
     return sets.reduce((s, x) => s + x, 0) / sets.length;
   };
   const floor = BUILDINGS.tower_floor;
-  const goldLine = `Gold a lone base whelp expects from one raid on the best of the ${TUNING.raidCandidates} kingdoms offered (if its vote wins): hatchling ${n1(bestOf(goldEach[0]))}, young ${n1(bestOf(goldEach[1]))}, adult ${n1(bestOf(goldEach[2]))}. A ${floor.name} takes ${floor.cost.gold} gold.`;
+  const goldLine = `Gold a lone base dragon expects from one raid on the best of the ${TUNING.raidCandidates} kingdoms offered (if its vote wins): hatchling ${n1(bestOf(goldEach[0]))}, young ${n1(bestOf(goldEach[1]))}, adult ${n1(bestOf(goldEach[2]))}. A ${floor.name} takes ${floor.cost.gold} gold.`;
   const pairCells = targets.map((t) => {
     const all = baseKeys.map((k) => odds(t, [{ key: k, stage: 2 }, { key: k, stage: 2 }], salt++));
     return pct(all.reduce((s, o) => s + o, 0) / all.length);
   });
-  rows.push(['Two young base whelps', ...pairCells]);
+  rows.push(['Two young base dragons', ...pairCells]);
   for (const [k, d] of Object.entries(DRAGONS).filter(([, d]) => !d.base)) {
     rows.push([`${d.name} (${d.element}), adult`, ...targets.map((t) => pct(odds(t, [{ key: k, stage: 3 }], salt++)))]);
   }
@@ -386,7 +386,7 @@ Kingdoms (${TUNING.raidCandidates} are offered each raid; average damage is the 
 
 ${table(['Kingdom', 'Defenders', 'Total health', 'Avg damage a round', 'Loot', 'Loot value'], targetRows)}
 
-Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
 
 ${table(head, rows)}
 

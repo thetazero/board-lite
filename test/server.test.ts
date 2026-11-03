@@ -166,7 +166,7 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
     // The bot plays its turn; wait returns when it's our decision again (the raid vote).
     assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/);
     assert.equal(room.game!.raid?.step, 'vote');
-    assert.match(await cli('status', url), /Room \w{4}: P1 Claude, P2 Bot Ada \(bot\)/);
+    assert.match(await cli('status', url), /Room \w{4}: P1 Claude, P2 Tick \(bot\)/);
   } finally {
     for (const r of rooms.values()) r.close();
     server.closeAllConnections();
