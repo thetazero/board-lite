@@ -118,39 +118,35 @@ export function iconText(html: string, size = 1.2): string {
     .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
 
-export const BUILDING_ICON: Record<string, string> = {
-  hatchery: '<ellipse cx="0" cy="0.5" rx="5.5" ry="7.5"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0007" stroke-width="1.4"/>',
-  port: '<circle cx="0" cy="-5.5" r="2.6"/><circle cx="0" cy="-5.5" r="1.1" fill="#0006"/><rect x="-0.9" y="-3.5" width="1.8" height="11"/><rect x="-4" y="-1.5" width="8" height="1.8"/><path d="M-7 2 Q-6 8 0 8 Q6 8 7 2 L5 3.5 Q4 6 0 6 Q-4 6 -5 3.5 Z"/>',
-  monument: '<path d="M-2 -8 L2 -8 L3.5 6 H-3.5 Z"/><rect x="-6" y="6" width="12" height="2"/>',
-};
+// An empty harbour hex's mark on the flat map: an anchor, where a port could go.
+const HARBOR_MARK = '<circle cx="0" cy="-5.5" r="2.6"/><circle cx="0" cy="-5.5" r="1.1" fill="#0006"/><rect x="-0.9" y="-3.5" width="1.8" height="11"/><rect x="-4" y="-1.5" width="8" height="1.8"/><path d="M-7 2 Q-6 8 0 8 Q6 8 7 2 L5 3.5 Q4 6 0 6 Q-4 6 -5 3.5 Z"/>';
 
-// The tower and the basic buildings are drawn in folded paper (icons.ts);
-// the rest are still flat marks, in `color`. Until a building has its own icon
-// it wears its class's. `owner` colours the tower's roof.
+// Every building is drawn in folded paper (icons.ts), in its own colours;
+// `owner` colours the tower's roof. A building with no drawing (none should be
+// left) wears its class's basic building's. `color` is kept for callers that
+// pass one; the drawings don't use it.
 const CLASS_ICON: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
 export function iconOf(type: string, cls?: string, owner?: number): string {
-  if (type === 'tower_floor') type = 'tower'; // a floor goes on the tower, as the log shows it
   const pc = owner === undefined ? undefined : PLAYER_COLORS[owner];
-  const like = CLASS_ICON[cls ?? ''] ?? '';
-  return buildingShapes(type, pc) || (BUILDING_ICON[type] ?? '') || buildingShapes(like, pc) || (BUILDING_ICON[like] ?? '');
+  return buildingShapes(type, pc) || buildingShapes(CLASS_ICON[cls ?? ''] ?? '', pc);
 }
-// Whether a building's icon is a folded-paper drawing (it brings its own colours).
-const folded = (type: string, cls?: string) => type === 'tower_floor' || !!buildingShapes(type) || (!BUILDING_ICON[type] && !!buildingShapes(CLASS_ICON[cls ?? ''] ?? ''));
 
 export function buildingIcon(type: string, size = 22, color = '#fff', cls?: string, owner?: number): string {
   return `<svg class="bicon" width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${iconOf(type, cls, owner)}</svg>`;
 }
 
-// A building's mark on its owner's disc: a folded-paper drawing sits on a
-// paper disc ringed in the owner's colour; a flat mark is white on the colour.
-// Drawn round 0,0 with radius r (in the caller's units).
+// A building's mark on its owner's disc: the folded-paper drawing on a paper
+// disc ringed in the owner's colour. Drawn round 0,0 with radius r.
 function ownedMark(type: string, owner: number, r: number, cls?: string): string {
   const pc = PLAYER_COLORS[owner];
-  if (folded(type, cls)) {
-    return `<circle r="${r}" fill="${pc}" stroke="#0009" stroke-width="${r * 0.1}"/><circle r="${r * 0.84}" fill="#f6efdf"/>`
-      + `<g transform="scale(${(r * 0.8) / 10})">${iconOf(type, cls, owner)}</g>`;
-  }
-  return `<circle r="${r}" fill="${pc}" stroke="#0009" stroke-width="${r * 0.13}"/><g transform="scale(${(r * 0.72) / 9.5})" fill="#fff">${iconOf(type, cls, owner)}</g>`;
+  return `<circle r="${r}" fill="${pc}" stroke="#0009" stroke-width="${r * 0.1}"/><circle r="${r * 0.84}" fill="#f6efdf"/>`
+    + `<g transform="scale(${(r * 0.8) / 10})">${iconOf(type, cls, owner)}</g>`;
+}
+
+// An upgrade's badge: its icon (the mark it puts by its building on the TV
+// board) on a gold-ringed paper disc, drawn round 0,0 with radius r.
+export function upgradeBadge(key: string, r: number): string {
+  return `<circle r="${r}" fill="#c79314" stroke="#0009" stroke-width="${r * 0.1}"/><circle r="${r * 0.78}" fill="#fff6dc"/><g transform="scale(${(r * 0.66) / 10})">${iconShapes(key)}</g>`;
 }
 
 export const STAGE_LABEL = ['Egg', 'Hatchling', 'Young', 'Adult'];
@@ -161,10 +157,10 @@ export function gainChips(b: Res, size = 1.25): string {
 }
 
 // A building as it sits on the map: its owner's disc with the building's mark,
-// and a gold star when it carries an upgrade.
-export function buildingChip(type: string, owner: number, upgraded = false, size = 26, cls?: string): string {
-  const star = upgraded ? '<g transform="translate(6.5 -6.5)"><circle r="3.6" fill="#f5c542" stroke="#0009" stroke-width=".8"/><path transform="scale(.3)" d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z" fill="#7a4d00"/></g>' : '';
-  return `<svg class="bchip" width="${size}" height="${size}" viewBox="-11 -11 22 22">${ownedMark(type, owner, 9.5, cls)}${star}</svg>`;
+// and the upgrade's badge when it carries one.
+export function buildingChip(type: string, owner: number, upgrade: string | null = null, size = 26, cls?: string): string {
+  const badge = upgrade ? `<g transform="translate(6.5 -6.5)">${upgradeBadge(upgrade, 4.4)}</g>` : '';
+  return `<svg class="bchip" width="${size}" height="${size}" viewBox="-11 -11 22 22">${ownedMark(type, owner, 9.5, cls)}${badge}</svg>`;
 }
 
 export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower', territory: 'territory' };
@@ -189,9 +185,9 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
     case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">healing</em>' : `<em class="st-${ev.why}">${ev.why}</em>`}`;
-    case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, false, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
-    case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, true, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'hatch': return `${who(ev.p)} ${dragon(ev.d, 0)} ${dname(ev.d)}`;
     case 'play': {
       const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : '';
@@ -328,7 +324,7 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     const sea = h.terrain === 'ocean';
     cells.push(`<polygon points="${hexPoints(x, y, size * (sea ? 1.01 : 0.97))}" fill="${TERRAIN_COLORS[h.terrain]}" stroke="${owner ?? (sea ? TERRAIN_COLORS.ocean : '#1b1d24')}" stroke-width="${owner ? size * 0.12 : size * 0.04}"/>`);
     if (sea) for (const dy of [-0.2, 0.25]) cells.push(`<path d="M${x - size * 0.45} ${y + dy * size} q${size * 0.15} ${-size * 0.15} ${size * 0.3} 0 t${size * 0.3} 0 t${size * 0.3} 0" stroke="#8fb8de" stroke-width="${size * 0.05}" fill="none" opacity=".6"/>`);
-    if (h.terrain === 'harbor' && !b) cells.push(`<g transform="translate(${x} ${y}) scale(${size / 24})" fill="#f4fbff" opacity=".95">${BUILDING_ICON.port}</g>`);
+    if (h.terrain === 'harbor' && !b) cells.push(`<g transform="translate(${x} ${y}) scale(${size / 24})" fill="#f4fbff" opacity=".95">${HARBOR_MARK}</g>`);
     if (h.terrain === 'ley') cells.push(`<path d="M${x - size * 0.5} ${y + size * 0.35} Q${x} ${y - size * 0.5} ${x + size * 0.5} ${y + size * 0.35}" stroke="#c7b6ff" stroke-width="${size * 0.06}" fill="none" opacity=".6"/>`);
     if (h.terrain === 'mountain') cells.push(`<path d="M${x - size * 0.55} ${y + size * 0.4} L${x - size * 0.15} ${y - size * 0.35} L${x + size * 0.1} ${y} L${x + size * 0.3} ${y - size * 0.2} L${x + size * 0.6} ${y + size * 0.4} Z" fill="#6d7078" opacity=".55"/>`);
     if (h.terrain === 'forest') for (const [dx, dy] of [[-0.35, 0.1], [0.05, -0.2], [0.35, 0.15]]) cells.push(`<path d="M${x + dx * size} ${y + (dy - 0.3) * size} l${size * 0.18} ${size * 0.42} h${-size * 0.36} Z" fill="#1e4a27" opacity=".7"/>`);
@@ -336,7 +332,7 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (b) {
       const r = size * 0.62;
       cells.push(`<g transform="translate(${x} ${y})">${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
-      if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})"><circle r="${size * 0.22}" fill="#f5c542" stroke="#0009" stroke-width="1.5"/><path transform="scale(${size / 90})" d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z" fill="#7a4d00"/></g>`);
+      if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);

@@ -16,7 +16,7 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null; floors: number } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; floors: number } | null;
 }
 
 export interface DragonView {
@@ -210,7 +210,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       const b = g.buildings[k];
       return {
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors } : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, floors: b.floors } : null,
       };
     }),
     dragons: g.dragons.map(dragonView),

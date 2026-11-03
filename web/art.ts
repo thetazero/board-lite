@@ -304,6 +304,11 @@ function fish(x: number, y: number, s = 1): string {
 
 // The yellow straw the pasture class thatches with.
 const STRAW = '#e9c46a';
+// Batch 3's class colours (icons.ts and board3d.ts share them): the hatchery's
+// clay, the trade buildings' red, the monuments' pale dressed stone.
+const CLAY = '#c9774a';
+const TRADE_RED = '#c8463d';
+const MON = '#d6cfc0';
 
 // ---------- buildings ----------
 
@@ -342,11 +347,17 @@ const BUILDINGS: Record<string, () => string> = {
     + lift(f([[50, 76], [54, 34], [62, 28], [66, 76]], '#a58a6a', 0.1) + f([[62, 28], [72, 36], [74, 76], [66, 76]], '#a58a6a', -0.22), true)
     + lift(f([[44, 30], [52, 36], [76, 36], [84, 30], [76, 26], [52, 26]], '#8a5a32', -0.05) + f([[44, 30], [52, 26], [76, 26], [84, 30], [64, 32]], '#a8743e', 0.15)
       + egg(58, 24, 0.9, '#ff7a59') + egg(70, 23, 0.8, '#8fd8ff'), true),
-  hatchery: () => `<rect width="120" height="84" fill="#5a3b2e"/>`
-    + lift(f(poly(60, 46, 34, 12), '#ffb347', -0.25) + f(poly(60, 46, 24, 12, 0.26), '#ffb347', 0))
-    + lift(f([[0, 66], [120, 66], [120, 84], [0, 84]], '#7a5038', 0))
-    + lift(f([[26, 68], [34, 58], [86, 58], [94, 68], [82, 74], [38, 74]], '#d9a94a', 0) + [30, 40, 50, 60, 70, 80].map((x) => f([[x, 60], [x + 6, 57], [x + 10, 61]], '#e9c06a', 0.15)).join(''))
-    + lift(egg(46, 50, 1.1, '#ff5a36') + egg(74, 50, 1.1, '#2f8fff') + egg(60, 46, 1.25, '#ffd23f'), true),
+  // The clay brooding dome, its mouth aglow, and the nest of eggs it keeps warm.
+  hatchery: () => sky('#f2c79a', { x: 98, y: 18, r: 9, c: '#fff1c4' })
+    + lift(ridges([[16, 24, 20], [40, 16, 16]], '#c08a63'))
+    + groundLayers('plains')
+    + shadowUnder(44, 78, 28)
+    + lift(f([[18, 76], [18, 52], [24, 38], [36, 30], [44, 29], [44, 76]], CLAY, 0.15) + f([[44, 29], [52, 30], [64, 38], [70, 52], [70, 76], [44, 76]], CLAY, -0.2)
+      + f([[48, 30], [48, 18], [54, 18], [54, 32]], CLAY, -0.35)
+      + f([[34, 76], [34, 60], [44, 54], [54, 60], [54, 76]], '#ff9a3c', 0.1) + f([[39, 76], [39, 64], [44, 61], [49, 64], [49, 76]], '#ffd23f', 0.2), true)
+    + shadowUnder(90, 80, 20)
+    + lift(egg(82, 66, 0.95, '#ff7a59') + egg(98, 66, 0.95, '#8fd8ff') + egg(90, 62, 1.1, '#ffd23f')
+      + f([[70, 70], [78, 80], [102, 80], [110, 70], [90, 74]], '#8a5a32', -0.05) + f([[70, 70], [90, 74], [110, 70], [100, 67], [80, 67]], '#a8743e', 0.15), true),
   market: () => sky('#bfe0f0', { x: 18, y: 16, r: 7, c: '#fff1c4' })
     + lift(f([[86, 64], [86, 40], [100, 30], [114, 40], [114, 64]], '#d6c3a0', 0) + f([[96, 64], [96, 52], [104, 52], [104, 64]], '#6b4527', 0))
     + groundLayers('plains')
@@ -379,6 +390,56 @@ const BUILDINGS: Record<string, () => string> = {
       + f([[44, 34], [60, 30], [76, 34], [60, 38]], '#b07cff', 0.45)
       + [44, 52, 60, 68].map((x, i) => f([[x, 34 + (i < 2 ? 0 : 0)], [x + 4, 33], [x + 4, 28], [x, 29]], '#b07cff', i < 2 ? 0.3 : -0.05)).join(''), true)
     + f([[30, 40], [38, 40], [38, 41], [30, 41]], '#ffffff') + f([[84, 44], [92, 44], [92, 45], [84, 45]], '#ffffff') + f([[28, 48], [34, 48], [34, 49], [28, 49]], '#ffffff'),
+  // ---- batch 3: the dragon, trade and monument cards ----
+  // A red-roofed warehouse on the quay, crates of the goods, a boat at the pier.
+  port: () => sky('#cfe6f2', { x: 22, y: 16, r: 8, c: '#fff8e0' })
+    + lift(strip([50, 48, 51, 47, 50, 48, 51], '#3d7fbf', -0.05))
+    + [60, 84, 106].map((x) => f([[x - 6, 56], [x, 53], [x + 6, 56], [x, 55]], '#cfe6f2', 0.2)).join('')
+    + lift(f([[0, 62], [64, 58], [64, 84], [0, 84]], '#a0673a', 0) + f([[0, 62], [64, 58], [64, 61], [0, 65]], '#c48a4e', 0.2))
+    + shadowUnder(30, 70, 26)
+    + lift(f([[8, 66], [8, 40], [48, 40], [48, 66]], '#f3ece0', 0) + f([[24, 66], [24, 52], [34, 52], [34, 66]], '#3a2a20', 0)
+      + f([[4, 42], [16, 24], [40, 24], [52, 42]], TRADE_RED, 0.15) + f([[2, 44], [4, 40], [52, 40], [54, 44]], TRADE_RED, -0.25), true)
+    + lift(cube(50, 66, 5, '#c6cad0') + cube(58, 70, 5, '#b97a44') + cube(54, 61, 5, '#b88bff') + cube(42, 72, 5, '#f5c542'), true)
+    + lift(f([[64, 64], [118, 60], [118, 64], [64, 68]], '#c48a4e', 0.1) + [72, 92, 112].map((x) => f([[x, 66], [x + 2, 66], [x + 2, 80], [x, 80]], '#7f4b23', 0)).join(''))
+    + lift(f([[80, 56], [108, 56], [104, 62], [84, 62]], '#a0673a', -0.05) + f([[93, 56], [93, 20], [95, 20], [95, 56]], '#5e3c22', 0)
+      + f([[95, 22], [95, 52], [112, 52]], '#f3ece0', 0.1) + f([[93, 24], [93, 52], [80, 52]], '#f3ece0', -0.15) + f([[95, 38], [95, 44], [105, 44], [102, 38]], TRADE_RED, 0), true),
+  // A ring of standing stones on the ley line, a trilithon carrying a gold sun.
+  standing_stones: () => sky('#3d3170', { x: 98, y: 14, r: 6, c: '#e8e0ff' })
+    + star(20, 12, 2) + star(70, 8, 1.5) + star(46, 18, 1.2)
+    + lift(ridges([[24, 20, 22], [104, 24, 22]], '#6f6a86'))
+    + groundLayers('ley')
+    + lift(`<path d="M0 74 Q60 60 120 72" stroke="#c7b6ff" stroke-width="2.4" fill="none" opacity=".8"/>`)
+    + shadowUnder(60, 78, 36)
+    + lift([[20, 46], [34, 40], [86, 40], [100, 46]].map(([x, top]) => f([[x - 5, 76], [x - 4.4, top], [x, top - 2], [x, 76]], MON, 0.2) + f([[x, 76], [x, top - 2], [x + 4.4, top], [x + 5, 76]], MON, -0.2)).join('')
+      + f([[46, 76], [47, 34], [53, 34], [53, 76]], MON, 0.15) + f([[67, 76], [67, 34], [73, 34], [74, 76]], MON, -0.2)
+      + f([[42, 34], [44, 26], [76, 26], [78, 34]], MON, 0.3) + f(poly(60, 40, 5, 8, Math.PI / 8), '#f5c542', 0.2) + f(poly(60, 40, 2.6, 8, Math.PI / 8), '#f5c542', -0.1)
+      + crystal(60, 74, 16, 4, '#b07cff'), true),
+  // A pale tower on its rock over the sea, the gold lantern lit, its beams out over the water.
+  lighthouse: () => sky('#253058', { x: 20, y: 14, r: 6, c: '#e8eef8' })
+    + star(100, 10, 1.6) + star(36, 22, 1.2)
+    + f([[62, 22], [120, 4], [120, 30]], '#fff1b0', 0.1).replace('<path', '<path opacity=".8"')
+    + f([[58, 22], [0, 6], [0, 30]], '#fff1b0', 0.1).replace('<path', '<path opacity=".6"')
+    + lift(strip([56, 54, 57, 53, 56, 55, 57], '#2c5f8f', -0.05))
+    + [16, 44, 88, 108].map((x) => f([[x - 6, 64], [x, 61], [x + 6, 64], [x, 63]], '#8fb8de', 0.1)).join('')
+    + lift(f([[30, 84], [40, 66], [60, 62], [80, 66], [92, 84]], '#8d8f96', 0.05) + f([[60, 62], [80, 66], [92, 84], [60, 84]], '#8d8f96', -0.2))
+    + lift(f([[50, 66], [53, 30], [60, 30], [60, 66]], MON, 0.2) + f([[60, 66], [60, 30], [67, 30], [70, 66]], MON, -0.2)
+      + [56, 44].map((y) => f([[50.5 + (66 - y) * 0.08, y], [69.5 - (66 - y) * 0.08, y], [69.3 - (66 - y) * 0.08, y - 4], [50.7 + (66 - y) * 0.08, y - 4]], MON, -0.45)).join('')
+      + f([[51, 30], [69, 30], [69, 27], [51, 27]], MON, -0.4)
+      + f([[54, 27], [66, 27], [66, 18], [54, 18]], '#ffd23f', 0.3)
+      + f([[51, 18], [60, 9], [69, 18]], MON, -0.3) + f([[59, 9], [60, 5], [61, 9]], '#f5c542', 0.2)
+      + f([[57, 66], [57, 59], [63, 59], [63, 66]], '#3a2a20', 0), true),
+  // A columned guildhall, banners in the goods' colours between the columns, a gold finial.
+  guildhall: () => sky('#bfd4e6', { x: 100, y: 16, r: 7, c: '#fff1c4' })
+    + lift(f([[2, 64], [2, 44], [14, 34], [26, 44], [26, 64]], '#d6c3a0', 0) + f([[94, 64], [94, 48], [118, 48], [118, 64]], '#d6c3a0', -0.1))
+    + groundLayers('plains')
+    + shadowUnder(60, 78, 40)
+    + lift(f([[18, 80], [20, 74], [100, 74], [102, 80]], MON, -0.1) + f([[22, 74], [22, 42], [98, 42], [98, 74]], MON, 0.05)
+      + f([[54, 74], [54, 56], [66, 56], [66, 74]], '#3a2a20', 0)
+      + [26, 38, 76, 88].map((x) => f([[x, 74], [x, 42], [x + 2.5, 42], [x + 2.5, 74]], MON, 0.45) + f([[x + 2.5, 74], [x + 2.5, 42], [x + 5, 42], [x + 5, 74]], MON, 0.1)).join('')
+      + ([[32, '#b88bff'], [44, TRADE_RED], [82, '#f5c542']] as [number, string][]).map(([x, c]) => f([[x - 0.5, 44], [x + 5, 44], [x + 5, 58], [x + 2.2, 55], [x - 0.5, 58]], c, 0)).join('')
+      + f([[18, 42], [102, 42], [102, 36], [18, 36]], MON, -0.1)
+      + f([[18, 36], [60, 16], [60, 36]], MON, 0.3) + f([[60, 16], [102, 36], [60, 36]], MON, -0.15)
+      + f([[57, 17], [60, 6], [60, 17]], '#f5c542', 0.3) + f([[60, 6], [63, 17], [60, 17]], '#f5c542', -0.15), true),
   // ---- batch 2: the production cards ----
   cliff_works: () => sky('#a9c8de', { x: 24, y: 16, r: 7, c: '#fff1c4' })
     + lift(ridges([[20, 30, 22], [112, 26, 20]], '#8d8f96'))
@@ -506,7 +567,10 @@ const BUILDINGS: Record<string, () => string> = {
 
 const UPGRADES: Record<string, () => string> = {
   workshop: () => upgradeScene(
-    f([[40, 62], [80, 62], [74, 70], [46, 70]], '#5c6370', 0.15) + f([[46, 70], [74, 70], [70, 76], [50, 76]], '#5c6370', -0.2) + f([[30, 58], [40, 62], [46, 66], [36, 64]], '#5c6370', 0)
+    // The cog it puts by its building on the board, a hammer and anvil before it.
+    lift(f(poly(66, 40, 22, 16), '#aab1bb', -0.1) + Array.from({ length: 8 }, (_, i) => { const a = (Math.PI * i) / 4; return f(poly(66 + 24 * Math.cos(a), 40 + 24 * Math.sin(a), 5, 4, a + Math.PI / 4), '#aab1bb', Math.cos(a + Math.PI * 0.75) * 0.3); }).join('')
+      + f(poly(66, 40, 14, 16), '#c9ced6', 0.2) + f(poly(66, 40, 6, 8, Math.PI / 8), '#3a302b', 0))
+    + f([[40, 62], [80, 62], [74, 70], [46, 70]], '#5c6370', 0.15) + f([[46, 70], [74, 70], [70, 76], [50, 76]], '#5c6370', -0.2) + f([[30, 58], [40, 62], [46, 66], [36, 64]], '#5c6370', 0)
     + `<g transform="rotate(-35 64 44)">${f([[62, 30], [66, 30], [66, 64], [62, 64]], '#a0673a', 0.05)}${f([[52, 24], [76, 24], [76, 32], [52, 32]], '#9aa0a6', 0.25)}${f([[52, 32], [76, 32], [76, 36], [52, 36]], '#9aa0a6', -0.25)}</g>`
     + star(84, 46, 4, '#fff1c4') + star(90, 56, 2.5, '#fff1c4')),
   gilding: () => upgradeScene(
@@ -561,7 +625,7 @@ const ACTIONS: Record<string, () => string> = {
 
 // The picture for one card. `element` is a dragon's element.
 // Until a building has its own picture it borrows its class's.
-const CLASS_ART: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'market' };
+const CLASS_ART: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
 
 export function cardArt(kind: string, key: string, element?: string, cls?: string): string {
   const draw = kind === 'building' ? BUILDINGS[key] ?? BUILDINGS[CLASS_ART[cls ?? ''] ?? ''] : kind === 'upgrade' ? UPGRADES[key] : kind === 'action' ? ACTIONS[key] : null;
