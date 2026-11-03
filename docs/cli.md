@@ -4,6 +4,8 @@ Needs Node 22.18 or newer (it runs the TypeScript directly). Run `npm install` o
 
 The game lives in a JSON file. Every command loads it, does one thing and saves it, under a lock, so one session can play every seat or several separate processes can each play one seat of the same game. The file holds the whole game, hidden parts included, so a player who must not cheat should only get the CLI, never the file. Setting `BOARD_LITE_SEAT=2` restricts a shell to seat 2. Keep game files on disk (e.g. `~/.cache/board-lite/`), not in `/tmp`.
 
+To sit at a game hosted by the server (the one the TV and phones use), put the room's address where the game file goes and your seat token where the seat number goes: see [`clients.md`](clients.md#playing-from-the-command-line). It's the same game and the same commands.
+
 ## Commands
 
 ```

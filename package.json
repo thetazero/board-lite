@@ -4,15 +4,20 @@
   "private": true,
   "type": "module",
   "description": "Wizards raising dragons: headless rules engine and CLI",
-  "bin": { "board-lite": "src/cli.ts" },
+  "bin": {
+    "board-lite": "src/cli.ts"
+  },
   "scripts": {
     "game": "node src/cli.ts",
+    "serve": "node src/server/server.ts",
     "datasheet": "node src/datasheet.ts",
-    "typecheck": "tsc",
+    "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts",
     "ci": "npm run typecheck && npm test"
   },
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "devDependencies": {
     "@types/node": "^22.19.0",
     "typescript": "^5.9.3"

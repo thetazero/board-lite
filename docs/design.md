@@ -194,4 +194,4 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
-- The 10-second flee timer is left to the clients; the CLI waits for every choice.
+- The 10-second flee timer is left to the clients; the CLI waits for every choice. The web server runs it: anyone undecided when it runs out stays.

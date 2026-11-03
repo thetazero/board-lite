@@ -243,4 +243,17 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   return out.join('\n');
 }
 
+// After a seat's move: the events it can see since `before` (a count of its
+// visible log), then its options or who the game is waiting on.
+export function visibleLog(g: Game, p: number) {
+  return g.log.filter((e) => !e.to || e.to.includes(p));
+}
+
+export function afterMove(g: Game, p: number, before: number): string {
+  const lines = visibleLog(g, p).slice(before).map((e) => `  [r${e.round}] ${e.text}`);
+  const hints = commandHints(g, p);
+  const tail = g.phase === 'over' ? 'The game is over.' : hints.length ? `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}` : `Waiting on: ${waitingOn(g).map(pname).join(', ')}.`;
+  return `${lines.join('\n')}\n${tail}`;
+}
+
 export { costLine };
