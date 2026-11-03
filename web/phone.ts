@@ -380,7 +380,7 @@ function dragonLabel(id: string): string {
 function moreView(me: Me): string {
   const basics = me.basics.map((b) => {
     const ok = b.affordable && b.hexes.length;
-    return `<div class="proj${ok ? '' : ' dim'}">${buildingIcon(b.key, 22, '#e9e2d2', b.cls)}<b>${esc(b.name)}</b> ${resChips(b.cost)}
+    return `<div class="proj${ok ? '' : ' dim'}">${buildingIcon(b.key, 22, '#4a3d45', b.cls)}<b>${esc(b.name)}</b> ${resChips(b.cost)}
       <button data-basic="${b.key}" ${ok ? '' : 'disabled'}>Build</button></div>`;
   }).join('');
   const egg = me.eggProject;
@@ -473,7 +473,7 @@ function raidView(g: PublicState, me: Me): string {
       <div class="sent">${sent}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
-      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#cfd3dc')} Bail</button></div>`;
+      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
   }
   return '';
 }
