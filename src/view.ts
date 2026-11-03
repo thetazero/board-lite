@@ -1,10 +1,10 @@
 // What one player is allowed to see, as text. Everything here is either
 // public (the TV) or this player's own hidden state (their phone).
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, FAUNA, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle } from './data.ts';
 import {
   PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
+  dragonCapacity, dragonName, faunaOnMap, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
 import { mapRadius } from './map.ts';
@@ -17,6 +17,7 @@ const BUILDING_CODE: Record<string, string> = {
   shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
   monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
+const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X' };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 
 export function cardText(c: Card): string {
@@ -48,7 +49,8 @@ function dragonLine(g: Game, d: Dragon): string {
   const def = DRAGONS[d.key];
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${def.growthTime}`;
   const health = st ? `${st.hp - d.damage}/${st.hp}hp` : 'egg';
-  const status = canRaid(d) ? 'can raid' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? (d.resting === 'hungry' ? 'went hungry: no growth or raids this round' : 'healing from a raid: no raids this round') : 'hurt, cannot raid';
+  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: 'healing from a fight: no raids this round', hunted: 'fought fauna: no raids this round' };
+  const status = canRaid(d) ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : 'hurt, cannot raid';
   return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
 }
 
@@ -64,6 +66,7 @@ function mapText(g: Game): string[] {
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
+  lines.push(`Fauna shows as {code} (no building there; a building under it produces nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${FAUNA[k].name}`).join(', ')}.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -72,7 +75,7 @@ function mapText(g: Game): string[] {
       if (!hex) continue;
       const b = g.buildings[k];
       const label = b ? `${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}` : '';
-      cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${label ? `[${label}]` : ''}`);
+      cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${label ? `[${label}]` : ''}${hex.fauna ? `{${FAUNA_CODE[hex.fauna]}}` : ''}`);
     }
     lines.push(`  ${' '.repeat(Math.abs(r) * 4)}${cells.join('  ')}`);
   }
@@ -111,6 +114,11 @@ export function targetText(t: string): string {
   return `${def.name} — defenders: ${units.join(', ')}; loot ${bundleText(def.loot)} (split among winners)`;
 }
 
+export function faunaText(k: string): string {
+  const x = FAUNA[k];
+  return `${x.name} (${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; loot ${bundleText(x.loot)})`;
+}
+
 // Command hints for this player right now. Empty if they have nothing to decide.
 export function commandHints(g: Game, p: number): string[] {
   if (!waitingOn(g).includes(p)) return [];
@@ -138,8 +146,8 @@ export function commandHints(g: Game, p: number): string[] {
         out.push(`play ${c.id}   (hatch ${cardName(c)})${afford}${full}`);
       } else {
         const a = ACTIONS[c.key];
-        const arg = { gain_resource: ' <stone|timber|crystal|livestock>', grow_dragon: ' <dragon id>', heal_dragon: ' <dragon id>', gain_gold: '', extra_raid: '', hidden_point: null }[a.effect];
-        if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name})${afford}`);
+        const arg = { gain_resource: ' <stone|timber|crystal|livestock>', grow_dragon: ' <dragon id>', heal_dragon: ' <dragon id>', gain_gold: '', extra_raid: '', hidden_point: null, send_fauna: ' <hex>' }[a.effect];
+        if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name}${a.effect === 'send_fauna' ? `: any land hex without fauna or a tower; ${faunaText(a.fauna!)}` : ''})${afford}`);
       }
     }
     for (const b of BASIC_BUILDINGS) {
@@ -147,6 +155,9 @@ export function commandHints(g: Game, p: number): string[] {
       const hexes = buildableHexes(g, p, b);
       if (hexes.length) out.push(`build ${b}${def.onTower ? '' : ' <hex>'}   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}${def.onTower ? '' : `; open hexes: ${hexes.join(' ')}`})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
     }
+    const fighters = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
+    const fauna = faunaOnMap(g);
+    if (fauna.length && fighters.length) out.push(`clear <hex> <dragon ids...>   (fight the fauna there; those dragons then sit out this round's raids. Your ready dragons: ${fighters.join(' ')}; fauna at: ${fauna.map((k) => `${k} ${FAUNA[g.map[k].fauna!].name}`).join(', ')})`);
     out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
@@ -230,6 +241,8 @@ export function playerView(g: Game, p: number, logLines = 25): string {
     out.push(`  ${pname(q)}: ${list.join(', ')}`);
   }
   out.push(...mapText(g));
+  const fauna = faunaOnMap(g);
+  out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
   if (g.phase === 'raid') {
     out.push('');
     out.push(...raidText(g, p));

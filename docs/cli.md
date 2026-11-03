@@ -45,6 +45,8 @@ Action phase, on your turn:
 | `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost`; `build tower_floor` adds a floor to your tower (no hex) |
 | `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
 | `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
+| `play c40 2,-1` | play a fauna card (Wolf Call, Rouse the Bear): put its beast on hex 2,-1 |
+| `clear 2,-1 d3 d7` | send your raid-ready dragons d3 and d7 against the fauna on 2,-1; they sit out this round's raids |
 | `project fire` | special project: a base dragon egg of that element, no card, double cost |
 | `bank stone gold 2` | pay 2× your bank rate in stone for 2 gold |
 | `offer P2 give 2 stone c12 get 1 gold` | propose a trade; items are `<n> <resource>` and card ids |
