@@ -19,7 +19,7 @@ let names: string[] = [];
 let stop: (() => void) | null = null;
 
 // UI state that lives only on this phone (not in the game).
-let tab: 'hand' | 'more' | 'trade' = 'hand';
+let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
 let picking: { title: string; hexes: string[]; command: (hex: string) => string } | null = null;
 let openCard: string | null = null;
 let selected = new Set<string>(); // discard picks
@@ -230,7 +230,7 @@ function render() {
   let body = '';
   if (picking) body = hexPicker(g);
   else if (g.phase === 'over') body = gameOver(g, me);
-  else if (g.phase === 'discard') body = me.deciding ? discardView(me) : handList(me, false);
+  else if (g.phase === 'discard') body = me.deciding ? discardView(me) : '<p class="big-note">Waiting for the others to discard…</p>';
   else if (g.phase === 'raid') body = raidView(g, me);
   else body = actionView(g, me);
   const den = !picking && (g.phase === 'action' || g.phase === 'discard') ? roost(g, me) : '';
@@ -238,7 +238,10 @@ function render() {
   const recent = me.log.filter((e) => !e.text.startsWith('You draw ')).slice(-2).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
-  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${recent && !picking ? `<ul class="mylog">${recent}</ul>` : ''}${zoom}`;
+  // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
+  const dock = !picking && (g.phase === 'action' || g.phase === 'discard') ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : '';
+  document.body.classList.toggle('has-hand', !!dock);
+  app.innerHTML = `${header(g, me)}${status(g, me)}<main class="pbody">${den}${body}</main>${recent && !picking ? `<ul class="mylog">${recent}</ul>` : ''}${dock}${zoom}`;
   wire(g, me);
 }
 
@@ -262,12 +265,12 @@ function actionView(g: PublicState, me: Me): string {
       <div class="row"><button class="primary" data-accept="${o.id}">Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
     <div class="offer out">You offer ${playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
+  // Build & bank and Trade open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
-    <button data-tab="hand" class="${tab === 'hand' ? 'on' : ''}">Hand (${me.hand.length})</button>
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build &amp; bank</button>` : ''}
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
-  const t = !me.myTurn && tab === 'more' ? 'hand' : tab;
-  const content = t === 'hand' ? handList(me, me.myTurn) : t === 'more' ? moreView(me) : tradeView(g, me);
+  const t = !me.myTurn && tab === 'more' ? 'none' : tab;
+  const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
   const end = me.myTurn ? '<button id="end" class="primary big endturn">End turn</button>' : '';
   return `${incoming}${mine}${tabs}${content}${end}`;
 }
@@ -286,10 +289,10 @@ function cornerMark(c: CardView): string {
 }
 
 // A card as it sits in the hand: a paper card with its picture, name and cost.
-function cardFace(c: CardView, me: Me, playable: boolean): string {
+function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''): string {
   const dim = playable && (!c.affordable || c.blocked) ? ' dim' : '';
   const dealt = dealtAt.has(c.id) ? ' dealt' : '';
-  return `<div class="card k-${c.kind}${dim}${dealt}${selected.has(c.id) ? ' picked' : ''}" data-card="${c.id}" style="--kc:${frameColor(c.kind, c.element)}${dealStyle(c.id)}">
+  return `<div class="card k-${c.kind}${dim}${dealt}${cls}${selected.has(c.id) ? ' picked' : ''}" data-card="${c.id}" style="--kc:${frameColor(c.kind, c.element)};${style}${dealStyle(c.id)}">
     <div class="cart">${cardArt(c.kind, c.key, c.element)}<span class="ckind">${cornerMark(c)}</span></div>
     <b class="cname">${esc(c.name)}</b>
     <div class="ccost">${costChips(c.cost, me)}</div>
@@ -315,12 +318,25 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
       <p class="ctext">${iconText(esc(c.text))}</p>
     </div>
     <div class="zoomacts">${actions}</div>
+    ${me.hand.length > 1 ? `<div class="zoomnav"><button class="ghost" data-zoomnav="-1" aria-label="Previous card">‹</button><span>${me.hand.indexOf(c) + 1} / ${me.hand.length}</span><button class="ghost" data-zoomnav="1" aria-label="Next card">›</button></div>` : ''}
   </div>`;
 }
 
-function handList(me: Me, playable: boolean): string {
-  if (!me.hand.length) return '<p class="hint">Your hand is empty. You draw 2 building cards and 1 action card each round.</p>';
-  return `<div class="hand">${me.hand.map((c) => cardFace(c, me, playable)).join('')}</div>`;
+// The hand, held like real cards: fanned along the bottom edge of the screen,
+// overlapping when there are many. On your turn the cards you can play now glow.
+function handFan(me: Me, playable: boolean, discarding: boolean): string {
+  const n = me.hand.length;
+  if (!n) return '<div class="handfan empty"><p class="hint">No cards. You draw 2 building cards and 1 action card each round.</p></div>';
+  const mid = (n - 1) / 2;
+  const tilt = Math.min(6, 36 / n); // degrees between neighbours
+  const cards = me.hand.map((c, i) => {
+    const d = i - mid;
+    const ready = playable && c.affordable && !c.blocked && c.needs !== 'unplayable';
+    // --x: offset from the centre as a share of the spread; --r: tilt; --y: the arc's drop.
+    const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
+    return cardFace(c, me, playable, `${pos}`, ready ? ' ready' : '');
+  }).join('');
+  return `<div class="handfan${discarding ? ' discarding' : ''}" style="--n:${n}">${cards}</div>`;
 }
 
 function dragonLabel(id: string): string {
@@ -411,8 +427,7 @@ function raidView(g: PublicState, me: Me): string {
 
 function discardView(me: Me): string {
   const n = me.hand.length - me.handCap;
-  return `<h2>Discard ${n} card${n === 1 ? '' : 's'}</h2><p class="hint">The hand limit is ${me.handCap}. Tap cards to pick them.</p>
-    <div class="hand">${me.hand.map((c) => cardFace(c, me, false)).join('')}</div>
+  return `<h2>Discard ${n} card${n === 1 ? '' : 's'}</h2><p class="hint">The hand limit is ${me.handCap}. Tap cards in your hand to pick them.</p>
     <button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
 }
 
@@ -505,7 +520,7 @@ function renderTalk() {
 
 function wire(g: PublicState, me: Me) {
   bind('[data-tab]', (el) => {
-    tab = el.dataset.tab as typeof tab;
+    tab = tab === el.dataset.tab ? 'none' : (el.dataset.tab as typeof tab);
     render();
   });
   bind('[data-card]', (el) => {
@@ -537,6 +552,12 @@ function wire(g: PublicState, me: Me) {
     render();
     send(cmd);
   }));
+  // Leafing through the hand from an open card.
+  bind('[data-zoomnav]', (el) => {
+    const i = me.hand.findIndex((c) => c.id === openCard);
+    openCard = me.hand[(i + Number(el.dataset.zoomnav) + me.hand.length) % me.hand.length].id;
+    render();
+  });
   // Tapping outside an open card closes it.
   const zoomEl = document.getElementById('zoom');
   if (zoomEl) zoomEl.onclick = (e) => {
@@ -584,7 +605,7 @@ function wire(g: PublicState, me: Me) {
     const side = (m: Record<string, number>, cards: string[] = []) => [...RESOURCES.filter((r) => m[r]).map((r) => `${m[r]} ${r}`), ...cards].join(' ');
     const cmd = `offer P${trade.to + 1} give ${side(trade.give, [...trade.cards])} get ${side(trade.get)}`;
     trade = fresh();
-    tab = 'hand';
+    tab = 'none';
     send(cmd);
   });
   // raid

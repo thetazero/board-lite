@@ -203,7 +203,20 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 /* Cards: illustrated paper. Cream card stock, the picture in a window, the
    name on a strip of the kind's coloured paper (dragons: their element), the
    cost on the stock below. A faint grain sits over all of it. */
-.hand { display: grid; grid-template-columns: 1fr 1fr; gap: .7em .6em; }
+.handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.1em; z-index: 15; width: min(100vw, 34em); height: 9.4em; transform: translateX(-50%); pointer-events: none; }
+.handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: linear-gradient(to top, var(--bg) 55%, transparent); }
+.handfan.empty { height: auto; pointer-events: auto; text-align: center; }
+.handfan.empty .hint { position: relative; margin: 0 1em .8em; }
+/* Each card: placed by its share of the spread (--x), tilted (--r) and dropped along the arc (--y). */
+.handfan .card { position: absolute; left: calc(50% - var(--cw) / 2 + var(--x) * min(37% - var(--cw) / 2, (var(--n) - 1) * 2.6em)); top: .6em; width: var(--cw); font-size: .78em; pointer-events: auto;
+  transform: translateY(var(--y)) rotate(var(--r)); transform-origin: 50% 160%; transition: transform .15s; }
+.handfan .card .cname { font-size: .95em; }
+.handfan .card .ckind { width: 18px; height: 18px; }
+.handfan .card .ckind svg { width: 11px; height: 11px; }
+.handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
+.handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); }
+.handfan.discarding .card:not(.picked) { filter: none; }
+body.has-hand { padding-bottom: 13.5em; }
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -220,7 +233,7 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 /* Icons drawn for the dark table get a thin ink outline on paper (livestock is cream). */
 .card .ricon, .tcard .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
 .card.dim .cart { filter: saturate(.7) brightness(.9); }
-.card.picked { transform: translateY(-4px) rotate(-1.5deg); box-shadow: 0 0 0 3px var(--bad), 0 8px 16px #000a; }
+.card.picked { box-shadow: 0 0 0 3px var(--bad), 0 8px 16px #000a; }
 .card.picked::before { content: '✕'; position: absolute; z-index: 2; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; background: var(--bad); color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
 /* New cards fly in from above, one after another. */
 .card.dealt { animation: deal .65s cubic-bezier(.2, .9, .3, 1.15) both; }
@@ -238,6 +251,8 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .zoomacts { width: min(19em, 88vw); display: flex; flex-direction: column; gap: .4em; text-align: center; }
 .zoomacts .row { justify-content: center; }
 .zoomacts .hint { color: #c9cdd8; }
+.zoomnav { display: flex; align-items: center; gap: 1.2em; color: var(--muted); }
+.zoomnav button { font-size: 1.6em; padding: .1em .7em; line-height: 1; }
 .blocked { color: #f2a33a; margin: .3em 0; font-size: .9em; }
 .row { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .3em; }
 .row.big2 > button { flex: 1; }
