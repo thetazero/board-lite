@@ -132,6 +132,23 @@ export function dragonBadge(d: DragonView, size = 30): string {
     <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g></svg>`;
 }
 
+// A dragon with its stage, growth, health and why it is staying home, if it is.
+export function dragonChip(d: DragonView, compact = false): string {
+  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
+  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
+  const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
+  const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
+  return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
+}
+
+// A round's income of one resource the way the table says it: "+2 +3d6",
+// "−1 +1d6". Dice of the same size are counted together.
+export function incomeText(x: { base: number; dice: number[] }): string {
+  const parts = x.base || !x.dice.length ? [x.base < 0 ? `−${-x.base}` : `+${x.base}`] : [];
+  for (const s of [...new Set(x.dice)].sort((a, b) => b - a)) parts.push(`+${x.dice.filter((d) => d === s).length}d${s}`);
+  return parts.join(' ');
+}
+
 export function hpBar(hp: number, max: number): string {
   const pct = max ? Math.max(0, Math.min(100, (hp / max) * 100)) : 0;
   const color = pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d';

@@ -116,6 +116,10 @@ export interface SeatState {
   bankRate: number;
   dragonsHoused: number;
   dragonCapacity: number;
+  // What a round brings in, per resource: production minus what the dragons
+  // eat. A fixed amount plus dice, the same every round until something is
+  // built or hatched.
+  income: Record<Resource, { base: number; dice: number[] }>;
   hand: CardView[];
   handCap: number;
   myTurn: boolean;
@@ -265,6 +269,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const raid = g.raid;
   const housed = g.dragons.filter((d) => d.owner === p).length;
   const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
+  const income = production(g, p);
+  income.livestock.base -= housed * TUNING.livestockPerDragon;
   return {
     seat: p,
     resources: { ...pl.resources },
@@ -273,6 +279,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     bankRate: bankRate(g, p),
     dragonsHoused: housed,
     dragonCapacity: dragonCapacity(g, p),
+    income,
     hand: pl.hand.map((c) => cardView(g, p, c)),
     handCap: TUNING.handCap,
     myTurn: g.phase === 'action' && g.turn === p,

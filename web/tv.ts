@@ -3,7 +3,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, elemIcon, esc, hpBar,
+  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, dragonChip, elemIcon, esc, hpBar,
   icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 
@@ -108,14 +108,6 @@ function phaseLabel(g: PublicState): string {
   if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
   if (g.phase === 'discard') return 'End of round: discarding';
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
-}
-
-function dragonChip(d: DragonView, compact = false): string {
-  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
-  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
-  const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
-  const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
 }
 
 function prodChips(prod: Record<string, { base: number; dice: number[] }>): string {

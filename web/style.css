@@ -178,8 +178,20 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .me .pts { font-weight: 800; font-size: 1.3em; margin-left: auto; display: inline-flex; align-items: center; gap: .25em; }
 .resbar { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--panel); padding: .4em .3em; text-align: center; }
 .res { display: flex; align-items: center; justify-content: center; gap: .2em; }
+.res { flex-direction: column; gap: 0; }
+.res > div { display: flex; align-items: center; gap: .2em; }
 .res b { font-size: 1.4em; }
-.res.zero { opacity: .45; }
+.res.zero > div { opacity: .45; }
+.res .inc { font-size: .78em; font-weight: 700; color: var(--good); white-space: nowrap; letter-spacing: -.02em; }
+.res .inc.minus { color: var(--bad); }
+.res .inc.none { color: var(--muted); font-weight: 500; }
+/* The roost: your dragons, and an empty nest for each one you have room for. */
+.roost { display: flex; align-items: center; gap: .6em; background: var(--panel); border-radius: 10px; padding: .45em .7em; }
+.roost .rhead { display: flex; flex-direction: column; align-items: center; line-height: 1; gap: .15em; }
+.roost .rhead b { font-size: 1.05em; }
+.roost.full .rhead b { color: #f2a33a; }
+.roost .nests { display: flex; flex-wrap: wrap; gap: .35em .9em; align-items: center; }
+.nest { width: 34px; height: 34px; border-radius: 50%; border: 2px dashed var(--line); }
 .phone .status { margin: 0; font-size: 1.05em; padding: .6em 1em; background: var(--panel2); justify-content: flex-start; }
 .phone .status.you { background: #3b3214; color: var(--accent); font-weight: 800; font-size: 1.25em; }
 .pbody { padding: .7em; display: flex; flex-direction: column; gap: .6em; }
