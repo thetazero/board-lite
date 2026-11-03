@@ -13,7 +13,8 @@
     "datasheet": "node src/datasheet.ts",
     "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts",
-    "ci": "npm run typecheck && npm test"
+    "ci": "npm run typecheck && npm test",
+    "shots": "node src/shots/shots.ts"
   },
   "engines": {
     "node": ">=22.18"
