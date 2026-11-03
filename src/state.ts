@@ -81,7 +81,7 @@ export interface PublicState {
   pointsToWin: number;
   waitingOn: number[];
   players: { publicPoints: number; dragons: number; buildings: number; titles: number; handSize: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
-  titles: { key: Title; name: string; holder: number | null; values: number[] }[];
+  titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   map: HexView[];
   dragons: DragonView[];
   offers: { id: string; from: number; to: number; give: string; get: string }[];
@@ -193,7 +193,7 @@ export function publicState(g: Game, logLines = 40): PublicState {
       const s = score(g, p);
       return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, handSize: pl.hand.length, production: production(g, p), bankRate: bankRate(g, p) };
     }),
-    titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t) })),
+    titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     map: Object.entries(g.map).map(([k, h]) => {
       const b = g.buildings[k];
       return {

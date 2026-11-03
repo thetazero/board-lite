@@ -12,7 +12,7 @@ import {
   type Attack, type Bundle, type Resource,
 } from './data.ts';
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
-import { generateMap, mapRadius, neighbors, parseKey, towerSpots } from './map.ts';
+import { distance, generateMap, mapRadius, parseKey, towerSpots } from './map.ts';
 
 // ---------- the yardstick ----------
 
@@ -72,35 +72,101 @@ Payback = value of the cost ÷ average output a round. ⚠ marks under ${PAYBACK
 ${table(['Building', 'Terrain', 'Cost', 'Value', 'Output a round', 'Payback (card)', 'Payback (special project)', 'Payback with Workshop'], rows)}${extra}`;
 }
 
+// Generated maps, one batch per player count, shared by the land sections.
+const MAP_SEEDS = 300;
+const PLAYER_COUNTS = [2, 3, 4];
+const hexDist = (a: { q: number; r: number }, b: { q: number; r: number }) => distance(a.q - b.q, a.r - b.r);
+function sampleMaps(players: number) {
+  return Array.from({ length: MAP_SEEDS }, (_, i) => generateMap({ state: (i + 1) * 7 + players }, players));
+}
+function towerHexes(players: number) {
+  return towerSpots(players).map((k) => { const [q, r] = parseKey(k)!; return { q, r }; });
+}
+const PRODUCERS = Object.values(BUILDINGS).filter((b) => b.produces);
+
 function land(): string {
   // Measured on generated maps: how often a tower has each terrain next to it,
   // and how many hexes of it lie within 2 steps.
-  const SEEDS = 300;
-  const counts = [2, 3, 4];
-  const rows = TERRAINS.filter((t) => Object.values(BUILDINGS).some((b) => b.terrain === t) || t === 'plains').map((t) => {
+  const terrains = TERRAINS.filter((t) => t !== 'ocean');
+  const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
+  const rows = terrains.map((t) => {
     const cells: string[] = [];
-    for (const players of counts) {
+    for (const players of PLAYER_COUNTS) {
       let adjacent = 0, near = 0, towers = 0;
-      for (let s = 1; s <= SEEDS; s++) {
-        const map = generateMap({ state: s * 7 + players }, players);
-        for (const spot of towerSpots(players)) {
+      for (const map of sampleMaps(players)) {
+        for (const tw of towerHexes(players)) {
           towers++;
-          const ring1 = neighbors(spot).filter((k) => map[k]);
-          if (ring1.some((k) => map[k].terrain === t)) adjacent++;
-          const [q, r] = parseKey(spot)!;
-          near += Object.values(map).filter((h) => h.terrain === t && Math.max(Math.abs(h.q - q), Math.abs(h.r - r), Math.abs(h.q + h.r - q - r)) <= 2 && !(h.q === q && h.r === r)).length;
+          const hexes = Object.values(map).filter((h) => h.terrain === t);
+          if (hexes.some((h) => hexDist(h, tw) === 1)) adjacent++;
+          near += hexes.filter((h) => hexDist(h, tw) <= 2 && hexDist(h, tw) > 0).length;
         }
       }
       cells.push(`${pct(adjacent / towers)} / ${n1(near / towers)}`);
     }
-    const share = TERRAIN_WEIGHTS[t] / TERRAINS.reduce((s, x) => s + TERRAIN_WEIGHTS[x], 0);
-    return [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', pct(share), ...cells];
+    const share = TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast';
+    return [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', share, ...cells];
   });
+  const size = PLAYER_COUNTS.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
-Measured on ${SEEDS} generated maps per player count. Each cell: share of towers with that terrain on a touching hex / average number of such hexes within 2 steps of the tower. Map radius: ${counts.map((p) => `${p}p ${mapRadius(p)}`).join(', ')}.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
 
-${table(['Terrain', 'For', 'Share of map', ...counts.map((p) => `${p} players`)], rows)}`;
+Measured on ${MAP_SEEDS} generated maps per player count. Each cell: share of towers with that terrain on a touching hex / average number of such hexes within 2 steps of the tower.
+
+${table(['Terrain', 'For', 'Share of land', ...PLAYER_COUNTS.map((p) => `${p} players`)], rows)}`;
+}
+
+function shortages(): string {
+  // Who is short of what, from the land alone: card costs ask for stone,
+  // timber and crystal about equally (see Resource demand), so a player is
+  // short of what their own land can't make. A player's "scarcest" resource is
+  // the one with the fewest hexes to make it within 2 steps of their tower
+  // (ties split evenly).
+  const rows = PLAYER_COUNTS.map((players) => {
+    let seats = 0, none = 0, sameScarcest = 0, pairs = 0;
+    const scarcest = Object.fromEntries(PRODUCERS.map((b) => [b.produces!.resource, 0])) as Record<string, number>;
+    for (const map of sampleMaps(players)) {
+      const shares = towerHexes(players).map((tw) => {
+        const counts = PRODUCERS.map((b) => Object.values(map).filter((h) => h.terrain === b.terrain && hexDist(h, tw) <= 2).length);
+        const min = Math.min(...counts);
+        const tied = counts.filter((c) => c === min).length;
+        if (min === 0) none++;
+        seats++;
+        return counts.map((c) => (c === min ? 1 / tied : 0));
+      });
+      for (const sh of shares) PRODUCERS.forEach((b, i) => (scarcest[b.produces!.resource] += sh[i]));
+      for (let a = 0; a < shares.length; a++) {
+        for (let b = a + 1; b < shares.length; b++) {
+          pairs++;
+          sameScarcest += shares[a].reduce((s, x, i) => s + x * shares[b][i], 0);
+        }
+      }
+    }
+    return [players, pct(none / seats), pct(sameScarcest / pairs), PRODUCERS.map((b) => `${b.produces!.resource} ${pct(scarcest[b.produces!.resource] / seats)}`).join(', ')];
+  });
+  const harbor = PLAYER_COUNTS.map((players) => {
+    let seats = 0, adjacent = 0, near = 0, steps = 0;
+    for (const map of sampleMaps(players)) {
+      const harbors = Object.values(map).filter((h) => h.terrain === 'harbor');
+      for (const tw of towerHexes(players)) {
+        seats++;
+        const d = Math.min(...harbors.map((h) => hexDist(h, tw)));
+        if (d === 1) adjacent++;
+        if (d <= 2) near++;
+        steps += d;
+      }
+    }
+    return [players, pct(adjacent / seats), pct(near / seats), n1(steps / seats)];
+  });
+  return `## Shortages
+
+What a player's own land can't make, they have to trade for. Measured on the same maps as Land, counting production terrain within 2 steps of each tower. If shortages were fully independent between players, two players would share their scarcest resource ${pct(1 / PRODUCERS.length)} of the time.
+
+${table(['Players', 'Players with no land for some resource', 'Two players share their scarcest resource', 'Scarcest resource, how often'], rows)}
+
+Harbors (for ports, the only way to beat the bank's ${TUNING.bankRate}:1):
+
+${table(['Players', 'Harbor touching the tower', 'Harbor within 2 steps', 'Average steps to the nearest harbor'], harbor)}`;
 }
 
 function others(): string {
@@ -348,7 +414,7 @@ export function datasheet(): string {
 
 Generated from \`src/data.ts\` and the engine by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff: it shows what the change does to payback, cost per point and raid odds.
 
-${[economy(), production(), land(), others(), points(), dragons(), raids(), demand(), deck(), length()].join('\n\n')}
+${[economy(), production(), land(), shortages(), others(), points(), dragons(), raids(), demand(), deck(), length()].join('\n\n')}
 `;
 }
 

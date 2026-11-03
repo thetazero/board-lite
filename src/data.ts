@@ -11,7 +11,7 @@ export type Bundle = Partial<Record<Resource, number>>;
 export const ELEMENTS = ['fire', 'ice', 'lightning', 'air', 'water'] as const;
 export type Element = (typeof ELEMENTS)[number];
 
-export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains'] as const;
+export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
 
 export const TUNING = {
@@ -26,6 +26,8 @@ export const TUNING = {
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 4], // egg, hatchling, young, adult
   titlePoints: 2,
+  // A title needs at least this much: dragon points, tower floors, buildings (tower included).
+  titleMinimum: { army: 8, tower: 3, territory: 7 },
   raidCandidates: 3,
   towerDragonCapacity: 1,
   // Special projects cost this many times the equivalent card's cost.
@@ -39,7 +41,7 @@ export interface BuildingDef {
   class: BuildingClass;
   cost: Bundle;
   text: string;
-  terrain?: Terrain; // production buildings must go on this terrain
+  terrain?: Terrain; // must go on this terrain (production buildings, the port)
   produces?: { resource: Resource; base: number; die: number };
   points?: number;
   dragonCapacity?: number;
@@ -57,8 +59,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   pasture: { name: 'Pasture', class: 'production', cost: { timber: 3, crystal: 3, stone: 2 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 6 }, text: 'Produces a d6 livestock each round.', copies: 4, specialProject: true },
   roost: { name: 'Roost', class: 'dragon', cost: { stone: 3, timber: 1 }, dragonCapacity: 2, text: 'Houses 2 more dragons.', copies: 4, specialProject: true },
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 2, timber: 2, crystal: 2 }, growthBonus: 1, text: 'Your growing dragons grow one extra step each round.', copies: 3 },
-  market: { name: 'Market', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
-  caravan_post: { name: 'Caravan Post', class: 'trade', cost: { timber: 3, stone: 2, gold: 1 }, bankRate: 2, text: 'You trade with the bank at 2:1.', copies: 2 },
+  port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   tower_floor: { name: 'Tower Floor', class: 'points', cost: { stone: 4, crystal: 1, gold: 1 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.', copies: 6 },
   monument: { name: 'Monument', class: 'points', cost: { stone: 4, timber: 2, gold: 2 }, points: 2, text: 'Worth 2 points.', copies: 3 },
 };
@@ -223,7 +224,8 @@ export const TARGETS: Record<string, TargetDef> = {
   tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'knights', 'knights'], loot: { gold: 16, livestock: 3 } },
 };
 
-// Share of each terrain on the generated map.
-export const TERRAIN_WEIGHTS: Record<Terrain, number> = { mountain: 3, forest: 3, ley: 2, meadow: 3, plains: 3 };
+// Share of each terrain on the generated land. The ocean rings the land, and
+// each of its six coasts has one natural harbor (src/map.ts).
+export const TERRAIN_WEIGHTS: Partial<Record<Terrain, number>> = { mountain: 1, forest: 1, ley: 1, meadow: 1, plains: 1 };
 
 export const STAGE_NAMES = ['egg', 'hatchling', 'young', 'adult'] as const;
