@@ -30,7 +30,7 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  resting: '' | 'hungry' | 'hurt'; // sitting out this round: no growth, no raid
+  resting: '' | 'hungry' | 'hurt'; // sitting out this round's raids; a hungry one doesn't grow either
   canRaid: boolean;
   status: string;
   targeting: string;
@@ -132,7 +132,7 @@ export interface SeatState {
   handCap: number;
   myTurn: boolean;
   deciding: boolean;
-  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[] }[]; // built without a card
+  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean };
   raidReady: string[]; // my dragons that can be committed
   myVote: number | null;
@@ -298,7 +298,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     deciding: waitingOn(g).includes(p),
     basics: BASIC_BUILDINGS.map((k) => {
       const b = BUILDINGS[k];
-      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Goes on ${b.terrain}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes: buildableHexes(g, p, k) };
+      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Goes on ${b.terrain}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes: buildableHexes(g, p, k), onTower: !!b.onTower };
     }),
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),

@@ -48,7 +48,7 @@ function dragonLine(g: Game, d: Dragon): string {
   const def = DRAGONS[d.key];
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${def.growthTime}`;
   const health = st ? `${st.hp - d.damage}/${st.hp}hp` : 'egg';
-  const status = canRaid(d) ? 'can raid' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? `${d.resting === 'hungry' ? 'went hungry' : 'healing from a raid'}: no growth or raids this round` : 'hurt, cannot raid';
+  const status = canRaid(d) ? 'can raid' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? (d.resting === 'hungry' ? 'went hungry: no growth or raids this round' : 'healing from a raid: no raids this round') : 'hurt, cannot raid';
   return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
 }
 
@@ -145,7 +145,7 @@ export function commandHints(g: Game, p: number): string[] {
     for (const b of BASIC_BUILDINGS) {
       const def = BUILDINGS[b];
       const hexes = buildableHexes(g, p, b);
-      if (hexes.length) out.push(`build ${b} <hex>   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}; open hexes: ${hexes.join(' ')})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
+      if (hexes.length) out.push(`build ${b}${def.onTower ? '' : ' <hex>'}   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}${def.onTower ? '' : `; open hexes: ${hexes.join(' ')}`})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
     }
     out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);

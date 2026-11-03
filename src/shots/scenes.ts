@@ -141,8 +141,8 @@ function most(g: Game, p: number, not = ''): string {
 }
 
 // ---------- the scenes ----------
-// The hand-3p scene's cards: kept, choose a dragon (two ways), on the tower, choose a building.
-const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'tower_floor', 'workshop'];
+// The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
+const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'monument', 'workshop'];
 
 
 export const SCENES: Scene[] = [
@@ -227,7 +227,7 @@ export const SCENES: Scene[] = [
     // The acting player offers the next seat a trade, and the seat after offers them one.
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4, b = (t + 2) % 4;
-      apply(g, t, `offer P${a + 1} give 2 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
+      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
       apply(g, b, `offer P${t + 1} give 1 ${most(g, b)} get 1 ${most(g, t, most(g, b))}`);
     },
     shots: (g) => [
@@ -491,7 +491,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-hoard', caption: 'Phone: Secret Hoard tapped open (kept, not played)', clicks: [card(id('secret_hoard'))] },
         { ...me, file: 'phone-zoom-elixir', caption: 'Phone: Growth Elixir, choosing the dragon', clicks: [card(id('growth_elixir'))] },
         { ...me, file: 'phone-zoom-potion', caption: 'Phone: Healing Potion, choosing the hurt dragon', clicks: [card(id('healing_potion'))] },
-        { ...me, file: 'phone-zoom-floor', caption: 'Phone: Tower Floor tapped open', clicks: [card(id('tower_floor'))] },
+        { ...me, file: 'phone-zoom-monument', caption: 'Phone: Monument tapped open', clicks: [card(id('monument'))] },
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },

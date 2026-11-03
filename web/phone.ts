@@ -626,6 +626,7 @@ function wire(g: PublicState, me: Me) {
   });
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
+    if (b.onTower) return send(`build ${b.key}`);
     picking = { title: `Build a ${b.name} where?`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}` };
     render();
   });
