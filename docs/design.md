@@ -84,6 +84,16 @@ Living design doc. Decisions here were made in conversation with the project own
 - Loot is split evenly (among those who play).
 - Targets have units with stats and with elemental strengths and weaknesses.
 - On a lost raid, each dragon's flee strength is rolled against the defenders' chase strength. A dragon that fails to flee is out healing for a number of rounds, scaled by how badly it lost the roll.
+
+### Combat
+
+- Classic damage rolls: each dragon has a number of targets, a number of dice, and how many sides each die has.
+- Classic turn-based combat: dragons and defending units alternate sides.
+- Targeting is simple and automatic; the rule is printed on the dragon card (e.g. lowest health, strongest attacker, random, a unit weak to my element).
+- Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
+- Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
+- After each round of combat, players get 10 seconds to choose whether to roll to flee.
+- A dragon that loses all its health takes a round to recover.
 - Action cards can add another raid phase.
 - No retaliation and no defense buildings.
 
@@ -92,6 +102,6 @@ Living design doc. Decisions here were made in conversation with the project own
 - Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
-- Raids: how a raid is won (how dragon and unit stats and elements combine with dice); what a raid's loot is; when the raid phase falls in a turn.
+- Raids: what a raid's loot is; when the raid phase falls in a turn; whether "a round to recover" means a game round; what happens to a dragon that fails its flee roll mid-fight; who shares the loot when some dragons fled.
 - Action cards: what they do.
 - Player count and game length.
