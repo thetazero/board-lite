@@ -70,11 +70,14 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .lobby-actions { display: flex; gap: 1em; font-size: 1.3em; }
 .hint { color: var(--muted); }
 
-.board { display: grid; grid-template-columns: 1fr 31em; grid-template-rows: auto 1fr auto; grid-template-areas: "top top" "map side" "tick side"; height: 100vh; gap: .5em; padding: .5em; }
-.topbar { grid-area: top; display: flex; align-items: baseline; gap: 1.5em; background: var(--panel); border-radius: 12px; padding: .4em 1em; }
-.topbar .round { font-size: 1.4em; font-weight: 800; color: var(--accent); }
+/* The board is read from a couch about 3 m away: nothing on it is smaller
+   than 1.1em of the TV's base size (about 22px at 1080p). */
+.board { display: grid; grid-template-columns: 1fr 38em; grid-template-rows: auto 1fr auto; grid-template-areas: "top top" "map side" "tick side"; height: 100vh; gap: .5em; padding: .5em; }
+.topbar { grid-area: top; display: flex; align-items: baseline; gap: 1.2em; background: var(--panel); border-radius: 12px; padding: .3em 1em; }
+.topbar .round { font-size: 1.5em; font-weight: 800; color: var(--accent); }
 .topbar .phase { font-size: 1.8em; font-weight: 800; }
-.topbar .roomcode { margin-left: auto; color: var(--muted); }
+.topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
+.topbar .roomcode { color: var(--muted); font-size: 1.1em; }
 .topbar .roomcode b { color: var(--text); letter-spacing: .1em; }
 .mapwrap { grid-area: map; position: relative; min-height: 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
@@ -83,46 +86,66 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .legend { display: flex; gap: 1.1em; justify-content: center; color: var(--muted); font-size: .9em; flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: .3em; text-transform: capitalize; }
 .legend i { width: 1em; height: 1em; border-radius: 3px; display: inline-block; }
-.side { grid-area: side; display: flex; flex-direction: column; gap: .45em; overflow: hidden; }
-.pcard { background: var(--panel); border-left: .45em solid var(--pc); border-radius: 10px; padding: .45em .7em; }
-.pcard.turn { background: color-mix(in srgb, var(--pc) 22%, var(--panel)); box-shadow: 0 0 0 2px var(--pc); }
-.phead { display: flex; align-items: baseline; gap: .6em; }
-.pname { font-size: 1.35em; font-weight: 800; color: var(--pc); }
-.thinking { color: var(--accent); font-size: .85em; animation: pulse 1.4s infinite; }
-.pts { margin-left: auto; font-size: 1.1em; display: inline-flex; align-items: center; gap: .15em; }
-.pts b { font-size: 1.7em; }
-.prow { display: flex; align-items: center; flex-wrap: wrap; gap: .2em; margin-top: .15em; }
-.chip.cards { color: var(--muted); margin-right: .7em; }
-.title-badge { background: #3b3214; color: var(--accent); border: 1px solid #6b5a1f; border-radius: 6px; padding: 0 .4em; font-size: .85em; margin-right: .3em; }
-.dragons { display: flex; flex-wrap: wrap; gap: .3em .8em; margin-top: .25em; }
+
+/* The side: one card per player, as large as the player count allows. */
+.side { grid-area: side; display: flex; flex-direction: column; gap: .4em; overflow: hidden; }
+/* Where each count starts; the TV steps it down if the cards don't fit (tv.ts fitSide). */
+.side.p2 { font-size: 1.9em; } .side.p3 { font-size: 1.7em; } .side.p4 { font-size: 1.5em; }
+.side.p5 { font-size: 1.35em; } .side.p6 { font-size: 1.25em; }
+.pcard { background: var(--panel); border-left: .4em solid var(--pc); border-radius: 10px; padding: .3em .6em .4em; }
+.pcard.turn { background: color-mix(in srgb, var(--pc) 22%, var(--panel)); box-shadow: 0 0 0 3px var(--pc); }
+.phead { display: flex; align-items: center; gap: .45em; }
+.pname { font-size: 1.3em; font-weight: 800; color: var(--pc); line-height: 1.1; }
+.doing { background: var(--accent); color: #111; font-weight: 800; border-radius: 99px; padding: 0 .55em; white-space: nowrap; }
+.hand { margin-left: auto; display: inline-flex; align-items: center; gap: .1em; font-weight: 700; color: #c9cdd8; }
+.pts { display: inline-flex; align-items: center; gap: .1em; margin-left: .4em; }
+.pts b { font-size: 1.5em; line-height: 1; }
+.prow { display: flex; align-items: center; gap: .55em; margin-top: .15em; white-space: nowrap; }
+.prow .lbl { color: var(--muted); font-size: .95em; margin-right: .1em; }
+.inc { display: inline-flex; align-items: center; gap: .05em; white-space: nowrap; }
+.inc b { font-weight: 800; }
+.inc small { color: #c9cdd8; font-weight: 600; font-size: 1em; }
+.inc.zero { opacity: .35; }
+.title-badge { background: #3b3214; color: var(--accent); border: 1px solid #6b5a1f; border-radius: 6px; padding: 0 .35em; font-weight: 700; white-space: nowrap; }
+.dragons { display: flex; flex-wrap: wrap; gap: .2em .9em; margin-top: .2em; }
+.tvdragon { display: flex; align-items: center; gap: .25em; line-height: 1.1; }
+.tvdragon svg { width: 1.9em; height: 1.9em; flex: none; }
+.tvdragon > div { display: flex; flex-direction: column; }
+.tvdragon b { white-space: nowrap; }
+.tvdragon span { display: flex; align-items: center; gap: .35em; color: #c9cdd8; white-space: nowrap; }
+.tvdragon .hpbar { width: 3em; height: .45em; }
+.grow { color: var(--muted); letter-spacing: -.05em; }
+.st-hungry, .st-healing { font-style: normal; font-weight: 800; }
+.st-hungry { color: #f2a33a; } .st-healing { color: #ff8f8f; }
+/* The phone's and the raid's dragon chips. */
 .dchip { display: flex; align-items: center; gap: .3em; font-size: .85em; line-height: 1.15; }
 .dchip > div { display: flex; flex-direction: column; }
-.pcard.compact { padding: .3em .6em; }
-.pcard.compact .pname { font-size: 1.15em; }
-.pcard.compact .pts b { font-size: 1.4em; }
-.pcard.compact .prow { margin-top: 0; }
-.pcard.compact .dragons { margin-top: .1em; gap: .2em .6em; }
-.dchip.compact { font-size: .75em; }
-.dchip.compact .hpbar { width: 3em; }
 .dchip .grow { color: var(--muted); letter-spacing: -.05em; }
-.dchip em { font-style: normal; font-size: .85em; }
-.st-hungry { color: #f2a33a; } .st-hurt { color: var(--bad); } .st-egg { color: var(--muted); }
+.dchip em { font-size: .85em; }
 .panel { background: var(--panel); border-radius: 10px; padding: .4em .8em; }
 .panel h3 { margin: .1em 0 .3em; font-size: 1em; }
 .panel ul { margin: 0; padding-left: 1.1em; }
-.offers { border: 2px solid var(--accent); }
-.ticker { grid-area: tick; background: var(--panel); border-radius: 12px; padding: .3em 1em; height: 9.5em; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; }
-.ticker ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-height: 0; overflow: hidden; }
-.ticker .talk { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); padding-left: 1em; }
-.ticker .talk h3 { margin: .1em 0 .2em; font-size: .85em; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.ticker .talk ul { flex: 1; }
-.ticker .talk li { font-size: 1.05em; }
-.ticker .talk li.none { color: var(--muted); font-weight: 400; }
+/* Trade offers sit in the map's empty top-left corner while they're open. */
+.mapwrap .offers { position: absolute; top: .2em; left: .2em; z-index: 2; font-size: 1.3em; max-width: 60%; border: 2px solid var(--accent); background: color-mix(in srgb, var(--panel) 92%, transparent); }
+.offers ul { list-style: none; padding: 0; }
+.offers li { margin: .15em 0; }
+
+/* The bottom strip: what happened and what was said, and the titles. */
+.ticker { grid-area: tick; background: var(--panel); border-radius: 12px; padding: .3em 1em; height: 8.6em; overflow: hidden; display: grid; grid-template-columns: 1fr auto; gap: 1.2em; font-size: 1.15em; }
+.ticker ul.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-height: 0; overflow: hidden; }
+.ticker li { padding: .05em 0; color: #c9cdd8; }
+.ticker .feed li:last-child { color: var(--text); font-weight: 600; }
+.ticker li.said { color: var(--text); font-size: 1.08em; }
+.ticker li.said q { font-style: italic; }
+.ticker .titles { border-left: 1px solid var(--line); padding-left: 1em; display: flex; flex-direction: column; justify-content: center; }
+.ticker .titles h3 { margin: 0 0 .1em; font-size: 1em; }
+.ticker .titles ul { list-style: none; margin: 0; padding: 0; }
+.ticker .titles li { display: flex; align-items: baseline; gap: .5em; padding: .1em 0; color: var(--text); white-space: nowrap; }
+.ticker .titles .title-badge { min-width: 5em; text-align: center; }
+.ticker .titles small { font-size: .95em; }
 q { quotes: "“" "”"; }
 q::before { content: open-quote; }
 q::after { content: close-quote; }
-.ticker li { padding: .05em 0; color: #c9cdd8; }
-.ticker li:last-child { color: var(--text); font-weight: 600; }
 
 /* TV overlays */
 .overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #0b0c10e8; }

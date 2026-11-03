@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure } from './art.ts';
 
@@ -255,7 +255,7 @@ function roost(g: PublicState, me: Me): string {
   const full = !empty;
   return `<section class="roost${full ? ' full' : ''}">
     <div class="rhead">${buildingIcon('roost', 22, '#cfd3dc')}<b>${mine.length}/${me.dragonCapacity}</b></div>
-    <div class="nests">${mine.map((d) => dragonChip(d)).join('')}${'<div class="nest" aria-label="room for a dragon"></div>'.repeat(empty)}</div>
+    <div class="nests">${mine.map((d) => dragonChip(d, g.dragons)).join('')}${'<div class="nest" aria-label="room for a dragon"></div>'.repeat(empty)}</div>
   </section>`;
 }
 
@@ -352,7 +352,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean): string {
 
 function dragonLabel(id: string): string {
   const d = snap!.game!.dragons.find((x) => x.id === id);
-  return d ? `${d.name} (${STAGE_LABEL[d.stage].toLowerCase()}${d.stage ? `, ${d.hp}/${d.maxHp}` : ''})` : id;
+  return d ? `${dragonName(d, snap!.game!.dragons)} (${STAGE_LABEL[d.stage].toLowerCase()}${d.stage ? `, ${d.hp}/${d.maxHp}` : ''})` : id;
 }
 
 function moreView(me: Me): string {
@@ -420,7 +420,7 @@ function raidView(g: PublicState, me: Me): string {
     const ready = raid.ready[me.seat];
     const list = me.raidReady.map((id) => {
       const d = g.dragons.find((x) => x.id === id)!;
-      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(d.name)}</b><br>${STAGE_LABEL[d.stage]} · ${d.hp}hp · hits ${esc(d.attack)}</span></button>`;
+      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} · ${d.hp}hp · hits ${esc(d.attack)}</span></button>`;
     }).join('');
     return `<h2>Raid on ${esc(raid.target!.name)}</h2><p class="hint">Everyone sees what you commit. Tap dragons to send them, then lock in.</p>
       ${list}${ready ? `<p class="big-note">Locked in with ${committed.size || 'no'} dragon${committed.size === 1 ? '' : 's'}.</p>` : `<button id="ready" class="primary big">Lock in ${committed.size ? `${committed.size} dragon${committed.size === 1 ? '' : 's'}` : '(stay home)'}</button>`}`;
