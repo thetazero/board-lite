@@ -127,7 +127,6 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
 - Victory points: the value of N; how many points each title is worth.
-- Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
 - Action cards: what they do.
 - Player count and game length.
