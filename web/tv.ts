@@ -3,13 +3,13 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, elemIcon, esc, eventHtml, gainChips, hpBar,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, esc, eventHtml, foeStack, gainChips, hpBar,
+  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, unitIcon, watch,
 } from './common.ts';
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
+import { Board3D } from './board3d.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
-import { Board3D } from './board3d.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 const app = $('app');
@@ -125,6 +125,7 @@ function nameList(ps: number[]): string {
 function phaseLabel(g: PublicState): string {
   if (g.phase === 'over') return 'Game over';
   if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
+  if (raidBanner) return 'Raid';
   if (g.phase === 'discard') return `End of round: ${g.waitingOn.length ? `${nameList(g.waitingOn)} discard${g.waitingOn.length === 1 ? 's' : ''} down to the hand limit` : 'discarding'}`;
   if (g.phase === 'cards') return 'Picking building cards';
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
@@ -249,23 +250,29 @@ function talkLine(text: string, g: PublicState): string {
 
 // ---------- overlays ----------
 
-// The raid takes over the screen while it runs.
+// The raid takes over the screen while it runs. Every step is the same
+// arena: the raiders on the left, the kingdom's defenders on the right.
 function targetCard(t: TargetView, extra = ''): string {
-  const units = t.units.map((u) => `
-    <div class="unit${u.hp <= 0 ? ' down' : ''}">
-      <b>${esc(u.name)}</b> ${hpBar(u.hp, u.maxHp)} <span class="hp">${u.hp}/${u.maxHp}</span>
-      <small>${glyph('attack', 'attack')}${esc(u.attack)}${u.weak.length ? ` <span class="weak">×2 ${u.weak.map(elem).join('')}</span>` : ''}${u.strong.length ? ` <span class="strong">½ ${u.strong.map(elem).join('')}</span>` : ''}</small>
-    </div>`).join('');
-  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">${resChips(t.loot, 1.4)}</div></div>`;
-}
-
-function elem(e: string): string {
-  return elemIcon(e, 1.25);
+  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${foeStack(t.units, 2.6)}<div class="loot">${resChips(t.loot, 1.6)}</div></div>`;
 }
 
 function check(done: boolean): string {
   return done ? '<span class="ok">✔</span>' : '<span class="wait">○</span>'; // not "…", which reads as text cut off
 }
+
+// This raid lit, and one dim mark for each raid still to come this round.
+function raidPips(g: PublicState): string {
+  if (g.raidsLeft < 2) return '';
+  return `<span class="pips" title="${g.raidsLeft - 1} more raid${g.raidsLeft > 2 ? 's' : ''} this round">${icon('raid', 1)}${`<span class="later">${icon('raid', 1)}</span>`.repeat(g.raidsLeft - 1)}</span>`;
+}
+
+// One dragon in a raider's row: lit if sent, faint if it could go but isn't.
+function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
+  const name = esc(dragonLabel(d, all));
+  return `<span class="rd${sent ? ' sent' : ''}" title="${name}">${dragonBadge(d, 60)}${sent ? `${hpBar(d.hp, d.maxHp)}<small>${name}</small>` : ''}</span>`;
+}
+
+const HOME = buildingIcon('roost', 40, '#9aa1ad'); // staying home: the roost
 
 function renderRaid(g: PublicState) {
   const raid = g.raid;
@@ -273,32 +280,29 @@ function renderRaid(g: PublicState) {
   if (!raid) return;
   el.className = 'overlay raid';
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
+  const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
   let body = '';
   if (raid.step === 'vote') {
-    body = `<h1>${icon('raid', 1.1)} Vote</h1>
+    body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}<span class="tag">${icon('secret', 1)}</span></h1>
       <div class="candidates">${raid.candidates.map((t, i) => targetCard(t, `<div class="num">${i + 1}</div>`)).join('')}</div>
       <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.voted[p])}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
-    // Each row says plainly where that player stands: what they've sent, that
-    // they're keeping their dragons home, that none of theirs can go, or how
-    // many could while they're still choosing.
-    const commitRow = (p: number) => {
-      const sent = raid.commits[p].map((id) => dragonChip(dragonById(id), g.dragons)).join('');
-      const able = g.dragons.filter((d) => d.owner === p && d.canRaid).length;
-      let what: string;
-      if (sent) what = `${sent} ${raid.ready[p] ? '<span class="ok">ready</span>' : '<span class="wait">choosing…</span>'}`;
-      else if (!able) what = '<span class="none">no dragon can go</span>';
-      else if (raid.ready[p]) what = '<span class="none">stays home</span> <span class="ok">ready</span>';
-      else what = `<span class="wait">choosing…</span> <span class="none">${able} dragon${able === 1 ? '' : 's'} can go</span>`;
-      return `<li>${playerTag(p, names)} ${what}</li>`;
+    // Each player's dragons that could go, the sent ones lit; a roost for
+    // anyone keeping theirs home; a tick once they're ready.
+    const row = (p: number) => {
+      const able = g.dragons.filter((d) => d.owner === p && d.canRaid);
+      const sent = new Set(raid.commits[p]);
+      const home = !able.length || (raid.ready[p] && !sent.size);
+      const ds = home ? `<span class="home">${HOME}</span>` : able.map((d) => raiderDragon(d, sent.has(d.id), g.dragons)).join('');
+      return `<li class="raider${home ? ' out' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${ds}</span>${able.length ? check(raid.ready[p]) : ''}</li>`;
     };
-    const rows = names.map((_, p) => commitRow(p)).join('');
-    body = `<h1>${icon('raid', 1.1)} Who's going? <span class="tag">${icon('public', 1)}</span></h1>
-      <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
+    body = `<h1>Who's going? ${raidPips(g)}<span class="tag">${icon('public', 1)}</span></h1>${arena(names.map((_, p) => row(p)).join(''))}`;
   } else if (raid.step === 'bail') {
-    const rows = names.flatMap((_, p) => (raid.commits[p].length ? [`<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id), g.dragons)).join('')} ${check(raid.decided[p])}</li>`] : [])).join('');
-    body = `<h1>Fight or bail? <span class="tag">${icon('secret', 1)}</span></h1>
-      <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
+    // Who's in, with what; a tick once they've chosen (not what they chose).
+    const rows = names.flatMap((_, p) => (raid.commits[p].length
+      ? [`<li class="raider" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${check(raid.decided[p])}</li>`]
+      : [])).join('');
+    body = `<h1>Fight or bail? ${raidPips(g)}<span class="tag">${icon('secret', 1)}</span></h1>${arena(rows)}`;
   }
   el.innerHTML = `<div class="raidbox">${body}</div>`;
 }
@@ -306,7 +310,8 @@ function renderRaid(g: PublicState) {
 // Short banners for things that just happened, shown one after another: the
 // result of a raid, production dice at the start of a round. The raid screen
 // and the final scores show whenever no banner is up.
-interface Banner { html: string; ms: number; dice?: boolean; play?: (el: HTMLElement) => void }
+interface Banner { html: string; ms: number; dice?: boolean; raid?: boolean; play?: (el: HTMLElement) => void }
+let raidBanner = false; // a raid's fight is on screen: the top bar still says "Raid"
 const banners: Banner[] = [];
 let bannerUp = false;
 
@@ -314,7 +319,7 @@ function queueBanners(g: PublicState, fresh: EventView[]) {
   for (const e of fresh) {
     const ev = e.ev;
     if (ev?.k === 'fight') banners.push(fightBanner(g, e, fresh));
-    if (ev?.k === 'noRaid') banners.push({ html: `<div class="result"><h1>${eventHtml(e, g, names)}</h1></div>`, ms: 4000 });
+    if (ev?.k === 'noRaid') banners.push({ html: `<div class="result"><h1>${eventHtml(e, g, names)}</h1></div>`, ms: 4000, raid: true });
     if (ev?.k === 'round') {
       const prod = fresh.filter((x) => x.i > e.i && x.round === e.round && x.ev?.k === 'produce');
       if (!prod.length) continue;
@@ -328,8 +333,9 @@ function queueBanners(g: PublicState, fresh: EventView[]) {
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow: the
-// dragons on one side, the defenders on the other, health bars falling as the
-// hits land, then who won and what they took.
+// dragons on one side, the defenders on the other, a stroke from each attacker
+// to what it hits, health bars falling as the hits land, then who won and what
+// they took. Whoever bailed is shown flown home, under the fighters.
 const HIT_MS = 300;
 function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
@@ -337,15 +343,25 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
   const endAt = later.findIndex((x) => x.ev?.k === 'raidEnd');
   const rounds = (endAt < 0 ? later : later.slice(0, endAt)).flatMap((x) => (x.ev?.k === 'combat' ? [x.ev] : []));
   const end = endAt < 0 ? null : (later[endAt].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
+  // This raid's bails: the ones logged since its commitments locked (maybe
+  // in an earlier update than the fight's, so from the whole log).
+  const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
+  const bailed = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'bail' ? [x.ev.p] : []));
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
-  const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(d.name)}</b>${hpBar(d.maxHp, d.maxHp)}</div>`).join('');
-  const foes = ev.units.map((u, i) => `<div class="fighter unit" data-u="${i}"><b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
+  const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(d.maxHp, d.maxHp)}</div>`).join('');
+  // A bailer's dragons are the ones they last committed before the lock.
+  const sentBy = (p: number) => g.log.slice(0, lockAt + 1).findLast((x) => x.ev?.k === 'commit' && x.ev.p === p)?.ev as Extract<EventView['ev'], { k: 'commit' }> | undefined;
+  const fled = bailed.map((p) => {
+    const ds = (sentBy(p)?.ds ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
+    return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
+  }).join('');
+  const foes = ev.units.map((u, i) => `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
   const outcome = !end ? '' : end.won
     ? `<h1>${esc(end.name)} <span class="ok">falls!</span></h1><div class="spoils">${end.winners.map((p) => `<span>${playerTag(p, names)} ${gainChips(end.share, 1.6)}</span>`).join('')}</div>`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const html = `<div class="result fight">
       <h2>${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}</h2>
-      <div class="battle"><div class="bside">${side}</div><div class="bvs"><small>round</small><b class="cround"></b></div><div class="bside foes">${foes}</div></div>
+      <div class="battle"><div class="bside">${side}${fled}</div><div class="bvs"><small>round</small><b class="cround"></b></div><div class="bside foes">${foes}</div></div>
       <div class="outcome">${outcome}</div></div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = Math.min(HIT_MS, 5000 / Math.max(1, hits.length));
@@ -354,6 +370,7 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
     dragons.forEach((d) => hp.set(`d${d.id}`, [d.maxHp, d.maxHp]));
     ev.units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.hp]));
     const box = (key: string) => el.querySelector<HTMLElement>(key[0] === 'u' ? `[data-u="${key.slice(1)}"]` : `[data-d="${key.slice(1)}"]`);
+    const battle = el.querySelector<HTMLElement>('.battle')!;
     hits.forEach((h, n) => setTimeout(() => {
       el.querySelector('.cround')!.textContent = String(h.round);
       const [from, to] = h.by === 'dragon' ? [`d${h.d}`, `u${h.u}`] : [`u${h.u}`, `d${h.d}`];
@@ -362,6 +379,13 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
       hp.set(to, [now, max]);
       const a = box(from), t = box(to);
       a?.classList.remove('strike'); void a?.offsetWidth; a?.classList.add('strike');
+      if (a && t) {
+        // The stroke: from the attacker's inner edge to the target's, in the
+        // dragon's element colour, or the defenders' steel.
+        const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : '#c9ced6';
+        battle.querySelector('.beam')?.remove();
+        battle.append(beam(battle, a, t, h.by === 'dragon', c));
+      }
       if (t) {
         t.querySelector('.hpbar')!.outerHTML = hpBar(now, max);
         const pop = document.createElement('span');
@@ -372,9 +396,23 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
         if (now <= 0) t.classList.add('down');
       }
     }, 800 + n * step));
-    setTimeout(() => el.querySelector('.outcome')!.classList.add('show'), 800 + hits.length * step + 400);
+    setTimeout(() => {
+      battle.querySelector('.beam')?.remove();
+      el.querySelector('.outcome')!.classList.add('show');
+    }, 800 + hits.length * step + 400);
   };
-  return { html, ms: 800 + hits.length * step + 4500, play };
+  return { html, ms: 800 + hits.length * step + 4500, play, raid: true };
+}
+
+// A line from one fighter's facing edge to another's, drawn over the battle.
+function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, rightward: boolean, color: string): HTMLElement {
+  const o = battle.getBoundingClientRect(), ra = a.getBoundingClientRect(), rt = t.getBoundingClientRect();
+  const x1 = (rightward ? ra.right : ra.left) - o.left, y1 = ra.top + ra.height / 2 - o.top;
+  const x2 = (rightward ? rt.left : rt.right) - o.left, y2 = rt.top + rt.height / 2 - o.top;
+  const b = document.createElement('div');
+  b.className = 'beam';
+  b.style.cssText = `left:${x1}px;top:${y1}px;width:${Math.hypot(x2 - x1, y2 - y1)}px;transform:rotate(${Math.atan2(y2 - y1, x2 - x1)}rad);--bc:${color}`;
+  return b;
 }
 
 function updateOverlay(g: PublicState) {
@@ -397,9 +435,16 @@ function updateOverlay(g: PublicState) {
   el.innerHTML = '';
 }
 
+function setRaidBanner(on: boolean) {
+  raidBanner = on;
+  const ph = app.querySelector('.topbar .phase');
+  if (ph && snap?.game) ph.innerHTML = phaseLabel(snap.game);
+}
+
 function showBanner(b: Banner) {
   const el = $('overlay');
   bannerUp = true;
+  setRaidBanner(!!b.raid);
   el.className = 'overlay banner';
   el.innerHTML = b.html;
   b.play?.(el);
@@ -419,6 +464,7 @@ function showBanner(b: Banner) {
   }
   setTimeout(() => {
     bannerUp = false;
+    setRaidBanner(false);
     if (snap?.game) updateOverlay(snap.game);
   }, b.ms);
 }

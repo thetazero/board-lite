@@ -197,16 +197,41 @@ q::after { content: close-quote; }
 .target { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: .8em 1.2em; text-align: left; min-width: 24em; position: relative; }
 .target h2 { margin: 0 0 .4em; font-size: 1.6em; }
 .target .num { position: absolute; top: -.5em; left: -.5em; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: #111; font-weight: 900; font-size: 1.4em; display: flex; align-items: center; justify-content: center; }
-.unit { margin: .35em 0; font-size: 1.1em; }
-.unit .hpbar { width: 7em; height: .7em; }
-.unit small { display: block; }
-.unit.down { opacity: .35; text-decoration: line-through; }
 .weak { color: var(--good); } .strong { color: #f2a33a; }
 .loot { margin-top: .5em; font-size: 1.2em; }
 .status { margin-top: 1em; font-size: 1.4em; display: flex; gap: 1em; justify-content: center; align-items: center; flex-wrap: wrap; }
-.raidrow { display: flex; gap: 2em; justify-content: center; align-items: flex-start; }
-.commits { list-style: none; padding: 0; text-align: left; font-size: 1.3em; }
-.commits li { display: flex; align-items: center; gap: .6em; margin: .5em 0; background: var(--panel); padding: .4em .8em; border-radius: 10px; }
+/* A kingdom's defenders: a picture per kind, how many, health, attack, weak and strong */
+.foes { display: flex; flex-direction: column; gap: .35em; }
+.foe { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .6em; font-weight: 700; white-space: nowrap; }
+.foe-pic { display: inline-flex; align-items: center; gap: .15em; min-width: 3.6em; }
+.foe-n { font-size: 1.05em; }
+.foe-stats, .foe-elems { display: inline-flex; align-items: center; gap: .3em; }
+.foe-elems > span { display: inline-flex; align-items: center; gap: .1em; margin-left: .3em; }
+.target .foes { font-size: 1.2em; }
+.target .loot { font-size: 1.5em; }
+.pips { display: inline-flex; gap: .1em; vertical-align: middle; font-size: .6em; margin-left: .3em; }
+.pips .later { opacity: .3; display: inline-flex; }
+.raidbox h1 .tag { font-size: .5em; vertical-align: middle; }
+/* The raid's arena: raiders left, defenders right */
+.arena { display: flex; gap: 2em; justify-content: center; align-items: center; }
+.arena .vs { opacity: .6; }
+.raiders { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .5em; font-size: 1.4em; min-width: 14em; }
+.raider { display: flex; align-items: center; gap: .6em; background: var(--panel); padding: .3em .8em; border-radius: 12px; border-left: 5px solid var(--pc); min-height: 3.3em; }
+.raider > .ptag { min-width: 3.5em; text-align: left; }
+.raider .rds { flex: 1; display: flex; gap: .4em; align-items: center; }
+.raider.out { opacity: .55; }
+.rd { display: inline-flex; flex-direction: column; align-items: center; gap: .1em; opacity: .28; }
+.rd.sent { opacity: 1; filter: drop-shadow(0 0 .3em var(--pc)); }
+.rd .hpbar { width: 2.2em; height: .35em; }
+.rd small { font-size: .55em; color: var(--text); white-space: nowrap; }
+.home { display: inline-flex; }
+.fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; opacity: .55; }
+.unit-art { filter: drop-shadow(0 1px 1px #0008); }
+.battle { position: relative; }
+.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; }
+.battle .bvs { position: relative; z-index: 1; text-shadow: 0 0 .3em #000; }
+.fighter.unit .ricon { flex: none; }
+.fighter.unit b { font-size: .8em; }
 /* A raid's fight, replayed: dragons left, defenders right */
 .result.fight { min-width: 60em; }
 .result.fight h2 { font-size: 1.8em; margin: .2em 0 .6em; display: flex; gap: .4em; align-items: center; justify-content: center; }
@@ -221,6 +246,7 @@ q::after { content: close-quote; }
 .fighter.strike { animation: strike .25s; }
 @keyframes strike { 50% { transform: scale(1.06); background: #3a3f4d; } }
 .fighter .dmg { position: absolute; top: -.2em; left: 50%; color: #ff7a59; font-weight: 900; font-size: 1.3em; animation: dmg .9s forwards; pointer-events: none; }
+.fighter .dmg { left: auto; right: 3em; } .fighter.unit .dmg { left: 3em; right: auto; }
 @keyframes dmg { to { transform: translateY(-1.2em); opacity: 0; } }
 .bvs { display: flex; flex-direction: column; align-items: center; color: var(--muted); min-width: 3em; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
@@ -462,3 +488,24 @@ button.on:disabled { opacity: 1; }
 .pover .hero { height: 14em; }
 .joinpage .hero { height: 15em; }
 .plobby button { width: auto; }
+
+/* Phone raid: the target drawn above the choice, who else is going */
+.ptarget { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: .6em .8em; margin-bottom: .6em; display: flex; align-items: center; justify-content: space-between; gap: .6em; }
+.ptarget .loot { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .2em; }
+.choice .foes { margin: .2em 0; font-size: .95em; }
+.choice .loot { margin: 0; }
+.allies { display: flex; flex-wrap: wrap; gap: .4em .9em; margin-bottom: .6em; }
+.ally { display: inline-flex; align-items: center; gap: .2em; background: var(--panel); border-radius: 10px; padding: .2em .6em; }
+.row.big2 > button { flex-direction: column; }
+#ready { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
+/* Narrow phones: a defender's stats wrap under its picture, the loot under the defenders */
+.ptarget { flex-wrap: wrap; }
+.ptarget .foes, .choice .foes { min-width: 0; }
+.ptarget .foe, .choice .foe { display: flex; flex-wrap: wrap; white-space: normal; gap: .2em .6em; }
+.ptarget .foe > span, .choice .foe > span { white-space: nowrap; }
+@media (max-width: 360px) { .ptarget .loot { flex-direction: row; gap: .6em; } }
+/* In the raid the hand is only to look at: on a short screen it gives way to the choice */
+@media (max-height: 700px) {
+  body.phone.raiding .handfan { display: none; }
+  body.phone.raiding.has-hand { padding-bottom: 3.6em; }
+}
