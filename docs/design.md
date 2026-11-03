@@ -108,12 +108,16 @@ Living design doc. Decisions here were made in conversation with the project own
 - The game is played in large global rounds. Each global round has, in order:
   1. Production phase: "Catan lite". Production is tied to the building, not the hex (at least for now); each building has a base production plus a roll of its own, e.g. a quarry produces 1 stone plus a d3. The TV shows each player's production per resource as the summed base plus the dice, e.g. 12 + some number of dice for stone.
   2. Card picking phase: cards are drawn from a deck. Picking is free. Each player gets a fixed number per round, maybe 2 building cards and 1 action card.
+     - Upgrade cards come from the building deck.
+     - Dragon cards are mixed randomly into the action deck, roughly evenly; no separate dragon deck.
+     - Hand cap of 7 cards. Cards (not just resources) can be traded.
   3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
 ## Open questions
 
-- Within the global round: whether phases are simultaneous or in turn order.
+- Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
+- Whether the 7-card hand cap counts resource cards or only building and action cards, and what happens when you go over.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
