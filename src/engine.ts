@@ -119,6 +119,13 @@ function log(g: Game, text: string, to?: number[], dice?: Die[]) {
   g.log.push(e);
 }
 
+const nCards = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
+
+// "Ada", "Ada and Bram", "Ada, Bram and Cora".
+function andList(xs: string[]): string {
+  return xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+}
+
 export function bundleText(b: Bundle): string {
   const parts = RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `${b[r]} ${r}`);
   return parts.length ? parts.join(', ') : 'nothing';
@@ -402,7 +409,7 @@ function startRound(g: Game) {
     }
     g.players[p].hand.push(...drawn);
     log(g, `You draw ${drawn.map((c) => `${cardName(c)} (${c.id})`).join(', ') || 'nothing'}.`, [p]);
-    log(g, `${pname(p)} draws ${drawn.length} cards.`);
+    log(g, `${pname(p)} draws ${nCards(drawn.length)}.`);
   }
   updateTitles(g);
   // 3. Action phase.
@@ -607,7 +614,11 @@ function checkRaidOver(g: Game): boolean {
     const share: Bundle = {};
     for (const r of RESOURCES) if (loot[r]) share[r] = Math.floor(loot[r]! / winners.length);
     for (const p of winners) gain(g.players[p], share);
-    log(g, `${TARGETS[raid.target!].name} falls! ${winners.map(pname).join(', ')} each take ${bundleText(share)}.`);
+    const who = andList(winners.map(pname));
+    const take = RESOURCES.some((r) => share[r])
+      ? winners.length === 1 ? `${who} takes ${bundleText(share)}` : `${who} each take ${bundleText(share)}`
+      : `The loot doesn't go round ${winners.length} ways: ${who} get nothing`;
+    log(g, `${TARGETS[raid.target!].name} falls! ${take}.`);
     finishRaid(g);
     return true;
   }
@@ -913,12 +924,12 @@ function discardCommand(g: Game, p: number, verb: string, args: string[]) {
   const pl = g.players[p];
   const over = pl.hand.length - TUNING.handCap;
   if (over <= 0) fail(`You don't need to discard.`);
-  if (verb !== 'discard') fail(`Discard ${over} card(s): discard <card ids>.`);
+  if (verb !== 'discard') fail(`Discard ${nCards(over)}: discard <card ids>.`);
   const ids = [...new Set(args)];
-  if (ids.length !== over) fail(`Discard exactly ${over} card(s).`);
+  if (ids.length !== over) fail(`Discard exactly ${nCards(over)}.`);
   const cards = ids.map((id) => handCard(g, p, id));
   for (const c of cards) discardCard(g, p, c);
-  log(g, `${pname(p)} discards ${ids.length} card(s).`);
+  log(g, `${pname(p)} discards ${nCards(ids.length)}.`);
   maybeEndRound(g);
 }
 

@@ -28,6 +28,17 @@ test('bot games reach a winner for every player count', () => {
   }
 });
 
+test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {
+  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls! \S+ each take/;
+  for (let players = 2; players <= 6; players++) {
+    for (let seed = 1; seed <= 10; seed++) {
+      const g = newGame(players, seed);
+      playOut(g, { state: seed * 31 + players });
+      for (const e of g.log) assert.doesNotMatch(e.text, bad, `${players}p seed ${seed}`);
+    }
+  }
+});
+
 test('the same seed gives the same game', () => {
   const a = newGame(4, 42), b = newGame(4, 42);
   playOut(a, { state: 1 });

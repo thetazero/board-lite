@@ -285,6 +285,7 @@ body.has-hand { padding-bottom: 14.5em; }
 .stepper button { padding: .15em .6em; font-weight: 800; }
 .stepper b { min-width: 1.3em; text-align: center; }
 .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .3em .8em; }
+#offer { margin: .6em 0; }
 .tres { display: flex; align-items: center; gap: .3em; }
 .who button.on { background: var(--pc); color: #111; font-weight: 800; }
 .tcard { display: flex; flex-direction: column; gap: .2em; width: 6.4em; padding: 3px 3px 4px; background: #f4ecd8; color: #2b2228; border: 0; border-bottom: 4px solid var(--kc); border-radius: 6px; font-size: .8em; font-weight: 700; line-height: 1.1; }
@@ -304,7 +305,7 @@ body.has-hand { padding-bottom: 14.5em; }
 .final { font-size: 1.2em; }
 
 /* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
-body.phone { padding-bottom: 3.6em; }
+body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100% tall, or the padding sits at the first screen's bottom, not after the page */
 .talkbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--panel2); border-top: 1px solid var(--line); }
 .talkbar > .latest { display: flex; align-items: center; gap: .5em; width: 100%; background: none; border: 0; border-radius: 0; padding: .75em .9em; text-align: left; color: var(--text); font: inherit; }
 .talkbar > .latest span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

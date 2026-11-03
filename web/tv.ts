@@ -200,7 +200,20 @@ function renderRaid(g: PublicState) {
       <div class="candidates">${raid.candidates.map((t, i) => targetCard(t, `<div class="num">${i + 1}</div>`)).join('')}</div>
       <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.voted[p])}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
-    const rows = names.map((_, p) => `<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id))).join('') || '<span class="none">nothing</span>'} ${raid.ready[p] ? '<span class="ok">ready</span>' : '<span class="wait">choosing…</span>'}</li>`).join('');
+    // Each row says plainly where that player stands: what they've sent, that
+    // they're keeping their dragons home, that none of theirs can go, or how
+    // many could while they're still choosing.
+    const commitRow = (p: number) => {
+      const sent = raid.commits[p].map((id) => dragonChip(dragonById(id))).join('');
+      const able = g.dragons.filter((d) => d.owner === p && d.canRaid).length;
+      let what: string;
+      if (sent) what = `${sent} ${raid.ready[p] ? '<span class="ok">ready</span>' : '<span class="wait">choosing…</span>'}`;
+      else if (!able) what = '<span class="none">no dragon can go</span>';
+      else if (raid.ready[p]) what = '<span class="none">stays home</span> <span class="ok">ready</span>';
+      else what = `<span class="wait">choosing…</span> <span class="none">${able} dragon${able === 1 ? '' : 's'} can go</span>`;
+      return `<li>${playerTag(p, names)} ${what}</li>`;
+    };
+    const rows = names.map((_, p) => commitRow(p)).join('');
     body = `<h1>Commit your dragons</h1><p class="sub">Commitments are public. They lock when everyone is ready.</p>
       <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
   } else if (raid.step === 'bail') {

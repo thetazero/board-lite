@@ -96,7 +96,16 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  proc.on('exit', () => rmSync(profile, { recursive: true, force: true }));
+  // Chrome's helper processes can still be writing the profile for a moment after it exits.
+  const removeProfile = (tries: number) => {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch (e) {
+      if (tries > 0) setTimeout(() => removeProfile(tries - 1), 300);
+      else console.error(`Couldn't remove Chrome's profile ${profile}: ${(e as Error).message}`);
+    }
+  };
+  proc.on('exit', () => removeProfile(10));
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
@@ -202,8 +211,20 @@ class Tab {
     if (device.mobile) {
       const h = await this.eval<number>('Math.max(document.documentElement.scrollHeight, innerHeight)');
       clip = { x: 0, y: 0, width: device.width, height: h, scale: 1 };
+      // A full-page capture would leave fixed bars (table talk) at the bottom of the
+      // first screen, over the middle of the page. Pin them to the page's end, as a
+      // phone scrolled to the bottom shows them.
+      await this.eval(`(() => {
+        for (const el of document.querySelectorAll('.talkbar')) {
+          el.dataset.shotStyle = el.getAttribute('style') ?? '';
+          el.style.cssText += ';position:absolute;bottom:auto;top:' + (${h} - el.offsetHeight) + 'px';
+        }
+        return true;
+      })()`);
+      await this.settle();
     }
     const r = await this.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !!clip, ...(clip ? { clip } : {}) });
+    if (clip) await this.eval(`(document.querySelectorAll('.talkbar').forEach((el) => { el.setAttribute('style', el.dataset.shotStyle); delete el.dataset.shotStyle; }), true)`);
     return Buffer.from(r.data, 'base64');
   }
 }

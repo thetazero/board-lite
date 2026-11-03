@@ -35,7 +35,7 @@ export function cardText(c: Card): string {
 export function dragonCardText(k: string): string {
   const d = DRAGONS[k];
   const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides}`).join(' / ');
-  return `${d.element}, grows every ${d.growthTime} step(s), ${TARGETING_TEXT[d.targeting]}; ${st}`;
+  return `${d.element}, grows every ${d.growthTime === 1 ? 'step' : `${d.growthTime} steps`}, ${TARGETING_TEXT[d.targeting]}; ${st}`;
 }
 
 function dragonLine(g: Game, d: Dragon): string {
@@ -162,7 +162,7 @@ function phaseText(g: Game): string {
   if (g.phase === 'over') return `Game over. ${pname(g.winner!)} won.`;
   if (g.phase === 'action') return `Round ${g.round}, action phase, ${pname(g.turn)}'s turn.`;
   if (g.phase === 'discard') return `Round ${g.round}, end of round: discarding down to ${TUNING.handCap} cards.`;
-  return `Round ${g.round}, raid phase (${g.raid!.step}), ${g.raidsLeft} raid(s) left this round.`;
+  return `Round ${g.round}, raid phase (${g.raid!.step}), ${g.raidsLeft} raid${g.raidsLeft === 1 ? '' : 's'} left this round.`;
 }
 
 function costLine(b: Bundle): string {

@@ -214,14 +214,14 @@ function header(g: PublicState, me: Me): string {
 }
 
 function status(g: PublicState, me: Me): string {
-  if (g.phase === 'over') return `<div class="status">Game over: ${playerTag(g.winner!, names)} wins.</div>`;
+  if (g.phase === 'over') return `<div class="status"><span>Game over: ${playerTag(g.winner!, names)} wins.</span></div>`;
   if (me.deciding) {
     const what = g.phase === 'action' ? (me.myTurn ? 'Your turn!' : 'An offer for you') : g.phase === 'discard' ? 'Too many cards' : 'Raid: your choice';
     return `<div class="status you">${what}</div>`;
   }
-  const w = g.waitingOn.map((p) => playerTag(p, names)).join(' ');
-  if (g.phase === 'action') return `<div class="status">${playerTag(g.turn, names)}'s turn. ${g.offers.length ? '' : 'You can offer them a trade.'}</div>`;
-  return `<div class="status">Waiting for ${w || 'the table'}…</div>`;
+  const w = g.waitingOn.map((p) => playerTag(p, names)).join(', ');
+  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn. ${g.offers.length ? '' : 'You can offer them a trade.'}</span></div>`;
+  return `<div class="status"><span>Waiting for ${w || 'the table'}…</span></div>`;
 }
 
 function render() {
