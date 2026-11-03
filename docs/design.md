@@ -80,6 +80,7 @@ Living design doc. Decisions here were made in conversation with the project own
   1. Public commit: everyone knows exactly who is committing what. Once everyone hits ready, the commitments lock in.
   2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.
 - Bailing costs nothing except that you get no share of the loot.
+- Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
 - Loot is split evenly (among those who play).
 - Targets have units with stats and with elemental strengths and weaknesses.
 - On a lost raid, each dragon's flee strength is rolled against the defenders' chase strength. A dragon that fails to flee is out healing for a number of rounds, scaled by how badly it lost the roll.
