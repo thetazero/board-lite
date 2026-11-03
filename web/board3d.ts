@@ -653,6 +653,274 @@ function monument(gilded: boolean): THREE.Group {
   );
 }
 
+// ---------- batch 2: the production cards ----------
+// Each is a relative of its class's basic building: the same goods in the same
+// colours, on a different structure, so two of one class still tell apart.
+
+const SAND = '#e8d29a';
+const SEA = '#3d7fbf';
+const KILN = '#b9643f';
+const FISH = '#9fc3d8';
+
+// A tall cliff face with a wooden scaffold up it and cut blocks at its foot.
+function cliffWorks(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(new THREE.DodecahedronGeometry(0.5, 0), STONE, { at: [0, 0.5, -0.3], scale: [1.25, 1.55, 0.6], rot: [0, 0.3, 0] }));
+  g.add(part(new THREE.DodecahedronGeometry(0.3, 0), STONE_DARK, { at: [0.45, 0.22, -0.2], scale: [1, 1.2, 1] }));
+  // The scaffold: four posts and two plank decks against the face.
+  for (const x of [-0.32, 0.12]) for (const z of [0.0, 0.14]) g.add(part(box(0.04, 0.82, 0.04), WOOD, { at: [x, 0.41, z] }));
+  for (const y of [0.4, 0.78]) g.add(part(box(0.56, 0.035, 0.2), mix(WOOD, WALL, 0.3), { at: [-0.1, y, 0.07] }));
+  // A ladder up to the first deck.
+  for (const x of [0.2, 0.3]) g.add(part(box(0.025, 0.46, 0.025), WOOD_DARK, { at: [x, 0.22, 0.24], rot: [0.25, 0, 0], crease: false }));
+  for (let i = 0; i < 4; i++) g.add(part(box(0.11, 0.018, 0.018), WOOD_DARK, { at: [0.25, 0.06 + i * 0.1, 0.27 - i * 0.025], crease: false }));
+  // Blocks cut and waiting, one up on the top deck.
+  g.add(stoneBlock(0.17, [-0.15, 0.85, 0.07], 0.2));
+  for (const [x, y, z, a] of [[-0.3, 0.07, 0.38, 0.1], [-0.1, 0.07, 0.4, -0.2], [-0.2, 0.21, 0.38, 0]]) g.add(stoneBlock(0.18, [x, y, z], a));
+  return g;
+}
+
+// A mason's yard: a stone arch built of cut blocks, a squared column being carved
+// under it, and a workshop roofed in slate behind.
+function stonemason(): THREE.Group {
+  const g = new THREE.Group();
+  const shop = cottage(0.46, 0.3, 0.24, WALL, STONE_DARK);
+  shop.position.set(0.05, 0, -0.38);
+  g.add(shop);
+  const s = 0.15;
+  for (const x of [-0.3, 0.3]) for (let i = 0; i < 4; i++) g.add(stoneBlock(s, [x, s * 0.4 + i * s * 0.8, 0.12], 0, i % 2 ? '#c6cad0' : STONE_BLOCK));
+  g.add(part(box(0.78, 0.13, 0.17), STONE_BLOCK, { at: [0, 4 * s * 0.8 + 0.065, 0.12] }));
+  g.add(part(box(0.16, 0.16, 0.18), '#eef0f2', { at: [0, 4 * s * 0.8 + 0.2, 0.12] }));
+  // The column on its block, half done, and the mallet on the ground.
+  g.add(stoneBlock(0.16, [0, 0.065, 0.14]));
+  g.add(part(cyl(0.05, 0.06, 0.24, 6), '#eef0f2', { at: [0, 0.25, 0.14] }));
+  g.add(part(box(0.1, 0.06, 0.06), WOOD_DARK, { at: [0.48, 0.03, 0.38], rot: [0, 0.5, 0] }));
+  g.add(part(box(0.025, 0.025, 0.16), WOOD, { at: [0.43, 0.03, 0.45], rot: [0, 0.5, 0], crease: false }));
+  for (const [x, z] of [[-0.48, 0.38], [-0.36, 0.48]]) g.add(stoneBlock(0.15, [x, 0.06, z], x));
+  return g;
+}
+
+// A log cabin (its walls laid from logs, their ends crossing at the corners)
+// roofed in bark, and a big axe left in the chopping stump.
+function woodcutter(): THREE.Group {
+  const g = new THREE.Group();
+  const w = 0.5, d = 0.38, r = 0.04, rows = 4;
+  for (let i = 0; i < rows; i++) {
+    const y = r + i * r * 1.8;
+    for (const z of [-d / 2, d / 2]) g.add(timberLog(w + 0.1, r, [0, y + (i % 2 ? r * 0.9 : 0), z - 0.15], 0));
+    for (const x of [-w / 2, w / 2]) g.add(timberLog(d + 0.1, r, [x, y + (i % 2 ? 0 : r * 0.9), -0.15], Math.PI / 2));
+  }
+  const top = r + rows * r * 1.8;
+  g.add(part(box(w - 0.04, top, d - 0.04), mix(WOOD, WALL, 0.25), { at: [0, top / 2, -0.15], crease: false }));
+  const roof = gable(w + 0.16, d + 0.16, 0.26, WOOD_DARK, top + 0.06);
+  roof.position.z = -0.15;
+  g.add(roof);
+  g.add(part(box(0.11, 0.18, 0.02), DARK, { at: [0.1, 0.09, -0.15 + d / 2 + 0.035], crease: false }));
+  // The stump with the axe, and split wood by it.
+  g.add(part(cyl(0.16, 0.19, 0.18, 7), WOOD_DARK, { at: [0.34, 0.09, 0.28] }));
+  g.add(part(cyl(0.15, 0.15, 0.012, 7), '#f0cb93', { at: [0.34, 0.185, 0.28], crease: false }));
+  g.add(part(box(0.045, 0.5, 0.045), '#c48a4e', { at: [0.42, 0.38, 0.28], rot: [0, 0, -0.5] }));
+  g.add(part(box(0.2, 0.13, 0.03), '#d3d6db', { at: [0.3, 0.22, 0.28], rot: [0, 0, -0.5] }));
+  for (const [x, z, a] of [[-0.05, 0.32, 0.3], [-0.2, 0.36, -0.4], [0.12, 0.42, 1.2]]) g.add(timberLog(0.2, 0.045, [x, 0.045, z], a));
+  const t = tree(1.25, PINE);
+  t.position.set(-0.48, 0, 0.12);
+  g.add(t);
+  return g;
+}
+
+// A big round saw on its bench, a log being fed through it, a shed roofed in
+// fresh-sawn boards and the pile of logs.
+function sawmill(): THREE.Group {
+  const g = new THREE.Group();
+  const shed = cottage(0.44, 0.3, 0.3, mix(WOOD, WALL, 0.35), '#d9a868');
+  shed.position.set(0.18, 0, -0.4);
+  g.add(shed);
+  g.add(part(box(0.66, 0.05, 0.22), WOOD, { at: [-0.05, 0.2, 0.08] }));
+  for (const x of [-0.34, 0.24]) for (const z of [0.0, 0.16]) g.add(part(box(0.04, 0.18, 0.04), WOOD_DARK, { at: [x, 0.09, z], crease: false }));
+  // The blade, standing on edge facing the room, its teeth around it.
+  const blade = new THREE.Group();
+  blade.add(part(cyl(0.34, 0.34, 0.025, 16), '#e3e6ea', { rot: [Math.PI / 2, 0, 0] }));
+  blade.add(part(cyl(0.06, 0.06, 0.04, 6), DARK, { rot: [Math.PI / 2, 0, 0], crease: false }));
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    blade.add(part(cone(0.045, 0.08, 3), '#9aa1ab', { at: [Math.cos(a) * 0.37, Math.sin(a) * 0.37, 0], rot: [0, 0, a - Math.PI / 2], crease: false }));
+  }
+  blade.position.set(0.02, 0.4, 0.08);
+  blade.rotation.x = -0.35; // leant back a little, so the room sees its face
+  g.add(blade);
+  g.add(timberLog(0.4, 0.07, [-0.25, 0.3, 0.08], 0));
+  const r = 0.075;
+  for (const [x, lvl] of [[-0.12, 0], [0.04, 0], [-0.04, 1]] as [number, number][]) g.add(timberLog(0.3, r, [0.38 + x, r + lvl * r * 1.7, 0.36], Math.PI / 2));
+  return g;
+}
+
+// Logs hauled up on a strip of beach, an upturned rowboat and an oar: facing the sea.
+function driftwoodYard(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(cyl(0.62, 0.66, 0.03, 7), SAND, { at: [0, 0.015, 0.05], scale: [1, 1, 0.85], crease: false }));
+  const r = 0.085, len = 0.42;
+  const pile: [number, number][] = [[-0.17, 0], [0, 0], [0.17, 0], [-0.085, 1], [0.085, 1]];
+  for (const [x, lvl] of pile) g.add(timberLog(len, r, [-0.15 + x, 0.03 + r + lvl * r * 1.7, -0.18], Math.PI / 2));
+  // Bleached driftwood lying loose.
+  for (const [x, z, a, l] of [[0.35, -0.2, 0.6, 0.4], [-0.45, 0.25, -0.3, 0.3]]) {
+    const t = timberLog(l, 0.04, [x, 0.07, z], a);
+    g.add(t);
+  }
+  // The rowboat, upside down on the sand.
+  const boat = group(part(cyl(0.13, 0.05, 0.5, 4), WOOD_DARK, { rot: [Math.PI / 2, Math.PI / 4, 0], scale: [1, 1, 0.55] }));
+  boat.rotation.set(Math.PI, 0.5, 0);
+  boat.position.set(0.3, 0.1, 0.3);
+  g.add(boat);
+  g.add(part(box(0.03, 0.03, 0.42), WOOD, { at: [0.0, 0.05, 0.38], rot: [0, -0.9, 0], crease: false }));
+  g.add(part(box(0.07, 0.015, 0.11), WOOD, { at: [0.16, 0.05, 0.25], rot: [0, -0.9, 0], crease: false }));
+  return g;
+}
+
+// A slender stone needle on stepped stones, a big violet crystal hanging in the
+// air over its point, and small ones breaking out at its foot.
+function leySpire(): THREE.Group {
+  const g = new THREE.Group();
+  const stone = mix(STONE, '#8a7fa6', 0.35);
+  g.add(part(cyl(0.34, 0.4, 0.08, 6), stone, { at: [0, 0.04, -0.05] }));
+  g.add(part(cyl(0.24, 0.28, 0.08, 6), mix(stone, WALL, 0.2), { at: [0, 0.12, -0.05] }));
+  g.add(part(cyl(0.06, 0.15, 0.9, 4), stone, { at: [0, 0.61, -0.05], rot: [0, Math.PI / 4, 0] }));
+  const top = crystal(0.44, CRYSTAL);
+  top.position.set(0, 1.42, -0.05);
+  g.add(top);
+  for (const [x, y, z, h] of [[-0.26, 1.2, 0.05, 0.13], [0.24, 1.3, -0.12, 0.11]]) {
+    const c = crystal(h, '#d6bfff');
+    c.position.set(x, y, z);
+    c.rotation.z = x * 2;
+    g.add(c);
+  }
+  for (const [x, z, h, t] of [[0.32, 0.25, 0.2, 0.4], [-0.34, 0.22, 0.16, -0.4], [0.05, 0.36, 0.14, 0.1]]) {
+    const c = crystal(h, CRYSTAL);
+    c.position.set(x, h * 0.6, z);
+    c.rotation.z = t;
+    g.add(c);
+  }
+  return g;
+}
+
+// A cutter's workshop: a grindstone wheel in its frame, a bench of big cut gems.
+function gemCutter(): THREE.Group {
+  const g = new THREE.Group();
+  const shop = cottage(0.4, 0.3, 0.24, WALL, '#8a62c9');
+  shop.position.set(-0.2, 0, -0.36);
+  g.add(shop);
+  // The grindstone, on edge to the room.
+  g.add(part(cyl(0.22, 0.22, 0.07, 10), '#b9b2a6', { at: [-0.25, 0.3, 0.15], rot: [Math.PI / 2, 0, 0] }));
+  g.add(part(cyl(0.05, 0.05, 0.09, 6), WOOD_DARK, { at: [-0.25, 0.3, 0.15], rot: [Math.PI / 2, 0, 0], crease: false }));
+  for (const x of [-0.42, -0.08]) g.add(part(box(0.04, 0.32, 0.04), WOOD, { at: [x, 0.16, 0.15] }));
+  g.add(part(box(0.4, 0.035, 0.035), WOOD, { at: [-0.25, 0.3, 0.15], crease: false }));
+  // The bench of cut gems: wide faceted stones, not the mine's long spires.
+  g.add(part(box(0.38, 0.04, 0.2), WOOD, { at: [0.3, 0.2, 0.18] }));
+  for (const x of [0.14, 0.46]) g.add(part(box(0.035, 0.18, 0.035), WOOD_DARK, { at: [x, 0.09, 0.18], crease: false }));
+  for (const [x, z, s] of [[0.22, 0.16, 0.11], [0.38, 0.22, 0.085], [0.42, 0.09, 0.07]]) {
+    g.add(part(new THREE.OctahedronGeometry(1, 0), CRYSTAL, { at: [x, 0.22 + s * 0.85, z], scale: [s, s * 0.9, s], rot: [0, 0.4, 0], glow: 0.35 }));
+  }
+  const big = part(new THREE.OctahedronGeometry(1, 0), '#d6bfff', { at: [0.3, 0.13, 0.42], scale: [0.13, 0.13, 0.13], glow: 0.35 });
+  g.add(big);
+  return g;
+}
+
+// A brick kiln with its tall chimney smoking, its mouth glowing; stone blocks go
+// in and violet crystals come out.
+function smelter(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(cyl(0.22, 0.36, 0.45, 8), KILN, { at: [-0.05, 0.225, -0.12] }));
+  g.add(part(cone(0.23, 0.2, 8), mix(KILN, DARK, 0.2), { at: [-0.05, 0.55, -0.12] }));
+  g.add(part(cyl(0.07, 0.09, 0.7, 6), mix(KILN, DARK, 0.15), { at: [0.12, 0.65, -0.32] }));
+  for (const [y, s, x] of [[1.08, 0.08, 0.14], [1.22, 0.1, 0.2], [1.38, 0.12, 0.3]]) g.add(part(new THREE.DodecahedronGeometry(s, 0), '#e8e4dc', { at: [x, y, -0.32], crease: false }));
+  g.add(part(box(0.18, 0.16, 0.04), '#ff9a3c', { at: [-0.05, 0.1, 0.22], glow: 0.9, crease: false }));
+  g.add(part(box(0.24, 0.04, 0.06), mix(KILN, DARK, 0.3), { at: [-0.05, 0.2, 0.23], crease: false }));
+  for (const [x, z, a] of [[-0.45, 0.2, 0.3], [-0.42, 0.38, -0.1]]) g.add(stoneBlock(0.15, [x, 0.06, z], a));
+  for (const [x, z, h, t] of [[0.3, 0.3, 0.22, 0.3], [0.42, 0.18, 0.18, -0.35], [0.2, 0.42, 0.14, -0.1]]) {
+    const c = crystal(h, CRYSTAL);
+    c.position.set(x, h * 0.6, z);
+    c.rotation.z = t;
+    g.add(c);
+  }
+  return g;
+}
+
+// A shepherd's bothy: a round stone hut under a tall straw cone, a little
+// dry-stone pen of sheep by it, and the crook leant on the wall.
+function shepherdsFold(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(part(cyl(0.24, 0.27, 0.3, 8), mix(STONE, WALL, 0.25), { at: [-0.2, 0.15, -0.25] }));
+  g.add(part(cone(0.34, 0.5, 8), STRAW, { at: [-0.2, 0.55, -0.25] }));
+  g.add(part(box(0.12, 0.18, 0.02), DARK, { at: [-0.12, 0.09, -0.01], rot: [0, 0.35, 0], crease: false }));
+  // The pen: a half ring of dry stone in front, open to the hut.
+  const n = 9, R = 0.36, cx = 0.18, cz = 0.18;
+  for (let i = 0; i < n; i++) {
+    const a = -0.6 + (i / (n - 1)) * Math.PI * 1.3;
+    g.add(part(box(0.2, 0.15, 0.1), i % 2 ? STONE : mix(STONE, WALL, 0.3), { at: [cx + Math.cos(a) * R, 0.075, cz + Math.sin(a) * R], rot: [0, -a + Math.PI / 2, 0] }));
+  }
+  for (const [x, z, a] of [[0.14, 0.16, 0.5], [0.3, 0.02, 2.6]]) {
+    const s = sheep();
+    s.scale.setScalar(1.45);
+    s.position.set(x, 0, z);
+    s.rotation.y = a;
+    g.add(s);
+  }
+  // The crook: a staff with its hooked top.
+  g.add(part(cyl(0.018, 0.018, 0.66, 4), WOOD, { at: [-0.48, 0.33, 0.1], rot: [0, 0, 0.12], crease: false }));
+  g.add(part(new THREE.TorusGeometry(0.07, 0.018, 3, 8, Math.PI * 1.3), WOOD, { at: [-0.5, 0.68, 0.1], rot: [0, 0, -0.2], crease: false }));
+  return g;
+}
+
+// A big drovers' barn: tall timber walls, a high straw roof, wide doors open on
+// sheep coming out.
+function droversBarn(): THREE.Group {
+  const g = new THREE.Group();
+  const w = 0.72, d = 0.5, h = 0.38;
+  g.add(part(box(w, h, d), mix(WOOD, WALL, 0.2), { at: [0, h / 2, -0.18] }));
+  g.add(gable(w + 0.1, d + 0.16, 0.42, STRAW, h + 0.12));
+  g.children[g.children.length - 1].position.z = -0.18;
+  g.add(part(box(0.26, 0.28, 0.02), DARK, { at: [0, 0.14, -0.18 + d / 2 + 0.005], crease: false }));
+  for (const sx of [-1, 1]) g.add(part(box(0.13, 0.28, 0.02), WOOD_DARK, { at: [sx * 0.2, 0.14, -0.18 + d / 2 + 0.05], rot: [0, sx * 0.9, 0] }));
+  g.add(part(box(0.1, 0.08, 0.02), DARK, { at: [0, 0.46, -0.18 + d / 2 + 0.035], crease: false }));
+  for (const [x, z, a] of [[0.05, 0.3, 1.4], [-0.3, 0.42, 0.9], [0.36, 0.4, 2.0]]) {
+    const s = sheep();
+    s.scale.setScalar(1.35);
+    s.position.set(x, 0, z);
+    s.rotation.y = a;
+    g.add(s);
+  }
+  return g;
+}
+
+// A straw-thatched hut up on stilts at the water's edge, a rack of fish drying and
+// a sheep by the door: facing the sea.
+function fishery(): THREE.Group {
+  const g = new THREE.Group();
+  for (const x of [-0.36, -0.02]) for (const z of [-0.42, -0.14]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.11, z], crease: false }));
+  g.add(part(box(0.48, 0.04, 0.4), WOOD, { at: [-0.19, 0.24, -0.28] }));
+  const hut = cottage(0.36, 0.28, 0.22, mix(WOOD, WALL, 0.45), STRAW);
+  hut.position.set(-0.19, 0.26, -0.3);
+  g.add(hut);
+  // The drying rack: two posts, a pole, fish hanging from it.
+  for (const x of [0.02, 0.6]) g.add(part(box(0.04, 0.5, 0.04), WOOD, { at: [x, 0.25, 0.14] }));
+  g.add(part(box(0.62, 0.035, 0.035), WOOD_DARK, { at: [0.31, 0.49, 0.14], crease: false }));
+  for (let i = 0; i < 4; i++) {
+    const x = 0.12 + i * 0.13;
+    g.add(part(new THREE.OctahedronGeometry(1, 0), i % 2 ? FISH : mix(FISH, WALL, 0.3), { at: [x, 0.34, 0.14], scale: [0.065, 0.13, 0.035] }));
+    g.add(part(cone(0.06, 0.07, 3), mix(FISH, DARK, 0.25), { at: [x, 0.19, 0.14], rot: [Math.PI, 0, 0], crease: false }));
+  }
+  // A basket of the catch, and the sheep that keeps the place.
+  g.add(part(cyl(0.1, 0.08, 0.1, 7), STRAW, { at: [0.3, 0.05, 0.38] }));
+  for (const x of [0.26, 0.33]) g.add(part(new THREE.OctahedronGeometry(1, 0), FISH, { at: [x, 0.11, 0.38], scale: [0.03, 0.02, 0.07] }));
+  const s = sheep();
+  s.scale.setScalar(1.35);
+  s.position.set(-0.32, 0, 0.3);
+  s.rotation.y = 0.8;
+  g.add(s);
+  return g;
+}
+
+// Buildings that turn to face the sea.
+const SEAWARD = new Set(['port', 'driftwood_yard', 'fishery']);
+
 // Where a building's dragons sit, in the building's own frame.
 interface Perch { x: number; y: number; z: number; face: number }
 
@@ -676,6 +944,17 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'hatchery': return { model: hatchery(pc), offset: [0, 0] };
     case 'port': return { model: port(pc), offset: [0, 0] };
     case 'monument': return { model: monument(up), offset: [0, 0] };
+    case 'cliff_works': return { model: cliffWorks(), offset: [0, 0] };
+    case 'stonemason': return { model: stonemason(), offset: [0, 0] };
+    case 'woodcutter': return { model: woodcutter(), offset: [0, 0] };
+    case 'sawmill': return { model: sawmill(), offset: [0, 0] };
+    case 'driftwood_yard': return { model: driftwoodYard(), offset: [0, 0] };
+    case 'ley_spire': return { model: leySpire(), offset: [0, 0] };
+    case 'gem_cutter': return { model: gemCutter(), offset: [0, 0] };
+    case 'smelter': return { model: smelter(), offset: [0, 0] };
+    case 'shepherds_fold': return { model: shepherdsFold(), offset: [0, 0] };
+    case 'drovers_barn': return { model: droversBarn(), offset: [0, 0] };
+    case 'fishery': return { model: fishery(), offset: [0, 0] };
     default: {
       // Until a building has its own model it borrows its class's.
       const stand: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
@@ -914,7 +1193,7 @@ export class Board3D {
         this.built.delete(h.k);
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, b.type === 'port' ? this.seaward(g.map, h) : 0), h);
+      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too.
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig !== bsig);
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });

@@ -140,6 +140,9 @@ function most(g: Game, p: number, not = ''): string {
   return (['stone', 'timber', 'crystal', 'livestock'] as const).filter((x) => x !== not).reduce((a, b) => (r[b] > r[a] ? b : a));
 }
 
+// The production cards (building art, batch 2).
+const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
+
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
 const PLAYABLE = ['secret_hoard', 'growth_elixir', 'healing_potion', 'monument', 'workshop'];
@@ -247,6 +250,37 @@ export const SCENES: Scene[] = [
       { file: 'tv-basics-2p', caption: 'TV: every basic building and both towers (one with three floors)', client: 'tv', waitMs: 4800 },
       { file: 'phone-basics-panel-2p', caption: 'Phone: the basic buildings to build', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]'] },
       { file: 'phone-basics-map-2p', caption: 'Phone: the map with every basic building, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
+    ],
+  },
+  {
+    // The production cards (building art, batch 2), each by its class's basic
+    // building: one player has the quarry and lumber cards, the other the mine
+    // and pasture cards, the coast cards on the coast. Their phone hand holds the
+    // eleven cards.
+    name: 'production-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 1 && g.phase === 'action',
+    setup: (g) => {
+      const dist = (a: string, b: string) => { const [q, r] = a.split(',').map(Number), [q2, r2] = b.split(',').map(Number); return Math.max(Math.abs(q - q2), Math.abs(r - r2), Math.abs(q + r - q2 - r2)); };
+      const coast = (k: string) => Object.keys(g.map).some((o) => g.map[o].terrain === 'ocean' && dist(o, k) === 1);
+      const near = (p: number, ok: (k: string) => boolean) => Object.keys(g.map).filter((k) => !g.buildings[k] && g.map[k].terrain !== 'ocean' && ok(k))
+        .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
+      const land = (terrain: string | null) => (k: string) => (terrain ? g.map[k].terrain === terrain : g.map[k].terrain !== 'harbor');
+      const want: [string, (k: string) => boolean][][] = [
+        [['quarry', land('mountain')], ['cliff_works', land(null)], ['stonemason', land(null)], ['lumber_camp', land('forest')], ['woodcutter', land(null)], ['sawmill', land(null)], ['driftwood_yard', coast]],
+        [['crystal_mine', land('ley')], ['ley_spire', land(null)], ['gem_cutter', land(null)], ['smelter', land(null)], ['pasture', land('meadow')], ['shepherds_fold', land(null)], ['drovers_barn', land(null)], ['fishery', coast]],
+      ];
+      for (const p of [0, 1]) for (const [type, ok] of want[p]) {
+        const k = near(p, ok);
+        if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+      }
+      giveHand(g, g.turn, PRODUCTION_CARDS);
+    },
+    shots: (g) => [
+      { file: 'tv-production-2p', caption: 'TV: the eleven production cards, each by its class\'s basic building', client: 'tv', waitMs: 4800 },
+      { file: 'phone-production-map-2p', caption: 'Phone: the map with the production cards, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
+      { file: 'phone-production-hand-2p', caption: 'Phone: a hand of the eleven production cards (staged)', client: 'phone', seat: g!.turn },
     ],
   },
   {
