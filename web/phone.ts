@@ -219,9 +219,10 @@ function status(g: PublicState, me: Me): string {
     const what = g.phase === 'action' ? (me.myTurn ? 'Your turn!' : 'An offer for you') : g.phase === 'discard' ? 'Too many cards' : 'Raid: your choice';
     return `<div class="status you">${what}</div>`;
   }
-  const w = g.waitingOn.map((p) => playerTag(p, names)).join(', ');
+  const tags = g.waitingOn.map((p) => playerTag(p, names));
+  const w = tags.length < 2 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`;
   if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn. ${g.offers.length ? '' : 'You can offer them a trade.'}</span></div>`;
-  return `<div class="status"><span>Waiting for ${w || 'the table'}…</span></div>`;
+  return `<div class="status"><span>Waiting for ${w || 'the table'}.</span></div>`;
 }
 
 function render() {

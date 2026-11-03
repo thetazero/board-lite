@@ -211,20 +211,21 @@ class Tab {
     if (device.mobile) {
       const h = await this.eval<number>('Math.max(document.documentElement.scrollHeight, innerHeight)');
       clip = { x: 0, y: 0, width: device.width, height: h, scale: 1 };
-      // A full-page capture would leave fixed bars (table talk) at the bottom of the
+      // A full-page capture would leave fixed bars (table talk, the hand) at the bottom of the
       // first screen, over the middle of the page. Pin them to the page's end, as a
       // phone scrolled to the bottom shows them.
       await this.eval(`(() => {
-        for (const el of document.querySelectorAll('.talkbar')) {
+        for (const el of document.querySelectorAll('.talkbar, .handfan')) {
+          const top = el.getBoundingClientRect().top + ${h} - innerHeight; // the same distance from the bottom, on the page's last screen
           el.dataset.shotStyle = el.getAttribute('style') ?? '';
-          el.style.cssText += ';position:absolute;bottom:auto;top:' + (${h} - el.offsetHeight) + 'px';
+          el.style.cssText += ';position:absolute;bottom:auto;top:' + top + 'px';
         }
         return true;
       })()`);
       await this.settle();
     }
     const r = await this.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !!clip, ...(clip ? { clip } : {}) });
-    if (clip) await this.eval(`(document.querySelectorAll('.talkbar').forEach((el) => { el.setAttribute('style', el.dataset.shotStyle); delete el.dataset.shotStyle; }), true)`);
+    if (clip) await this.eval(`(document.querySelectorAll('.talkbar, .handfan').forEach((el) => { el.setAttribute('style', el.dataset.shotStyle); delete el.dataset.shotStyle; }), true)`);
     return Buffer.from(r.data, 'base64');
   }
 }

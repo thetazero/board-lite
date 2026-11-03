@@ -91,11 +91,13 @@ const ICONS: Record<string, Facet[]> = {
     ['#ddd7c8', P([[2.5, -6.5], [5, -6.5], [5, -4], [7.5, -4], [7.5, 8], [2.5, 8]])],
   ],
   // Elements.
+  // A flame of three tongues around a yellow core, so it reads as fire even dimmed.
   fire: [
-    ['#ffcf4a', P([[0, -9], [5.5, -1], [6, 4], [1.5, 8.5], [0, 2]])],
-    ['#ff7a2e', P([[0, -9], [0, 2], [-1.5, 8.5], [-6, 4], [-5, -2], [-2.5, 0]])],
-    ['#e3401f', P([[0, 2], [1.5, 8.5], [-1.5, 8.5]])],
-    ['#fff1b0', P([[0.5, 1], [2.8, 4.5], [1.2, 7.5], [-1, 4.5]])],
+    ['#ff9a3c', P([[0, -9.5], [0, 9], [-4.5, 6.5], [-6.5, 1], [-5.5, -6], [-3, -3]])],
+    ['#f05a24', P([[0, -9.5], [3, -3], [5.5, -6], [6.5, 1], [4.5, 6.5], [0, 9]])],
+    ['#c8331a', P([[-4.5, 6.5], [0, 4], [4.5, 6.5], [0, 9]])],
+    ['#ffd23f', P([[0, -3], [2.8, 2.5], [0, 6.5], [-2.8, 2.5]])],
+    ['#fff1b0', P([[0, -3], [0, 6.5], [-2.8, 2.5]])],
   ],
   // Icicles hanging from a snowy ledge: nothing like the crystal's cut gem.
   ice: [
@@ -135,6 +137,11 @@ const ICONS: Record<string, Facet[]> = {
 export const ICON_NAMES = Object.keys(ICONS);
 
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards' };
+
+// Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
+export function iconShapes(name: string): string {
+  return (ICONS[name] ?? []).map(([f, p]) => `<polygon fill="${f}" points="${p}"/>`).join('');
+}
 
 export function icon(name: string, size = 1.25, cls = 'ricon'): string {
   const facets = ICONS[name];

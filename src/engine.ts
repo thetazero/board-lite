@@ -392,7 +392,7 @@ function startRound(g: Game) {
     while (d.stage < 3 && d.growth >= need) {
       d.growth -= need;
       d.stage++;
-      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) grows into a ${['egg', 'hatchling', 'young dragon', 'adult'][d.stage]}.`);
+      log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][d.stage]}.`);
     }
     if (d.stage === 3) d.growth = 0;
   }
@@ -853,7 +853,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
           pay(pl, def.cost);
           d.stage++;
           d.growth = 0;
-          what = `grows ${dragonName(d)} (${d.id}) into a ${['egg', 'hatchling', 'young dragon', 'adult'][d.stage]}`;
+          what = `grows ${dragonName(d)} (${d.id}) into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][d.stage]}`;
           break;
         }
         case 'heal_dragon': {

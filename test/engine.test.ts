@@ -29,7 +29,7 @@ test('bot games reach a winner for every player count', () => {
 });
 
 test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {
-  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls! \S+ each take/;
+  const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls! \S+ each take|\ba (adult|egg)\b/;
   for (let players = 2; players <= 6; players++) {
     for (let seed = 1; seed <= 10; seed++) {
       const g = newGame(players, seed);

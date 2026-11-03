@@ -160,6 +160,12 @@ function renderGame(g: PublicState) {
       </aside>
       <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
     </div>`;
+  // The ticker shows the newest lines at the bottom; an older one that only
+  // partly fits at the top is dropped rather than shown sliced in half.
+  for (const ul of app.querySelectorAll<HTMLElement>('.ticker ul')) {
+    const top = ul.getBoundingClientRect().top;
+    while (ul.children.length > 1 && ul.firstElementChild!.getBoundingClientRect().top < top - 1) ul.firstElementChild!.remove();
+  }
 }
 
 // "P2 says: "hi"" -> the speaker's name, then what they said.
@@ -185,7 +191,7 @@ function elem(e: string): string {
 }
 
 function check(done: boolean): string {
-  return done ? '<span class="ok">✔</span>' : '<span class="wait">…</span>';
+  return done ? '<span class="ok">✔</span>' : '<span class="wait">○</span>'; // not "…", which reads as text cut off
 }
 
 function renderRaid(g: PublicState) {
