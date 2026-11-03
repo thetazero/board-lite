@@ -87,6 +87,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   - The basic production buildings are not cards; anyone can build them.
   - Building cards are "special and more interesting, like buildings that scale with number of neighbors of a certain class, regardless of what team they are on. generally adjacency limited."
   - Lots of variety: "I want lots of fun variety."
+  - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
 - Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
