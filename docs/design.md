@@ -168,6 +168,16 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - A web game. Strong preference for TypeScript; no other stack preferences.
 - The phone client should be lightweight.
 
+## Look and feel
+
+The owner's calls (2026-11-03), after playing the first clients:
+
+- Art style: papercraft / pop-up book, leaning origami: "Yeah I feel like oragami leaning is the way to go".
+- "I want cool looking cards with graphics that look like cards, I want the game board to be 3d and fun, and for buildings to literally be built and stand on the board, I want dragons to look cool and fly around their homes from time to time. but otherwise just chill at home"
+- The phone's copy of the map stays flat: "yup flat simplified version probably".
+- Icons, not words: "we should constantly use icons over words for things like wood, and make the icons look better too".
+- Show, don't tell: "things should be show not tell, there should just be an animation where cards are added to your hand" (said of the phone's "You draw Quarry, Crystal Mine, Rime Drake." line).
+
 ## Open questions
 
 - Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length. `docs/datasheet.md` shows the current numbers and what they add up to.

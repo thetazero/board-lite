@@ -14,7 +14,7 @@ let code = '';
 let hostToken = '';
 let snap: Snapshot | null = null;
 let names: string[] = [];
-let lan: { lan: string[]; port: number } = { lan: [], port: Number(location.port) || 80 };
+let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
 let seenLog = -1; // highest log index already animated
 
 async function boot() {
@@ -60,9 +60,14 @@ function onSnapshot(s: Snapshot) {
 // ---------- lobby ----------
 
 // The room's address: phones open it, and CLI players use it as the game.
-function joinUrl(): string {
-  const host = lan.lan[0] ?? location.hostname;
+function joinUrl(host = lan.lan[0] ?? lan.tailscale[0] ?? location.hostname): string {
   return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}/${code}`;
+}
+
+// Phones on the same tailnet reach this machine from anywhere at its Tailscale address.
+function tailscaleUrl(): string | null {
+  const t = lan.tailscale[0];
+  return t && lan.lan.length ? joinUrl(t) : null;
 }
 
 function renderLobby() {
@@ -78,9 +83,11 @@ function renderLobby() {
       <div class="join-box">
         <div>On your phone, open</div>
         <div class="url">${esc(joinUrl())}</div>
+        ${tailscaleUrl() ? `<div class="alt">or over Tailscale: <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
         <div>room code</div>
         <div class="code">${esc(l.code)}</div>
         <div class="cli">At a terminal: <code>node src/cli.ts join http://${esc(joinUrl())} &lt;name&gt;</code></div>
+        <div class="cli">Claude players: <code>node src/playtest/run.ts --room http://${esc(joinUrl('localhost'))} --models opus,haiku</code></div>
       </div>
       <ul class="seats">${seats || '<li class="empty">Waiting for players to join…</li>'}</ul>
       <div class="lobby-actions">
@@ -140,6 +147,7 @@ function renderGame(g: PublicState) {
   const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${esc(o.give)}</b> for <b>${esc(o.get)}</b></li>`).join('');
   const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')})</small></li>`).join('');
   const log = g.log.slice(-7).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
+  const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
   const legend = Object.keys(TERRAIN_COLORS).map((t) => `<span><i style="background:${TERRAIN_COLORS[t]}"></i>${TERRAIN_NAMES[t]}</span>`).join('');
   const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'market', 'caravan_post', 'monument'] as const)
     .map((b) => `<span>${buildingIcon(b, 18, '#ddd')}${b.replace('_', ' ')}</span>`).join('');
@@ -148,7 +156,7 @@ function renderGame(g: PublicState) {
       <header class="topbar">
         <span class="round">Round ${g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
-        <span class="roomcode">Join: <b>${esc(joinUrl())}</b></span>
+        <span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>
       </header>
       <section class="mapwrap">${mapSvg(g.map, { size: 40, highlight: g.phase === 'action' ? g.turn : null })}
         <div class="legend">${legend}</div><div class="legend">${bLegend}</div>
@@ -158,8 +166,14 @@ function renderGame(g: PublicState) {
         ${many ? '' : `<div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>`}
         ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       </aside>
-      <footer class="ticker"><ul>${log}</ul></footer>
+      <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
     </div>`;
+}
+
+// "P2 says: "hi"" -> the speaker's name, then what they said.
+function talkLine(text: string, g: PublicState): string {
+  const m = /^(P\d) says: "(.*)"$/.exec(text);
+  return m ? `${named(m[1], names)} <q>${named(m[2], names, g.dragons)}</q>` : named(text, names, g.dragons);
 }
 
 // ---------- overlays ----------
@@ -218,9 +232,10 @@ function queueBanners(g: PublicState, fresh: EventView[]) {
       // There is no retreat, so the whole fight resolves at once: replay it.
       const rounds = fresh.filter((x) => x.i > e.i && x.round === e.round && /^Combat round/.test(x.text));
       const rows = rounds.map((x) => `<li>${named(x.text, names, g.dragons)}</li>`).join('');
-      banners.push({ html: `<div class="result"><h2>${named(e.text, names, g.dragons)}</h2><ul class="combatlog">${rows}</ul></div>`, ms: 4000 + 1500 * rounds.length });
+      const end = fresh.find((x) => x.i > e.i && /falls!|holds\./.test(x.text));
+      banners.push({ html: `<div class="result"><h2>${named(e.text, names, g.dragons)}</h2><ul class="combatlog">${rows}</ul>${end ? `<h1>${named(end.text, names, g.dragons)}</h1>` : ''}</div>`, ms: 5000 + 1500 * rounds.length });
     }
-    if (/falls!|holds\.|Everyone bailed|Nobody commits/.test(e.text)) {
+    if (/Everyone bailed|Nobody commits/.test(e.text)) {
       banners.push({ html: `<div class="result"><h1>${named(e.text, names, g.dragons)}</h1></div>`, ms: 5000 });
     }
     if (/^=== Round \d+ ===$/.test(e.text)) {

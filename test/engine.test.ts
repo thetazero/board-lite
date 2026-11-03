@@ -162,28 +162,6 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.equal(g.raid!.step, 'vote');
 });
 
-test('a playtest seat server plays one seat over MCP', () => {
-  mkdirSync(join(homedir(), '.cache'), { recursive: true });
-  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
-  try {
-    const file = join(dir, 'g.json');
-    execFileSync(process.execPath, ['src/cli.ts', 'new', file, '--players', '2', '--seed', '4']);
-    const reqs = [
-      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
-      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
-      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'say', arguments: { message: 'hello', to: 'P1' } } },
-      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'act', arguments: { command: 'end' } } },
-    ];
-    const outText = execFileSync(process.execPath, ['src/playtest/seat-server.ts', file, '2'], { input: reqs.map((r) => JSON.stringify(r)).join('\n') + '\n', encoding: 'utf8' });
-    const res = outText.trim().split('\n').map((l) => JSON.parse(l));
-    assert.deepEqual(res[1].result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
-    assert.match(res[2].result.content[0].text, /P2 to P1 \(private\): "hello"/);
-    assert.match(res[3].result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test('a dragon hurt in a raid heals but sits out the next round', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];

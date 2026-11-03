@@ -1,12 +1,19 @@
 #!/usr/bin/env node
-// Runs one sandboxed playtest: each seat is its own `claude -p` process whose
-// only tools are the seat server's (view, act, say, wait, rules) for that one
-// seat. No built-in tools (no shell, files, web), no other MCP servers, no
-// user or project settings. "bot" seats are played by the random bot.
+// Seats Claude players at a board-lite table. Each Claude seat is its own
+// `claude -p` process whose only tools are the seat server's (view, act, say,
+// wait, rules) for that one seat. No built-in tools (no shell, files, web), no
+// other MCP servers, no user or project settings.
 //
-//   node src/playtest/run.ts --models opus,haiku,haiku [--seed N] [--out DIR]
+// Claude players are clients like any other: they join a room on a board-lite
+// server and play through the same interface as the phones and the CLI. Either
+// this runner hosts the room itself (a playtest: every seat Claude or a bot,
+// the TV optional with --serve), or it joins Claude seats to a room someone is
+// already hosting with `npm run serve` (--room), next to phone and CLI players.
 //
-// See docs/playtest.md.
+//   node src/playtest/run.ts --models opus,haiku,haiku [--seed N] [--out DIR] [--serve PORT]
+//   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
+//
+// See docs/playtest.md and docs/play-vs-claude.md.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -14,24 +21,30 @@ import { appendFileSync, createWriteStream, existsSync, mkdirSync, writeFileSync
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { botMove } from '../bot.ts';
-import { RuleError, newGame, pname, score, waitingOn, type Game } from '../engine.ts';
-import { load, save, withLock } from '../store.ts';
+import type { AddressInfo } from 'node:net';
+import { pname, score, type Game } from '../engine.ts';
+import { load } from '../store.ts';
+import { Room } from '../server/room.ts';
+import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.ts';
+import type { Lobby } from '../state.ts';
 import { FLOOR_MB, defaultPool, release, tryAcquire } from './slots.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 
-  --models opus,haiku,sonnet,bot   one entry per seat (2-6): a claude model alias or name, or "bot"
-  --seed N                          game seed (default random)
+  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, or "bot"
+  --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
+                                    e.g. http://localhost:8080/ABCD; without it, this runner hosts the game
+  --seed N                          game seed when hosting (default random)
   --out DIR                         where everything goes (default ~/.cache/board-lite/playtests/<time>-<models>)
+  --serve PORT                      when hosting, also open the TV and phone pages to the network on PORT
   --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
-  --max-minutes N                   stop the game after this long (default 240)
-  --stall-minutes N                 stop if nothing happens in the game for this long (default 15)
+  --max-minutes N                   stop after this long (default 240)
+  --stall-minutes N                 stop if nothing happens in the game for this long (default 15; 60 with --room)
   --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
 
 Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
-the game waits its turn when the pool is full or memory is short. See docs/playtest.md.`;
+wait their turn when the pool is full or memory is short. See docs/playtest.md.`;
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -45,29 +58,86 @@ if (!modelsArg || args.includes('--help')) {
   process.exit(modelsArg ? 0 : 1);
 }
 const models = modelsArg.split(',').map((m) => m.trim()).filter(Boolean);
-if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
+const joinUrl = opt(args, '--room');
+if (joinUrl) {
+  if (!models.length || models.length > 5) throw new Error('Give 1 to 5 Claude seats in --models.');
+  if (models.includes('bot')) throw new Error('With --room, add bots from the TV ("Add a bot"); --models is only for Claude seats.');
+} else if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
 const seed = Number(opt(args, '--seed') ?? Math.floor(Math.random() * 2 ** 31));
 const effort = opt(args, '--effort');
 const budget = Number(opt(args, '--budget-usd') ?? 5);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
-const stallMinutes = Number(opt(args, '--stall-minutes') ?? 15);
+const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
 const advice = opt(args, '--advice');
+const servePort = opt(args, '--serve');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const out = resolve(opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
 
 const seatServer = fileURLToPath(new URL('./seat-server.ts', import.meta.url));
-const gameFile = join(out, 'game.json');
 const tmp = join(out, 'tmp');
 mkdirSync(tmp, { recursive: true });
-if (existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
-withLock(gameFile, () => save(gameFile, newGame(models.length, seed)));
-
 const TOOL_NAMES = ['view', 'act', 'say', 'wait', 'rules'].map((t) => `mcp__game__${t}`);
 
-function systemPrompt(p: number): string {
-  const others = models.map((_, q) => pname(q)).filter((_, q) => q !== p).join(', ');
-  return `You are ${pname(p)}, one player at a ${models.length}-player table of board-lite, a social board game about wizards who raise dragons. The other players (${others}) are also AI players, each with their own hidden hand. Play to win.
+// ---- the room ----
+
+let roomUrl = ''; // http://host:port/CODE
+let api = '';
+let hosted: Room | null = null; // the room, when this runner hosts it
+let gameFile = '';
+
+async function call(path: string, body?: object): Promise<Record<string, any>> {
+  const r = await fetch(api + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const data = (await r.json().catch(() => ({}))) as Record<string, any>;
+  if (!r.ok) throw new Error(String(data.error ?? `HTTP ${r.status}`));
+  return data;
+}
+
+const lobby = async (): Promise<Lobby> => (await call('')).lobby;
+
+async function host() {
+  gameFile = join(out, 'game.json');
+  if (existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
+  const { server, rooms } = startServer(Number(servePort ?? 0), { botDelayMs: 300 }, [], servePort ? '0.0.0.0' : '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  const port = (server.address() as AddressInfo).port;
+  hosted = new Room(Room.newCode((c) => rooms.has(c)), { botDelayMs: 300, file: gameFile });
+  rooms.set(hosted.code, hosted);
+  roomUrl = `http://127.0.0.1:${port}/${hosted.code}`;
+  api = `http://127.0.0.1:${port}/api/rooms/${hosted.code}`;
+  if (servePort) {
+    const addr = lanAddresses()[0] ?? tailscaleAddresses()[0] ?? 'localhost';
+    note(`Watch on a TV: http://${addr}:${port}/tv?room=${hosted.code}`);
+  }
+}
+
+function seatName(model: string, taken: string[]): string {
+  const m = /opus|sonnet|haiku|fable/i.exec(model)?.[0] ?? model.replace(/^claude-/, '');
+  const base = model === 'bot' ? 'Bot' : `${m[0].toUpperCase()}${m.slice(1).toLowerCase()}`.slice(0, 9);
+  for (let n = 1; ; n++) {
+    const name = n === 1 ? base : `${base} ${n}`;
+    if (!taken.some((t) => t.toLowerCase() === name.toLowerCase())) return name;
+  }
+}
+
+// ---- Claude seats ----
+
+interface Seat { p: number; model: string; token: string; session: string; proc: ChildProcess | null; starts: number; cost: number; exitedAt: number }
+const seats: Seat[] = [];
+let table: Lobby['seats'] = []; // everyone at the table, once the game starts
+
+function systemPrompt(s: Seat): string {
+  const who = (q: number) => {
+    const t = table[q];
+    const mine = seats.find((x) => x.p === q);
+    const kind = mine ? 'another AI player' : t.kind === 'bot' ? 'a random bot that never talks' : t.kind === 'open' ? 'an empty seat' : 'a person, playing on their phone or at a terminal';
+    return `${pname(q)} ${t.name} (${kind})`;
+  };
+  const others = table.map((_, q) => q).filter((q) => q !== s.p).map(who).join('; ');
+  const people = table.some((t, q) => t.kind === 'player' && !seats.some((x) => x.p === q));
+  return `You are ${pname(s.p)}, called ${table[s.p].name}, one player at a ${table.length}-player table of board-lite, a social board game about wizards who raise dragons. The others: ${others}. Each has their own hidden hand. Play to win.${people ? `
+
+There are people at this table. They see your public talk on the TV, and your private messages to them on their phone, and they can talk to you. Talk to them as you would to anyone at a game night: short, friendly, to the point. They play at human speed, so be patient when you're waiting on them.` : ''}
 
 Your only way to act is the game tools: view, act, say, wait and rules. You have no other tools, and nothing outside the game matters.
 
@@ -79,14 +149,11 @@ How to play:
 - Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
 }
 
-interface Seat { p: number; model: string; session: string; proc: ChildProcess | null; starts: number; cost: number; exitedAt: number }
-const seats: Seat[] = models.map((model, p) => ({ p, model, session: randomUUID(), proc: null, starts: 0, cost: 0, exitedAt: 0 }));
-
 function startSeat(s: Seat) {
   const dir = join(out, `seat-${s.p + 1}`);
   mkdirSync(dir, { recursive: true });
   const mcp = join(dir, 'mcp.json');
-  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, gameFile, String(s.p + 1)] } } }));
+  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token] } } }));
   const first = s.starts === 0;
   const prompt = first
     ? 'The game has started. Read the rules, then play until the game is over.'
@@ -94,7 +161,7 @@ function startSeat(s: Seat) {
   const argv = [
     '-p', prompt,
     '--model', s.model,
-    ...(first ? ['--session-id', s.session, '--append-system-prompt', systemPrompt(s.p)] : ['--resume', s.session]),
+    ...(first ? ['--session-id', s.session, '--append-system-prompt', systemPrompt(s)] : ['--resume', s.session]),
     '--tools', '',
     '--strict-mcp-config', '--mcp-config', mcp,
     '--allowedTools', TOOL_NAMES.join(','),
@@ -112,7 +179,7 @@ function startSeat(s: Seat) {
   const proc = spawn('claude', argv, {
     cwd: dir,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, TMPDIR: tmp, BOARD_LITE_WAIT_SECS: '60', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    env: { ...process.env, TMPDIR: tmp, BOARD_LITE_WAIT_SECS: '120', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
   });
   let buf = '';
   proc.stdout!.on('data', (chunk: Buffer) => {
@@ -144,36 +211,31 @@ function note(text: string) {
   appendFileSync(join(out, 'runner.log'), `${line}\n`);
 }
 
-const botRng = { state: seed ^ 0x2545f491 };
-function playBots() {
-  withLock(gameFile, () => {
-    const g = load(gameFile);
-    let moved = false;
-    for (const s of seats) {
-      if (s.model !== 'bot' || g.phase === 'over' || !waitingOn(g).includes(s.p)) continue;
-      try {
-        botMove(g, s.p, botRng);
-        moved = true;
-      } catch (e) {
-        if (!(e instanceof RuleError)) throw e;
-      }
-    }
-    if (moved) save(gameFile, g);
-  });
+// What sits in each seat: a model for this runner's Claude seats, else the room's seat.
+function seatLabel(q: number): string {
+  const mine = seats.find((s) => s.p === q);
+  if (mine) return mine.model;
+  const t = table[q];
+  return t?.kind === 'bot' ? 'bot' : `${t?.kind === 'open' ? 'open' : 'player'}: ${t?.name ?? '?'}`;
 }
 
-function writeResults(g: Game, status: string, started: number) {
+function writeResults(g: Game | null, status: string, started: number) {
+  const base = { status, ...(hosted ? { seed } : { room: roomUrl }), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
+  if (!g) {
+    writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.model, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })) }, null, 2)}\n`);
+    return { ...base, rounds: 0, winner: null };
+  }
   const log = g.log.map((e) => `[r${e.round}]${e.to ? ` (only ${e.to.map(pname).join(', ')})` : ''} ${e.text}`);
   writeFileSync(join(out, 'log.txt'), `${log.join('\n')}\n`);
   writeFileSync(join(out, 'talk.txt'), `${log.filter((l) => / says: "| \(private\): "/.test(l)).join('\n')}\n`);
   const results = {
-    status,
-    seed,
-    ...(advice ? { advice } : {}),
+    ...base,
     rounds: g.round,
-    minutes: Math.round((Date.now() - started) / 600) / 100,
-    winner: g.winner === null ? null : { seat: pname(g.winner), model: models[g.winner] },
-    seats: seats.map((s) => ({ seat: pname(s.p), model: s.model, points: score(g, s.p).total, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })),
+    winner: g.winner === null ? null : { seat: pname(g.winner), model: seatLabel(g.winner) },
+    seats: g.players.map((_, q) => {
+      const s = seats.find((x) => x.p === q);
+      return { seat: pname(q), name: table[q]?.name, model: seatLabel(q), points: score(g, q).total, ...(s ? { costUsd: Math.round(s.cost * 100) / 100, starts: s.starts } : {}) };
+    }),
     talk: { public: g.log.filter((e) => / says: "/.test(e.text)).length, private: g.log.filter((e) => / \(private\): "/.test(e.text)).length },
   };
   writeFileSync(join(out, 'results.json'), `${JSON.stringify(results, null, 2)}\n`);
@@ -181,10 +243,11 @@ function writeResults(g: Game, status: string, started: number) {
 }
 
 const pool = defaultPool();
+let interrupted = false;
 
 /** Blocks until this game's Claude seats fit in the machine-wide pool. */
 async function admit(): Promise<boolean> {
-  const claudeSeats = seats.filter((s) => s.model !== 'bot').length;
+  const claudeSeats = models.filter((m) => m !== 'bot').length;
   let said = '';
   for (;;) {
     const r = tryAcquire(pool, claudeSeats, out);
@@ -196,31 +259,67 @@ async function admit(): Promise<boolean> {
   }
 }
 
-let interrupted = false;
+// The game as the host saved it, for the results (a room hosted elsewhere on this machine saves it too).
+function finalGame(): Game | null {
+  if (hosted) return hosted.game;
+  return gameFile && existsSync(gameFile) ? load(gameFile) : null;
+}
 
 async function main() {
-  note(`Playtest in ${out}: ${models.map((m, p) => `${pname(p)} ${m}`).join(', ')}; seed ${seed}.`);
   const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
   process.on('SIGINT', () => { interrupted = true; stopAll(); });
   process.on('SIGTERM', () => { interrupted = true; stopAll(); });
   process.on('exit', () => release(pool));
   let status = 'running';
   if (!(await admit())) status = 'interrupted';
+
+  // Take the seats: Claude seats join the room like any player; when hosting, bots too, then start.
+  if (joinUrl) {
+    const m = /^(https?:\/\/[^/]+)\/(?:tv\?room=)?([A-Za-z]{4})\/?$/.exec(joinUrl);
+    if (!m) throw new Error('A room URL looks like http://localhost:8080/ABCD (the TV shows it).');
+    roomUrl = `${m[1]}/${m[2].toUpperCase()}`;
+    api = `${m[1]}/api/rooms/${m[2].toUpperCase()}`;
+  } else await host();
+  note(`${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}.`);
+  if (status === 'running') {
+    for (const model of models) {
+      if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
+      const name = seatName(model, (await lobby()).seats.map((t) => t.name));
+      const r = await call('/join', { name });
+      seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, cost: 0, exitedAt: 0 });
+      note(`${name} (${model}) takes seat ${r.seat}.`);
+    }
+    if (hosted) hosted.start(hosted.hostToken, seed);
+    else note('Waiting for the game to start (press Start game on the TV, or the first player does on their phone).');
+    while (!(await lobby()).started && !interrupted) await new Promise((r) => setTimeout(r, 2000));
+    if (interrupted) status = 'interrupted';
+    table = (await lobby()).seats;
+    gameFile ||= (await lobby()).file;
+    note(`The table: ${table.map((t, q) => `${pname(q)} ${t.name} (${seatLabel(q)})`).join(', ')}.`);
+  }
   const started = Date.now();
-  if (status === 'running') for (const s of seats) if (s.model !== 'bot') startSeat(s);
-  let lastLen = -1, lastChange = Date.now(), lowSince = 0;
+  if (status === 'running') for (const s of seats) startSeat(s);
+
+  // Follow the game through the first Claude seat's eyes (only to see that it moves and when it ends).
+  let since = 0, lastChange = Date.now(), lowSince = 0;
+  const watcher = seats[0];
   for (;;) {
     if (status !== 'running') break;
     await new Promise((r) => setTimeout(r, 1000));
-    playBots();
-    const g = load(gameFile);
-    if (g.log.length !== lastLen) { lastLen = g.log.length; lastChange = Date.now(); }
     if (interrupted) { status = 'interrupted'; break; }
+    let over = false;
+    if (watcher) {
+      const r = await call(`/listen?token=${watcher.token}&since=${since}&timeout=0`).catch(() => null);
+      if (r) {
+        if (r.next !== since) { since = r.next; lastChange = Date.now(); }
+        over = /^The game is over/.test(r.status);
+      }
+    } else over = hosted?.game?.phase === 'over';
     // Free memory under the floor for 10 s: stop this game before the machine OOMs.
     if (pool.memAvailableMb() >= FLOOR_MB) lowSince = 0;
     else if (!lowSince) lowSince = Date.now();
     else if (Date.now() - lowSince > 10000) { status = 'low memory'; break; }
-    if (g.phase === 'over') {
+    if (over) {
       // Give the players a moment to see the end and sign off.
       const until = Date.now() + 120000;
       while (seats.some((s) => s.proc) && Date.now() < until) await new Promise((r) => setTimeout(r, 1000));
@@ -229,7 +328,7 @@ async function main() {
     if (Date.now() - started > maxMinutes * 60000) { status = 'time limit'; break; }
     if (Date.now() - lastChange > stallMinutes * 60000) { status = 'stalled'; break; }
     for (const s of seats) {
-      if (s.model === 'bot' || s.proc) continue;
+      if (s.proc) continue;
       if (s.cost >= budget) { status = `${pname(s.p)} hit its budget`; break; }
       if (s.starts >= 30) { status = `${pname(s.p)} kept stopping`; break; }
       if (Date.now() - s.exitedAt > 3000) startSeat(s);
@@ -237,9 +336,10 @@ async function main() {
   }
   if (status === 'running') status = 'over';
   stopAll();
-  const results = writeResults(load(gameFile), status, started);
+  const results = writeResults(finalGame(), status, started);
   note(`Finished (${results.status}) after ${results.rounds} rounds. Winner: ${results.winner ? `${results.winner.seat} (${results.winner.model})` : 'none'}.`);
-  note(`Results: ${join(out, 'results.json')}; full log with talk: ${join(out, 'log.txt')}.`);
+  note(`Results: ${join(out, 'results.json')}${results.rounds ? `; full log with talk: ${join(out, 'log.txt')}` : ''}.`);
+  process.exit(0); // the hosted server would keep the process alive
 }
 
 void main();

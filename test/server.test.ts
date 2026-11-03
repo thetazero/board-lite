@@ -178,3 +178,58 @@ test("a game from the CLI's file mode can be hosted; players claim its open seat
   assert.throws(() => room.join('Cora'), /every seat is taken/);
   room.close();
 });
+
+test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {
+  const { server } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, any>;
+  try {
+    const { code } = await post('/api/rooms', {});
+    const ada = await post(`/api/rooms/${code}/join`, { name: 'Ada' }); // a phone
+    const opus = await post(`/api/rooms/${code}/join`, { name: 'Opus' }); // Claude
+    await post(`/api/rooms/${code}/start`, { token: ada.token });
+    const reqs = [
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'view', arguments: {} } },
+      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'say', arguments: { message: 'hello', to: 'P1' } } },
+      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'act', arguments: { command: 'end' } } },
+      { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'wait', arguments: {} } },
+    ];
+    const child = execFile(process.execPath, ['src/playtest/seat-server.ts', `${base}/${code}`, opus.token], { env: { ...process.env, BOARD_LITE_WAIT_SECS: '20' } });
+    const lines: any[] = [];
+    let buf = '';
+    child.stdout!.on('data', (d) => {
+      buf += d;
+      for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) lines.push(JSON.parse(buf.slice(0, i)));
+    });
+    const reply = async (id: number) => {
+      for (let t = 0; t < 400; t++) {
+        const r = lines.find((l) => l.id === id);
+        if (r) return r;
+        await sleep(25);
+      }
+      throw new Error(`no reply to ${id}`);
+    };
+    // One request at a time, as Claude makes them.
+    for (const r of reqs.slice(0, 5)) {
+      child.stdin!.write(`${JSON.stringify(r)}\n`);
+      await reply(r.id);
+    }
+    assert.deepEqual((await reply(2)).result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
+    assert.match((await reply(3)).result.content[0].text, /^Table: P1 Ada, P2 Opus \(you\)\.\nYou are P2\./);
+    assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
+    assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
+    // Waiting returns as soon as the phone player talks.
+    child.stdin!.write(`${JSON.stringify(reqs[5])}\n`);
+    await sleep(200);
+    assert.ok(!lines.some((l) => l.id === 6), 'wait blocks while nothing happens');
+    await post(`/api/rooms/${code}/do`, { token: ada.token, command: 'say hi Opus, want to trade?' });
+    assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Not your decision/);
+    child.kill();
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});

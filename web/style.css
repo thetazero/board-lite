@@ -109,8 +109,16 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .panel h3 { margin: .1em 0 .3em; font-size: 1em; }
 .panel ul { margin: 0; padding-left: 1.1em; }
 .offers { border: 2px solid var(--accent); }
-.ticker { grid-area: tick; background: var(--panel); border-radius: 12px; padding: .3em 1em; height: 9.5em; overflow: hidden; }
-.ticker ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.ticker { grid-area: tick; background: var(--panel); border-radius: 12px; padding: .3em 1em; height: 9.5em; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; }
+.ticker ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-height: 0; overflow: hidden; }
+.ticker .talk { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); padding-left: 1em; }
+.ticker .talk h3 { margin: .1em 0 .2em; font-size: .85em; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.ticker .talk ul { flex: 1; }
+.ticker .talk li { font-size: 1.05em; }
+.ticker .talk li.none { color: var(--muted); font-weight: 400; }
+q { quotes: "“" "”"; }
+q::before { content: open-quote; }
+q::after { content: close-quote; }
 .ticker li { padding: .05em 0; color: #c9cdd8; }
 .ticker li:last-child { color: var(--text); font-weight: 600; }
 
@@ -221,3 +229,23 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .big-note { font-size: 1.2em; text-align: center; padding: 1.2em .5em; background: var(--panel); border-radius: 12px; margin: 0; }
 .mylog { list-style: none; margin: .5em .7em; padding: .5em .7em; background: var(--panel); border-radius: 10px; color: var(--muted); font-size: .9em; }
 .final { font-size: 1.2em; }
+
+/* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
+body.phone { padding-bottom: 3.6em; }
+.talkbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--panel2); border-top: 1px solid var(--line); }
+.talkbar > .latest { display: flex; align-items: center; gap: .5em; width: 100%; background: none; border: 0; border-radius: 0; padding: .75em .9em; text-align: left; color: var(--text); font: inherit; }
+.talkbar > .latest span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.talkbar .unread { background: var(--accent); color: #111; border-radius: 99px; padding: 0 .5em; font-size: .85em; }
+.talkbar .sheet { display: none; flex-direction: column; height: 70vh; padding: .5em .7em .7em; }
+.talkbar.open .sheet { display: flex; }
+.talkbar.open > .latest { display: none; }
+.talkbar .sheet header { display: flex; justify-content: space-between; align-items: center; }
+.talkbar .sheet ul { flex: 1; overflow-y: auto; list-style: none; margin: .3em 0; padding: 0; display: flex; flex-direction: column; gap: .35em; }
+.talkbar .sheet li { background: var(--panel); border-radius: 10px; padding: .4em .6em; }
+.talkbar .sheet li.private { border-left: 3px solid var(--accent); }
+.talkbar .sheet li.mine { align-self: flex-end; background: #2d3442; }
+.talkbar .sheet li small { color: var(--muted); }
+.talkbar form { display: flex; gap: .4em; }
+.talkbar form select { max-width: 7.5em; }
+.talkbar form input { flex: 1; min-width: 0; }
+.join-box .alt { color: var(--muted); margin-top: -.3em; }

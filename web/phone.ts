@@ -102,6 +102,7 @@ function onSnapshot(s: Snapshot) {
   }
   if (navigator.vibrate && s.you.deciding && !prev?.you?.deciding) navigator.vibrate(120);
   render();
+  renderTalk();
 }
 
 function seatIndex(): number {
@@ -109,6 +110,7 @@ function seatIndex(): number {
 }
 
 function leaveToJoin(msg: string) {
+  talk.el.remove();
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
@@ -341,6 +343,84 @@ function gameOver(g: PublicState, me: Me): string {
   return `<h2>${g.winner === me.seat ? 'You win!' : `${esc(names[g.winner!])} wins.`}</h2>
     <ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} ${t} points</li>`).join('')}</ol>
     <button id="newgame" class="primary">Join another game</button>`;
+}
+
+// ---------- table talk ----------
+
+// People at the table just talk, but players who aren't in the room (Claude, or
+// anyone at a terminal) only hear what goes through the game: "say" reaches
+// everyone (it shows on the TV), "tell P2" only that player. The bar is built
+// once and only its messages change, so a snapshot never wipes what you're typing.
+const talk = (() => {
+  const el = document.createElement('div');
+  el.className = 'talkbar';
+  el.innerHTML = `
+    <button class="latest" type="button"><span>Table talk</span><b class="unread" hidden></b></button>
+    <div class="sheet">
+      <header><b>Table talk</b><button class="ghost small close" type="button">Close</button></header>
+      <ul></ul>
+      <form><select aria-label="To"></select><input maxlength="300" placeholder="Say something…" autocomplete="off" enterkeyhint="send"><button class="primary">Send</button></form>
+    </div>`;
+  const q = <T extends Element>(sel: string) => el.querySelector(sel) as T;
+  return { el, latest: q<HTMLElement>('.latest span'), unread: q<HTMLElement>('.unread'), list: q<HTMLUListElement>('ul'), to: q<HTMLSelectElement>('select'), input: q<HTMLInputElement>('input'), form: q<HTMLFormElement>('form'), open: false, read: -1, toKey: '' };
+})();
+
+talk.el.querySelector<HTMLElement>('.latest')!.onclick = () => {
+  talk.open = true;
+  talk.el.classList.add('open');
+  renderTalk();
+  talk.list.scrollTop = talk.list.scrollHeight;
+};
+talk.el.querySelector<HTMLElement>('.close')!.onclick = () => {
+  talk.open = false;
+  talk.el.classList.remove('open');
+  renderTalk();
+};
+talk.form.onsubmit = (e) => {
+  e.preventDefault();
+  const text = talk.input.value.trim();
+  if (!text) return;
+  const to = Number(talk.to.value);
+  post(`/api/rooms/${code}/do`, { token, command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
+    .then(() => (talk.input.value = ''))
+    .catch(toast);
+};
+
+function talkHtml(text: string, g: PublicState): string {
+  const pub = /^(P\d) says: "(.*)"$/.exec(text);
+  if (pub) return `${named(pub[1], names)} <q>${named(pub[2], names, g.dragons)}</q>`;
+  const priv = /^(P\d) to (P\d) \(private\): "(.*)"$/.exec(text);
+  if (priv) return `${named(priv[1], names)} <small>to</small> ${named(priv[2], names)} <small>(private)</small> <q>${named(priv[3], names, g.dragons)}</q>`;
+  return named(text, names, g.dragons);
+}
+
+function renderTalk() {
+  const g = snap?.game;
+  const me = snap?.you;
+  if (!g || !me) return talk.el.remove();
+  if (!talk.el.isConnected) document.body.append(talk.el);
+  // Who you can talk to: everyone, or one other player.
+  const key = names.join('|');
+  if (key !== talk.toKey) {
+    const keep = talk.to.value;
+    talk.to.innerHTML = `<option value="-1">Everyone</option>${names.map((n, i) => (i === me.seat ? '' : `<option value="${i}">${esc(n)} only</option>`)).join('')}`;
+    talk.to.value = keep || '-1';
+    talk.toKey = key;
+  }
+  const lines = me.talk;
+  const mine = (text: string) => text.startsWith(`P${me.seat + 1} `);
+  const atBottom = talk.list.scrollHeight - talk.list.scrollTop - talk.list.clientHeight < 40;
+  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>Nobody has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
+  if (atBottom) talk.list.scrollTop = talk.list.scrollHeight;
+  const last = lines.at(-1);
+  if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
+  const unread = lines.filter((e) => e.i > talk.read && !mine(e.text)).length;
+  talk.latest.innerHTML = last ? talkHtml(last.text, g) : 'Table talk: tap to talk to the other players';
+  talk.unread.hidden = !unread;
+  talk.unread.textContent = String(unread);
+  const prevLast = talk.el.dataset.last;
+  if (last && prevLast !== String(last.i) && !mine(last.text) && last.private && navigator.vibrate) navigator.vibrate([60, 60, 60]);
+  talk.el.dataset.last = last ? String(last.i) : '';
 }
 
 // ---------- wiring ----------
