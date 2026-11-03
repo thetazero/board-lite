@@ -220,6 +220,36 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' }],
   },
   {
+    // Every building on every board, side by side: each player's tower (one
+    // with floors), and a quarry, lumber camp, crystal mine, pasture and roost
+    // beside it, so their models and icons can be told apart and compared.
+    name: 'basics-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 1 && g.phase === 'action',
+    setup: (g) => {
+      const near = (p: number, ok: (k: string) => boolean) => {
+        const [tq, tr] = g.towers[p].split(',').map(Number);
+        return Object.keys(g.map).filter((k) => !g.buildings[k] && ok(k))
+          .sort((a, b) => { const d = (k: string) => { const [q, r] = k.split(',').map(Number); return Math.max(Math.abs(q - tq), Math.abs(r - tr), Math.abs(q + r - tq - tr)); }; return d(a) - d(b) || a.localeCompare(b); })[0];
+      };
+      const want: [string, string | null][] = [['quarry', 'mountain'], ['lumber_camp', 'forest'], ['crystal_mine', 'ley'], ['pasture', 'meadow'], ['roost', null]];
+      for (const p of [0, 1]) {
+        for (const [type, terrain] of want) {
+          const k = near(p, (k) => (terrain ? g.map[k].terrain === terrain : !['ocean', 'harbor'].includes(g.map[k].terrain)));
+          if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+        }
+        Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 9));
+      }
+      g.buildings[g.towers[0]].floors = 3;
+    },
+    shots: (g) => [
+      { file: 'tv-basics-2p', caption: 'TV: every basic building and both towers (one with three floors)', client: 'tv', waitMs: 4800 },
+      { file: 'phone-basics-panel-2p', caption: 'Phone: the basic buildings to build', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]'] },
+      { file: 'phone-basics-map-2p', caption: 'Phone: the map with every basic building, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
+    ],
+  },
+  {
     name: 'trade-4p',
     players: 4,
     seed: 1,

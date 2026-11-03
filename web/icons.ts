@@ -165,12 +165,7 @@ const ICONS: Record<string, Facet[]> = {
     ['#111', P(Array.from({ length: 6 }, (_, i) => polar(1.7, 30 + 60 * i)))],
   ],
   // Titles: the tallest tower, the largest territory, the strongest army.
-  tower: [
-    ['#e6e1d3', P([[-5.5, 9], [-5.5, -5], [-7, -5], [-7, -9.5], [-4.5, -9.5], [-4.5, -7.5], [-1.2, -7.5], [-1.2, -9.5], [0, -9.5], [0, 9]])],
-    ['#b3ac98', P([[0, 9], [0, -9.5], [1.2, -9.5], [1.2, -7.5], [4.5, -7.5], [4.5, -9.5], [7, -9.5], [7, -5], [5.5, -5], [5.5, 9]])],
-    ['#6b6553', P([[-1.6, 9], [-1.6, 4], [0, 2.5], [1.6, 4], [1.6, 9]])],
-    ['#6b6553', P([[-3.5, -3], [-2, -3], [-2, 0], [-3.5, 0]])],
-  ],
+  tower: [], // drawn below, as the tower building
   territory: [
     ...hexFacets(-4.6, -4, '#a6d46a', '#6f9a3a'),
     ...hexFacets(4.6, -4, '#e3d39f', '#b39f62'),
@@ -319,3 +314,127 @@ export function icon(name: string, size = 1.25, cls = 'ricon'): string {
   if (!facets) return '';
   return `<svg class="${cls}" style="width:${size}em;height:${size}em" viewBox="-10 -10 20 20" role="img" aria-label="${LABEL[name] ?? name}"><title>${LABEL[name] ?? name}</title>${facets.map(([f, p]) => `<polygon fill="${f}" points="${p}"/>`).join('')}</svg>`;
 }
+
+// ---- buildings ----
+// The tower and the five basic buildings, drawn as the TV board's paper models
+// look from the room. How a building shows its class, here and on the board:
+// it carries its class's goods (cut stone blocks for a quarry, a log pile for a
+// lumber camp, violet crystals for a mine, white sheep for a pasture, a nest for
+// a dragon building) in its class's paper colours. Its owner shows round it
+// (the disc on the phone's map, the plate on the TV's), never on it, except the
+// tower: a player's home is their colour.
+
+const hex2rgb = (c: string) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+// Lit (t > 0, toward warm paper) or shaded (t < 0, toward warm violet), as art.ts's tone().
+function shade(c: string, t: number): string {
+  const a = hex2rgb(c), b = hex2rgb(t >= 0 ? '#fff8ea' : '#2a1d33');
+  return `#${a.map((v, i) => Math.round(v + (b[i] - v) * Math.abs(t)).toString(16).padStart(2, '0')).join('')}`;
+}
+
+// A cut stone block seen corner-on: its top lit, its left face mid, its right face shaded.
+function block(cx: number, cy: number, s: number, c = '#c6cad0'): Facet[] {
+  return [
+    [shade(c, 0.55), P([[cx - s, cy - s * 0.5], [cx, cy - s], [cx + s, cy - s * 0.5], [cx, cy]])],
+    [c, P([[cx - s, cy - s * 0.5], [cx, cy], [cx, cy + s], [cx - s, cy + s * 0.5]])],
+    [shade(c, -0.3), P([[cx, cy], [cx + s, cy - s * 0.5], [cx + s, cy + s * 0.5], [cx, cy + s]])],
+  ];
+}
+
+// A log lying end-on to the room: its bark running back, its cut end in front.
+function log(cx: number, cy: number, r: number): Facet[] {
+  const end = Array.from({ length: 6 }, (_, i) => polar(r, i * 60));
+  const at = (p: [number, number], dx = 0, dy = 0): [number, number] => [cx + p[0] + dx, cy + p[1] + dy];
+  return [
+    ['#7f4b23', P([at(end[4]), at(end[4], 2.6, -1.6), at(end[0], 2.6, -1.6), at(end[0])])],
+    ['#a0673a', P([at(end[3]), at(end[3], 2.6, -1.6), at(end[4], 2.6, -1.6), at(end[4])])],
+    ['#f0cb93', P(end.map((p) => at(p)))],
+    ['#c9965a', P(Array.from({ length: 6 }, (_, i) => at(polar(r * 0.42, i * 60))))],
+  ];
+}
+
+// A crystal spire from its foot, leaning by `tilt` (radians): lit left, shaded right.
+function spire(x: number, y: number, h: number, w: number, tilt = 0): Facet[] {
+  const top: [number, number] = [x + Math.sin(tilt) * h, y - Math.cos(tilt) * h];
+  const mid = (s: number): [number, number] => [x + Math.sin(tilt) * h * 0.3 + s * w * Math.cos(tilt), y - Math.cos(tilt) * h * 0.3 + s * w * Math.sin(tilt)];
+  return [
+    ['#e3d1ff', P([[x, y], mid(-1), top])],
+    ['#8a55e0', P([[x, y], top, mid(1)])],
+  ];
+}
+
+// A facet list moved and scaled, to place one drawing inside another.
+const moved = (fs: Facet[], dx: number, dy: number, s = 1): Facet[] =>
+  fs.map(([c, p]) => [c, p.split(' ').map((xy) => { const [x, y] = xy.split(',').map(Number); return `${+(x * s + dx).toFixed(2)},${+(y * s + dy).toFixed(2)}`; }).join(' ')]);
+
+// The tower's roof when its owner isn't known (the Tallest Tower title).
+const TOWER_ROOF = '#8d96aa';
+
+export function buildingFacets(type: string, pc = TOWER_ROOF): Facet[] | null {
+  switch (type) {
+    // White walls, a band in the owner's colour, a pointed roof in it.
+    case 'tower': return [
+      ['#f6f0e2', P([[-5, 9.5], [-4.3, -1.2], [0, -1.2], [0, 9.5]])],
+      ['#cfc6b0', P([[0, 9.5], [0, -1.2], [4.3, -1.2], [5, 9.5]])],
+      ['#a39a84', P([[-4.3, -1.2], [4.3, -1.2], [4.3, 0.4], [-4.3, 0.4]])],
+      [shade(pc, 0.15), P([[-4.75, 4.6], [-4.65, 3], [0, 3], [0, 4.6]])],
+      [shade(pc, -0.25), P([[0, 4.6], [0, 3], [4.65, 3], [4.75, 4.6]])],
+      [shade(pc, 0.2), P([[-6.4, -0.6], [0, -10], [0, -0.6]])],
+      [shade(pc, -0.3), P([[0, -0.6], [0, -10], [6.4, -0.6]])],
+      ['#3a302b', P([[-0.65, 0.9], [0.65, 0.9], [0.65, 2.4], [-0.65, 2.4]])],
+      ['#3a302b', P([[-1.6, 9.5], [-1.6, 6.7], [0, 5.6], [1.6, 6.7], [1.6, 9.5]])],
+    ];
+    // Cut blocks stacked by a wooden crane.
+    case 'quarry': return [
+      ['#a0673a', P([[-9.8, 9.5], [-9.8, -8], [-8.3, -8], [-8.3, 9.5]])],
+      ['#c48a4e', P([[-9.8, -9.4], [5, -7.6], [5, -6.3], [-9.8, -7.9]])],
+      ['#3a302b', P([[3.7, -6.5], [4.3, -6.5], [4.3, -3.2], [3.7, -3.2]])],
+      ...block(-2.5, 5.2, 4.2), ...block(5.6, 5.2, 4.2), ...block(1.55, 1, 4.2, '#d3d6db'),
+    ];
+    // A log pile under a pine.
+    case 'lumber_camp': return [
+      ['#5e3c22', P([[5.3, 9], [6.9, 9], [6.9, 4], [5.3, 4]])],
+      ['#5f9a52', P([[6.1, -10], [1.6, -1.5], [6.1, -1.5]])],
+      ['#35603a', P([[6.1, -10], [6.1, -1.5], [10, -1.5]])],
+      ['#6aa85c', P([[6.1, -5.5], [0.8, 5], [6.1, 5]])],
+      ['#3f6f3d', P([[6.1, -5.5], [6.1, 5], [10, 5]])],
+      ...log(-6.2, 6.4, 3), ...log(0, 6.4, 3), ...log(-3.1, 1.2, 3),
+    ];
+    // A rock with a timbered mouth, violet crystals breaking out of its top.
+    case 'crystal_mine': return [
+      ...spire(-4.4, -0.2, 5.6, 1.9, -0.38), ...spire(4.3, -0.4, 6, 1.9, 0.38), ...spire(0, -1.8, 8.2, 2.3),
+      ['#a1958a', P([[-9.8, 9.5], [-5.5, -0.5], [0, -2.2], [0, 9.5]])],
+      ['#6e645a', P([[0, -2.2], [5.5, -0.5], [9.8, 9.5], [0, 9.5]])],
+      ['#c48a4e', P([[-3.5, 9.5], [-3.5, 2.6], [3.5, 2.6], [3.5, 9.5]])],
+      ['#241a33', P([[-2.1, 9.5], [-2.1, 4], [2.1, 4], [2.1, 9.5]])],
+      ['#d6bfff', P([[-1.3, 9.5], [-0.3, 7.2], [0.9, 9.5]])],
+    ];
+    // A sheep behind a rail fence.
+    case 'pasture': return [
+      ...moved(ICONS.livestock, 0.6, -3.4, 1.05),
+      ...[-8.8, 8.8].flatMap((x): Facet[] => [['#a0673a', P([[x - 1, 9.8], [x - 1, 3], [x + 1, 3], [x + 1, 9.8]])], ['#f0cb93', P([[x - 1, 3], [x, 2.1], [x + 1, 3]])]]),
+      ['#d9a868', P([[-10, 4.4], [10, 4.4], [10, 5.8], [-10, 5.8]])],
+      ['#b97a44', P([[-10, 7.6], [10, 7.6], [10, 9], [-10, 9]])],
+    ];
+    // A nest with a dragon's egg in it, up on a stone crag.
+    case 'roost': return [
+      ['#c6cad0', P([[-5.6, 10], [-4.6, 1], [0.4, 0.4], [0.6, 10]])],
+      ['#8d939c', P([[0.6, 10], [0.4, 0.4], [4.6, 1], [5.6, 10]])],
+      ['#5e3d22', P([[-8.6, -1.4], [-5.4, -3.6], [5.4, -3.6], [8.6, -1.4]])],
+      ['#ffb08a', P([[0, -9.8], [-2.4, -8.4], [-3.4, -5.2], [-2.6, -2], [0, -1.4]])],
+      ['#d9542e', P([[0, -9.8], [0, -1.4], [2.6, -2], [3.4, -5.2], [2.4, -8.4]])],
+      ['#a8743e', P([[-8.6, -1.4], [8.6, -1.4], [6.2, 2.8], [-6.2, 2.8]])],
+      ['#7f4b23', P([[-6.2, 2.8], [6.2, 2.8], [4.6, 4.2], [-4.6, 4.2]])],
+      ['#d9a066', P([[-7.4, -0.6], [5.5, 1.2], [5.5, 1.9], [-7.4, 0.1]])],
+      ['#d9a066', P([[-5.5, 2], [7.4, -0.4], [7.4, 0.3], [-5.5, 2.7]])],
+    ];
+  }
+  return null;
+}
+
+// A building's shapes on the -10..10 box, or '' if it has no drawing of its own.
+export function buildingShapes(type: string, pc?: string): string {
+  return (buildingFacets(type, pc) ?? []).map(([f, p]) => `<polygon fill="${f}" points="${p}"/>`).join('');
+}
+
+// The Tallest Tower title is the tower itself, as the board shows it.
+ICONS.tower = buildingFacets('tower')!;
