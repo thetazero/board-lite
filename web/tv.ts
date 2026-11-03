@@ -52,7 +52,7 @@ function onSnapshot(s: Snapshot) {
   if (first) {
     // Joined mid-game (e.g. the TV reloaded): only animate what happens from now on,
     // except the opening round, which is worth showing.
-    seenLog = s.game.round === 1 && s.game.phase === 'action' ? -1 : log.at(-1)?.i ?? -1;
+    seenLog = s.game.round === 1 && (s.game.phase === 'action' || s.game.phase === 'cards') ? -1 : log.at(-1)?.i ?? -1;
   }
   const fresh = log.filter((e) => e.i > seenLog);
   if (fresh.length) seenLog = fresh.at(-1)!.i;
@@ -117,6 +117,7 @@ function phaseLabel(g: PublicState): string {
   if (g.phase === 'over') return 'Game over';
   if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
   if (g.phase === 'discard') return `End of round: ${g.waitingOn.length ? `${nameList(g.waitingOn)} discard${g.waitingOn.length === 1 ? 's' : ''} down to the hand limit` : 'discarding'}`;
+  if (g.phase === 'cards') return 'Picking building cards';
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
 }
 
@@ -125,6 +126,7 @@ function doing(g: PublicState, p: number): string {
   if (!g.waitingOn.includes(p)) return '';
   if (g.phase === 'action') return g.turn === p ? 'their turn' : 'answering a trade';
   if (g.phase === 'discard') return 'discarding';
+  if (g.phase === 'cards') return 'picking a card';
   if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'voting' : g.raid?.step === 'commit' ? 'sending dragons' : 'fight or bail?';
   return '';
 }

@@ -1,29 +1,34 @@
 // What one player is allowed to see, as text. Everything here is either
 // public (the TV) or this player's own hidden state (their phone).
 
-import { ACTIONS, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, type Bundle } from './data.ts';
 import {
-  PROJECT_BUILDINGS, PROJECT_DRAGONS, TITLE_NAMES, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
+  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
   dragonCapacity, dragonName, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
 import { mapRadius } from './map.ts';
 
 const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
-const BUILDING_LETTER: Record<string, string> = {
-  tower: 'T', quarry: 'q', lumber_camp: 'l', crystal_mine: 'c', pasture: 'p', roost: 'r', hatchery: 'h', port: 'a', tower_floor: 'T', monument: 'o',
+// Two letters per building on the text map.
+const BUILDING_CODE: Record<string, string> = {
+  tower: 'TW', quarry: 'qu', lumber_camp: 'lc', crystal_mine: 'cm', pasture: 'pa', roost: 'ro',
+  cliff_works: 'cw', stonemason: 'sm', woodcutter: 'wc', sawmill: 'sw', driftwood_yard: 'dy', ley_spire: 'ls', gem_cutter: 'gc', smelter: 'se',
+  shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
+  monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
+const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 
 export function cardText(c: Card): string {
   const kind = cardKind(c);
   const cost = bundleText(cardCost(c));
   if (kind === 'building') {
     const b = BUILDINGS[c.key];
-    return `${c.id} ${b.name} [building, ${b.class}${b.terrain ? `, on ${b.terrain}` : ''}] cost ${cost}: ${b.text}`;
+    return `${c.id} ${b.name} [building, class ${CLASS_NAMES[b.class]}${b.terrain ? `, on ${b.terrain}` : ''}] cost ${cost}: ${b.text}`;
   }
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
-    return `${c.id} ${u.name} [upgrade for a ${u.appliesTo} building] cost ${cost}: ${u.text}`;
+    return `${c.id} ${u.name} [upgrade for a ${u.appliesTo.map((x) => CLASS_NAMES[x]).join(' or ')}] cost ${cost}: ${u.text}`;
   }
   if (kind === 'action') {
     const a = ACTIONS[c.key];
@@ -58,7 +63,7 @@ function mapText(g: Game): string[] {
   const R = mapRadius(g.players.length) + 1;
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
-  lines.push('Buildings show as <owner><letter>: T tower, q quarry, l lumber camp, c crystal mine, p pasture, r roost, h hatchery, a port (anchor), o monument (lowercase=no upgrade, +=upgraded).');
+  lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -66,7 +71,7 @@ function mapText(g: Game): string[] {
       const hex = g.map[k];
       if (!hex) continue;
       const b = g.buildings[k];
-      const label = b ? `${b.owner + 1}${BUILDING_LETTER[b.type]}${b.upgrade ? '+' : ''}` : '';
+      const label = b ? `${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}` : '';
       cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${label ? `[${label}]` : ''}`);
     }
     lines.push(`  ${' '.repeat(Math.abs(r) * 4)}${cells.join('  ')}`);
@@ -121,8 +126,10 @@ export function commandHints(g: Game, p: number): string[] {
       const kind = cardKind(c);
       const afford = canAfford(pl, cardCost(c)) ? '' : ' (cannot afford yet)';
       if (kind === 'building') {
-        const hexes = buildableHexes(g, p, c.key);
-        if (BUILDINGS[c.key].onTower) out.push(`build ${c.id}   (${cardName(c)})${afford}`);
+        const def = BUILDINGS[c.key];
+        // For a building that counts its neighbours, each hex shows its count, like 2,-1(x3).
+        const hexes = buildableHexes(g, p, c.key).map((k) => (def.per ? `${k}(x${neighbourCount(g, k, def.per)})` : k));
+        if (def.onTower) out.push(`build ${c.id}   (${cardName(c)})${afford}`);
         else out.push(`build ${c.id} <hex>   (${cardName(c)}; open hexes: ${hexes.join(' ') || 'none'})${afford}`);
       } else if (kind === 'upgrade') {
         out.push(`upgrade ${c.id} <hex>   (${cardName(c)}; on: ${upgradeTargets(g, p, c.key).join(' ') || 'none'})${afford}`);
@@ -135,12 +142,21 @@ export function commandHints(g: Game, p: number): string[] {
         if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name})${afford}`);
       }
     }
-    out.push(`project <${PROJECT_BUILDINGS.join('|')}> <hex>   (no card needed, costs ${TUNING.specialProjectMultiplier}x the card cost)`);
+    for (const b of BASIC_BUILDINGS) {
+      const def = BUILDINGS[b];
+      const hexes = buildableHexes(g, p, b);
+      if (hexes.length) out.push(`build ${b} <hex>   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}; open hexes: ${hexes.join(' ')})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
+    }
     out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
     for (const o of g.offers.filter((x) => x.from === p)) out.push(`cancel ${o.id}`);
     out.push('end   (end your turn)');
+    return out;
+  }
+  if (g.phase === 'cards') {
+    out.push(`keep <${pl.choice.map((c) => c.id).join('|')}>   (keep one of the building cards you drew; the other is discarded)`);
+    for (const c of pl.choice) out.push(`  ${cardText(c)}`);
     return out;
   }
   if (g.phase === 'discard') {
@@ -160,6 +176,7 @@ export function commandHints(g: Game, p: number): string[] {
 
 function phaseText(g: Game): string {
   if (g.phase === 'over') return `Game over. ${pname(g.winner!)} won.`;
+  if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps one of the two building cards they drew.`;
   if (g.phase === 'action') return `Round ${g.round}, action phase, ${pname(g.turn)}'s turn.`;
   if (g.phase === 'discard') return `Round ${g.round}, end of round: discarding down to ${TUNING.handCap} cards.`;
   return `Round ${g.round}, raid phase (${g.raid!.step}), ${g.raidsLeft} raid${g.raidsLeft === 1 ? '' : 's'} left this round.`;
@@ -200,6 +217,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   out.push(`Bank rate ${bankRate(g, p)}:1. Dragons ${g.dragons.filter((d) => d.owner === p).length}/${dragonCapacity(g, p)} housed. Each dragon eats ${TUNING.livestockPerDragon} livestock per round.`);
   out.push(`Hand (${pl.hand.length}/${TUNING.handCap}):`);
   for (const c of pl.hand) out.push(`  ${cardText(c)}`);
+  if (pl.choice.length) out.push(`Drawn, keep one: ${pl.choice.map((c) => cardText(c)).join(' | ')}`);
   out.push('');
   out.push('== Dragons (public) ==');
   for (const d of g.dragons) out.push(`  ${dragonLine(g, d)}`);

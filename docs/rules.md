@@ -8,13 +8,13 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 ## A round: four phases
 
-1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each production building rolls its own die (a quarry: d6 stone; a Workshop adds 1). Then every dragon eats 1 livestock and heals fully. A dragon that went hungry, or was hurt in the last raid, **sits out** this round: it doesn't grow and can't raid. The rest grow one step (plus one per hatchery you own). A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
-2. **Cards** (all at once). Draw 2 building cards and 1 action card. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
+1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry: d6 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then every dragon eats 1 livestock and heals fully. A dragon that went hungry, or was hurt in the last raid, **sits out** this round: it doesn't grow and can't raid. The rest grow one step (plus one per hatchery you own). A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
+2. **Cards** (all at once). Draw 1 action card and 2 building cards; keep one of the building cards and discard the other. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
-   - **Build** a building card on an empty land hex touching one of your buildings (production buildings need their terrain, ports a harbor; tower floors stack on your tower).
-   - **Upgrade**: put an upgrade card on one of your buildings of its class. One upgrade per building; your tower counts as a points and a dragon building.
+   - **Build** on an empty land hex touching one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on ley line, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor; tower floors stack on your tower).
+   - **Upgrade**: put an upgrade card on one of your buildings of its class. One upgrade per building.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
-   - **Special project** (no card): build a quarry, lumber camp, crystal mine, pasture or roost, or hatch a base egg of any element, for double the card's cost.
+   - **Special project** (no card): hatch a base egg of any element, for double the base dragon card's cost.
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. Open offers expire when the turn ends.
 4. **Raid** (all at once). Repeat once per War Horn played this round.
@@ -28,13 +28,15 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
+**Neighbours.** Every building has a class (quarry, lumber camp, mine, pasture, dragon building, monument or trade building); the tower is a monument and a dragon building. Many building cards count their six neighbouring hexes, either hexes of a terrain (built on or not) or buildings of a class, whoever owns them. The count is always the current one: a neighbour built later counts too.
+
 ## Points
 
 - Dragons: hatchling 1, young 2, adult 4. Eggs 0.
-- Tower floor 1, monument 2, Gilding +1.
+- Tower floor 1; other monuments as their card says (most count their neighbours); Gilding +2.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
-- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 8), Tallest Tower (most floors, at least 3), Largest Territory (most buildings, at least 7). The holder keeps a title on a tie.
+- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 8), Tallest Tower (most floors, at least 3), Largest Territory (most buildings, at least 9). The holder keeps a title on a tie.
 
 ## Cards
 
-Building cards and upgrades are listed with their text and cost in a player's view and in `src/data.ts`: 9 buildings (quarry, lumber camp, crystal mine, pasture, roost, hatchery, port, tower floor, monument) and 4 upgrades (Workshop, Gilding, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, and 15 dragons (a base whelp and two special dragons per element).
+Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 19 buildings across the seven classes, most of which count their neighbours, and 4 upgrades (Workshop, Gilding, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, and 15 dragons (a base whelp and two special dragons per element).

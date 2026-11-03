@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { promisify } from 'node:util';
 import { candidateCommands } from '../src/bot.ts';
-import { newGame, waitingOn } from '../src/engine.ts';
+import { apply, newGame, waitingOn } from '../src/engine.ts';
 import { Room, RoomError } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
@@ -116,8 +116,13 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
 
     const bad = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'build c999 0,0' });
     assert.equal(bad.status, 400);
-    assert.match(bad.body.error, /no card/);
+    assert.match(bad.body.error, /Keep one of the building cards/); // the round opens with picking a card
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: made.hostToken, command: 'end' })).status, 400, 'the TV has no seat');
+    // The round opens with everyone keeping one of two building cards.
+    assert.equal(snap.you!.choice.length, 2);
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: `keep ${snap.you!.choice[0].id}` })).status, 200);
+    const g = rooms.get(made.code)!.game!;
+    apply(g, 1, `keep ${g.players[1].choice[0].id}`);
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end' })).status, 200);
 
     // The clients are served with their TypeScript types stripped.
@@ -151,7 +156,11 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
     const view = await cli('view', url, token!);
     assert.match(view, /You are P1/);
     assert.match(view, /Your options/);
-    assert.match(await cli('do', url, token!, 'build', 'c999', '0,0'), /Not allowed: You have no card/);
+    const keep = /keep <(c\d+)\|/.exec(view)?.[1];
+    assert.ok(keep, view);
+    assert.match(await cli('do', url, token!, 'keep', keep!), /You keep/);
+    assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/); // the bot keeps one too
+    assert.match(await cli('do', url, token!, 'build', 'c999', '0,0'), /Not allowed: Build a card from your hand/);
     const ended = await cli('do', url, token!, 'end');
     assert.match(ended, /P1 ends their turn/);
     // The bot plays its turn; wait returns when it's our decision again (the raid vote).
@@ -167,7 +176,9 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
 
 test("a game from the CLI's file mode can be hosted; players claim its open seats", () => {
   const file = join(dir, 'hosted.json');
-  save(file, newGame(2, 4));
+  const g = newGame(2, 4);
+  for (const p of [0, 1]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  save(file, g);
   const room = new Room('HOST', { file });
   assert.deepEqual(room.seats.map((s) => s.kind), ['open', 'open']);
   const ada = room.join('Ada');
@@ -180,7 +191,7 @@ test("a game from the CLI's file mode can be hosted; players claim its open seat
 });
 
 test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {
-  const { server } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, any>;
@@ -189,6 +200,8 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     const ada = await post(`/api/rooms/${code}/join`, { name: 'Ada' }); // a phone
     const opus = await post(`/api/rooms/${code}/join`, { name: 'Opus' }); // Claude
     await post(`/api/rooms/${code}/start`, { token: ada.token });
+    const g = rooms.get(code)!.game!;
+    for (const [p, t] of [[0, ada.token], [1, opus.token]] as const) await post(`/api/rooms/${code}/do`, { token: t, command: `keep ${g.players[p].choice[0].id}` });
     const reqs = [
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
       { jsonrpc: '2.0', id: 2, method: 'tools/list' },
