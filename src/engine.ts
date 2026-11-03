@@ -2,10 +2,10 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
-import { generateMap, key, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
+import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
 
 export interface Card {
@@ -98,7 +98,7 @@ export type GameEvent =
   | { k: 'hatch'; p: number; d: string; project?: boolean }
   | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
   | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; ds: string[] } // a player's dragons attack fauna
-  | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle }
+  | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle; points?: number }
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
@@ -144,6 +144,8 @@ export interface Game {
   raidsLeft: number;
   raid: Raid | null;
   titles: Record<Title, number | null>;
+  slain: Record<string, number>; // great beasts slain, and by whom
+  beastTried: number[]; // the last round each player fought a great beast
   winner: number | null;
   nextId: number;
   log: LogEntry[];
@@ -218,7 +220,7 @@ export function stageStats(d: Dragon): DragonStage | null {
 
 // A raid defender or a beast of the fauna: the same stats, the same combat.
 export function foeDef(k: string): UnitDef {
-  return UNITS[k] ?? FAUNA[k];
+  return UNITS[k] ?? faunaDef(k);
 }
 
 export function canRaid(d: Dragon): boolean {
@@ -322,6 +324,11 @@ export function buildingPoints(g: Game, k: string): number {
   return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]) + up;
 }
 
+// Is hex k on or next to the peak, once the Thunderbird has fallen?
+export function onPeak(g: Game, k: string): boolean {
+  return g.slain.thunderbird !== undefined && (k === PEAK || neighbors(PEAK).includes(k));
+}
+
 // Public production: fixed amount plus a list of dice, per resource.
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
@@ -336,6 +343,7 @@ export function production(g: Game, p: number): Record<Resource, { base: number;
     for (const r of RESOURCES) out[r].base += (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0);
     const made = madeResource(def);
     if (made && up?.baseBonus) out[made].base += up.baseBonus;
+    if (made && onPeak(g, k)) out[made].base += TUNING.peakBonus;
   }
   return out;
 }
@@ -370,6 +378,7 @@ export interface Score {
   dragons: number;
   buildings: number;
   titles: number;
+  beasts: number; // great beasts slain
   hidden: number;
   public: number;
   total: number;
@@ -381,8 +390,9 @@ export function score(g: Game, p: number): Score {
   for (const [k] of ownedBuildings(g, p)) buildings += buildingPoints(g, k);
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
   const hidden = g.players[p].hand.filter((c) => ACTIONS[c.key]?.effect === 'hidden_point').length;
-  const pub = dragons + buildings + titles;
-  return { dragons, buildings, titles, hidden, public: pub, total: pub + hidden };
+  const beasts = Object.entries(g.slain).filter(([, by]) => by === p).reduce((s, [k]) => s + BEASTS[k].points, 0);
+  const pub = dragons + buildings + titles + beasts;
+  return { dragons, buildings, titles, beasts, hidden, public: pub, total: pub + hidden };
 }
 
 // ---------- setup ----------
@@ -415,6 +425,8 @@ export function newGame(players: number, seed: number): Game {
     raidsLeft: 0,
     raid: null,
     titles: { army: null, tower: null, territory: null },
+    slain: {},
+    beastTried: Array(players).fill(0),
     winner: null,
     nextId: 1,
     log: [],
@@ -781,10 +793,16 @@ function checkRaidOver(g: Game): boolean {
 
 // A player's dragons attack the beast on hex k, in a raid's combat, to the
 // end. Each sits out this round's raids. If the beast falls, the hex is free
-// and its loot goes to the player; if not, it stays, healed.
+// and its loot (and a great beast's points, for good) goes to the player; if
+// not, it stays, healed. A player gets one try at a great beast a round.
 function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   const f = g.map[k].fauna!;
-  const def = FAUNA[f];
+  const def = faunaDef(f);
+  const great = BEASTS[f];
+  if (great) {
+    if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: one try a round.`);
+    g.beastTried[p] = g.round;
+  }
   for (const d of ds) d.resting = 'hunted';
   const b: Battle = { units: [{ key: f, hp: def.hp }], fighters: ds.map((d) => d.id) };
   log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, ds: [...b.fighters] });
@@ -793,8 +811,13 @@ function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   if (won) {
     delete g.map[k].fauna;
     gain(g.players[p], def.loot);
+    if (great) g.slain[f] = p;
   }
-  log(g, won ? `The ${def.name} at ${k} is cleared! ${pname(p)} takes ${bundleText(def.loot)}.` : `The ${def.name} at ${k} drives ${pname(p)}'s dragons off.`, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? def.loot : {} });
+  const prize = great ? `${great.points} point${great.points === 1 ? '' : 's'}, for good` : bundleText(def.loot);
+  const text = won
+    ? great ? `The ${def.name} is slain! ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and around its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} is cleared! ${pname(p)} takes ${prize}.`
+    : `The ${def.name} at ${k} drives ${pname(p)}'s dragons off.`;
+  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? def.loot : {}, ...(great && won ? { points: great.points } : {}) });
 }
 
 // Where a fauna card can put its beast: any land hex without fauna or a tower.
@@ -804,6 +827,12 @@ export function faunaHexes(g: Game): string[] {
 
 export function faunaOnMap(g: Game): string[] {
   return Object.keys(g.map).filter((k) => g.map[k].fauna).sort();
+}
+
+// The beasts player p may fight now: every fauna, and the great beasts
+// unless they have had their try this round.
+export function huntable(g: Game, p: number): string[] {
+  return faunaOnMap(g).filter((k) => !BEASTS[g.map[k].fauna!] || g.beastTried[p] !== g.round);
 }
 
 // ---------- commands ----------
@@ -855,7 +884,8 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (!hex) fail(`${k} is not on the map.`);
   if (hex.terrain === 'ocean') fail(`${k} is ocean; nothing is built on the ocean.`);
   if (g.buildings[k]) fail(`${k} already has a building.`);
-  if (hex.fauna) fail(`A ${FAUNA[hex.fauna].name} holds ${k}: clear it with your dragons first.`);
+  if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it with your dragons first.`);
+  if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from next door: slay it first.`);
   if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${def.terrain}; ${k} is ${hex.terrain}.`);
   if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} doesn't touch any of your buildings.`);
   return k;
@@ -867,7 +897,7 @@ export function buildableHexes(g: Game, p: number, type: string): string[] {
   const out = new Set<string>();
   for (const [k] of ownedBuildings(g, p)) {
     for (const n of neighbors(k)) {
-      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && !g.map[n].fauna && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
+      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && !nearBeast(g.map, n) && !g.map[n].fauna && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
     }
   }
   return [...out].sort();

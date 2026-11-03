@@ -1,9 +1,9 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
-import { ACTIONS, BASIC_BUILDINGS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, faunaOnMap, specialProjectCost,
+  apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -45,8 +45,11 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     }
     // Now and then, send the ready dragons at fauna touching its land.
     const ready = g.dragons.filter((d) => d.owner === p && canRaid(d) && d.stage >= 2).map((d) => d.id);
-    const near = faunaOnMap(g).filter((k) => Object.keys(g.buildings).some((b) => g.buildings[b].owner === p && (b === k || isNeighbour(b, k))));
+    const near = huntable(g, p).filter((k) => Object.keys(g.buildings).some((b) => g.buildings[b].owner === p && (b === k || isNeighbour(b, k))));
     if (ready.length && near.length && next(rng) < 0.4) out.push(`clear ${pick(rng, near)} ${ready.join(' ')}`);
+    // With three or more grown dragons ready, now and then try a great beast.
+    const beasts = huntable(g, p).filter((k) => BEASTS[g.map[k].fauna!]);
+    if (ready.length >= 3 && beasts.length && next(rng) < 0.3) out.push(`clear ${pick(rng, beasts)} ${ready.join(' ')}`);
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
     if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);

@@ -317,7 +317,7 @@ function actionView(g: PublicState, me: Me): string {
   const t = !me.myTurn && tab === 'more' ? 'none' : tab;
   const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
   // Fauna anywhere on the map, and dragons fit to fight it: clearing is one tap away.
-  const beasts = g.map.filter((h) => h.fauna);
+  const beasts = g.map.filter((h) => h.fauna && me.huntable.includes(h.k));
   const clear = me.myTurn && beasts.length && me.raidReady.length
     ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} Clear fauna</button>` : '';
   // An offer to you needs your answer before your turn can end.
@@ -468,9 +468,12 @@ function huntView(g: PublicState, me: Me): string {
   const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
   const n = hunting!.chosen.size;
   const sent = [...hunting!.chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
-  return `<h3 class="huntname">Fight the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${resChips(h.fauna.loot, 1.4)}</div></section>
+  // A great beast pays in points, for good; it's one try a round, to the end.
+  const great = h.fauna.points !== undefined;
+  const prize = great ? iconText(`${h.fauna.points} point`, 1.4) : resChips(h.fauna.loot, 1.4);
+  return `<h3 class="huntname">Fight the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${prize}</div></section>
     ${list}
-    <p class="hint">They miss this round's raids.</p>
+    <p class="hint">They miss this round's raids.${great ? ' One try a round.' : ''}</p>
     <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} Send ${n || ''}${n ? ` ${powerTag(sent)}` : ''}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
 }
 
@@ -690,7 +693,7 @@ function wire(g: PublicState, me: Me) {
     if (!cmd.startsWith('hunt ')) send(cmd);
   }));
   on('hunt', () => {
-    picking = { title: 'Clear which beast?', hexes: g.map.filter((h) => h.fauna).map((h) => h.k), command: (h) => `hunt ${h}` };
+    picking = { title: 'Clear which beast?', hexes: me.huntable, command: (h) => `hunt ${h}` };
     render();
   });
   bind('[data-hunter]', (el) => {
