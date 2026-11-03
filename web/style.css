@@ -37,9 +37,13 @@ small { color: var(--muted); }
 .ok { color: var(--good); font-weight: 800; }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
-.die { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 2.4em; height: 2.4em; margin: 0 .15em; background: #fff; color: #111; border-radius: .45em; box-shadow: 0 2px 0 #0007; vertical-align: middle; line-height: 1; }
-.die b { font-size: 1.2em; }
-.die small { font-size: .55em; color: #555; }
+/* Dice: one white paper shape per kind of die, the same blank (a die to roll,
+   "2" and a square for 2d6) and rolled (the shape with its number on it). */
+.dicechip { display: inline-flex; align-items: center; gap: .05em; }
+.die { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.4em; height: 2.4em; margin: 0 .15em; color: #111; vertical-align: middle; line-height: 1; filter: drop-shadow(0 2px 0 #0007); }
+.die .dieicon { position: absolute; inset: 0; }
+.die b { position: relative; font-size: 1.2em; }
+.die[data-sides="4"] b { margin-top: .45em; font-size: 1em; }
 .die.rolling { animation: shake .18s infinite; }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
@@ -319,11 +323,8 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .res .inc.none { color: var(--muted); font-weight: 500; }
 /* The roost: your dragons, and an empty nest for each one you have room for. */
 .roost { display: flex; align-items: center; gap: .6em; background: var(--panel); border-radius: 10px; padding: .45em .7em; }
-.roost .rhead { display: flex; flex-direction: column; align-items: center; line-height: 1; gap: .15em; }
-.roost .rhead b { font-size: 1.05em; }
-.roost.full .rhead b { color: #f2a33a; }
 .roost .nests { display: flex; flex-wrap: wrap; gap: .35em .9em; align-items: center; }
-.nest { width: 34px; height: 34px; border-radius: 50%; border: 2px dashed var(--line); }
+.nest { width: 40px; height: 40px; opacity: .85; }
 .phone .status { margin: 0; font-size: 1.05em; padding: .6em 1em; background: var(--panel2); justify-content: flex-start; }
 .phone .status.you { background: #3b3214; color: var(--accent); font-weight: 800; font-size: 1.25em; }
 .pbody { padding: .7em; display: flex; flex-direction: column; gap: .6em; }
@@ -331,7 +332,6 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .pbody .hint { margin: 0; font-size: .9em; }
 .tabs { display: flex; gap: .3em; }
 .tabs button { flex: 1; padding: .6em .3em; }
-.tabs button.on { background: var(--text); color: var(--bg); font-weight: 800; }
 /* Cards: illustrated paper. Cream card stock, the picture in a window, the
    name on a strip of the kind's coloured paper (dragons: their element), the
    cost on the stock below. A faint grain sits over all of it. */
@@ -350,6 +350,8 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
 .handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); }
 .handfan.discarding .card:not(.picked) { filter: none; }
+/* Offering cards in a trade: tapped cards rise out of the fan, outlined like any other choice. */
+.handfan .card.offered { transform: translateY(calc(var(--y) - 1.6em)) rotate(var(--r)); box-shadow: 0 0 0 3px var(--accent), 0 8px 16px #000a; }
 body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk bar: room for both */
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
@@ -365,7 +367,7 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk ba
 .card .chip.free { color: #8a7d70; font-style: italic; }
 .card .chip.short { color: #c0392b; }
 /* Icons drawn for the dark table get a thin ink outline on paper (livestock is cream). */
-.card .ricon, .tcard .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
+.card .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
 .card.dim .cart { filter: saturate(.7) brightness(.9); }
 .card.picked { box-shadow: 0 0 0 3px var(--bad), 0 8px 16px #000a; }
 .card.picked::before { content: '✕'; position: absolute; z-index: 2; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; background: var(--bad); color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
@@ -388,7 +390,9 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk ba
 .dstats { margin: .4em .2em 0; display: grid; gap: .1em; }
 .drow { display: grid; grid-template-columns: 4.2em 1fr 1fr; align-items: center; gap: .4em; font-weight: 700; }
 .drow span, .dgrow { display: inline-flex; align-items: center; gap: .3em; }
-.drow .stagefig { width: 4.2em; height: 2.9em; }
+.drow .sfig { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.drow .sfig small { color: #6a5d52; font-size: .72em; font-weight: 600; line-height: 1; }
+.drow .stagefig { width: 4.2em; height: 2.6em; }
 .dgrow { margin-top: .2em; color: #6a5d52; font-size: .9em; }
 .glyph { flex: none; }
 .zoomnav { display: flex; align-items: center; gap: 1.2em; color: var(--muted); }
@@ -406,23 +410,20 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk ba
 .proj.dim b { opacity: .5; }
 .elembtn { border-color: var(--ec); }
 .iconbtn { padding: .3em .5em; line-height: 0; }
-.iconbtn.on { background: color-mix(in srgb, var(--accent) 25%, var(--panel2)); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .respick { display: flex; gap: .3em; flex-wrap: wrap; }
 .bankrow { display: flex; align-items: center; gap: .6em; margin-bottom: .4em; }
 .bankrow > span { min-width: 2.4em; font-weight: 700; }
-#bankgo { display: inline-flex; align-items: center; gap: .3em; }
+#bankgo { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .3em; }
 #bankgo .chip { margin: 0; }
 .bank { display: flex; align-items: center; flex-wrap: wrap; gap: .4em; margin-bottom: .5em; }
 .stepper { display: inline-flex; align-items: center; gap: .3em; }
 .stepper button { padding: .15em .6em; font-weight: 800; }
 .stepper b { min-width: 1.3em; text-align: center; }
-.tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .3em .8em; }
-#offer { margin: .6em 0; }
-.tres { display: flex; align-items: center; gap: .3em; }
-.who button.on { background: var(--pc); color: #111; font-weight: 800; }
-.tcard { display: flex; flex-direction: column; gap: .2em; width: 6.4em; padding: 3px 3px 4px; background: #f4ecd8; color: #2b2228; border: 0; border-bottom: 4px solid var(--kc); border-radius: 6px; font-size: .8em; font-weight: 700; line-height: 1.1; }
-.tcard svg.art { width: 100%; aspect-ratio: 10 / 7; border-radius: 2px; }
-.tcard.on { box-shadow: 0 0 0 3px var(--accent); transform: translateY(-3px); }
+.tgrid { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: .3em .6em; }
+.tgrid h3 { margin: .4em 0 0; }
+#offer { margin: .6em 0; width: 100%; }
+.tpick { margin: .4em 0 0; }
+.who button { color: var(--pc); font-weight: 800; padding: .35em .7em; }
 .trade h3 { margin: .6em 0 .2em; }
 .picker h3 { margin: .2em 0; }
 .pmap { background: var(--panel); border-radius: 12px; padding: .3em; }
@@ -430,7 +431,7 @@ body.phone.has-hand { padding-bottom: 14.5em; } /* the fan sits over the talk ba
 .choice { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
 .choice b { font-size: 1.15em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
-.dragon.on { background: #3b3214; border: 2px solid var(--accent); }
+
 .dragon em { font-style: normal; color: var(--accent); font-weight: 800; }
 .big-note { font-size: 1.2em; text-align: center; padding: 1.2em .5em; background: var(--panel); border-radius: 12px; margin: 0; }
 .mylog { list-style: none; margin: .5em .7em; padding: .5em .7em; background: var(--panel); border-radius: 10px; color: var(--muted); font-size: .9em; }
@@ -472,8 +473,10 @@ body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100
 .keepone .card.big .cname { font-size: 1.25em; }
 .proj > svg { flex: none; margin-right: -.2em; }
 .proj b { min-width: 6.5em; }
-/* Phone: a choice once made stays lit; the ones not taken fade */
-.choice.on, .row.big2 > button.on { background: #3b3214; border: 2px solid var(--accent); color: var(--text); }
+/* Anything chosen (a tab, a player, a resource, a dragon, a vote) is lit the
+   same way, gold on gold, and stays lit once made. */
+button.on { background: #3b3214; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--text); }
+.who button.on { color: var(--pc); }
 button.on:disabled { opacity: 1; }
 .row.big2 > button { display: flex; flex-direction: column; align-items: center; gap: .15em; }
 .row.big2 > button small { font-size: .7em; font-weight: 600; }

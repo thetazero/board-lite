@@ -147,10 +147,10 @@ function incomeRow(prod: Record<string, { base: number; dice: number[] }>): stri
   return RESOURCES.map((r) => {
     const x = prod[r];
     const none = !x.base && !x.dice.length;
-    // "+d6", or "+2d6" for two of them.
+    // "+1" and a d6, or "+2" and a d6 for two of them: dice as everywhere else.
     const dice = [...new Set(x.dice)].sort((a, b) => b - a).map((s) => {
       const k = x.dice.filter((d) => d === s).length;
-      return `<small>+${k > 1 ? k : ''}d${s}</small>`;
+      return `<small>${iconText(`+${k}d${s}`, 1)}</small>`;
     }).join('');
     return `<span class="inc${none ? ' zero' : ''}">${resIcon(r, 1.25)}<b>${x.base < 0 ? '−' : '+'}${Math.abs(x.base)}</b>${dice}</span>`;
   }).join('');

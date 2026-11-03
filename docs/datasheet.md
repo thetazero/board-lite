@@ -104,9 +104,9 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 | Guildhall, 2 neighbours | 2 stone, 2 timber, 2 gold | 2 | 6 | now |
 | Gilding (upgrade) | 3 gold | 2 | 6 | now |
 | Secret Hoard (action card) | nothing | 1 | 0 | now, uses a hand slot |
-| Base whelp, hatchling | 2 crystal, 1 livestock + 2 livestock | 1 | 5 | 2 rounds |
-| Base whelp, young | 2 crystal, 1 livestock + 4 livestock | 2 | 3.5 | 4 rounds |
-| Base whelp, adult | 2 crystal, 1 livestock + 6 livestock | 4 | 2.3 | 6 rounds |
+| Base dragon, hatchling | 2 crystal, 1 livestock + 2 livestock | 1 | 5 | 2 rounds |
+| Base dragon, young | 2 crystal, 1 livestock + 4 livestock | 2 | 3.5 | 4 rounds |
+| Base dragon, adult | 2 crystal, 1 livestock + 6 livestock | 4 | 2.3 | 6 rounds |
 | Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 3 crystal, 1 livestock, 1 gold + 3 livestock | 1 | 11 | 3 rounds |
 | Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 3 crystal, 1 livestock, 1 gold + 6 livestock | 2 | 7 | 6 rounds |
 | Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 3 crystal, 1 livestock, 1 gold + 9 livestock | 4 | 4.3 | 9 rounds |
@@ -116,7 +116,7 @@ Value per point = value of everything paid ÷ points. Dragon costs include the l
 | Zephyr Drake, hatchling | 3 crystal, 1 livestock + 1 livestock | 1 | 5 | 1 round |
 | Zephyr Drake, young | 3 crystal, 1 livestock + 2 livestock | 2 | 3 | 2 rounds |
 | Zephyr Drake, adult | 3 crystal, 1 livestock + 3 livestock | 4 | 1.8 | 3 rounds |
-| Base whelp by special project, adult | 4 crystal, 2 livestock + 6 livestock | 4 | 3 | 6 rounds |
+| Base dragon by special project, adult | 4 crystal, 2 livestock + 6 livestock | 4 | 3 | 6 rounds |
 
 Cheapest paid point: Zephyr Drake, adult at 1.8. Dearest: Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling at 11, 6.1× as much.
 
@@ -130,7 +130,7 @@ Each stage: health, targets × dice (average damage a combat round, before eleme
 
 | Dragon | Element | Cost | Growth time | Targets | Hatchling | Young | Adult |
 |---|---|---|---|---|---|---|---|
-| Base whelp (any element) | any | 2 crystal, 1 livestock | 2 | random | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d6 (14) |
+| Base dragon (any element) | any | 2 crystal, 1 livestock | 2 | random | 6hp 1×1d6 (3.5) | 12hp 1×2d6 (7) | 20hp 2×2d6 (14) |
 | Ember Wyrm | fire | 3 crystal, 1 livestock, 1 gold | 3 | weak_to_me | 7hp 1×1d8 (4.5) | 14hp 1×2d8 (9) | 24hp 2×3d8 (27) |
 | Cinder Drake | fire | 3 crystal, 1 livestock | 2 | lowest_health | 6hp 1×1d6 (3.5) | 11hp 2×1d6 (7) | 18hp 3×1d8 (13.5) |
 | Frost Wyrm | ice | 3 crystal, 1 livestock, 1 gold | 3 | strongest_attacker | 9hp 1×1d6 (3.5) | 17hp 1×2d6 (7) | 30hp 1×3d8 (13.5) |
@@ -166,14 +166,14 @@ Kingdoms (3 are offered each raid; average damage is the defenders' total a comb
 | Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | 40 | 18 | 16 gold | 64 |
 | Tidewatch | Sea Serpent, Sea Serpent, Knights, Knights | 52 | 19 | 3 livestock, 16 gold | 67 |
 
-Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base whelp rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
+Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Loot is split among the players still fighting, so a shared raid pays each less.
 
 | Raider | Hamlet of Brindle | Archer's Hold | Knightsgate | Frostpeak | Stormspire | Tidewatch |
 |---|---|---|---|---|---|---|
-| Base whelp, hatchling | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
-| Base whelp, young | 99% (98%–100%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
-| Base whelp, adult | 100% (100%–100%) | 50% (0%–89%) | 13% (0%–65%) | 23% (0%–66%) | 21% (0%–88%) | 9% (0%–44%) |
-| Two young base whelps | 100% | 62% | 16% | 28% | 22% | 13% |
+| Base dragon, hatchling | 35% (18%–70%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base dragon, young | 99% (98%–100%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
+| Base dragon, adult | 100% (100%–100%) | 50% (0%–89%) | 13% (0%–65%) | 23% (0%–66%) | 21% (0%–88%) | 9% (0%–44%) |
+| Two young base dragons | 100% | 62% | 16% | 28% | 22% | 13% |
 | Ember Wyrm (fire), adult | 100% | 99% | 0% | 100% | 91% | 0% |
 | Cinder Drake (fire), adult | 100% | 37% | 0% | 50% | 0% | 0% |
 | Frost Wyrm (ice), adult | 100% | 31% | 21% | 1% | 63% | 12% |
