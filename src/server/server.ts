@@ -2,7 +2,7 @@
 // No dependencies: node:http, server-sent events for pushes, and the
 // browser's TypeScript is stripped of types on the fly (no build step).
 //
-//   node src/server/server.ts [--port 8080]
+//   node src/server/server.ts [--port 8080] [--game <file>] [--flee-seconds N]
 //
 // The TV opens http://<this machine>:<port>/tv, phones open
 // http://<this machine>:<port>/ and type the room code.
@@ -29,7 +29,7 @@ const TYPES: Record<string, string> = {
 
 const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html' };
 
-export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = []): { server: Server; rooms: Map<string, Room> } {
+export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = [], host = '0.0.0.0'): { server: Server; rooms: Map<string, Room> } {
   const rooms = new Map<string, Room>();
   // Saved games to host (e.g. one started in the CLI's file mode): every seat starts open.
   for (const file of hostFiles) {
@@ -90,7 +90,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
 
   async function api(req: IncomingMessage, res: ServerResponse, parts: string[], query: URLSearchParams) {
     // GET /api/info -> the addresses phones can reach this server on
-    if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), port: (req.socket.localPort ?? 0) });
+    if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), tailscale: tailscaleAddresses(), port: (req.socket.localPort ?? 0) });
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
     // POST /api/rooms -> a new room, for the TV
     if (parts.length === 1 && req.method === 'POST') {
@@ -109,8 +109,12 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       const r = await room.wait(query.get('token') ?? '', secs * 1000);
       return json(res, 200, r);
     }
-    // GET /api/rooms/CODE?token=... -> does the room exist, and is this token seated in it
-    if (!action && req.method === 'GET') return json(res, 200, { seated: room.seatOf(query.get('token') ?? '') >= 0, host: query.get('token') === room.hostToken });
+    if (req.method === 'GET' && action === 'listen') {
+      const secs = Math.min(Number(query.get('timeout') ?? 0) || 0, 3600);
+      return json(res, 200, await room.listen(query.get('token') ?? '', Number(query.get('since') ?? 0) || 0, secs * 1000));
+    }
+    // GET /api/rooms/CODE?token=... -> does the room exist, is this token seated in it, and who's in it
+    if (!action && req.method === 'GET') return json(res, 200, { seated: room.seatOf(query.get('token') ?? '') >= 0, host: query.get('token') === room.hostToken, lobby: room.lobby() });
     if (req.method !== 'POST') return json(res, 404, { error: 'Not found.' });
     const b = await body(req);
     const tok = str(b.token);
@@ -183,15 +187,26 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       if (!res.headersSent) json(res, 500, { error: 'Something went wrong on the server.' });
     }
   });
-  server.listen(port, '0.0.0.0');
+  server.listen(port, host);
   return { server, rooms };
 }
 
+// The machine's own network addresses, by interface. Container and VM bridges
+// (docker0, br-..., veth..., virbr...) aren't reachable from a phone, so they're left out.
+function addresses(): { iface: string; address: string }[] {
+  return Object.entries(networkInterfaces()).flatMap(([iface, list]) =>
+    (list ?? []).filter((a) => a.family === 'IPv4' && !a.internal).map((a) => ({ iface, address: a.address })),
+  ).filter((a) => !/^(docker|br-|veth|virbr|lxc|cni|flannel)/.test(a.iface));
+}
+
+/** Addresses on the local network (Wi-Fi, ethernet). */
 export function lanAddresses(): string[] {
-  return Object.values(networkInterfaces())
-    .flat()
-    .filter((a) => a && a.family === 'IPv4' && !a.internal)
-    .map((a) => a!.address);
+  return addresses().filter((a) => !a.iface.startsWith('tailscale')).map((a) => a.address);
+}
+
+/** This machine's Tailscale address(es): phones on the same tailnet reach it from anywhere. */
+export function tailscaleAddresses(): string[] {
+  return addresses().filter((a) => a.iface.startsWith('tailscale')).map((a) => a.address);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -201,13 +216,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   };
   const port = Number(flag('--port') ?? process.env.PORT ?? 8080);
   const game = flag('--game');
-  const { server, rooms } = startServer(port, {}, game ? [resolve(game)] : []);
+  const flee = flag('--flee-seconds');
+  const { server, rooms } = startServer(port, flee ? { fleeSeconds: Number(flee) } : {}, game ? [resolve(game)] : []);
   server.on('listening', () => {
     const hosts = lanAddresses();
+    const tail = tailscaleAddresses();
     console.log(`board-lite is running on port ${port}.`);
     for (const r of rooms.values()) console.log(`  Hosting ${r.file} as room ${r.code}: TV http://localhost:${port}/tv?room=${r.code}`);
     console.log(`  TV:     http://localhost:${port}/tv${hosts.length ? `   (or http://${hosts[0]}:${port}/tv)` : ''}`);
     for (const h of hosts) console.log(`  Phones: http://${h}:${port}/`);
-    if (!hosts.length) console.log('  No network address found: phones need to be on the same network as this machine.');
+    for (const h of tail) console.log(`  Phones over Tailscale: http://${h}:${port}/`);
+    if (!hosts.length && !tail.length) console.log('  No network address found: phones need to be on the same network as this machine.');
   });
 }
