@@ -60,6 +60,20 @@ node src/server/demo.ts --players 3 --round 3
 
 starts a server with a game already in round 3, played by bots except for the first seat, and prints a TV link and a phone link for that seat (open the phone link in a narrow browser window). `--all-bots` lets bots play every seat; `--seed N` picks the game.
 
+## Staged screenshots (for look tuning)
+
+```
+npm run shots                    # every scene, about 15 seconds
+npm run shots -- --only raid     # scenes whose name contains "raid"
+npm run shots -- --out DIR       # somewhere else
+```
+
+writes TV (1920×1080) and phone (390 wide at 2×, the whole page) screenshots of staged situations to `~/.cache/board-lite/staged-shots/latest/`, with an `index.html` contact sheet. The run before moves to `latest.previous`; files that differ from it are starred in the output and outlined in the sheet, so a visual change shows exactly which screens it touched.
+
+- **The scenes** (`src/shots/scenes.ts`): the lobby and joining, the opening production roll, an early board, building, the bank, trade offers in and out, the raid's vote, commit, fight-or-bail, battle with the flee clock, a won raid's banner, discarding, a new round's production, late-game boards and the final scores, across 2 to 6 players. Each is a seeded bot game played until a condition holds, plus a few scripted commands (bots don't offer trades). Add a scene by adding an entry there.
+- **The same every run:** the games are seeded, the pages' clock is frozen, CSS animations are off, and the TV shows a fixed address, so the same code gives byte-identical images. A change to the rules or the numbers can move a scene to a different moment (or the next seed, if its condition stops holding); `npm test` checks every scene still stages.
+- **How:** the real server and clients, with each scene hosted as a room whose seats nobody plays, so nothing moves on its own; one headless Chrome (about 1 GB) driven over the DevTools protocol, no extra dependencies. It finds Chrome at the usual paths, or set `CHROME=/path/to/chrome`. Its profile and the output stay under `~/.cache/board-lite/`, never `/tmp`.
+
 ## How it's built
 
 - `src/server/server.ts`: one `node:http` server with no dependencies. It serves `web/` and the room API (create, join, add bot, start, do a command, plus text `view`/`wait`/`status` for the CLI) and pushes a fresh snapshot to every TV and phone over server-sent events whenever anything changes. The browser code is TypeScript; the server strips its types as it serves it (Node's `stripTypeScriptTypes`), so there's no build step here either.
