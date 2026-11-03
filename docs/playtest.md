@@ -2,6 +2,8 @@
 
 `src/playtest/run.ts` runs one game where every seat is a Claude player (or the random bot). Each Claude player is its own `claude -p` process, and the only tools it has are five game tools for its own seat. It can't run commands, read or write files, browse, or act for another seat.
 
+Claude players are clients like phones: the runner hosts the game in a room on a board-lite server of its own (on `127.0.0.1` only, on a random port) and each Claude player joins it through the same room interface the phones and the CLI use. To seat Claude players at a game people are playing, with the server the TV uses, see [`play-vs-claude.md`](play-vs-claude.md) (`--room`).
+
 ```
 node src/playtest/run.ts --models opus,haiku,haiku
 ```
@@ -17,6 +19,9 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
 | `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
+| `--serve PORT` | off | also open the game's TV and phone pages to the network on PORT, to watch a playtest on a TV (the runner prints the TV link) |
+| `--flee-seconds N` | 120 | the stay-or-flee clock in raid battles; whoever hasn't answered when it runs out stays |
+| `--room URL` | none | don't host: join the Claude seats to a room someone else hosts; see [`play-vs-claude.md`](play-vs-claude.md) |
 
 It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.
 
@@ -35,24 +40,24 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 
 In the `--out` directory:
 
-- `results.json`: status (`over`, `stalled`, `time limit`, ...), seed, rounds, minutes, winner (seat and model), and per seat: model, final points (hidden ones included), cost, how many times its process was (re)started; plus counts of public and private messages.
+- `results.json`: status (`over`, `stalled`, `time limit`, ...), seed, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, or `player: <name>` for someone else's seat in a `--room` game), final points (hidden ones included), and for Claude seats cost and how many times its process was (re)started; plus counts of public and private messages.
 - `log.txt`: the whole game log as the engine recorded it, talk included. Lines only some players saw are marked `(only P1, P3)`: private messages, card draws, secret votes and fight-or-bail choices.
 - `talk.txt`: just the talk.
 - `seat-N.jsonl`: seat N's full Claude transcript (stream-json), including its reasoning between moves.
-- `runner.log`, `seat-N.stderr.log`, `game.json` (the final state).
+- `runner.log`, `seat-N.stderr.log`, `game.json` (the game, saved after every change; with `--room` the host keeps it instead).
 
 For a depth batch (Haiku vs Opus), run several games with seats shuffled across games and read `winner.model` from each `results.json`.
 
 ## What a player can do
 
-The seat server (`src/playtest/seat-server.ts <game.json> <seat>`, an MCP server) offers:
+The seat server (`src/playtest/seat-server.ts <room-url> <token>`, an MCP server) plays one seat through the room's HTTP interface and offers:
 
 | Tool | Does |
 |---|---|
 | `view` | the seat's view (`node src/cli.ts view`): public board, own hand and resources, recent events, options |
 | `act` | one decision command, exactly as in `docs/cli.md` |
 | `say` | talk: to the table, or with `to: "P2"` privately to one player |
-| `wait` | blocks up to 60 s until it's the seat's decision, someone talks, or the game ends; returns the new events |
+| `wait` | blocks up to 120 s until it's the seat's decision, someone talks, or the game ends; returns the new events |
 | `rules` | `docs/rules.md` |
 
 Talk is part of the game: `say <message>` and `tell P2 <message>` are engine commands (any player, any time, binding no one), so they land in the game log and every player's view like other events. Players are told the game is social and to negotiate, ally, bluff and reply when spoken to.
@@ -62,7 +67,7 @@ Talk is part of the game: `say <message>` and `tell P2 <message>` are engine com
 Each player process is started with:
 
 - `--tools ""`: no built-in tools at all (no Bash, Read, Write, Edit, WebFetch, Agent, ...).
-- `--strict-mcp-config --mcp-config seat-N/mcp.json`: the one MCP server, its seat fixed on its command line. The game file holds every hand, but only the server reads it; the player sees only what the server returns, which is that seat's view.
+- `--strict-mcp-config --mcp-config seat-N/mcp.json`: the one MCP server, its room and seat token fixed on its command line. The room only answers a token with that seat's view, so that's all the player ever sees.
 - `--allowedTools mcp__game__*` (the five, by name) with `--permission-mode dontAsk`: anything else would be denied, not prompted.
 - `--setting-sources ""`, `--disable-slash-commands`, `--no-chrome`: none of the owner's settings, hooks, plugins, skills or browser.
 - cwd `seat-N/` and `TMPDIR` inside `--out`, so nothing lands in `/tmp`.

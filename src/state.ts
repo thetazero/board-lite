@@ -93,7 +93,8 @@ export interface PublicState {
   raidsLeft: number;
   winner: number | null;
   finalTotals: number[] | null;
-  log: EventView[];
+  log: EventView[]; // public events, talk aside
+  talk: EventView[]; // the latest public talk
 }
 
 export interface CardView {
@@ -130,6 +131,7 @@ export interface SeatState {
   myChoice: 'fight' | 'bail' | null;
   myFlee: string[] | null;
   log: EventView[]; // private events for me
+  talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
 
 const res = (b: Bundle): Res => Object.fromEntries(RESOURCES.filter((r) => b[r]).map((r) => [r, b[r]!]));
@@ -168,6 +170,9 @@ function sideText(g: Game, s: TradeSide): string {
   }
   return parts.join(', ') || 'nothing';
 }
+
+// Table talk (say and tell), as the engine logs it.
+export const isTalk = (text: string) => / says: "| \(private\): "/.test(text);
 
 function events(g: Game, keep: (e: Game['log'][number]) => boolean, n: number): EventView[] {
   const out: EventView[] = [];
@@ -219,7 +224,8 @@ export function publicState(g: Game, logLines = 40): PublicState {
     raidsLeft: g.raidsLeft,
     winner: g.winner,
     finalTotals: g.phase === 'over' ? g.players.map((_, p) => score(g, p).total) : null,
-    log: events(g, (e) => !e.to, logLines),
+    log: events(g, (e) => !e.to && !isTalk(e.text), logLines),
+    talk: events(g, (e) => !e.to && isTalk(e.text), 12),
   };
 }
 
@@ -287,7 +293,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     myVote: raid?.votes[p] ?? null,
     myChoice: raid?.choices[p] ?? null,
     myFlee: raid?.flee[p] ?? null,
-    log: events(g, (e) => !!e.to?.includes(p), logLines),
+    log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
+    talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),
   };
 }
 

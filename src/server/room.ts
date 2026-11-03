@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { botMove } from '../bot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { publicState, seatState, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
-import { afterMove, playerView, publicStatus, visibleLog } from '../view.ts';
+import { afterMove, playerView, publicStatus, seatStatus, visibleLog } from '../view.ts';
 import { load, save, withLock } from '../store.ts';
 
 export const MIN_PLAYERS = 2;
@@ -175,7 +175,13 @@ export class Room {
   viewText(tok: string, logLines = 25): string {
     const p = this.playerSeat(tok);
     if (!this.game) return `You are seat ${p + 1} (${this.seats[p].name}) in room ${this.code}. The game hasn't started.\n${this.statusText()}`;
-    return playerView(this.game, p, logLines);
+    return `${this.tableLine(p)}\n${playerView(this.game, p, logLines)}`;
+  }
+
+  // Who sits where: the engine calls players P1, P2...; people know each other by name.
+  tableLine(p = -1): string {
+    const who = this.seats.map((s, i) => `P${i + 1} ${s.name}${i === p ? ' (you)' : s.kind === 'bot' ? ' (bot)' : s.kind === 'open' ? ' (open seat)' : ''}`);
+    return `Table: ${who.join(', ')}.`;
   }
 
   statusText(): string {
@@ -203,6 +209,42 @@ export class Room {
       const timer = setTimeout(() => finish(this.game ? `Still waiting on: ${waitingOn(this.game).map((q) => `P${q + 1}`).join(', ')}.` : 'The game has not started yet.', 2), timeoutMs);
       const unsubscribe = this.subscribe(() => void check());
       check();
+    });
+  }
+
+  // For a player who follows the game as it goes (a Claude seat's tool server):
+  // the events this seat can see from index `since` of its visible log, and its
+  // status. With a timeout it waits until it's this seat's decision, someone
+  // else talks, the game ends, or time runs out. On its own turn with an offer
+  // out, it waits for an answer rather than returning at once.
+  listen(tok: string, since: number, timeoutMs: number): Promise<{ events: string[]; next: number; status: string }> {
+    const p = this.playerSeat(tok);
+    const result = () => {
+      const g = this.game;
+      if (!g) return { events: [], next: 0, status: `The game hasn't started yet. ${this.tableLine(p)}` };
+      const v = visibleLog(g, p);
+      return { events: v.slice(since).map((e) => `[r${e.round}] ${e.text}`), next: v.length, status: seatStatus(g, p) };
+    };
+    const ready = (): boolean => {
+      const g = this.game;
+      if (!g) return false;
+      if (g.phase === 'over') return true;
+      const others = visibleLog(g, p).slice(since).filter((e) => !e.text.startsWith(`P${p + 1} `));
+      if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
+      const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
+      return waitingOn(g).includes(p) && !awaitingAnswer;
+    };
+    if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
+    return new Promise((done) => {
+      const finish = () => {
+        clearTimeout(timer);
+        unsubscribe();
+        done(result());
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      const unsubscribe = this.subscribe(() => {
+        if (ready()) finish();
+      });
     });
   }
 

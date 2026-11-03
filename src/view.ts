@@ -249,6 +249,14 @@ export function visibleLog(g: Game, p: number) {
   return g.log.filter((e) => !e.to || e.to.includes(p));
 }
 
+// One line for a seat: its options when it's its decision, else who the game waits on.
+export function seatStatus(g: Game, p: number): string {
+  if (g.phase === 'over') return `The game is over.${g.winner !== null ? ` ${pname(g.winner)} won.` : ''}`;
+  const hints = commandHints(g, p);
+  if (hints.length) return `It's your decision. Your options:\n${hints.map((h) => `  ${h}`).join('\n')}`;
+  return `Not your decision. Waiting on: ${waitingOn(g).map(pname).join(', ')}.`;
+}
+
 export function afterMove(g: Game, p: number, before: number): string {
   const lines = visibleLog(g, p).slice(before).map((e) => `  [r${e.round}] ${e.text}`);
   const hints = commandHints(g, p);
