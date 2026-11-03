@@ -2,6 +2,28 @@
 
 Living design doc. Decisions here were made in conversation with the project owner; quoted lines are theirs. Open questions are listed at the end and are not decided yet.
 
+## Design principles (the owner's, and the most important part of this doc)
+
+- Simple core systems that work well, not a pile of edge cases. Keep it "board game like".
+- When a playtest shows a problem, assume a poorly designed system first, not a bug to patch. In the owner's words: "often times 'x' happens due to poorly designed game systems, not because of bugs that need to be patched away... design simple core system that work well, not add a million edge cases."
+- A fix should make the rules simpler or keep them the same size. A fix that adds a special case, exception or extra rule is the wrong fix unless nothing simpler works, and then something else should go.
+- Depth test: Haiku players should regularly lose to Opus players. If they don't, the game has no depth.
+- Provisional design calls made without the owner are recorded, with reasoning, in `docs/decisions.md`.
+
+### Complexity budget
+
+Hard ceilings, set provisionally by the orchestrator at the owner's request ("try to force this by asserting certain complexity maximums"). Changes must stay within them; raising one is a design decision recorded in `docs/decisions.md`.
+
+- The full rules, not counting individual card text, fit on one printed page.
+- 5 resources (stone, timber, crystal, livestock, gold). No more.
+- 4 phases per global round. No more.
+- At most 10 building types and 6 upgrade types.
+- At most 12 distinct non-dragon action card effects.
+- A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
+- At most 6 raid unit types, each just stats plus elemental strengths and weaknesses.
+- Any card's text is one short sentence.
+- No rule that only exists to handle a single edge case.
+
 ## Format
 
 - A "board game lite" played in one room: the shared game board is on a TV with a fixed camera, and each player's phone holds only their small hidden state (their hand).
