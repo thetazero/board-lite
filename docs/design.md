@@ -51,7 +51,8 @@ Living design doc. Decisions here were made in conversation with the project own
   - Buildings: some building cards are worth points (e.g. tower floors, monuments).
   - Upgrades can add points to their building.
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
-  - Titles that change hands, like Catan's "longest road": e.g. "strongest dragon army", and others.
+  - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
+  - Raids give loot only, no points.
 
 ## Buildings
 
@@ -125,7 +126,7 @@ Living design doc. Decisions here were made in conversation with the project own
 ## Open questions
 
 - Within the global round: whether the production, card picking and raid phases are simultaneous or in turn order.
-- Victory points: the value of N; which titles exist; whether raids also give points (raid trophies) or only loot.
+- Victory points: the value of N; how many points each title is worth.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
 - Action cards: what they do.
