@@ -16,6 +16,7 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--budget-usd N` | 5 | spending cap per Claude seat for the whole game |
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
+| `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
 
 It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.
 
