@@ -101,14 +101,14 @@ Living design doc. Decisions here were made in conversation with the project own
 ## Game structure
 
 - The game is played in large global rounds. Each global round has, in order:
-  1. Production phase
+  1. Production phase: "Catan lite". Production is tied to the building, not the hex (at least for now); each building has a base production plus a roll.
   2. Card picking phase
   3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
 ## Open questions
 
-- Within the global round: how production works (dice?), how card picking works (what cards, from where), whether phases are simultaneous or in turn order.
+- Within the global round: how a building's production roll works, how card picking works (what cards, from where), whether phases are simultaneous or in turn order.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
