@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { playOut } from './bot.ts';
 import {
-  ACTIONS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES,
   type Attack, type BuildingClass, type Bundle, type Resource, type Terrain,
 } from './data.ts';
 import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
@@ -455,6 +455,56 @@ Cards that send fauna (action cards; see Decks for how often they come):
 ${table(['Card', 'Sends', 'Cost', 'Value', 'Copies'], cardRows)}`;
 }
 
+// The great beasts: what force kills each, how often, and when it exists.
+function beasts(): string {
+  const unitRows = Object.entries(BEASTS).map(([k, b]) => [
+    b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.strong.join(', '), b.weak.join(', '), b.points,
+    k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean beside one harbor',
+  ]);
+  const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
+  const weakKey = (b: string) => baseKeys.find((k) => BEASTS[b].weak.includes(DRAGONS[k].element))!;
+  const others = (b: string) => baseKeys.filter((k) => !BEASTS[b].weak.includes(DRAGONS[k].element));
+  const N = 2 * RAIDS_PER_CELL;
+  let salt = 900;
+  const rate = (b: string, party: { key: string; stage: number }[]) => {
+    const s0 = salt++;
+    let won = 0;
+    for (let i = 0; i < N; i++) if (hunt(b, party, s0 * 1000 + i)) won++;
+    return won / N;
+  };
+  const same = (k: string, stages: number[]) => stages.map((stage) => ({ key: k, stage }));
+  const parties: [string, number[]][] = [['Two young', [2, 2]], ['One adult', [3]], ['Two adults', [3, 3]], ['Three adults', [3, 3, 3]], ['Four adults', [3, 3, 3, 3]]];
+  const rows: string[][] = [];
+  for (const [label, stages] of parties) {
+    rows.push([label, ...Object.keys(BEASTS).flatMap((b) => {
+      const weak = pct(rate(b, same(weakKey(b), stages)));
+      const all = others(b).map((k) => rate(b, same(k, stages)));
+      return [weak, `${pct(all.reduce((x, y) => x + y, 0) / all.length)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`];
+    })]);
+  }
+  const specials = Object.keys(BEASTS).map((b) => {
+    const best = Object.keys(DRAGONS).filter((k) => !DRAGONS[k].base && BEASTS[b].weak.includes(DRAGONS[k].element));
+    return best.map((k) => `${DRAGONS[k].name} adult with a base adult of its element: ${pct(rate(b, [{ key: k, stage: 3 }, { key: weakKey(b), stage: 3 }]))} against the ${BEASTS[b].name}`).join('; ');
+  });
+  const base = Object.values(DRAGONS).find((d) => d.base)!;
+  const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus)!;
+  const adult = growth(base.growthTime, 1, 3);
+  const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
+  return `## Great beasts
+
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end, and they sit out the round's raids), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
+
+${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Points', 'Lives in'], unitRows)}
+
+Chance it falls, from ${N} fights through the engine per cell. "Weakness" is base dragons of the element it is weak to; "other" averages the other four elements (worst–best in brackets). A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
+
+${table(['Dragons sent', ...Object.values(BEASTS).flatMap((b) => [`${b.name}, weakness`, `${b.name}, other`])], rows)}
+
+${specials.join('. ')}.
+
+When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult ${adult} rounds after it is hatched, ${fast} with a ${hatchery.name}. Two adults of a beast's weakness, hatched in rounds 2–4, are ready in rounds ${2 + adult}–${4 + adult}; the bot games under Game length show when beasts fall with random play.`;
+}
+
 function deck(): string {
   const build = [...Object.values(BUILDINGS), ...Object.values(UPGRADES)];
   const act = [...Object.values(ACTIONS), ...Object.values(DRAGONS)];
@@ -517,15 +567,21 @@ function length(): string {
     const rounds: number[] = [];
     let stalled = 0;
     const held = { army: 0, tower: 0, territory: 0 };
+    const slain: Record<string, number[]> = Object.fromEntries(Object.keys(BEASTS).map((k) => [k, []]));
     for (let i = 0; i < GAMES; i++) {
       const g = newGame(players, 1 + i);
       playOut(g, { state: 7919 + i });
       if (g.phase === 'over') rounds.push(g.round);
       else stalled++;
       for (const t of Object.keys(held) as (keyof typeof held)[]) if (g.titles[t] !== null) held[t]++;
+      for (const k of Object.keys(slain)) {
+        const at = g.log.find((e) => e.ev?.k === 'cleared' && e.ev.fauna === k && e.ev.won);
+        if (at) slain[k].push(at.round);
+      }
     }
+    const fell = (rs: number[]) => (rs.length ? `${pct(rs.length / GAMES)}, median round ${rs.sort((a, b) => a - b)[Math.floor(rs.length / 2)]}` : 'never');
     rounds.sort((a, b) => a - b);
-    return [players, rounds[0] ?? '—', rounds[Math.floor(rounds.length / 2)] ?? '—', rounds[rounds.length - 1] ?? '—', stalled, ...Object.values(held).map((n) => pct(n / GAMES))];
+    return [players, rounds[0] ?? '—', rounds[Math.floor(rounds.length / 2)] ?? '—', rounds[rounds.length - 1] ?? '—', stalled, ...Object.values(held).map((n) => pct(n / GAMES)), ...Object.values(slain).map(fell)];
   });
   return `## Game length (random bots)
 
@@ -533,7 +589,9 @@ ${GAMES} games per player count between the random bot (\`src/bot.ts\`). Random 
 
 Last three columns: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points, ${TUNING.titleMinimum.tower} tower floors or ${TUNING.titleMinimum.territory} buildings).
 
-${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Territory held'], rows)}`;
+The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
+
+${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Territory held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
 }
 
 export function datasheet(): string {
@@ -541,7 +599,7 @@ export function datasheet(): string {
 
 Generated from \`src/data.ts\` and the engine by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff: it shows what the change does to payback, cost per point and raid odds.
 
-${[economy(), production(), land(), shortages(), neighbourCards(), others(), points(), dragons(), raids(), fauna(), demand(), deck(), length()].join('\n\n')}
+${[economy(), production(), land(), shortages(), neighbourCards(), others(), points(), dragons(), raids(), fauna(), beasts(), demand(), deck(), length()].join('\n\n')}
 `;
 }
 

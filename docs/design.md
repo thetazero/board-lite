@@ -22,6 +22,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
 - At most 6 raid unit types, each just stats plus elemental strengths and weaknesses.
 - At most 3 kinds of fauna, each just stats, elemental strengths and weaknesses, and its loot.
+- At most 2 great beasts, each just stats, elemental strengths and weaknesses, its points, and where it lives.
 - Any card's text is one short sentence.
 - No rule that only exists to handle a single edge case.
 
@@ -50,6 +51,17 @@ Playtests showed that refusing to trade and taking land first were the only ways
 - "you can chose to fight fauna or raid (but maybe this is a dragon level choice)… maybe you can go half half": each dragon either fights fauna or raids in a round, never both, so a player can split their dragons.
 - New fauna comes only from action cards: "card only for now". The board doesn't respawn it.
 - Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
+
+### Great beasts
+
+The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for killing. 1. thunderbird on a mountain at the center of the map (this mountain should have some special modifier) 2. some sea serpent in the ocean". They are the top tier of the fauna.
+
+- A race: "they do not, it's a race". A slain beast never comes back.
+- Fights: "fauna fights should be 1 player and a time and it should heal up between fights". Fought like fauna, to the end with no bail, as one of each dragon's choices for the round (raid, hunt fauna, or hunt a beast), with one attempt per player per round, in turn order.
+- Each beast has an elemental weakness, so "the race is to get the right dragons, not the most dragons", and "a well-built force should be able to win around round 8–10, not round 4" (proposed by the orchestrator; the owner: "Yup I like it").
+- The centre mountain: nobody builds on or next to the peak while the Thunderbird lives; once it's slain, buildings next to the peak produce more ("Right I think a production bonus makes sense").
+- The sea serpent prowls one coast, and the harbour there produces nothing until it's killed ("I like it").
+- Points from beasts: "It's not a raid, and that's not a hard rul" (of "raids give loot only, no points").
 
 ## Theme
 
@@ -88,7 +100,7 @@ Playtests showed that refusing to trade and taking land first were the only ways
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
   - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
   - Titles take real investment: "strongest army and largest territory need a larger threshold".
-  - Raids give loot only, no points.
+  - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 1 point.
 
 ## Buildings
 
@@ -230,3 +242,4 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
 - Fauna (provisional, PR for issue #66): three beasts (Wolf Pack, Cave Bear, Basilisk), one per 8 land hexes at the start, none within 1 step of a tower, stronger further from the towers. Clearing happens on your own turn in the action phase, with your own dragons only, and is fought to the end like a raid; the dragons sent sit out that round's raids. A lost fight leaves the beast at full health. "Produces nothing" covers dice and made resources; a building under fauna keeps its points and dragon room. Two fauna cards, one action effect (put a beast on any land hex but a tower): Wolf Call (2 copies) and Rouse the Bear (1 copy), the rarest action cards and among the dearest, gold-heavy. The Basilisk is never sent by a card. Seven of the twelve allowed effects.
+- Great beasts (provisional, PR for issue #67): a great beast holds its own hex and every hex next to it, so one rule covers both "nobody builds on or next to the peak" and the serpent's harbour (no port can be built there, so none works). The sea serpent is the Leviathan, to keep it apart from Tidewatch's Sea Serpent defenders; it sits in the ocean beside a random coast's harbor. The Thunderbird is weak to ice (strong against lightning, air, water), the Leviathan to lightning (strong against water, fire, ice). The peak bonus is +2 to each production building on or next to the peak, a Workshop's worth. One try at a great beast per player per round, across both.

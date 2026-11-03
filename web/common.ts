@@ -5,6 +5,9 @@ import type { DragonView, EventView, HexView, PublicState, Res, Snapshot, UnitVi
 import { buildingShapes, icon, iconShapes } from './icons.ts';
 import { glyph } from './art.ts';
 
+// The colour each great beast marks the hexes it holds with (the TV's board uses the same).
+export const HOLD_COLORS: Record<string, string> = { thunderbird: '#5b4bb7', leviathan: '#1f7f9b' };
+
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
@@ -206,7 +209,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'everyone bailed' : 'nobody went'}</span>`;
     case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
-    case 'cleared': return `${who(ev.p)} ${icon(ev.fauna, 1.5)} ${ev.won ? `<span class="ok">cleared</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
+    case 'cleared': return `${who(ev.p)} ${icon(ev.fauna, 1.5)} ${ev.won ? ev.points ? `<span class="ok">slain</span> +${ev.points}${icon('points', 1.2)}` : `<span class="ok">cleared</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
     default: return '';
   }
 }
@@ -337,9 +340,13 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
+    // A great beast's hold on the hexes round it, and the freed peak's richer ground.
+    const ring = h.held ? HOLD_COLORS[h.held] : h.peakZone ? '#e7b43f' : '';
+    if (ring) cells.push(`<polygon points="${hexPoints(x, y, size * 0.82)}" fill="none" stroke="${ring}" stroke-width="${size * 0.1}" stroke-dasharray="${size * 0.3} ${size * 0.14}" opacity=".9"/>`);
     // A beast holding the hex: in its middle, or crouched on the building it shuts down.
     if (h.fauna) {
-      const [fx, fy, fs] = b ? [x + size * 0.3, y + size * 0.28, size * 0.034] : [x, y, size * 0.05];
+      const great = h.fauna.points !== undefined;
+      const [fx, fy, fs] = b ? [x + size * 0.3, y + size * 0.28, size * 0.034] : [x, y, size * (great ? 0.065 : 0.05)];
       cells.push(`<g class="fauna" transform="translate(${fx} ${fy})"><circle r="${fs * 11}" fill="#3a2a22" opacity=".55"/><g transform="scale(${fs})">${iconShapes(h.fauna.key)}</g></g>`);
     }
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);

@@ -35,6 +35,9 @@ export const TUNING = {
   specialProjectMultiplier: 2,
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
+  // Once the Thunderbird falls, each production building on or next to its
+  // peak (the centre hex) makes this many more a round.
+  peakBonus: 2,
 };
 
 // A building's class is what upgrades and other buildings' effects refer to.
@@ -270,6 +273,27 @@ export const FAUNA: Record<string, FaunaDef> = {
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, strong: ['ice'], weak: ['lightning'], loot: { livestock: 4 } },
   basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, strong: ['fire', 'lightning'], weak: ['water', 'ice'], loot: { livestock: 6 } },
 };
+// Great beasts (#67): the top tier of the fauna, one of each on every map.
+// Each holds its hex and every hex around it until it is slain: nothing is
+// built there. Fighting one is clearing fauna, but a player gets one try at
+// a great beast a round, and the one who slays it scores its points for good.
+// It never comes back. Its weakness makes the race about the right dragons.
+export interface BeastDef extends FaunaDef {
+  points: number;
+}
+
+export const BEASTS: Record<string, BeastDef> = {
+  // On the mountain at the centre of the map.
+  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, strong: ['lightning', 'air', 'water'], weak: ['ice'], loot: {}, points: 1 },
+  // In the ocean off one coast, beside its harbor.
+  leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, strong: ['water', 'fire', 'ice'], weak: ['lightning'], loot: {}, points: 1 },
+};
+
+// A beast on the map: one of the fauna, or a great beast.
+export function faunaDef(k: string): FaunaDef {
+  return FAUNA[k] ?? BEASTS[k];
+}
+
 // On the starting map, a beast's kind goes by its distance to the nearest
 // tower: wolves close in, the basilisk furthest out.
 export const FAUNA_BY_DISTANCE = ['wolf_pack', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps

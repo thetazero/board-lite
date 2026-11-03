@@ -1,14 +1,17 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
-import { FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
+import { BEASTS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
 import { type Rng, next, shuffle } from './rng.ts';
 
 export interface Hex {
   q: number;
   r: number;
   terrain: Terrain;
-  fauna?: string; // a beast on this hex, a FAUNA key
+  fauna?: string; // a beast on this hex, a FAUNA or BEASTS key
 }
+
+// The Thunderbird's peak: the mountain at the centre of the map.
+export const PEAK = '0,0';
 
 export const DIRECTIONS: [number, number][] = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 
@@ -82,8 +85,30 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
     const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
     hexes[key(q, r)].terrain = 'harbor';
   }
+  placeBeasts(rng, hexes, players);
   placeFauna(rng, hexes, players);
   return hexes;
+}
+
+// Is hex k held by a great beast: on it, or next to it?
+export function nearBeast(hexes: Record<string, Hex>, k: string): boolean {
+  return [k, ...neighbors(k)].some((n) => !!hexes[n]?.fauna && !!BEASTS[hexes[n].fauna!]);
+}
+
+// The great beasts: the Thunderbird on the peak at the centre, and the
+// Leviathan in the ocean beside one coast's harbor, on a random coast, on
+// the side of that harbor that keeps clear of the towers' neighbours.
+function placeBeasts(rng: Rng, hexes: Record<string, Hex>, players: number) {
+  hexes[PEAK].terrain = 'mountain';
+  hexes[PEAK].fauna = 'thunderbird';
+  const towers = towerSpots(players);
+  const nearTower = (k: string) => towers.some((t) => t === k || neighbors(t).includes(k));
+  const harbors = Object.keys(hexes).filter((k) => hexes[k].terrain === 'harbor').sort();
+  const harbor = harbors[Math.floor(next(rng) * harbors.length)];
+  const sea = neighbors(harbor).filter((n) => hexes[n]?.terrain === 'ocean');
+  const clear = sea.filter((s) => !neighbors(s).some((n) => hexes[n] && nearTower(n)));
+  const pool = clear.length ? clear : sea;
+  hexes[pool[Math.floor(next(rng) * pool.length)]].fauna = 'leviathan';
 }
 
 // Aggressive fauna on the starting map: one beast per TUNING.landHexesPerFauna
@@ -93,7 +118,7 @@ function placeFauna(rng: Rng, hexes: Record<string, Hex>, players: number) {
   const towers = towerSpots(players).map((k) => parseKey(k)!);
   const land = Object.values(hexes).filter((h) => h.terrain !== 'ocean');
   const away = (h: Hex) => Math.min(...towers.map(([q, r]) => distance(h.q - q, h.r - r)));
-  const open = shuffle(rng, land.filter((h) => away(h) >= 2));
+  const open = shuffle(rng, land.filter((h) => away(h) >= 2 && !nearBeast(hexes, key(h.q, h.r))));
   for (const h of open.slice(0, Math.round(land.length / TUNING.landHexesPerFauna))) {
     h.fauna = FAUNA_BY_DISTANCE[Math.min(away(h) - 2, FAUNA_BY_DISTANCE.length - 1)];
   }

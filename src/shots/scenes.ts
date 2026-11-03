@@ -8,7 +8,7 @@
 import { botStep } from '../bot.ts';
 import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
 import { apply, newGame, score, waitingOn, type Game } from '../engine.ts';
-import { neighbors } from '../map.ts';
+import { PEAK, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
 import type { Room } from '../server/room.ts';
@@ -779,4 +779,59 @@ export const SCENES: Scene[] = [
       { file: 'phone-fauna-where-3p', caption: 'Phone: choosing where to send the Cave Bear', client: 'phone', seat: g!.turn, clicks: [card('c901'), '[data-pickhex]'] },
     ],
   },
+  {
+    // Great beasts (#67): the Thunderbird on the centre peak and the Leviathan
+    // off a harbor, each with the hexes it holds marked. The acting player
+    // has three adult ice dragons, the Thunderbird's weakness, and sends them.
+    name: 'beasts-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => beastHunters(g),
+    shots: (g) => [
+      { file: 'tv-beasts-3p', caption: 'TV: the Thunderbird on its peak and the Leviathan off its harbor, the hexes they hold ringed', client: 'tv', waitMs: 4800 },
+      { file: 'phone-beast-pick-3p', caption: 'Phone: choosing which beast to fight, great beasts included', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
+      { file: 'phone-beast-send-3p', caption: 'Phone: sending dragons against the Thunderbird', client: 'phone', seat: g!.turn, clicks: ['#hunt', `[data-hex="${PEAK}"]`, '[data-hunter]'] },
+      // Last: the fight changes the game.
+      { file: 'tv-beast-fight-3p', caption: 'TV: a fight against the Thunderbird mid-replay', client: 'tv', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
+    ],
+  },
+  {
+    // The same fight, at its end.
+    name: 'beasts-slain-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => beastHunters(g),
+    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +1 point for good', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
+  },
+  {
+    // After the Thunderbird falls: the peak is free and its ring is rich
+    // ground; one player has built there, and holds the beast's trophy.
+    name: 'peak-free-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      huntPeak(g);
+      const ring = neighbors(PEAK).find((k) => !g.buildings[k])!;
+      g.map[ring].terrain = 'meadow';
+      g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
+    },
+    shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
+  },
 ];
+
+// The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
+function beastHunters(g: Game) {
+  const p = g.turn;
+  g.dragons = g.dragons.filter((d) => d.owner !== p);
+  for (const key of ['frost_wyrm', 'rime_drake', 'ice_whelp']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 3, growth: 0, damage: 0, resting: '' });
+}
+
+// The acting player sends every ready dragon against the Thunderbird.
+function huntPeak(g: Game) {
+  const ids = g.dragons.filter((d) => d.owner === g.turn && d.stage > 0 && !d.resting && !d.damage).map((d) => d.id);
+  apply(g, g.turn, `clear ${PEAK} ${ids.join(' ')}`);
+}

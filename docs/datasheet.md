@@ -64,20 +64,20 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 | Card | Class | Counts | Cost | Value | Each one adds | At 1 | At 2 | At 3 | Map |
 |---|---|---|---|---|---|---|---|---|---|
-| Cliff Works | quarry | mountain hexes | 2 timber, 2 crystal, 1 livestock | 5 | 1 stone a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 22% |
+| Cliff Works | quarry | mountain hexes | 2 timber, 2 crystal, 1 livestock | 5 | 1 stone a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 25% |
 | Stonemason | quarry | quarries (anyone's) | 2 timber, 2 crystal, 1 livestock | 5 | 1 stone a round | 5 | 2.5 | 1.7 ⚠ | built |
-| Woodcutter's Hut | lumber camp | forest hexes | 2 stone, 2 crystal, 1 livestock | 5 | 1 timber a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 23% |
+| Woodcutter's Hut | lumber camp | forest hexes | 2 stone, 2 crystal, 1 livestock | 5 | 1 timber a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 22% |
 | Sawmill | lumber camp | lumber camps (anyone's) | 2 stone, 2 crystal, 1 livestock | 5 | 1 timber a round | 5 | 2.5 | 1.7 ⚠ | built |
 | Driftwood Yard | lumber camp | ocean hexes | 3 stone, 2 crystal, 2 livestock | 7 | 1 timber a round | 7 | 3.5 | 2.3 | 3 / 39% |
-| Ley Spire | mine | ley hexes | 2 stone, 2 timber, 1 livestock | 5 | 1 crystal a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 21% |
+| Ley Spire | mine | ley hexes | 2 stone, 2 timber, 1 livestock | 5 | 1 crystal a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 20% |
 | Gem Cutter | mine | mines (anyone's) | 2 stone, 2 timber, 1 livestock | 5 | 1 crystal a round | 5 | 2.5 | 1.7 ⚠ | built |
 | Smelter | mine | quarries (anyone's) | 1 stone, 2 timber, 2 livestock | 5 | 1 crystal a round | 5 | 2.5 | 1.7 ⚠ | built |
-| Shepherd's Fold | pasture | meadow hexes | 2 stone, 2 timber, 1 crystal | 5 | 1 livestock a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 21% |
+| Shepherd's Fold | pasture | meadow hexes | 2 stone, 2 timber, 1 crystal | 5 | 1 livestock a round | 5 | 2.5 | 1.7 ⚠ | 1.6 / 20% |
 | Drovers' Barn | pasture | pastures (anyone's) | 1 stone, 2 timber, 2 crystal | 5 | 1 livestock a round | 5 | 2.5 | 1.7 ⚠ | built |
 | Fishery | pasture | ocean hexes | 2 stone, 3 timber, 2 crystal | 7 | 1 livestock a round | 7 | 3.5 | 2.3 | 3 / 39% |
 | Market | trade building | trade buildings (anyone's) | 2 stone, 2 timber, 2 crystal, 1 gold | 10 | 1 gold a round | 2.5 | 1.3 ⚠ | 0.8 ⚠ | built |
 | Monument | monument | monuments (anyone's) | 3 stone, 2 timber, 2 gold | 13 | 1 point | 13 | 6.5 | 4.3 | built |
-| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 2 gold | 12 | 1 point | 12 | 6 | 4 | 1.6 / 21% |
+| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 2 gold | 12 | 1 point | 12 | 6 | 4 | 1.6 / 20% |
 | Lighthouse | monument | ocean hexes | 4 stone, 2 timber, 2 gold | 14 | 1 point | 14 | 7 | 4.7 | 3 / 39% |
 | Guildhall | monument | trade buildings (anyone's) | 2 stone, 2 timber, 2 gold | 12 | 1 point | 12 | 6 | 4 | built |
 
@@ -208,9 +208,9 @@ On the starting map (one beast per 8 land hexes, none within 1 step of a tower),
 
 | Players | Land hexes | Wolf Pack | Cave Bear | Basilisk |
 |---|---|---|---|---|
-| 2 | 61 | 2.4 | 2.8 | 2.8 |
-| 3 | 61 | 4 | 3.3 | 0.6 |
-| 4 | 91 | 4.4 | 3.9 | 2.7 |
+| 2 | 61 | 2.4 | 2.4 | 3.1 |
+| 3 | 61 | 4.5 | 2.8 | 0.7 |
+| 4 | 91 | 5.1 | 3.6 | 2.3 |
 
 Cards that send fauna (action cards; see Decks for how often they come):
 
@@ -218,6 +218,29 @@ Cards that send fauna (action cards; see Decks for how often they come):
 |---|---|---|---|---|
 | Wolf Call | Wolf Pack | 1 crystal, 2 gold | 9 | 2 |
 | Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 14 | 1 |
+
+## Great beasts
+
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end, and they sit out the round's raids), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round.
+
+| Beast | Health | Attack (avg) | Strong vs | Weak vs | Points | Lives in |
+|---|---|---|---|---|---|---|
+| Thunderbird | 70 | 2×2d8 (18) | lightning, air, water | ice | 1 | the mountain peak at the centre |
+| Leviathan | 80 | 1×3d10 (16.5) | water, fire, ice | lightning | 1 | the ocean beside one harbor |
+
+Chance it falls, from 200 fights through the engine per cell. "Weakness" is base dragons of the element it is weak to; "other" averages the other four elements (worst–best in brackets). A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
+
+| Dragons sent | Thunderbird, weakness | Thunderbird, other | Leviathan, weakness | Leviathan, other |
+|---|---|---|---|---|
+| Two young | 10% | 0% (0%–0%) | 4% | 0% (0%–0%) |
+| One adult | 0% | 0% (0%–0%) | 0% | 0% (0%–0%) |
+| Two adults | 47% | 0% (0%–0%) | 48% | 0% (0%–0%) |
+| Three adults | 100% | 13% (0%–54%) | 98% | 12% (0%–48%) |
+| Four adults | 100% | 33% (9%–100%) | 100% | 34% (10%–100%) |
+
+Frost Wyrm adult with a base adult of its element: 99% against the Thunderbird; Rime Drake adult with a base adult of its element: 70% against the Thunderbird. Storm Wyrm adult with a base adult of its element: 23% against the Leviathan; Bolt Drake adult with a base adult of its element: 74% against the Leviathan.
+
+When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult 6 rounds after it is hatched, 3 with a Hatchery. Two adults of a beast's weakness, hatched in rounds 2–4, are ready in rounds 8–10; the bot games under Game length show when beasts fall with random play.
 
 ## Resource demand
 
@@ -276,8 +299,10 @@ Building deck 46 cards (18 buildings, 4 upgrades), action deck 41. Last column: 
 
 Last three columns: share of games that end with someone holding each title (it needs 8 dragon points, 3 tower floors or 9 buildings).
 
-| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held |
-|---|---|---|---|---|---|---|---|
-| 2 | 9 | 12 | 15 | 0 | 73% | 37% | 73% |
-| 3 | 7 | 11 | 15 | 0 | 90% | 60% | 73% |
-| 4 | 7 | 11 | 14 | 0 | 73% | 60% | 93% |
+The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
+
+| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 | 9 | 12 | 18 | 0 | 77% | 40% | 80% | 7%, median round 13 | 3%, median round 9 |
+| 3 | 8 | 11 | 16 | 0 | 87% | 63% | 80% | 10%, median round 13 | 7%, median round 10 |
+| 4 | 7 | 11 | 15 | 0 | 77% | 70% | 67% | 7%, median round 12 | 3%, median round 11 |
