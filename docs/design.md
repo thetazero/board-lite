@@ -21,6 +21,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - At most 12 distinct non-dragon action card effects.
 - A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
 - At most 6 raid unit types, each just stats plus elemental strengths and weaknesses.
+- At most 3 kinds of fauna, each just stats, elemental strengths and weaknesses, and its loot.
 - Any card's text is one short sentence.
 - No rule that only exists to handle a single edge case.
 
@@ -39,10 +40,21 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Works for casual, mixed-skill groups over many sessions; most people should leave feeling good.
 - Core loop: Catan's social loop (generate → trade → build) combined with Terraforming Mars's satisfying engine growth.
 
+## Holding each other back: aggressive fauna
+
+Playtests showed that refusing to trade and taking land first were the only ways to slow a leader, and they weren't enough. The owner (2026-11-03): "you're right that only positive sum trading + a bit of land contention is insufficient". Of three options (one robber-like piece, "take that" cards, secret split-or-grab raid loot), the owner chose many nuisance pieces: "nusience pieces, and not just one sounds beautiful. Like aggressive fauna you need to clear out with dragons to expand and action cards that place them near opponents (or on top shutting down the tiles production)".
+
+- The starting map has fauna on it, in a few strengths ("yes").
+- Fauna blocks building on its hex and shuts down the production of a building it sits on (chosen over spreading or eating livestock).
+- Clearing fauna "its not a raid but uses the same combat system". Anyone can clear any fauna ("anyone"), and clearing pays "some livestock? (food)", scaled by how strong the beast is.
+- "you can chose to fight fauna or raid (but maybe this is a dragon level choice)… maybe you can go half half": each dragon either fights fauna or raids in a round, never both, so a player can split their dragons.
+- New fauna comes only from action cards: "card only for now". The board doesn't respawn it.
+- Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
+
 ## Theme
 
 - You play a wizard who raises dragons. Your tower and buildings produce resources, dragons are hatched and raised, and dragons raid neutral kingdoms for loot.
-- Raids target neutral kingdoms, not other players ("raid neutral targets is definitely the move").
+- Raids target neutral kingdoms, not other players ("raid neutral targets is definitely the move"). Players hold each other back with fauna instead (see above).
 - Spells are dropped as a system ("Drop spells for the most part though"). What remains are spell cards in hand, "basically action cards".
 
 ## Hidden vs public state
@@ -107,6 +119,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Bigger than the first version: "the map needs to be bigger".
 - "Ocean around the outside of the map, only natural harbors support markets which should probably be renamed to ports".
 - Neutral kingdoms are not on the map. Raids against them happen in a separate raiding phase of the game.
+- Aggressive fauna holds hexes on the map until dragons clear it (see Holding each other back).
 
 ## Dragons
 
@@ -219,3 +232,4 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
+- Fauna (provisional, PR for issue #66): three beasts (Wolf Pack, Cave Bear, Basilisk), one per 8 land hexes at the start, none within 1 step of a tower, stronger further from the towers. Clearing happens on your own turn in the action phase, with your own dragons only, and is fought to the end like a raid; the dragons sent sit out that round's raids. A lost fight leaves the beast at full health. "Produces nothing" covers dice and made resources; a building under fauna keeps its points and dragon room. Two fauna cards, one action effect (put a beast on any land hex but a tower): Wolf Call (2 copies) and Rouse the Bear (1 copy), the rarest action cards and among the dearest, gold-heavy. The Basilisk is never sent by a card. Seven of the twelve allowed effects.

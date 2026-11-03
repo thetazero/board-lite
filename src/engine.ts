@@ -2,8 +2,8 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, combatPower, BUILDINGS, DRAGONS, ELEMENTS, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES,
-  type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource,
+  ACTIONS, BASIC_BUILDINGS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower,
+  type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { generateMap, key, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
@@ -28,8 +28,9 @@ export interface Dragon {
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
   damage: number;
-  // Why the dragon sits out this round's raids: it was hungry (and doesn't grow) or hurt at production.
-  resting: '' | 'hungry' | 'hurt';
+  // Why the dragon sits out this round's raids: it was hungry (and doesn't
+  // grow) or hurt at production, or it already fought fauna this round.
+  resting: '' | 'hungry' | 'hurt' | 'hunted';
 }
 
 export interface Player {
@@ -95,7 +96,9 @@ export type GameEvent =
   | { k: 'floor'; p: number; floors: number; project?: boolean }
   | { k: 'upgrade'; p: number; u: string; name: string; on: string; hex: string }
   | { k: 'hatch'; p: number; d: string; project?: boolean }
-  | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number }
+  | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
+  | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; ds: string[] } // a player's dragons attack fauna
+  | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle }
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
@@ -213,6 +216,11 @@ export function stageStats(d: Dragon): DragonStage | null {
   return d.stage === 0 ? null : DRAGONS[d.key].stages[d.stage - 1];
 }
 
+// A raid defender or a beast of the fauna: the same stats, the same combat.
+export function foeDef(k: string): UnitDef {
+  return UNITS[k] ?? FAUNA[k];
+}
+
 export function canRaid(d: Dragon): boolean {
   return d.stage > 0 && !d.resting && d.damage === 0;
 }
@@ -318,7 +326,8 @@ export function buildingPoints(g: Game, k: string): number {
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
   for (const r of RESOURCES) out[r].base += TUNING.towerProduction[r] ?? 0;
-  for (const { b, def, n } of placed(g, p)) {
+  for (const { k, b, def, n } of placed(g, p)) {
+    if (g.map[k]?.fauna) continue; // a building under fauna produces nothing
     const up = b.upgrade ? UPGRADES[b.upgrade] : null;
     if (def.produces) {
       out[def.produces.resource].base += def.produces.base;
@@ -653,7 +662,7 @@ function resolveBail(g: Game) {
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
   log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp })) });
   // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
-  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, round);
+  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round);
 }
 
 function rollAttack(g: Game, a: Attack): number {
@@ -662,19 +671,25 @@ function rollAttack(g: Game, a: Attack): number {
   return sum;
 }
 
-function pickTargets(g: Game, d: Dragon, n: number): number[] {
-  const raid = g.raid!;
-  const alive = raid.units.flatMap((u, i) => (u.hp > 0 ? [i] : []));
+// One fight: dragons against foes (a raid's defenders, or one beast of the
+// fauna). The raid keeps its fight in g.raid; clearing fauna uses its own.
+interface Battle {
+  units: { key: string; hp: number }[];
+  fighters: string[];
+}
+
+function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
+  const alive = b.units.flatMap((u, i) => (u.hp > 0 ? [i] : []));
   const rule = DRAGONS[d.key].targeting;
   let order = shuffle(g.rng, alive.slice());
-  if (rule === 'lowest_health') order.sort((a, b) => raid.units[a].hp - raid.units[b].hp);
+  if (rule === 'lowest_health') order.sort((x, y) => b.units[x].hp - b.units[y].hp);
   if (rule === 'strongest_attacker') {
-    const power = (i: number) => { const u = UNITS[raid.units[i].key]; return u.targets * u.dice * (u.sides + 1); };
-    order.sort((a, b) => power(b) - power(a));
+    const power = (i: number) => { const u = foeDef(b.units[i].key); return u.targets * u.dice * (u.sides + 1); };
+    order.sort((x, y) => power(y) - power(x));
   }
   if (rule === 'weak_to_me') {
-    const weak = (i: number) => (UNITS[raid.units[i].key].weak.includes(DRAGONS[d.key].element) ? 0 : 1);
-    order.sort((a, b) => weak(a) - weak(b));
+    const weak = (i: number) => (foeDef(b.units[i].key).weak.includes(DRAGONS[d.key].element) ? 0 : 1);
+    order.sort((x, y) => weak(x) - weak(y));
   }
   return order.slice(0, n);
 }
@@ -684,24 +699,23 @@ function dragonById(g: Game, id: string): Dragon {
 }
 
 // A dragon at 0 health is knocked out: it leaves the fight and heals at home.
-function knockedOut(g: Game, d: Dragon): boolean {
+function knockedOut(b: Battle, d: Dragon): boolean {
   if (d.damage < stageStats(d)!.hp) return false;
   d.damage = stageStats(d)!.hp;
-  g.raid!.fighters = g.raid!.fighters.filter((id) => id !== d.id);
+  b.fighters = b.fighters.filter((id) => id !== d.id);
   return true;
 }
 
-function combatRound(g: Game, round: number) {
-  const raid = g.raid!;
+function combatRound(g: Game, b: Battle, round: number) {
   const lines: string[] = [];
   const hits: Hit[] = [];
   // Dragons strike first.
-  for (const id of raid.fighters) {
+  for (const id of b.fighters) {
     const d = dragonById(g, id);
     const st = stageStats(d)!;
-    for (const ui of pickTargets(g, d, st.targets)) {
-      const u = raid.units[ui];
-      const def = UNITS[u.key];
+    for (const ui of pickTargets(g, b, d, st.targets)) {
+      const u = b.units[ui];
+      const def = foeDef(u.key);
       let dmg = rollAttack(g, st);
       const el = DRAGONS[d.key].element;
       if (def.weak.includes(el)) dmg *= 2;
@@ -712,14 +726,14 @@ function combatRound(g: Game, round: number) {
     }
   }
   // Then the defenders.
-  for (const [ui, u] of raid.units.entries()) {
+  for (const [ui, u] of b.units.entries()) {
     if (u.hp <= 0) continue;
-    const def = UNITS[u.key];
-    for (let t = 0; t < def.targets && raid.fighters.length; t++) {
-      const d = dragonById(g, pick(g.rng, raid.fighters));
+    const def = foeDef(u.key);
+    for (let t = 0; t < def.targets && b.fighters.length; t++) {
+      const d = dragonById(g, pick(g.rng, b.fighters));
       const dmg = rollAttack(g, def);
       d.damage += dmg;
-      const down = knockedOut(g, d);
+      const down = knockedOut(b, d);
       lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${down ? ' (knocked out, limps home)' : ''}`);
       hits.push({ d: d.id, u: ui, by: 'unit', dmg, down });
     }
@@ -761,6 +775,35 @@ function checkRaidOver(g: Game): boolean {
     return true;
   }
   return false;
+}
+
+// ---------- fauna ----------
+
+// A player's dragons attack the beast on hex k, in a raid's combat, to the
+// end. Each sits out this round's raids. If the beast falls, the hex is free
+// and its loot goes to the player; if not, it stays, healed.
+function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
+  const f = g.map[k].fauna!;
+  const def = FAUNA[f];
+  for (const d of ds) d.resting = 'hunted';
+  const b: Battle = { units: [{ key: f, hp: def.hp }], fighters: ds.map((d) => d.id) };
+  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, ds: [...b.fighters] });
+  for (let round = 1; b.units[0].hp > 0 && b.fighters.length; round++) combatRound(g, b, round);
+  const won = b.units[0].hp <= 0;
+  if (won) {
+    delete g.map[k].fauna;
+    gain(g.players[p], def.loot);
+  }
+  log(g, won ? `The ${def.name} at ${k} is cleared! ${pname(p)} takes ${bundleText(def.loot)}.` : `The ${def.name} at ${k} drives ${pname(p)}'s dragons off.`, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? def.loot : {} });
+}
+
+// Where a fauna card can put its beast: any land hex without fauna or a tower.
+export function faunaHexes(g: Game): string[] {
+  return Object.keys(g.map).filter((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower').sort();
+}
+
+export function faunaOnMap(g: Game): string[] {
+  return Object.keys(g.map).filter((k) => g.map[k].fauna).sort();
 }
 
 // ---------- commands ----------
@@ -812,6 +855,7 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (!hex) fail(`${k} is not on the map.`);
   if (hex.terrain === 'ocean') fail(`${k} is ocean; nothing is built on the ocean.`);
   if (g.buildings[k]) fail(`${k} already has a building.`);
+  if (hex.fauna) fail(`A ${FAUNA[hex.fauna].name} holds ${k}: clear it with your dragons first.`);
   if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${def.terrain}; ${k} is ${hex.terrain}.`);
   if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} doesn't touch any of your buildings.`);
   return k;
@@ -823,7 +867,7 @@ export function buildableHexes(g: Game, p: number, type: string): string[] {
   const out = new Set<string>();
   for (const [k] of ownedBuildings(g, p)) {
     for (const n of neighbors(k)) {
-      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
+      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && !g.map[n].fauna && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
     }
   }
   return [...out].sort();
@@ -945,6 +989,16 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const b = g.buildings[k];
       return log(g, `${pname(p)} adds ${UPGRADES[c.key].name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}.`, { k: 'upgrade', p, u: c.key, name: UPGRADES[c.key].name, on: b.type, hex: k });
     }
+    case 'clear': {
+      const coords = parseKey(args[0] ?? '');
+      const k = coords ? key(...coords) : '';
+      if (!g.map[k]?.fauna) fail(`There is no fauna at "${args[0] ?? ''}". Fauna is at: ${faunaOnMap(g).join(' ') || 'nowhere'}.`);
+      const ids = [...new Set(args.slice(1))];
+      if (!ids.length) fail(`Send at least one dragon: clear ${k} d1 d4`);
+      const ds = ids.map((id) => ownDragon(g, p, id));
+      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, unhurt, and not sitting out the round).`);
+      return clearFauna(g, p, k, ds);
+    }
     case 'project': {
       const what = args[0] ?? '';
       const el = ELEMENTS.find((e) => e === what);
@@ -999,12 +1053,25 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
+          if (d.resting === 'hunted') fail(`${d.id} fought fauna this round, so it sits out the raids anyway.`);
           if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
           if (d.resting === 'hurt') d.resting = '';
           ev.d = d.id;
           what = `heals ${d.id}, ready to raid`;
+          break;
+        }
+        case 'send_fauna': {
+          const coords = parseKey(args[1] ?? '');
+          const k = coords ? key(...coords) : '';
+          if (!faunaHexes(g).includes(k)) fail(`Say where to put the ${FAUNA[def.fauna!].name}: a land hex without fauna or a tower, like "play ${c.id} 2,-1".`);
+          pay(pl, def.cost);
+          g.map[k].fauna = def.fauna!;
+          ev.hex = k;
+          ev.fauna = def.fauna!;
+          const b = g.buildings[k];
+          what = `puts a ${FAUNA[def.fauna!].name} on ${k}${b ? `, on ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}`;
           break;
         }
         case 'extra_raid':
@@ -1018,7 +1085,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
     }
   }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, bank, offer, accept, decline, cancel, end.`);
+  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, bank, offer, accept, decline, cancel, end.`);
 }
 
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {

@@ -36,6 +36,8 @@ export const TUNING = {
   towerDragonCapacity: 1,
   // The base-egg special project costs this many times the base dragon card.
   specialProjectMultiplier: 2,
+  // The starting map has one fauna for every this many land hexes (src/map.ts).
+  landHexesPerFauna: 8,
 };
 
 // A building's class is what upgrades and other buildings' effects refer to.
@@ -132,12 +134,13 @@ export const UPGRADES: Record<string, UpgradeDef> = {
   trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 2, crystal: 1 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
 
-export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point';
+export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';
 
 export interface ActionDef {
   name: string;
   effect: ActionEffect;
   amount?: number;
+  fauna?: string; // send_fauna: which beast, a FAUNA key
   cost: Bundle;
   text: string;
   copies: number;
@@ -150,6 +153,10 @@ export const ACTIONS: Record<string, ActionDef> = {
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Heal one of your hurt dragons so it can raid this round.', copies: 3 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'This round has one more raid.', copies: 3 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
+  // Sabotage, kept rare and dear (the owner: "a bit of this just like in
+  // catan, you just don't want to over do it").
+  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 1, gold: 2 }, text: 'Put a Wolf Pack on any land hex but a tower.', copies: 2 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 2, gold: 3 }, text: 'Put a Cave Bear on any land hex but a tower.', copies: 1 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';
@@ -261,6 +268,23 @@ export const UNITS: Record<string, UnitDef> = {
   storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, strong: ['air', 'lightning'], weak: ['ice'] },
   sea_serpent: { name: 'Sea Serpent', hp: 14, targets: 2, dice: 1, sides: 4, strong: ['water', 'fire'], weak: ['lightning'] },
 };
+
+// Aggressive fauna: wild beasts on the map. A hex with fauna can't be built
+// on, and a building under it produces nothing. A player's dragons clear it
+// in the same combat as a raid; the beast's loot goes to that player.
+// Kept apart from UNITS: these are not raid defenders.
+export interface FaunaDef extends UnitDef {
+  loot: Bundle;
+}
+
+export const FAUNA: Record<string, FaunaDef> = {
+  wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, strong: [], weak: ['fire'], loot: { livestock: 2 } },
+  cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, strong: ['ice'], weak: ['lightning'], loot: { livestock: 4 } },
+  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, strong: ['fire', 'lightning'], weak: ['water', 'ice'], loot: { livestock: 6 } },
+};
+// On the starting map, a beast's kind goes by its distance to the nearest
+// tower: wolves close in, the basilisk furthest out.
+export const FAUNA_BY_DISTANCE = ['wolf_pack', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
 
 export interface TargetDef {
   name: string;

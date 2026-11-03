@@ -7,6 +7,7 @@
 // nothing extra. The card frame around the art lives in phone.ts and style.css.
 
 import { ELEMENT_COLORS, TERRAIN_COLORS } from './common.ts';
+import { iconShapes } from './icons.ts';
 
 type Pt = [number, number];
 
@@ -614,6 +615,13 @@ const ACTIONS: Record<string, () => string> = {
     + f([[48, 45], [52, 43], [57, 51], [53, 53]], '#e9b84a', 0) + f([[64, 39], [68, 38], [70, 47], [66, 47]], '#e9b84a', -0.05)
     + f([[26, 66], [30, 62], [36, 66], [32, 70]], '#e9b84a', 0)
     + `<path d="M98 20 L106 14 M100 30 L110 30 M98 40 L106 46" stroke="#fff1c4" stroke-width="2" stroke-linecap="square"/>`, '#ff7a59'),
+  // The fauna cards: the beast they send, big, called up out of the night.
+  wolf_call: () => actionScene(
+    f(poly(92, 20, 9, 12), '#f6efd8', 0.2) + f(poly(95, 18, 7, 12), '#33285a', 0)
+    + `<g transform="translate(60 46) scale(2.4)">${iconShapes('wolf_pack')}</g>`, '#9aa0a8'),
+  rouse_bear: () => actionScene(
+    f([[26, 76], [34, 40], [60, 26], [86, 40], [94, 76], [80, 76], [76, 48], [60, 40], [44, 48], [40, 76]], '#6d6a63', 0.05)
+    + `<g transform="translate(60 54) scale(2.2)">${iconShapes('cave_bear')}</g>`, '#c48a52'),
   secret_hoard: () => actionScene(
     f([[40, 74], [36, 58], [46, 42], [60, 40], [56, 56], [52, 74]], '#b58a5a', 0.1) + f([[52, 74], [56, 56], [60, 40], [74, 42], [84, 58], [80, 74]], '#b58a5a', -0.15)
     + f([[48, 40], [56, 34], [64, 36], [72, 34], [72, 42], [48, 42]], '#9c7448', 0.05)

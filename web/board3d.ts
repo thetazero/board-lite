@@ -332,8 +332,8 @@ function crystal(h: number, color = '#c3aefc'): THREE.Mesh {
 function decor(h: HexView, seaward: number): THREE.Group {
   const r = rng(h.k);
   const g = new THREE.Group();
-  const built = !!h.building;
-  // Spots around the hex: the middle is kept for a building.
+  const built = !!h.building || !!h.fauna;
+  // Spots around the hex: the middle is kept for a building or a beast.
   const spot = (min: number, max: number): [number, number] => {
     const a = r() * Math.PI * 2, d = min + r() * (max - min);
     return [Math.cos(a) * d, Math.sin(a) * d];
@@ -382,7 +382,7 @@ function decor(h: HexView, seaward: number): THREE.Group {
         for (let i = -1; i <= 1; i++) field.add(part(cyl(0.06, 0.06, 0.9 - Math.abs(i) * 0.25, 3), mix(TERRAIN_COLORS.plains, '#b8913f', 0.45), { at: [0, 0.035, i * 0.2], rot: [0, 0, Math.PI / 2] }));
         place(field, [0, 0], spin);
         if (r() < 0.5) place(part(cone(0.14, 0.24, 6), '#d6ad55', { at: [0, 0.12, 0] }), spot(0.45, 0.6));
-      } else if (h.building!.type !== 'tower') {
+      } else if (h.building?.type !== 'tower') {
         place(part(cone(0.1, 0.17, 6), '#d6ad55', { at: [0, 0.085, 0] }), rim());
       }
       break;
@@ -605,6 +605,73 @@ function roost(): THREE.Group {
     g.add(part(box(0.22, 0.02, 0.02), '#c48a52', { at: [Math.cos(a) * 0.5, ROOST_TOP + 0.06, Math.sin(a) * 0.5], rot: [0, -a + 0.6, 0.3], crease: false }));
   }
   return g;
+}
+
+// ---------- the fauna ----------
+// Wild beasts holding hexes, folded like everything else: chunky shapes that
+// read from the TV's tilted camera. Each faces +x; the board turns it.
+
+const WOLF = '#9aa0a8', WOLF_DARK = '#5d626c', WOLF_LIGHT = '#e4e1da';
+function wolf(): THREE.Group {
+  const g = group(
+    part(box(0.36, 0.15, 0.15), WOLF, { at: [0, 0.21, 0] }),
+    part(box(0.13, 0.17, 0.17), WOLF_LIGHT, { at: [0.14, 0.22, 0], rot: [0, 0, 0.25] }),
+    part(cone(0.085, 0.24, 4), WOLF, { at: [0.3, 0.29, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.3] }),
+    part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, 0.045], rot: [0, 0, -0.2] }),
+    part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, -0.045], rot: [0, 0, -0.2] }),
+    part(cone(0.04, 0.22, 4), WOLF_DARK, { at: [-0.25, 0.25, 0], rot: [0, 0, 1.1] }),
+    part(box(0.03, 0.02, 0.03), '#f2c230', { at: [0.27, 0.33, 0.05], glow: 0.6, crease: false }),
+  );
+  for (const [x, z] of [[0.13, 0.05], [0.13, -0.05], [-0.13, 0.05], [-0.13, -0.05]]) g.add(part(box(0.045, 0.15, 0.045), WOLF_DARK, { at: [x, 0.075, z], crease: false }));
+  return g;
+}
+
+// A pack: three wolves, the leader in front.
+function wolfPack(): THREE.Group {
+  const g = new THREE.Group();
+  for (const [x, z, spin, s] of [[0.12, 0, 0, 1.1], [-0.2, 0.24, 0.35, 0.9], [-0.22, -0.22, -0.3, 0.9]]) {
+    const w = wolf();
+    w.position.set(x, 0, z);
+    w.rotation.y = spin;
+    w.scale.setScalar(s);
+    g.add(w);
+  }
+  return g;
+}
+
+const BEAR = '#8a5a36', BEAR_DARK = '#5e3e26', BEAR_LIGHT = '#d8bc92';
+function caveBear(): THREE.Group {
+  const g = group(
+    part(new THREE.DodecahedronGeometry(0.24, 0), BEAR, { at: [-0.04, 0.3, 0], scale: [1.5, 1.05, 1.1] }),
+    part(new THREE.DodecahedronGeometry(0.16, 0), BEAR, { at: [0.33, 0.38, 0] }),
+    part(box(0.14, 0.1, 0.12), BEAR_LIGHT, { at: [0.47, 0.34, 0] }),
+    part(box(0.05, 0.04, 0.06), DARK, { at: [0.55, 0.37, 0], crease: false }),
+    part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, 0.1] }),
+    part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, -0.1] }),
+  );
+  for (const [x, z] of [[0.2, 0.13], [0.2, -0.13], [-0.25, 0.13], [-0.25, -0.13]]) g.add(part(cyl(0.065, 0.075, 0.2, 5), BEAR_DARK, { at: [x, 0.1, z] }));
+  return g;
+}
+
+const SCALE_GREEN = '#5aa84c', SCALE_DARK = '#3a7a33', CREST = '#e5484d';
+function basilisk(): THREE.Group {
+  const g = group(
+    // A coil on the ground, its neck rising from the front, the head looking out.
+    part(new THREE.TorusGeometry(0.24, 0.085, 4, 10, Math.PI * 1.7), SCALE_DARK, { at: [-0.08, 0.09, 0], rot: [Math.PI / 2, 0, 0.6] }),
+    part(new THREE.TorusGeometry(0.13, 0.07, 4, 8, Math.PI * 1.6), SCALE_GREEN, { at: [-0.08, 0.2, 0], rot: [Math.PI / 2, 0, 2.2] }),
+    part(cyl(0.065, 0.09, 0.42, 5), SCALE_GREEN, { at: [0.2, 0.3, 0], rot: [0, 0, -0.45] }),
+    part(box(0.2, 0.1, 0.13), SCALE_GREEN, { at: [0.33, 0.52, 0], rot: [0, 0, -0.15] }),
+    part(cone(0.07, 0.16, 4), SCALE_DARK, { at: [0.48, 0.49, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.15] }),
+    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, 0.066], glow: 0.8, crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, -0.066], glow: 0.8, crease: false }),
+  );
+  // The crest: red fins down the back of the head and neck.
+  for (const [x, y, h] of [[0.3, 0.6, 0.16], [0.22, 0.5, 0.13], [0.15, 0.38, 0.11]]) g.add(part(cone(0.05, h, 3), CREST, { at: [x, y + h / 2, 0], rot: [0, 0, 0.5], scale: [1, 1, 0.35] }));
+  return g;
+}
+
+function beastModel(key: string): THREE.Group {
+  return key === 'wolf_pack' ? wolfPack() : key === 'cave_bear' ? caveBear() : basilisk();
 }
 
 function nest(): THREE.Mesh {
@@ -1304,6 +1371,7 @@ export class Board3D {
   private tiles = new Map<string, { hex: HexView; decorSig: string }>();
   private decor = new THREE.Group(); // everything growing on the map, merged
   private built = new Map<string, Built>();
+  private beasts = new Map<string, Built>(); // fauna, by hex
   private dragons = new Map<string, DragonEntry>();
   private plateMats = PLAYER_COLORS.map((c) => new THREE.MeshLambertMaterial({ color: c, map: null, flatShading: true }));
   private highlight: number | null = null;
@@ -1359,7 +1427,7 @@ export class Board3D {
     for (const h of g.map) {
       const t = this.tiles.get(h.k)!;
       t.hex = h;
-      const decorSig = h.building ? `b${h.building.type}` : '';
+      const decorSig = h.building ? `b${h.building.type}` : h.fauna ? 'f' : '';
       if (decorSig !== t.decorSig) regrow = true;
       t.decorSig = decorSig;
     }
@@ -1391,6 +1459,22 @@ export class Board3D {
       // Pop up from the page when it's new; a new floor or upgrade pops up too.
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig !== bsig);
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
+    }
+    // Fauna: in the middle of an open hex, or crouched at the front of the
+    // building it shuts down. It folds up like a building when it arrives.
+    for (const h of g.map) {
+      const f = h.fauna;
+      const fsig = f ? `${f.key}|${h.building ? 1 : 0}` : '';
+      const had = this.beasts.get(h.k);
+      if ((had?.sig ?? '') === fsig) continue;
+      if (had) {
+        this.world.remove(had.obj);
+        dispose(had.obj);
+        this.beasts.delete(h.k);
+      }
+      if (!f) continue;
+      const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
+      this.beasts.set(h.k, { sig: fsig, obj, born: animate ? now : -1e9 });
     }
     this.placeDragons(g);
     this.firstUpdate = false;
@@ -1434,6 +1518,25 @@ export class Board3D {
     return g;
   }
 
+  private beastGroup(key: string, onBuilding: boolean, k: string): THREE.Group {
+    const g = new THREE.Group();
+    const model = bake(beastModel(key));
+    const pop = new THREE.Group();
+    const [x, z] = onBuilding ? [0.32, 0.42] : [0, 0.05];
+    pop.position.set(x, onBuilding ? GROUND : TOP, z);
+    model.scale.setScalar(onBuilding ? 0.85 : 1.15);
+    // Three-quarters to the room, half of them looking left.
+    const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
+    model.rotation.y = face;
+    model.userData.face = face;
+    model.userData.seed = hash(k) % 628 / 100;
+    pop.add(model);
+    g.add(pop);
+    g.userData.pop = pop;
+    g.userData.figure = model;
+    return g;
+  }
+
   private buildMap(map: HexView[], sig: string) {
     for (const o of [...this.world.children]) {
       this.world.remove(o);
@@ -1441,6 +1544,7 @@ export class Board3D {
     }
     this.tiles.clear();
     this.built.clear();
+    this.beasts.clear();
     this.dragons.clear();
     this.mapSig = sig;
     const geo = tileGeometry();
@@ -1620,7 +1724,7 @@ export class Board3D {
   private frame() {
     if (document.hidden) return;
     const t = clock();
-    for (const b of this.built.values()) {
+    for (const b of [...this.built.values(), ...this.beasts.values()]) {
       const pop = b.obj.userData.pop as THREE.Group;
       const age = t - b.born;
       if (age < 1.2) {
@@ -1641,6 +1745,11 @@ export class Board3D {
       m.emissiveIntensity = on ? 0.25 + 0.2 * Math.sin(t * 3) : 0;
     });
     for (const c of (this.decor.userData.floaters ?? []) as THREE.Object3D[]) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
+    // Beasts prowl: a slow turn back and forth where they stand.
+    for (const b of this.beasts.values()) {
+      const m = b.obj.userData.figure as THREE.Group;
+      m.rotation.y = m.userData.face + Math.sin(t * 0.5 + m.userData.seed) * 0.25;
+    }
     for (const e of this.dragons.values()) this.animateDragon(e, t);
     this.renderer.render(this.scene, this.camera);
   }

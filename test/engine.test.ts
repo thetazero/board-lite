@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
 import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
-import { BUILDINGS, DRAGONS, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
+import { ACTIONS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
-import { mapRadius, neighbors } from '../src/map.ts';
+import { distance, mapRadius, neighbors } from '../src/map.ts';
 
 // Each round starts with everyone keeping a building card: keep the first.
 function keepAll(g: Game) {
@@ -459,4 +459,95 @@ test('combat power: dragons and kingdoms carry one number, and a side adds up', 
   assert.equal(dragonPower(a), Math.round(Math.sqrt(st.hp * st.targets * st.dice * (st.sides + 1) / 2)));
   assert.equal(targetPower('brindle'), 2 * combatPower(UNITS.militia));
   assert.match(playerView(g, 0), new RegExp(`power ${dragonPower(a)}`));
+});
+
+test('the starting map has fauna, at least 2 steps from every tower, stronger further out', () => {
+  for (let players = 2; players <= 6; players++) {
+    const g = newGame(players, 3);
+    const land = Object.values(g.map).filter((h) => h.terrain !== 'ocean');
+    const fauna = land.filter((h) => h.fauna);
+    assert.equal(fauna.length, Math.round(land.length / TUNING.landHexesPerFauna));
+    for (const h of fauna) {
+      const away = Math.min(...g.towers.map((t) => { const [q, r] = t.split(',').map(Number); return distance(h.q - q, h.r - r); }));
+      assert.ok(away >= 2, `${players}p: fauna ${away} step(s) from a tower`);
+      assert.equal(h.fauna, FAUNA_BY_DISTANCE[Math.min(away - 2, FAUNA_BY_DISTANCE.length - 1)]);
+    }
+  }
+});
+
+// A game where P1's own land is set: a meadow pasture next to the tower, and
+// fauna on the hex beyond it.
+function faunaGame() {
+  const g = newGame(2, 5);
+  keepAll(g);
+  for (const k of Object.keys(g.map)) delete g.map[k].fauna;
+  rich(g, 0);
+  rich(g, 1);
+  const [near, beyond] = neighbors(g.towers[0]).filter((k) => g.map[k] && g.map[k].terrain !== 'ocean');
+  g.map[near].terrain = 'meadow';
+  g.map[beyond].terrain = 'meadow';
+  return { g, near, beyond };
+}
+
+test('fauna blocks building on its hex, and a building under it produces nothing', () => {
+  const { g, near, beyond } = faunaGame();
+  g.map[beyond].fauna = 'wolf_pack';
+  assert.throws(() => apply(g, 0, `build pasture ${beyond}`), RuleError);
+  apply(g, 0, `build pasture ${near}`);
+  assert.equal(production(g, 0).livestock.dice.length, 1);
+  g.map[near].fauna = 'cave_bear';
+  assert.equal(production(g, 0).livestock.dice.length, 0);
+  assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock);
+});
+
+test('clearing fauna: any player may, the loot is theirs, and those dragons sit out the raids', () => {
+  const { g, near } = faunaGame();
+  apply(g, 0, `build pasture ${near}`);
+  g.map[near].fauna = 'wolf_pack'; // on P1's pasture
+  apply(g, 0, 'end');
+  assert.throws(() => apply(g, 1, `clear ${g.towers[0]} d2`), RuleError); // no fauna there
+  assert.throws(() => apply(g, 1, `clear ${near}`), RuleError); // no dragons sent
+  // P2 clears it with an adult that can't lose to wolves (a refused command
+  // restores the game, so the dragon is looked up after those).
+  const d = g.dragons.find((x) => x.owner === 1)!;
+  d.stage = 3;
+  d.key = 'frost_wyrm';
+  const before = g.players[1].resources.livestock;
+  apply(g, 1, `clear ${near} ${d.id}`);
+  assert.equal(g.map[near].fauna, undefined);
+  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf_pack.loot.livestock!);
+  assert.equal(d.resting, 'hunted');
+  assert.throws(() => apply(g, 1, `clear ${near} ${d.id}`), RuleError); // one fight a round
+  const ev = g.log.map((e) => e.ev).filter((e) => e?.k === 'cleared');
+  assert.ok(ev.some((e) => e?.k === 'cleared' && e.won && e.p === 1));
+  apply(g, 1, 'end');
+  for (const p of waitingOn(g)) apply(g, p, 'vote 1');
+  assert.throws(() => apply(g, 1, `commit ${d.id}`), RuleError);
+});
+
+test('a lost fight leaves the beast at full health on its hex', () => {
+  const { g, beyond } = faunaGame();
+  g.map[beyond].fauna = 'basilisk';
+  const d = g.dragons.find((x) => x.owner === 0)!;
+  d.stage = 1; // a hatchling can't beat a basilisk
+  apply(g, 0, `clear ${beyond} ${d.id}`);
+  assert.equal(g.map[beyond].fauna, 'basilisk');
+  assert.equal(d.damage, DRAGONS[d.key].stages[0].hp); // knocked out
+});
+
+test('fauna cards put a beast on any land hex but a tower, shutting down a building', () => {
+  const { g, near } = faunaGame();
+  apply(g, 0, `build pasture ${near}`);
+  apply(g, 0, 'end');
+  const card = { id: 'c999', deck: 'action' as const, key: 'wolf_call' };
+  g.players[1].hand.push(card);
+  assert.throws(() => apply(g, 1, `play c999 ${g.towers[0]}`), RuleError);
+  const ocean = Object.keys(g.map).find((k) => g.map[k].terrain === 'ocean')!;
+  assert.throws(() => apply(g, 1, `play c999 ${ocean}`), RuleError);
+  const gold = g.players[1].resources.gold;
+  apply(g, 1, `play c999 ${near}`);
+  assert.equal(g.map[near].fauna, 'wolf_pack');
+  assert.equal(g.players[1].resources.gold, gold - ACTIONS.wolf_call.cost.gold!);
+  assert.equal(production(g, 0).livestock.dice.length, 0);
+  assert.ok(!g.players[1].hand.includes(card));
 });
