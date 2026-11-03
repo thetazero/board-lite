@@ -76,9 +76,13 @@ Living design doc. Decisions here were made in conversation with the project own
 ## Raids
 
 - Each raid phase has one raid candidate (a single neutral target).
-- Each player privately chooses to commit dragons to the raid or not. Players don't know for sure whether anyone else commits.
-- After everyone has committed or not, a "bail out" button appears.
-- Loot is split evenly.
+- The raid has two phases:
+  1. Public commit: everyone knows exactly who is committing what. Once everyone hits ready, the commitments lock in.
+  2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.
+- Bailing costs nothing except that you get no share of the loot.
+- Loot is split evenly (among those who play).
+- Targets have units with stats and with elemental strengths and weaknesses.
+- On a lost raid, each dragon's flee strength is rolled against the defenders' chase strength. A dragon that fails to flee is out healing for a number of rounds, scaled by how badly it lost the roll.
 - Action cards can add another raid phase.
 - No retaliation and no defense buildings.
 
@@ -86,7 +90,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
-- Dragons: what elements do in raids; how players get dragon cards.
-- Raids: what players see before deciding to commit or bail (the target's strength? who or how much committed?); what happens to a failed raid and to dragons in it; whether bailing costs anything; what elements do in raids; when the raid phase falls in a turn.
+- Dragons: how players get dragon cards.
+- Raids: how a raid is won (how dragon and unit stats and elements combine with dice); what a raid's loot is; when the raid phase falls in a turn.
 - Action cards: what they do.
 - Player count and game length.
