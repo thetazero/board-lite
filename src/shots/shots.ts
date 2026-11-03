@@ -85,8 +85,10 @@ function findChrome(): string {
   return found;
 }
 
+// Each run gets its own profile, so two runs at once (from two worktrees) don't
+// collide on Chrome's profile lock. It's deleted when Chrome exits.
 async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
-  const profile = join(CACHE, 'chrome-profile');
+  const profile = join(CACHE, `chrome-profile-${process.pid}`);
   mkdirSync(profile, { recursive: true });
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
@@ -95,6 +97,11 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  proc.on('exit', () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch { /* Chrome's helpers may still be writing; a leftover profile is harmless */ }
+  });
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
