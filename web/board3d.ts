@@ -1,5 +1,5 @@
-// The TV's board in 3D: a pop-up book. The hex map is cut from coloured card
-// and lies on an open book; buildings are folded paper models that pop up when
+// The TV's board in 3D, in folded paper: each hex is a creased sheet of coloured
+// paper, set in an origami tray; buildings are folded paper models that pop up when
 // they're built; dragons are origami, live at home (their tower, a roost or a
 // hatchery) and now and then take off and circle it.
 //
@@ -22,11 +22,16 @@ declare global {
 }
 
 const SQ3 = Math.sqrt(3);
-const TILE_H = 0.2; // card thickness of a hex
-const TILE_LIFT = 0.05; // the fold up to the middle of a hex
-const TOP = TILE_H + TILE_LIFT * 0.5; // where things stand on a hex
+const TILE_H = 0.07; // paper thickness of a hex
+const TILE_LIFT = 0.1; // how high its folds rise to the middle
+const TOP = TILE_H + TILE_LIFT * 0.6; // where things stand on a hex
 const PLATE_H = 0.05;
 const GROUND = TOP + PLATE_H; // where a building stands on its plate
+// The camera looks down at the board from the room's side, this far above the
+// table (radians; 1.13 is about 65 degrees): the owner asked for "a slight tilt"
+// from top-down. Lower shows more of the models' fronts and
+// sides; straight down would flatten them.
+const CAMERA_TILT = 1.13;
 
 // Paper colours. Terrain is the phone map's colours, so the two maps match.
 const WALL = '#f1e8d4';
@@ -83,12 +88,13 @@ function paperTexture(): THREE.Texture {
   x.fillRect(0, 0, 256, 256);
   const r = rng('paper');
   for (let i = 0; i < 2200; i++) {
-    const v = 225 + Math.floor(r() * 30);
-    x.fillStyle = `rgba(${v},${v - 4},${v - 10},${0.25 + r() * 0.3})`;
-    x.fillRect(r() * 256, r() * 256, 1 + r() * 3, 1 + r() * 3);
+    const v = 205 + Math.floor(r() * 50);
+    x.fillStyle = `rgba(${v},${v - 5},${v - 14},${0.3 + r() * 0.4})`;
+    x.fillRect(r() * 256, r() * 256, 2 + r() * 6, 2 + r() * 6);
   }
-  x.strokeStyle = 'rgba(150,135,110,.10)';
-  for (let i = 0; i < 160; i++) {
+  x.strokeStyle = 'rgba(140,120,90,.2)';
+  x.lineWidth = 1.5;
+  for (let i = 0; i < 220; i++) {
     const px = r() * 256, py = r() * 256, a = r() * Math.PI;
     x.beginPath();
     x.moveTo(px, py);
@@ -153,37 +159,72 @@ function sheet(points: [number, number, number][], tris: number[][]): THREE.Buff
   return g;
 }
 
-// A hex cut from card, its top folded up a little to a point in the middle.
-function tileGeometry(): THREE.BufferGeometry {
+// A hex folded from a sheet of paper: twelve facets that crease up to a peak
+// in the middle and down along each corner, so the light picks out the folds.
+// Its cut edges (the sides) are the paper's paler core.
+function tileGeometry(): { top: THREE.BufferGeometry; sides: THREE.BufferGeometry } {
   const R = 0.965;
-  const pos: number[] = [];
-  const uv: number[] = [];
-  const corner = (i: number) => {
+  const corner = (i: number, r = R) => {
     const a = (Math.PI / 180) * (60 * i - 30);
-    return new THREE.Vector3(R * Math.cos(a), 0, R * Math.sin(a));
+    return new THREE.Vector3(r * Math.cos(a), 0, r * Math.sin(a));
   };
-  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, out: THREE.Vector3) => {
-    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
-    const [p, q, s] = n.dot(out) >= 0 ? [a, b, c] : [a, c, b];
-    for (const v of [p, q, s]) {
-      pos.push(v.x, v.y, v.z);
-      uv.push(v.x * 0.35 + v.y * 0.35, v.z * 0.35);
+  const build = (tris: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3][]) => {
+    const pos: number[] = [];
+    const uv: number[] = [];
+    for (const [a, b, c, out] of tris) {
+      const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+      for (const v of n.dot(out) >= 0 ? [a, b, c] : [a, c, b]) {
+        pos.push(v.x, v.y, v.z);
+        uv.push(v.x * 0.5 + v.y * 0.5, v.z * 0.5);
+      }
     }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.computeVertexNormals();
+    return g;
   };
-  const top = new THREE.Vector3(0, TILE_H + TILE_LIFT, 0);
+  const up = new THREE.Vector3(0, 1, 0);
+  const peak = new THREE.Vector3(0, TILE_H + TILE_LIFT, 0);
+  const top: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3][] = [];
+  const sides: typeof top = [];
   for (let i = 0; i < 6; i++) {
-    const p = corner(i), q = corner(i + 1);
-    const pt = p.clone().setY(TILE_H), qt = q.clone().setY(TILE_H);
-    tri(top, pt, qt, new THREE.Vector3(0, 1, 0));
-    const out = p.clone().add(q).normalize();
-    tri(pt, p, q, out);
-    tri(pt, q, qt, out);
+    const p = corner(i).setY(TILE_H), q = corner(i + 1).setY(TILE_H);
+    // Mountain folds to the middle of each edge, valley folds to the corners.
+    const mid = p.clone().add(q).multiplyScalar(0.5).setY(TILE_H + TILE_LIFT * 0.45);
+    top.push([peak, p, mid, up], [peak, mid, q, up]);
+    const out = p.clone().add(q).setY(0).normalize();
+    const pb = p.clone().setY(0), qb = q.clone().setY(0);
+    sides.push([p, pb, mid, out], [mid, pb, qb, out], [mid, qb, q, out]);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.computeVertexNormals();
-  return g;
+  return { top: build(top), sides: build(sides) };
+}
+
+// An origami tray the map sits in: a paper floor with its six walls folded up
+// and out, and a narrow rim folded flat along their tops.
+function trayGeometry(corners: THREE.Vector3[], wall: number, rim: number): { floor: THREE.BufferGeometry; walls: THREE.BufferGeometry } {
+  const quad = (out: number[], a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => {
+    for (const v of [a, b, c, a, c, d]) out.push(v.x, v.y, v.z);
+  };
+  const floor: number[] = [];
+  const walls: number[] = [];
+  const center = new THREE.Vector3();
+  const lift = (v: THREE.Vector3, by: number, outBy: number) => v.clone().add(v.clone().setY(0).normalize().multiplyScalar(outBy)).setY(by);
+  for (let i = 0; i < 6; i++) {
+    const a = corners[i], b = corners[(i + 1) % 6];
+    for (const v of [center, b, a]) floor.push(v.x, v.y, v.z);
+    const at = lift(a, wall, wall * 0.55), bt = lift(b, wall, wall * 0.55);
+    quad(walls, a, b, bt, at);
+    quad(walls, at, bt, lift(b, wall, wall * 0.55 + rim), lift(a, wall, wall * 0.55 + rim));
+  }
+  const geo = (pos: number[]) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(pos.flatMap((_, i) => (i % 3 === 1 ? [] : [pos[i] * 0.6])), 2));
+    g.computeVertexNormals();
+    return g;
+  };
+  return { floor: geo(floor), walls: geo(walls) };
 }
 
 // Merges a model's pieces into one mesh per material and one set of crease
@@ -743,8 +784,8 @@ export class Board3D {
     GRAIN ??= paperTexture();
     this.plateMats.forEach((m) => (m.map = GRAIN));
 
-    this.scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 1.25));
-    this.sun = new THREE.DirectionalLight('#fff1dc', 2.9);
+    this.scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 0.95));
+    this.sun = new THREE.DirectionalLight('#fff1dc', 3.4);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0005;
@@ -855,11 +896,13 @@ export class Board3D {
     for (const h of map) {
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
-      tiles.add(part(geo, mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12), { at: [x, (r() - 0.5) * 0.03, z] }));
+      const color = mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12);
+      const at: [number, number, number] = [x, (r() - 0.5) * 0.02, z];
+      tiles.add(part(geo.top, color, { at }), part(geo.sides, mix(color, '#fbf6ea', 0.6), { at, crease: false }));
       this.tiles.set(h.k, { hex: h, decorSig: '-' });
     }
     this.world.add(bake(tiles));
-    // The open book the map is pasted into.
+    // The map's extent, for the tray, the shadows and the camera.
     this.bounds.makeEmpty();
     for (const h of map) {
       const [x, z] = hexXZ(h.q, h.r);
@@ -872,21 +915,23 @@ export class Board3D {
     });
     const size = this.bounds.getSize(new THREE.Vector3());
     const center = this.bounds.getCenter(new THREE.Vector3());
-    const w = size.x + 2.4, d = size.z + 1.6;
-    const pageMat = '#e8dcc2';
-    for (const s of [-1, 1]) {
-      const page = part(box(w / 2, 0.12, d), pageMat, { at: [center.x + s * w / 4, -0.07 + 0.04, center.z], rot: [0, 0, s * 0.012], crease: false });
-      page.castShadow = false;
-      this.world.add(page);
-      // Stacked page edges.
-      const edge = part(box(w / 2 - 0.1, 0.1, d - 0.12), '#e3d6bb', { at: [center.x + s * (w / 4 - 0.02), -0.16, center.z], crease: false });
-      edge.castShadow = false;
-      this.world.add(edge);
-    }
-    const cover = part(box(w + 0.5, 0.08, d + 0.4), '#7a2f2a', { at: [center.x, -0.25, center.z], crease: false });
-    cover.castShadow = false;
-    this.world.add(cover);
-    this.world.add(part(box(0.05, 0.02, d), '#d9caa8', { at: [center.x, -0.005, center.z], crease: false })); // the gutter
+    // The origami tray: a big hexagon round the map's six corner hexes.
+    const far = map.reduce((m, h) => Math.max(m, Math.hypot(...hexXZ(h.q, h.r))), 0);
+    const corners = Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i;
+      return new THREE.Vector3(center.x + Math.cos(a) * (far + 1.35), 0, center.z + Math.sin(a) * (far + 1.35));
+    });
+    const tray = trayGeometry(corners.map((c) => c.clone().sub(new THREE.Vector3(center.x, 0, center.z))), 0.45, 0.25);
+    const floor = part(tray.floor, '#efe5cf', { at: [center.x, -0.01, center.z] });
+    floor.castShadow = false;
+    const walls = part(tray.walls, '#e9dec5', { at: [center.x, -0.01, center.z], two: true });
+    this.world.add(floor, walls);
+    // The table under it catches the tray's shadow; otherwise it's the page behind.
+    const table = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.35 }));
+    table.rotation.x = -Math.PI / 2;
+    table.position.set(center.x, -0.02, center.z);
+    table.receiveShadow = true;
+    this.world.add(table);
 
     const r = Math.max(size.x, size.z);
     this.sun.position.set(center.x - r * 0.45, r * 1.1, center.z + r * 0.55);
@@ -977,7 +1022,7 @@ export class Board3D {
     this.camera.aspect = w / h;
     // Look down at the board from the room's side, as close as fits it all.
     const center = this.bounds.isEmpty() ? new THREE.Vector3() : this.bounds.getCenter(new THREE.Vector3());
-    const dir = new THREE.Vector3(0, Math.sin(0.76), Math.cos(0.76));
+    const dir = new THREE.Vector3(0, Math.sin(CAMERA_TILT), Math.cos(CAMERA_TILT));
     const corners = this.fitPoints;
     const fits = (dist: number) => {
       this.camera.position.copy(center).addScaledVector(dir, dist);
