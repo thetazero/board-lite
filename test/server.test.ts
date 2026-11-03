@@ -20,22 +20,14 @@ const run = promisify(execFile);
 const cli = (...args: string[]) => run(process.execPath, ['src/cli.ts', ...args]).then((r) => r.stdout, (e) => `${e.stdout}${e.stderr}`);
 
 test('phones can play a whole game through a room, and see only their own hand', async () => {
-  const room = new Room('TEST', { fleeSeconds: 0.02, dir });
+  const room = new Room('TEST', { dir });
   const seats = ['Ada', 'Bram', 'Cora'].map((n) => room.join(n));
   assert.throws(() => room.start(seats[1].token), RoomError, 'only the first player or the TV starts');
   room.start(seats[0].token, 11);
   const g = room.game!;
   const rng = { state: 5 };
   let steps = 0;
-  let timedOutFlees = 0;
   while (g.phase !== 'over' && steps++ < 20000) {
-    // Nobody ever answers the flee question: the room's clock must answer "stay".
-    if (g.phase === 'raid' && g.raid!.step === 'flee') {
-      const round = g.raid!.combatRound;
-      await sleep(40);
-      if (g.raid?.combatRound !== round || g.raid?.step !== 'flee') timedOutFlees++;
-      continue;
-    }
     const p = waitingOn(g)[0];
     for (const cmd of candidateCommands(g, p, rng)) {
       try {
@@ -64,12 +56,11 @@ test('phones can play a whole game through a room, and see only their own hand',
   const end = room.snapshot(seats[0].token);
   assert.equal(end.game!.winner, g.winner);
   assert.equal(end.game!.finalTotals!.length, 3);
-  assert.ok(timedOutFlees > 0, 'some flee decisions were made by the clock');
   room.close();
 });
 
 test('a room of bots plays itself to the end', async () => {
-  const room = new Room('BOTS', { botDelayMs: 0, fleeSeconds: 5, dir });
+  const room = new Room('BOTS', { botDelayMs: 0, dir });
   room.addBot();
   room.addBot();
   room.start(room.hostToken, 3);

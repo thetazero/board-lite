@@ -13,7 +13,7 @@
 // what changed since the previous run.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -26,8 +26,7 @@ const CACHE = join(homedir(), '.cache', 'board-lite', 'staged-shots'); // on dis
 const TV = { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false };
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true };
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
-const FLEE_LEFT_MS = 7000; // the flee clock reads 7s
-const LAN = { lan: ['192.168.1.20'], tailscale: [], port: 8080 }; // the address the TV shows
+const LAN = { lan: ['192.168.1.20'], tailscale: [] as string[], port: 8080 }; // the address the TV shows
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -87,16 +86,26 @@ function findChrome(): string {
 }
 
 async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
-  const profile = join(CACHE, 'chrome-profile');
-  mkdirSync(profile, { recursive: true });
+  // A profile of its own, so runs from several worktrees at once don't collide.
+  mkdirSync(CACHE, { recursive: true });
+  const profile = mkdtempSync(join(CACHE, 'chrome-profile-'));
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
     '--force-color-profile=srgb', '--font-render-hinting=none',
     '--use-angle=swiftshader', '--enable-unsafe-swiftshader', // WebGL for the TV's 3D board, on the CPU
+    '--disable-gpu-rasterization', // the rest of the page rasterized in software, the same every run
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  // Chrome's GPU process can still be writing its shader cache as Chrome exits: retry.
+  proc.on('exit', () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    } catch (e) {
+      console.error(`Couldn't remove Chrome's profile ${profile}: ${(e as Error).message}`);
+    }
+  });
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
@@ -226,7 +235,7 @@ function makeRoom(staged: Staged, code: string): Room {
   if (staged.game) {
     mkdirSync(join(CACHE, 'rooms'), { recursive: true });
     save(file, staged.game);
-    room = new Room(code, { file, fleeSeconds: 1e6 });
+    room = new Room(code, { file });
     room.seats.forEach((s, i) => Object.assign(s, { name: NAMES[i], kind: 'player' }));
   } else {
     room = new Room(code, { file });
@@ -235,8 +244,7 @@ function makeRoom(staged: Staged, code: string): Room {
     for (let i = 0; i < lobby!.bots; i++) room.addBot();
   }
   room.seats.forEach((s) => (s.seen = Number.MAX_SAFE_INTEGER)); // nobody shows as away
-  room.changed(); // starts the flee clock if it's running, then fix what it reads
-  if (room.fleeDeadline !== null) room.fleeDeadline = FROZEN_NOW + FLEE_LEFT_MS;
+  room.changed();
   return room;
 }
 

@@ -3,8 +3,8 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, esc, hpBar,
-  mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, buildingIcon, dieFace, dragonBadge, dragonChip, elemIcon, esc, hpBar,
+  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 import { Board3D } from './board3d.ts';
 
@@ -37,7 +37,6 @@ async function boot() {
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
   watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
-  setInterval(tickClock, 250);
 }
 
 function onSnapshot(s: Snapshot) {
@@ -83,7 +82,7 @@ function renderLobby() {
   app.innerHTML = `
     <div class="lobby">
       <h1 class="title">board-lite</h1>
-      <p class="subtitle">Wizards raise dragons. First to 15 points wins.</p>
+      <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
       <div class="join-box">
         <div>On your phone, open</div>
         <div class="url">${esc(joinUrl())}</div>
@@ -114,17 +113,9 @@ function phaseLabel(g: PublicState): string {
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
 }
 
-function dragonChip(d: DragonView, compact = false): string {
-  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
-  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
-  const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
-  const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
-}
-
 function prodChips(prod: Record<string, { base: number; dice: number[] }>): string {
   return RESOURCES.filter((r) => prod[r].base || prod[r].dice.length)
-    .map((r) => `<span class="chip">${resIcon(r, 18)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
+    .map((r) => `<span class="chip">${resIcon(r, 1.2)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
     .join('');
 }
 
@@ -141,14 +132,14 @@ function renderGame(g: PublicState) {
         <div class="phead">
           <span class="pname">${esc(names[i])}${seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
           ${waiting.has(i) && g.phase !== 'over' ? '<span class="thinking">deciding…</span>' : ''}
-          <span class="pts"><b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
+          <span class="pts">${icon('points', 1.5)}<b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
         </div>
-        <div class="prow"><span class="cards">${p.handSize} cards</span>${prodChips(p.production)}</div>
+        <div class="prow"><span class="chip cards" title="cards in hand">${icon('cards', 1.25)}${p.handSize}</span>${prodChips(p.production)}</div>
         ${titles ? `<div class="prow">${titles}</div>` : ''}
         <div class="dragons">${dragons}</div>
       </div>`;
   }).join('');
-  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${esc(o.give)}</b> for <b>${esc(o.get)}</b></li>`).join('');
+  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} → ${playerTag(o.to, names)}: gives <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b></li>`).join('');
   const titles = g.titles.map((t) => `<li><b>${esc(t.name)}</b>: ${t.holder === null ? 'nobody' : playerTag(t.holder, names)} <small>(${t.values.join(' / ')})</small></li>`).join('');
   const log = g.log.slice(-7).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
@@ -171,7 +162,7 @@ function renderGame(g: PublicState) {
       <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
       <aside class="side">
         ${players}
-        ${many ? '' : `<div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>`}
+        ${many ? '' : `<div class="panel"><h3>Titles <small>(${iconText('2 points')} each)</small></h3><ul>${titles}</ul></div>`}
         ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       </aside>
       <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
@@ -195,13 +186,13 @@ function targetCard(t: TargetView, extra = ''): string {
   const units = t.units.map((u) => `
     <div class="unit${u.hp <= 0 ? ' down' : ''}">
       <b>${esc(u.name)}</b> ${hpBar(u.hp, u.maxHp)} <span class="hp">${u.hp}/${u.maxHp}</span>
-      <small>hits ${esc(u.attack)} · chase ${u.chase}${u.weak.length ? ` · <span class="weak">weak: ${u.weak.map(elem).join(' ')}</span>` : ''}${u.strong.length ? ` · <span class="strong">resists: ${u.strong.map(elem).join(' ')}</span>` : ''}</small>
+      <small>hits ${esc(u.attack)}${u.weak.length ? ` · <span class="weak">weak: ${u.weak.map(elem).join(' ')}</span>` : ''}${u.strong.length ? ` · <span class="strong">resists: ${u.strong.map(elem).join(' ')}</span>` : ''}</small>
     </div>`).join('');
-  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">Loot ${resChips(t.loot, 22)} <small>split among the winners</small></div></div>`;
+  return `<div class="target">${extra}<h2>${esc(t.name)}</h2>${units}<div class="loot">Loot ${resChips(t.loot, 1.4)} <small>split among the winners</small></div></div>`;
 }
 
 function elem(e: string): string {
-  return `<span class="elem" style="--ec:${ELEMENT_COLORS[e]}">${e}</span>`;
+  return elemIcon(e, 1.25);
 }
 
 function check(done: boolean): string {
@@ -227,26 +218,8 @@ function renderRaid(g: PublicState) {
     const rows = names.flatMap((_, p) => (raid.commits[p].length ? [`<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id))).join('')} ${check(raid.decided[p])}</li>`] : [])).join('');
     body = `<h1>Fight or bail?</h1><p class="sub">Each committed player chooses in secret on their phone.</p>
       <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
-  } else {
-    const fighters = raid.fighters.map((id) => {
-      const d = dragonById(id);
-      return `<div class="fighter" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<div><b>${esc(d.name)}</b> <small>${esc(names[d.owner])}</small><br>${hpBar(d.hp, d.maxHp)} ${d.hp}/${d.maxHp}</div></div>`;
-    }).join('');
-    const combat = g.log.filter((e) => /^Combat round|flees|bails!|^Fighting:/.test(e.text)).slice(-4).map((e) => `<li>${named(e.text, names, g.dragons)}${e.dice ? ` ${e.dice.map((d) => dieFace(d.sides, d.value)).join('')}` : ''}</li>`).join('');
-    const deciding = names.flatMap((_, p) => (raid.fighting[p] ? [`${playerTag(p, names)} ${check(raid.fleeDecided[p])}`] : [])).join(' ');
-    body = `<h1>Battle for ${esc(raid.target!.name)} <small>round ${raid.combatRound}</small></h1>
-      <div class="battle"><div class="side-d">${fighters}</div><div class="vs">VS</div>${targetCard(raid.target!)}</div>
-      <ul class="combatlog">${combat}</ul>
-      <div class="status">Stay or flee? <span id="clock" class="clock"></span> ${deciding}</div>`;
   }
   el.innerHTML = `<div class="raidbox">${body}</div>`;
-  tickClock();
-}
-
-function tickClock() {
-  const c = document.getElementById('clock');
-  const dl = snap?.lobby.fleeDeadline;
-  if (c && dl) c.textContent = `${Math.max(0, Math.ceil((dl - Date.now()) / 1000))}s`;
 }
 
 // Short banners for things that just happened, shown one after another: the
@@ -258,7 +231,14 @@ let bannerUp = false;
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
   for (const e of fresh) {
-    if (/falls!|holds\.|Everyone bailed|Nobody commits/.test(e.text)) {
+    if (/^Fighting:/.test(e.text)) {
+      // There is no retreat, so the whole fight resolves at once: replay it.
+      const rounds = fresh.filter((x) => x.i > e.i && x.round === e.round && /^Combat round/.test(x.text));
+      const rows = rounds.map((x) => `<li>${named(x.text, names, g.dragons)}</li>`).join('');
+      const end = fresh.find((x) => x.i > e.i && /falls!|holds\./.test(x.text));
+      banners.push({ html: `<div class="result"><h2>${named(e.text, names, g.dragons)}</h2><ul class="combatlog">${rows}</ul>${end ? `<h1>${named(end.text, names, g.dragons)}</h1>` : ''}</div>`, ms: 5000 + 1500 * rounds.length });
+    }
+    if (/Everyone bailed|Nobody commits/.test(e.text)) {
       banners.push({ html: `<div class="result"><h1>${named(e.text, names, g.dragons)}</h1></div>`, ms: 5000 });
     }
     if (/^=== Round \d+ ===$/.test(e.text)) {
@@ -279,7 +259,7 @@ function updateOverlay(g: PublicState) {
     const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
     el.className = 'overlay end';
     el.innerHTML = `<div class="endbox"><h1>${playerTag(g.winner!, names)} wins!</h1>
-      <ol>${order.map(([t, p]) => `<li>${playerTag(p, names)} <b>${t}</b> points <small>(${g.players[p].publicPoints} on the board, ${t - g.players[p].publicPoints} hidden)</small></li>`).join('')}</ol>
+      <ol>${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip"><b>${t}</b>${icon('points', 1.8)}</span> <small>(${g.players[p].publicPoints} on the board, ${t - g.players[p].publicPoints} hidden)</small></li>`).join('')}</ol>
       <button class="primary" id="again">New game</button></div>`;
     $('again').onclick = () => (location.href = '/tv');
     return;

@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import type { DragonView, HexView, PublicState } from '../src/state.ts';
-import { ELEMENT_COLORS, PLAYER_COLORS, RESOURCE_COLORS, TERRAIN_COLORS } from './common.ts';
+import { ELEMENT_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
 
 declare global {
   interface Window {
@@ -38,6 +38,7 @@ const DARK = '#3a302b';
 const GOLD = '#e7b43f';
 const SNOW = '#fbf8f1';
 const LEAF = ['#3f6f3d', '#4c7f45', '#35603a'];
+const GOODS = ['#c6cad0', '#b97a44', '#b88bff', '#f5c542']; // stone, timber, crystal, gold, as in icons.ts
 
 const clock = () => window.boardClock ?? performance.now() / 1000;
 
@@ -519,7 +520,7 @@ function market(pc: string): THREE.Group {
   awning.rotation.x = 0.32;
   g.add(awning);
   // Goods on the counter, in the resources' colours.
-  ['stone', 'timber', 'crystal', 'gold'].forEach((res, i) => g.add(part(box(0.1, 0.08, 0.1), RESOURCE_COLORS[res], { at: [-0.24 + i * 0.16, 0.28, 0.08] })));
+  GOODS.forEach((c, i) => g.add(part(box(0.1, 0.08, 0.1), c, { at: [-0.24 + i * 0.16, 0.28, 0.08] })));
   g.add(part(box(0.16, 0.16, 0.16), WOOD, { at: [0.28, 0.08, 0.42], rot: [0, 0.4, 0] }));
   g.add(part(cyl(0.08, 0.08, 0.18, 8), WOOD_DARK, { at: [-0.3, 0.09, 0.42] }));
   return g;

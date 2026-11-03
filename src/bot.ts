@@ -34,7 +34,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
         if (a.effect === 'gain_gold' || a.effect === 'extra_raid') out.push(`play ${c.id}`);
         const growable = mine.filter((d) => d.stage < 3);
         if (a.effect === 'grow_dragon' && growable.length) out.push(`play ${c.id} ${pick(rng, growable).id}`);
-        const hurt = mine.filter((d) => d.damage > 0);
+        const hurt = mine.filter((d) => d.damage > 0 || d.resting === 'hurt');
         if (a.effect === 'heal_dragon' && hurt.length) out.push(`play ${c.id} ${pick(rng, hurt).id}`);
       }
     }
@@ -62,8 +62,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
     return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
   }
-  if (raid.step === 'bail') return [next(rng) < 0.85 ? 'fight' : 'bail'];
-  return [next(rng) < 0.2 ? 'flee all' : 'stay'];
+  return [next(rng) < 0.85 ? 'fight' : 'bail'];
 }
 
 // Makes one move for one waiting player. Returns the command it applied.

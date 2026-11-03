@@ -17,7 +17,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - The full rules, not counting individual card text, fit on one printed page.
 - 5 resources (stone, timber, crystal, livestock, gold). No more.
 - 4 phases per global round. No more.
-- At most 10 building types and 6 upgrade types.
+- No cap on building or upgrade types. The owner, 2026-11-03: "the 10 building limit is stupid and the exact opposite of what I want, I want lots of fun variety." (The 6-upgrade cap went with it, as an orchestrator call in the same spirit.) Variety comes as many cards within a few classes.
 - At most 12 distinct non-dragon action card effects.
 - A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
 - At most 6 raid unit types, each just stats plus elemental strengths and weaknesses.
@@ -83,6 +83,12 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   1. Building cards.
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
 - Costs: upgrades skew gold-heavy; raw builds skew resource-heavy.
+- Building cards should be special and interesting (owner, 2026-11-03, after playing: "I basically always have too many building cards, and they don't feel fun or meaningful"):
+  - The basic production buildings are not cards; anyone can build them.
+  - Building cards are "special and more interesting, like buildings that scale with number of neighbors of a certain class, regardless of what team they are on. generally adjacency limited."
+  - Lots of variety: "I want lots of fun variety."
+  - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
+  - Drawing: "draw two keep 1 is the correct direction".
 - Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
 ### Special projects
@@ -119,7 +125,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
 - Loot is split evenly (among those who play; see Combat for fled dragons).
 - Targets have units with stats and with elemental strengths and weaknesses.
-- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost.
+- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost. *(Provisionally removed: the secret bail is the only way out of a raid. Reasoning in the pull request for issue #5.)*
 
 ### Combat
 
@@ -128,7 +134,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - Targeting is simple and automatic; the rule is printed on the dragon card (e.g. lowest health, strongest attacker, random, a unit weak to my element).
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
-- After each round of combat, players get 10 seconds to choose whether to roll to flee.
+- After each round of combat, players get 10 seconds to choose whether to roll to flee. *(Provisionally removed with fleeing, above.)*
 - Healing: healing time scales with health lost, measured in global rounds. Typically it's one round; only a fully mature dragon that took a lot of damage is out longer.
 - Loot is split evenly among players whose dragons were still fighting at the end.
 - Loot is gold plus resources, skewed heavily toward gold.
@@ -195,8 +201,8 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a points and a dragon building.
 - Special projects cost double the card: the four production buildings, a roost, or a base egg of any element.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing is 8 health per round; any damage keeps a dragon out of raids. Dragons never die: at 0 health they are knocked out and heal at home.
-- Combat: dragons strike first, then each defender hits random dragons. Fleeing is d6 + dragon speed against d6 + the best defender chase; losing costs 2 damage per point.
+- Healing: every dragon heals fully at production, but one that was hurt (or went hungry) sits out that round: no growth, no raid. Any hit in a raid costs a round, however big the dragon. Dragons never die: at 0 health they are knocked out and heal at home.
+- Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Loot is rounded down per player; the remainder is lost.
 - The bank sells gold at the normal rate.
@@ -204,4 +210,3 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
-- The 10-second flee timer is left to the clients; the CLI waits for every choice. The web server runs it: anyone undecided when it runs out stays.

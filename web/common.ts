@@ -2,6 +2,7 @@
 // and the hex map. Plain DOM, no framework; the server strips the types.
 
 import type { DragonView, HexView, Res, Snapshot } from '../src/state.ts';
+import { icon } from './icons.ts';
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
@@ -9,7 +10,6 @@ export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35b
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e' };
 export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Ley line', meadow: 'Meadow', plains: 'Plains' };
 export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#cfd8dc', water: '#2f8fff' };
-export const RESOURCE_COLORS: Record<string, string> = { stone: '#9aa0a6', timber: '#a0673a', crystal: '#b07cff', livestock: '#e9e4d4', gold: '#f5c542' };
 
 // ---------- server ----------
 
@@ -52,7 +52,7 @@ export function esc(s: string): string {
 // The engine's log is written for the CLI: players are P1, P2..., dragons and
 // cards have ids. The clients show names instead and drop the ids.
 export function named(text: string, names: string[], dragons: DragonView[] = []): string {
-  return esc(text)
+  return iconText(esc(text))
     .replace(/ \((?:c|o|d)\d+\)/g, '')
     .replace(/\boffer o\d+/g, 'the offer')
     .replace(/^Offer o\d+ expires\./, 'An open offer expires.')
@@ -70,24 +70,33 @@ export function playerTag(i: number, names: string[]): string {
   return `<span class="ptag" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i] ?? `P${i + 1}`)}</span>`;
 }
 
-// ---------- icons (inline SVG, drawn on a -10..10 box) ----------
+// ---------- icons ----------
 
-const RES_ICON: Record<string, string> = {
-  stone: '<path d="M-7 4 L-5 -4 L2 -7 L7 -2 L6 5 L-1 7 Z" />',
-  timber: '<rect x="-8" y="-4" width="14" height="8" rx="2"/><ellipse cx="6" cy="0" rx="3" ry="4" fill="#d9a066"/>',
-  crystal: '<path d="M0 -8 L6 -2 L0 8 L-6 -2 Z"/><path d="M-6 -2 L6 -2 L0 8 Z" fill-opacity=".35" fill="#000"/>',
-  livestock: '<circle cx="-3" cy="0" r="4"/><circle cx="2" cy="-2" r="4"/><circle cx="3" cy="2" r="4"/><circle cx="-6" cy="-3" r="2.5" fill="#333"/>',
-  gold: '<circle r="7"/><circle r="4.5" fill="none" stroke="#a37b12" stroke-width="1.5"/>',
-};
+export { icon } from './icons.ts';
 
-export function resIcon(r: string, size = 18): string {
-  return `<svg class="ricon" width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${RESOURCE_COLORS[r]}">${RES_ICON[r]}</svg>`;
+export function resIcon(r: string, size = 1.25): string {
+  return icon(r, size);
+}
+
+export function elemIcon(e: string, size = 1.25): string {
+  return icon(e, size);
 }
 
 // "2 stone, 1 gold" as icons. Empty bundles read "free".
-export function resChips(b: Res, size = 18): string {
+export function resChips(b: Res, size = 1.25): string {
   const parts = RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `<span class="chip">${b[r]}${resIcon(r, size)}</span>`);
   return parts.join('') || '<span class="chip free">free</span>';
+}
+
+// Game text (the log, card rules, offers) with the things it names over and
+// over drawn as icons: "gains 3 livestock" reads "gains 3" and a sheep. Takes
+// text that is already escaped HTML.
+const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b/g;
+const POINTS_WORD = /\b(\d+) (?:more )?points?\b/g;
+export function iconText(html: string, size = 1.2): string {
+  return html
+    .replace(RES_WORD, (_, n, r) => `<span class="tchip">${n ?? ''}${icon(r, size)}</span>`)
+    .replace(POINTS_WORD, (m, n) => `<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`);
 }
 
 export const BUILDING_ICON: Record<string, string> = {
@@ -122,6 +131,23 @@ export function dragonBadge(d: DragonView, size = 30): string {
     <path d="M-9 -2 L-3 -7 L-2 0 Z"/><path d="M9 -2 L3 -7 L2 0 Z"/>
     <path d="M0 -6 C4 -6 5 -1 4 3 L2 8 L0 6 L-2 8 L-4 3 C-5 -1 -4 -6 0 -6 Z"/>
     <circle cx="-1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/><circle cx="1.8" cy="-1.5" r="0.9" fill="#111" stroke="none"/></g></svg>`;
+}
+
+// A dragon with its stage, growth, health and why it is staying home, if it is.
+export function dragonChip(d: DragonView, compact = false): string {
+  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
+  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
+  const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
+  const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
+  return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
+}
+
+// A round's income of one resource the way the table says it: "+2 +3d6",
+// "−1 +1d6". Dice of the same size are counted together.
+export function incomeText(x: { base: number; dice: number[] }): string {
+  const parts = x.base || !x.dice.length ? [x.base < 0 ? `−${-x.base}` : `+${x.base}`] : [];
+  for (const s of [...new Set(x.dice)].sort((a, b) => b - a)) parts.push(`+${x.dice.filter((d) => d === s).length}d${s}`);
+  return parts.join(' ');
 }
 
 export function hpBar(hp: number, max: number): string {
