@@ -21,12 +21,8 @@ export const TUNING = {
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
   livestockPerDragon: 1,
-  healPerRound: 8,
   dragonPointsByStage: [0, 1, 2, 4], // egg, hatchling, young, adult
   titlePoints: 2,
-  // Damage a dragon takes per point it loses a flee roll by.
-  fleeDamagePerPoint: 2,
-  fleeDie: 6,
   raidCandidates: 3,
   towerDragonCapacity: 1,
   // Special projects cost this many times the equivalent card's cost.
@@ -119,9 +115,7 @@ export interface Attack {
   dice: number;
   sides: number;
 }
-export interface DragonStage extends Attack {
-  speed: number; // added to the flee roll
-}
+export type DragonStage = Attack;
 
 export interface DragonDef {
   name: string;
@@ -135,9 +129,9 @@ export interface DragonDef {
 }
 
 const baseStages: [DragonStage, DragonStage, DragonStage] = [
-  { hp: 6, targets: 1, dice: 1, sides: 6, speed: 1 },
-  { hp: 12, targets: 1, dice: 2, sides: 6, speed: 2 },
-  { hp: 20, targets: 2, dice: 2, sides: 6, speed: 2 },
+  { hp: 6, targets: 1, dice: 1, sides: 6 },
+  { hp: 12, targets: 1, dice: 2, sides: 6 },
+  { hp: 20, targets: 2, dice: 2, sides: 6 },
 ];
 
 function baseDragon(element: Element, name: string): DragonDef {
@@ -152,61 +146,60 @@ export const DRAGONS: Record<string, DragonDef> = {
   water_whelp: baseDragon('water', 'Tide Whelp'),
   ember_wyrm: {
     name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
-    stages: [{ hp: 7, targets: 1, dice: 1, sides: 8, speed: 1 }, { hp: 14, targets: 1, dice: 2, sides: 8, speed: 1 }, { hp: 24, targets: 2, dice: 3, sides: 8, speed: 1 }],
+    stages: [{ hp: 7, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 1, dice: 2, sides: 8 }, { hp: 24, targets: 2, dice: 3, sides: 8 }],
   },
   cinder_drake: {
     name: 'Cinder Drake', element: 'fire', growthTime: 2, targeting: 'lowest_health', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6, speed: 2 }, { hp: 11, targets: 2, dice: 1, sides: 6, speed: 2 }, { hp: 18, targets: 3, dice: 1, sides: 8, speed: 3 }],
+    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 11, targets: 2, dice: 1, sides: 6 }, { hp: 18, targets: 3, dice: 1, sides: 8 }],
   },
   frost_wyrm: {
     name: 'Frost Wyrm', element: 'ice', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
-    stages: [{ hp: 9, targets: 1, dice: 1, sides: 6, speed: 0 }, { hp: 17, targets: 1, dice: 2, sides: 6, speed: 0 }, { hp: 30, targets: 1, dice: 3, sides: 8, speed: 1 }],
+    stages: [{ hp: 9, targets: 1, dice: 1, sides: 6 }, { hp: 17, targets: 1, dice: 2, sides: 6 }, { hp: 30, targets: 1, dice: 3, sides: 8 }],
   },
   rime_drake: {
     name: 'Rime Drake', element: 'ice', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6, speed: 1 }, { hp: 12, targets: 1, dice: 2, sides: 6, speed: 2 }, { hp: 20, targets: 2, dice: 2, sides: 8, speed: 2 }],
+    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 12, targets: 1, dice: 2, sides: 6 }, { hp: 20, targets: 2, dice: 2, sides: 8 }],
   },
   storm_wyrm: {
     name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
-    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4, speed: 2 }, { hp: 12, targets: 3, dice: 1, sides: 6, speed: 2 }, { hp: 20, targets: 4, dice: 1, sides: 8, speed: 3 }],
+    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 20, targets: 4, dice: 1, sides: 8 }],
   },
   bolt_drake: {
     name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 8, speed: 3 }, { hp: 10, targets: 1, dice: 2, sides: 8, speed: 3 }, { hp: 16, targets: 1, dice: 3, sides: 8, speed: 4 }],
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 8 }, { hp: 10, targets: 1, dice: 2, sides: 8 }, { hp: 16, targets: 1, dice: 3, sides: 8 }],
   },
   sky_wyrm: {
     name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
-    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6, speed: 3 }, { hp: 13, targets: 2, dice: 1, sides: 8, speed: 4 }, { hp: 22, targets: 2, dice: 2, sides: 8, speed: 5 }],
+    stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 2, dice: 1, sides: 8 }, { hp: 22, targets: 2, dice: 2, sides: 8 }],
   },
   zephyr_drake: {
     name: 'Zephyr Drake', element: 'air', growthTime: 1, targeting: 'random', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 4, speed: 4 }, { hp: 9, targets: 1, dice: 1, sides: 8, speed: 5 }, { hp: 14, targets: 2, dice: 1, sides: 8, speed: 6 }],
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 4 }, { hp: 9, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 2, dice: 1, sides: 8 }],
   },
   abyss_wyrm: {
     name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 3, livestock: 1, gold: 1 }, copies: 1,
-    stages: [{ hp: 8, targets: 1, dice: 1, sides: 8, speed: 1 }, { hp: 16, targets: 2, dice: 1, sides: 8, speed: 1 }, { hp: 28, targets: 2, dice: 2, sides: 8, speed: 2 }],
+    stages: [{ hp: 8, targets: 1, dice: 1, sides: 8 }, { hp: 16, targets: 2, dice: 1, sides: 8 }, { hp: 28, targets: 2, dice: 2, sides: 8 }],
   },
   reef_drake: {
     name: 'Reef Drake', element: 'water', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 3, livestock: 1 }, copies: 1,
-    stages: [{ hp: 7, targets: 1, dice: 1, sides: 6, speed: 2 }, { hp: 13, targets: 1, dice: 2, sides: 6, speed: 2 }, { hp: 21, targets: 2, dice: 2, sides: 6, speed: 3 }],
+    stages: [{ hp: 7, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 1, dice: 2, sides: 6 }, { hp: 21, targets: 2, dice: 2, sides: 6 }],
   },
 };
 
 export interface UnitDef extends Attack {
   name: string;
-  chase: number; // added to the defenders' roll when a dragon flees
   strong: Element[]; // takes half damage from these
   weak: Element[]; // takes double damage from these
 }
 
 // Defenders attack a random dragon still in the fight.
 export const UNITS: Record<string, UnitDef> = {
-  militia: { name: 'Militia', hp: 5, targets: 1, dice: 1, sides: 4, chase: 1, strong: [], weak: ['fire'] },
-  archers: { name: 'Archers', hp: 6, targets: 1, dice: 1, sides: 6, chase: 3, strong: ['water'], weak: ['air'] },
-  knights: { name: 'Knights', hp: 12, targets: 1, dice: 1, sides: 8, chase: 2, strong: ['fire'], weak: ['lightning'] },
-  frost_golem: { name: 'Frost Golem', hp: 16, targets: 1, dice: 1, sides: 6, chase: 0, strong: ['ice', 'water'], weak: ['fire'] },
-  storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, chase: 4, strong: ['air', 'lightning'], weak: ['ice'] },
-  sea_serpent: { name: 'Sea Serpent', hp: 14, targets: 2, dice: 1, sides: 4, chase: 2, strong: ['water', 'fire'], weak: ['lightning'] },
+  militia: { name: 'Militia', hp: 5, targets: 1, dice: 1, sides: 4, strong: [], weak: ['fire'] },
+  archers: { name: 'Archers', hp: 6, targets: 1, dice: 1, sides: 6, strong: ['water'], weak: ['air'] },
+  knights: { name: 'Knights', hp: 12, targets: 1, dice: 1, sides: 8, strong: ['fire'], weak: ['lightning'] },
+  frost_golem: { name: 'Frost Golem', hp: 16, targets: 1, dice: 1, sides: 6, strong: ['ice', 'water'], weak: ['fire'] },
+  storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, strong: ['air', 'lightning'], weak: ['ice'] },
+  sea_serpent: { name: 'Sea Serpent', hp: 14, targets: 2, dice: 1, sides: 4, strong: ['water', 'fire'], weak: ['lightning'] },
 };
 
 export interface TargetDef {
@@ -220,8 +213,8 @@ export const TARGETS: Record<string, TargetDef> = {
   archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'militia'], loot: { gold: 5, timber: 2 } },
   knightsgate: { name: 'Knightsgate', units: ['knights', 'knights'], loot: { gold: 7, stone: 2 } },
   frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'archers'], loot: { gold: 7, crystal: 2 } },
-  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin'], loot: { gold: 9 } },
-  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'knights'], loot: { gold: 9, livestock: 2 } },
+  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 12 } },
+  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'knights'], loot: { gold: 12, livestock: 3 } },
 };
 
 // Share of each terrain on the generated map.

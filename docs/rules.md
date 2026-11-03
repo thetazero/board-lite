@@ -8,7 +8,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 ## A round: four phases
 
-1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each production building gives its base amount plus its own die (e.g. a quarry: 1 + d3 stone). Then hurt dragons heal 8 health, and every dragon eats 1 livestock: a fed dragon grows one step (plus one per hatchery you own); a hungry one doesn't grow and can't raid this round. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
+1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each production building gives its base amount plus its own die (e.g. a quarry: 1 + d3 stone). Then hurt dragons heal half their full health (so a knocked-out dragon sits out the next round's raid), and every dragon eats 1 livestock: a fed dragon grows one step (plus one per hatchery you own); a hungry one doesn't grow and can't raid this round. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
 2. **Cards** (all at once). Draw 2 building cards and 1 action card. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
    - **Build** a building card on an empty hex touching one of your buildings (production buildings need their terrain; tower floors stack on your tower). One building per hex.
@@ -20,8 +20,8 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 4. **Raid** (all at once). Repeat once per War Horn played this round.
    - **Vote**: three random kingdoms are shown; everyone secretly votes; ties are a coin flip.
    - **Commit**: everyone publicly commits raid-ready dragons (hatched, fed, unhurt) and can change their mind until they say ready. When everyone is ready, commitments lock.
-   - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot.
-   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. After each round, every player with dragons in the fight chooses for each to **stay** or **flee**: a fleeing dragon rolls d6 + speed against d6 + the best chase among living defenders; it leaves either way, and if it loses, it takes 2 damage per point it lost by.
+   - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat.
+   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot evenly (rounded down).
 
 **End of round.** Anyone over 7 cards discards down to 7. If anyone has 15 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).

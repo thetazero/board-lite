@@ -65,6 +65,9 @@ test('votes and fight-or-bail choices stay secret until revealed', () => {
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
   apply(g, 1, 'fight');
   assert.ok(playerView(g, 1, 1000).includes('P1 bails!'));
+  // There is no retreat: the fight plays out to the end with no more choices.
+  assert.equal(g.raid, null);
+  assert.match(playerView(g, 1, 1000), /falls!|holds\./);
 });
 
 test('illegal moves are refused without changing the game', () => {

@@ -50,7 +50,7 @@ export interface Offer {
 }
 
 export interface Raid {
-  step: 'vote' | 'commit' | 'bail' | 'flee';
+  step: 'vote' | 'commit' | 'bail';
   candidates: string[];
   votes: (number | null)[];
   target: string | null;
@@ -59,8 +59,6 @@ export interface Raid {
   choices: ('fight' | 'bail' | null)[];
   units: { key: string; hp: number }[];
   fighters: string[];
-  flee: (string[] | null)[];
-  combatRound: number;
 }
 
 export interface LogEntry {
@@ -351,7 +349,9 @@ function startRound(g: Game) {
   }
   // Dragons heal, then eat and grow.
   for (const d of g.dragons) {
-    d.damage = Math.max(0, d.damage - TUNING.healPerRound);
+    // A hurt dragon heals half its health each round, so a knocked-out one
+    // misses exactly the next round's raid.
+    if (d.stage > 0) d.damage = Math.max(0, d.damage - Math.ceil(stageStats(d)!.hp / 2));
     const pl = g.players[d.owner];
     d.fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (!d.fed) {
@@ -426,8 +426,6 @@ function startRaid(g: Game) {
     choices: Array(n).fill(null),
     units: [],
     fighters: [],
-    flee: Array(n).fill(null),
-    combatRound: 0,
   };
   log(g, `Raid phase: vote for a target among ${g.raid.candidates.map((t, i) => `${i + 1}. ${TARGETS[t].name}`).join(', ')}.`);
 }
@@ -506,7 +504,8 @@ function resolveBail(g: Game) {
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
   log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`);
-  combatRound(g);
+  // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
+  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, round);
 }
 
 function rollAttack(g: Game, a: Attack): number {
@@ -544,9 +543,8 @@ function knockedOut(g: Game, d: Dragon): boolean {
   return true;
 }
 
-function combatRound(g: Game) {
+function combatRound(g: Game, round: number) {
   const raid = g.raid!;
-  raid.combatRound++;
   const lines: string[] = [];
   // Dragons strike first.
   for (const id of raid.fighters) {
@@ -574,11 +572,7 @@ function combatRound(g: Game) {
       lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${knockedOut(g, d) ? ' (knocked out, limps home)' : ''}`);
     }
   }
-  log(g, `Combat round ${raid.combatRound}: ${lines.join('; ')}.`);
-  if (checkRaidOver(g)) return;
-  raid.step = 'flee';
-  raid.flee = g.players.map((_, p) => (raid.fighters.some((id) => dragonById(g, id).owner === p) ? null : []));
-  log(g, `Defenders left: ${unitsText(g)}. Players with dragons in the fight choose to flee or stay.`);
+  log(g, `Combat round ${round}: ${lines.join('; ')}.`);
 }
 
 export function unitsText(g: Game): string {
@@ -603,27 +597,6 @@ function checkRaidOver(g: Game): boolean {
     return true;
   }
   return false;
-}
-
-function resolveFlee(g: Game) {
-  const raid = g.raid!;
-  const chase = Math.max(...raid.units.filter((u) => u.hp > 0).map((u) => UNITS[u.key].chase));
-  for (const ids of raid.flee) {
-    for (const id of ids ?? []) {
-      const d = dragonById(g, id);
-      const mine = roll(g.rng, TUNING.fleeDie) + stageStats(d)!.speed;
-      const theirs = roll(g.rng, TUNING.fleeDie) + chase;
-      raid.fighters = raid.fighters.filter((x) => x !== id);
-      if (mine >= theirs) {
-        log(g, `${pname(d.owner)}'s ${d.id} flees cleanly (${mine} vs ${theirs}).`);
-      } else {
-        const dmg = (theirs - mine) * TUNING.fleeDamagePerPoint;
-        d.damage = Math.min(stageStats(d)!.hp, d.damage + dmg);
-        log(g, `${pname(d.owner)}'s ${d.id} flees but is caught (${mine} vs ${theirs}) and takes ${dmg} damage${d.damage >= stageStats(d)!.hp ? ', limping home knocked out' : ''}.`);
-      }
-    }
-  }
-  if (!checkRaidOver(g)) combatRound(g);
 }
 
 // ---------- commands ----------
@@ -911,19 +884,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
     raid.choices[p] = verb as 'fight' | 'bail';
     log(g, `You choose to ${verb}.`, [p]);
     if (raid.commits.every((c, q) => !c.length || raid.choices[q])) resolveBail(g);
-    return;
   }
-  // flee
-  if (raid.flee[p] !== null) fail(`You have nothing to decide right now.`);
-  if (verb === 'stay') raid.flee[p] = [];
-  else if (verb === 'flee') {
-    const mine = raid.fighters.filter((id) => dragonById(g, id).owner === p);
-    const ids = args.length === 0 || args[0] === 'all' ? mine : args;
-    for (const id of ids) if (!mine.includes(id)) fail(`${id} isn't one of your dragons in the fight.`);
-    raid.flee[p] = [...new Set(ids)];
-  } else fail(`Choose "stay", "flee all", or "flee d3".`);
-  log(g, `You choose to ${verb} ${raid.flee[p]!.join(' ')}.`.replace(' .', '.'), [p]);
-  if (raid.flee.every((f) => f !== null)) resolveFlee(g);
 }
 
 function discardCommand(g: Game, p: number, verb: string, args: string[]) {
@@ -985,6 +946,5 @@ export function waitingOn(g: Game): number[] {
   const raid = g.raid!;
   if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null);
   if (raid.step === 'commit') return all.filter((p) => !raid.ready[p]);
-  if (raid.step === 'bail') return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
-  return all.filter((p) => raid.flee[p] === null);
+  return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
 }
