@@ -87,10 +87,10 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .phead { display: flex; align-items: baseline; gap: .6em; }
 .pname { font-size: 1.35em; font-weight: 800; color: var(--pc); }
 .thinking { color: var(--accent); font-size: .85em; animation: pulse 1.4s infinite; }
-.pts { margin-left: auto; font-size: 1.1em; }
+.pts { margin-left: auto; font-size: 1.1em; display: inline-flex; align-items: center; gap: .15em; }
 .pts b { font-size: 1.7em; }
 .prow { display: flex; align-items: center; flex-wrap: wrap; gap: .2em; margin-top: .15em; }
-.cards { color: var(--muted); margin-right: .7em; }
+.chip.cards { color: var(--muted); margin-right: .7em; }
 .title-badge { background: #3b3214; color: var(--accent); border: 1px solid #6b5a1f; border-radius: 6px; padding: 0 .4em; font-size: .85em; margin-right: .3em; }
 .dragons { display: flex; flex-wrap: wrap; gap: .3em .8em; margin-top: .25em; }
 .dchip { display: flex; align-items: center; gap: .3em; font-size: .85em; line-height: 1.15; }
@@ -172,13 +172,14 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .plobby p { margin: 0; }
 .swatch { height: 2.4em; border-radius: 12px; background: var(--pc); }
 .plobby .seats { font-size: 1em; }
-.me { display: flex; align-items: baseline; padding: .6em 1em; background: color-mix(in srgb, var(--pc) 30%, var(--panel)); border-bottom: 3px solid var(--pc); position: sticky; top: 0; z-index: 5; }
+.mehead { position: sticky; top: 0; z-index: 5; box-shadow: 0 4px 10px #0007; }
+.me { display: flex; align-items: center; padding: .6em 1em; background: color-mix(in srgb, var(--pc) 30%, var(--panel)); border-bottom: 3px solid var(--pc); }
 .me .pname { font-size: 1.3em; }
-.me .pts { font-weight: 800; font-size: 1.1em; }
+.me .pts { font-weight: 800; font-size: 1.3em; margin-left: auto; display: inline-flex; align-items: center; gap: .25em; }
 .resbar { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--panel); padding: .4em .3em; text-align: center; }
-.res { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.res { display: flex; align-items: center; justify-content: center; gap: .2em; }
 .res b { font-size: 1.4em; }
-.res small { font-size: .7em; }
+.res.zero { opacity: .45; }
 .phone .status { margin: 0; font-size: 1.05em; padding: .6em 1em; background: var(--panel2); justify-content: flex-start; }
 .phone .status.you { background: #3b3214; color: var(--accent); font-weight: 800; font-size: 1.25em; }
 .pbody { padding: .7em; display: flex; flex-direction: column; gap: .6em; }
@@ -208,7 +209,14 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .proj b { min-width: 7em; }
 .proj button { margin-left: auto; }
 .proj.dim b { opacity: .5; }
-.elembtn { border-color: var(--ec); color: var(--ec); text-transform: capitalize; font-weight: 700; }
+.elembtn { border-color: var(--ec); }
+.iconbtn { padding: .3em .5em; line-height: 0; }
+.iconbtn.on { background: color-mix(in srgb, var(--accent) 25%, var(--panel2)); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.respick { display: flex; gap: .3em; flex-wrap: wrap; }
+.bankrow { display: flex; align-items: center; gap: .6em; margin-bottom: .4em; }
+.bankrow > span { min-width: 2.4em; font-weight: 700; }
+#bankgo { display: inline-flex; align-items: center; gap: .3em; }
+#bankgo .chip { margin: 0; }
 .bank { display: flex; align-items: center; flex-wrap: wrap; gap: .4em; margin-bottom: .5em; }
 .stepper { display: inline-flex; align-items: center; gap: .3em; }
 .stepper button { padding: .15em .6em; font-weight: 800; }
@@ -249,3 +257,7 @@ body.phone { padding-bottom: 3.6em; }
 .talkbar form select { max-width: 7.5em; }
 .talkbar form input { flex: 1; min-width: 0; }
 .join-box .alt { color: var(--muted); margin-top: -.3em; }
+
+/* Icons inside game text ("gains 3" and a sheep): no gap after them. */
+.tchip { display: inline-flex; align-items: center; gap: .1em; font-weight: 700; white-space: nowrap; vertical-align: bottom; }
+.ricon { flex: none; }

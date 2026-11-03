@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, dragonBadge, esc, hpBar, mapSvg, named, playerTag, post, resChips, resIcon, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, dragonBadge, elemIcon, esc, hpBar, icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 
 type Me = SeatState & { name: string };
@@ -167,14 +167,17 @@ function bind(sel: string, fn: (el: HTMLElement) => unknown) {
 }
 
 function header(g: PublicState, me: Me): string {
-  const res = RESOURCES.map((r) => `<div class="res"><span>${resIcon(r, 26)}</span><b>${me.resources[r]}</b><small>${r}</small></div>`).join('');
+  const res = RESOURCES.map((r) => `<div class="res${me.resources[r] ? '' : ' zero'}">${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div>`).join('');
   const pts = me.hiddenPoints ? `${me.totalPoints} <small>(${me.hiddenPoints} secret)</small>` : `${me.totalPoints}`;
+  // Name, points and resources stay on screen together while the page scrolls.
   return `
-    <header class="me" style="--pc:${PLAYER_COLORS[me.seat]}">
-      <span class="pname">${esc(me.name)}</span>
-      <span class="pts">${pts} <small>/ ${g.pointsToWin} pts</small></span>
-    </header>
-    <div class="resbar">${res}</div>`;
+    <div class="mehead" style="--pc:${PLAYER_COLORS[me.seat]}">
+      <header class="me">
+        <span class="pname">${esc(me.name)}</span>
+        <span class="pts">${icon('points', 1.4)}${pts} <small>/ ${g.pointsToWin}</small></span>
+      </header>
+      <div class="resbar">${res}</div>
+    </div>`;
 }
 
 function status(g: PublicState, me: Me): string {
@@ -206,10 +209,10 @@ function render() {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => o.to === me.seat).map((o) => `
-    <div class="offer in">${playerTag(o.from, names)} offers <b>${esc(o.give)}</b> for your <b>${esc(o.get)}</b>
+    <div class="offer in">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> for your <b>${iconText(esc(o.get))}</b>
       <div class="row"><button class="primary" data-accept="${o.id}">Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
-    <div class="offer out">You offer ${playerTag(o.to, names)} <b>${esc(o.give)}</b> for <b>${esc(o.get)}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
+    <div class="offer out">You offer ${playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
   const tabs = `<nav class="tabs">
     <button data-tab="hand" class="${tab === 'hand' ? 'on' : ''}">Hand (${me.hand.length})</button>
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build &amp; bank</button>` : ''}
@@ -225,9 +228,9 @@ function cardHtml(c: CardView, playable: boolean): string {
   const kindLabel = { building: 'Building', upgrade: 'Upgrade', action: 'Action', dragon: 'Dragon egg' }[c.kind];
   let actions = '';
   if (open && playable) {
-    if (c.blocked) actions = `<p class="blocked">${esc(c.blocked)}</p>`;
+    if (c.blocked) actions = `<p class="blocked">${iconText(esc(c.blocked))}</p>`;
     else if (!c.affordable) actions = `<p class="blocked">You can't afford it yet.</p>`;
-    else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button data-play="${c.id} ${r}">${resIcon(r)} ${r}</button>`).join('')}</div>`;
+    else if (c.needs === 'resource') actions = `<div class="row">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn" data-play="${c.id} ${r}" aria-label="${r}">${resIcon(r, 1.9)}</button>`).join('')}</div>`;
     else if (c.needs === 'dragon') actions = `<div class="row">${c.dragons.map((id) => `<button data-play="${c.id} ${id}">${esc(dragonLabel(id))}</button>`).join('')}</div>`;
     else if (c.needs === 'hex') actions = `<button class="primary" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Choose a building' : 'Choose where to build'}</button>`;
     else if (c.kind === 'building') actions = `<button class="primary" data-build="${c.id}">Build it</button>`;
@@ -237,7 +240,7 @@ function cardHtml(c: CardView, playable: boolean): string {
   return `<div class="card k-${c.kind}${open ? ' open' : ''}${dim}${selected.has(c.id) ? ' picked' : ''}" data-card="${c.id}">
     <div class="ctop"><b>${esc(c.name)}</b><span class="cost">${resChips(c.cost)}</span></div>
     <div class="ckind">${kindLabel}</div>
-    ${open || !playable ? `<p class="ctext">${esc(c.text)}</p>` : ''}
+    ${open || !playable ? `<p class="ctext">${iconText(esc(c.text))}</p>` : ''}
     ${actions}</div>`;
 }
 
@@ -257,21 +260,22 @@ function moreView(me: Me): string {
       <button data-project="${p.key}" ${p.affordable && p.hexes.length ? '' : 'disabled'}>Build</button></div>`).join('');
   const egg = me.eggProject;
   const eggOk = egg.affordable && egg.room;
-  const eggs = egg.elements.map((e) => `<button class="elembtn" style="--ec:${ELEMENT_COLORS[e]}" data-egg="${e}" ${eggOk ? '' : 'disabled'}>${e}</button>`).join('');
-  const opts = (sel: string) => RESOURCES.map((r) => `<option value="${r}" ${sel === r ? 'selected' : ''}>${r}</option>`).join('');
+  const eggs = egg.elements.map((e) => `<button class="elembtn iconbtn" style="--ec:${ELEMENT_COLORS[e]}" data-egg="${e}" aria-label="${e} egg" ${eggOk ? '' : 'disabled'}>${elemIcon(e, 1.9)}</button>`).join('');
+  // Pick a resource by tapping its icon.
+  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
   return `
     <section class="panel"><h3>Special projects <small>(no card, double cost)</small></h3>${projects}
       <div class="proj${eggOk ? '' : ' dim'}"><b>Base dragon egg</b> ${resChips(egg.cost)}</div>
       <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost.</p>'}</section>
     <section class="panel"><h3>Bank <small>(${me.bankRate} for 1)</small></h3>
-      <div class="bank">Give <b>${me.bankRate * bank.times}</b> <select id="bgive">${opts(bank.give)}</select>
-        for <span class="stepper"><button data-btimes="-1">−</button><b>${bank.times}</b><button data-btimes="1">+</button></span>
-        <select id="bget">${opts(bank.get)}</select></div>
-      <button id="bankgo" ${me.resources[bank.give as 'stone'] >= me.bankRate * bank.times && bank.give !== bank.get ? '' : 'disabled'}>Trade with the bank</button></section>`;
+      <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
+      <div class="bankrow"><span>Get</span>${pick('get', bank.get)}</div>
+      <div class="bank"><span class="stepper"><button data-btimes="-1">−</button><b>${bank.times}</b><button data-btimes="1">+</button></span>
+        <button id="bankgo" class="primary" ${me.resources[bank.give as 'stone'] >= me.bankRate * bank.times && bank.give !== bank.get ? '' : 'disabled'}>Trade <span class="chip">${me.bankRate * bank.times}${resIcon(bank.give, 1.25)}</span>→<span class="chip">${bank.times}${resIcon(bank.get, 1.25)}</span></button></div></section>`;
 }
 
 function stepper(side: 'give' | 'get', r: string, n: number, max: number): string {
-  return `<div class="tres">${resIcon(r, 22)}<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span></div>`;
+  return `<div class="tres">${resIcon(r, 1.4)}<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span></div>`;
 }
 
 function tradeView(g: PublicState, me: Me): string {
@@ -341,7 +345,7 @@ function discardView(me: Me): string {
 function gameOver(g: PublicState, me: Me): string {
   const order = g.finalTotals!.map((t, p) => [t, p]).sort((a, b) => b[0] - a[0]);
   return `<h2>${g.winner === me.seat ? 'You win!' : `${esc(names[g.winner!])} wins.`}</h2>
-    <ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} ${t} points</li>`).join('')}</ol>
+    <ol class="final">${order.map(([t, p]) => `<li>${playerTag(p, names)} <span class="chip">${t}${icon('points', 1.25)}</span></li>`).join('')}</ol>
     <button id="newgame" class="primary">Join another game</button>`;
 }
 
@@ -468,10 +472,11 @@ function wire(g: PublicState, me: Me) {
   bind('[data-decline]', (el) => send(`decline ${el.dataset.decline}`));
   bind('[data-cancel]', (el) => send(`cancel ${el.dataset.cancel}`));
   // bank
-  const bg = document.getElementById('bgive') as HTMLSelectElement | null;
-  const bt = document.getElementById('bget') as HTMLSelectElement | null;
-  if (bg) bg.onchange = () => { bank.give = bg.value; render(); };
-  if (bt) bt.onchange = () => { bank.get = bt.value; render(); };
+  bind('[data-bank]', (el) => {
+    const [side, r] = el.dataset.bank!.split(' ');
+    bank[side as 'give' | 'get'] = r;
+    render();
+  });
   bind('[data-btimes]', (el) => {
     bank.times = Math.max(1, bank.times + Number(el.dataset.btimes));
     render();
