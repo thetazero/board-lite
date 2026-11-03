@@ -336,6 +336,36 @@ const ICONS: Record<string, Facet[]> = {
     ['#f2d200', P([[-3.6, -3.4], [-0.4, -3.8], [-1.8, -1.8]])],
     ['#111111', P([[-2.1, -3.6], [-1.6, -3.6], [-1.8, -2.1]])],
   ],
+
+  // ---- the great beasts ----
+  // The Thunderbird, wings spread, a bolt down its breast.
+  thunderbird: [
+    ['#3d3f8f', P([[-1.5, -2], [-10, -7.5], [-9, -2.5], [-10, 1], [-6, 1.5], [-1.5, 3.5]])],
+    ['#2e3070', P([[1.5, -2], [10, -7.5], [9, -2.5], [10, 1], [6, 1.5], [1.5, 3.5]])],
+    ['#8a91e0', P([[-1.5, 0], [-7.5, -4], [-6.5, -0.5], [-1.5, 2.2]])],
+    ['#6d74c4', P([[1.5, 0], [7.5, -4], [6.5, -0.5], [1.5, 2.2]])],
+    ['#2e3070', P([[-2.6, 5], [0, 10], [2.6, 5]])],
+    ['#3d3f8f', P([[-2.6, -3.5], [2.6, -3.5], [3, 4], [0, 8.5], [-3, 4]])],
+    ['#4b4fa8', P([[-2.3, -7.8], [0, -9.5], [2.3, -7.8], [2.6, -3.5], [-2.6, -3.5]])],
+    ['#ffd23f', P([[-1.1, -5.6], [1.1, -5.6], [0, -2.8]])],
+    ['#fff4b8', P([[-1.9, -7.2], [-0.9, -7.2], [-0.9, -6.2], [-1.9, -6.2]])],
+    ['#fff4b8', P([[0.9, -7.2], [1.9, -7.2], [1.9, -6.2], [0.9, -6.2]])],
+    ['#ffd23f', P([[0.6, -1.8], [-1.6, 1.8], [0, 1.8], [-0.9, 5.6], [1.9, 1], [0.3, 1]])],
+  ],
+  // The Leviathan, deep blue, finned, rearing out of the waves.
+  leviathan: [
+    ['#7fe0d0', P([[-6.5, 2.5], [-9.5, 0.5], [-6, 0]])],
+    ['#7fe0d0', P([[-3, -1.5], [-5, -5], [-1.2, -3]])],
+    ['#2a7fa0', P([[-6.5, 8], [-7.5, 3], [-4.5, -1], [-0.5, -3.5], [0.5, -6.5], [3.5, -5.5], [2.5, -1], [-1.5, 2], [-3, 5], [-2.5, 8]])],
+    ['#164e63', P([[-4.5, -1], [-6, -3.5], [-2.5, -2.5]])],
+    ['#1f6f8b', P([[0.5, -6.5], [4, -9.5], [9.5, -6.5], [8.5, -4], [3.5, -5]])],
+    ['#164e63', P([[3.5, -5], [8.5, -4], [6.5, -2.8]])],
+    ['#7fe0d0', P([[1.5, -7.5], [2, -10], [4, -8.8]])],
+    ['#d9fff6', P([[4.4, -7.6], [5.8, -7.6], [5.8, -6.4], [4.4, -6.4]])],
+    ['#3d7fbf', P([[-10, 7.5], [-6, 6], [-2, 7.5], [2, 6], [6, 7.5], [10, 6], [10, 10], [-10, 10]])],
+    ['#7fb6e6', P([[-10, 7.5], [-6, 6], [-2, 7.5], [-6, 7.2]])],
+    ['#7fb6e6', P([[2, 6], [6, 7.5], [2, 7.2], [-2, 7.5]])],
+  ],
 };
 
 export const ICON_NAMES = Object.keys(ICONS);
@@ -343,7 +373,7 @@ export const ICON_NAMES = Object.keys(ICONS);
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', gilding: 'Gilding', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
-  wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk' };
+  wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {

@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import type { DragonView, HexView, PublicState } from '../src/state.ts';
-import { ELEMENT_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
+import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
 
 declare global {
   interface Window {
@@ -332,7 +332,10 @@ function crystal(h: number, color = '#c3aefc'): THREE.Mesh {
 function decor(h: HexView, seaward: number): THREE.Group {
   const r = rng(h.k);
   const g = new THREE.Group();
-  const built = !!h.building || !!h.fauna;
+  // The Thunderbird perches on its peak rather than hiding it.
+  const built = !!h.building || (!!h.fauna && !h.peak);
+  if (h.held) g.add(hexBorder(HOLD_COLORS[h.held] ?? '#555'));
+  if (h.peakZone) g.add(hexBorder(GOLD));
   // Spots around the hex: the middle is kept for a building or a beast.
   const spot = (min: number, max: number): [number, number] => {
     const a = r() * Math.PI * 2, d = min + r() * (max - min);
@@ -350,7 +353,12 @@ function decor(h: HexView, seaward: number): THREE.Group {
   };
   switch (h.terrain) {
     case 'mountain':
-      if (built) {
+      if (h.peak && !built) {
+        // The centre peak: taller than any other, snow on top.
+        place(peak(0.78, PEAK_H, 6, 0.3, true), [0, 0], 0);
+        place(peak(0.28, 0.5, 5, r() * 3, false), [0.5, 0.28]);
+        place(peak(0.24, 0.42, 4, r() * 3, true), [-0.5, 0.3]);
+      } else if (built) {
         place(peak(0.22, 0.42, 5, r() * 3, true), rim());
         place(peak(0.16, 0.3, 4, r() * 3, false), rim());
       } else {
@@ -608,6 +616,32 @@ function roost(): THREE.Group {
 }
 
 // ---------- the fauna ----------
+
+// A beast's lair: a dark, torn paper scrap under it with a pale edge, so the
+// beast stands out from any terrain (grey wolves on grey mountains) and from
+// the plate of a building it sits on.
+const LAIR = '#2b2420', LAIR_EDGE = '#efe5cf';
+function lair(r: number): THREE.Group {
+  return group(
+    part(cyl(r, r, 0.016, 7), LAIR_EDGE, { at: [0, 0.008, 0], rot: [0, 0.2, 0], crease: false }),
+    part(cyl(r * 0.88, r * 0.88, 0.03, 7), LAIR, { at: [0, 0.015, 0], rot: [0, 0.6, 0] }),
+  );
+}
+
+// A building's paper gone dull grey: what a shut-down building is made of.
+const SHUT = new Map<THREE.Material, THREE.MeshLambertMaterial>();
+function shutPaper(m: THREE.MeshLambertMaterial): THREE.MeshLambertMaterial {
+  let s = SHUT.get(m);
+  if (!s) {
+    const c = m.color.clone();
+    const grey = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
+    s = m.clone();
+    s.color = new THREE.Color(grey, grey, grey).multiplyScalar(0.8).lerp(new THREE.Color('#4d4843'), 0.5);
+    s.emissiveIntensity = 0;
+    SHUT.set(m, s);
+  }
+  return s;
+}
 // Wild beasts holding hexes, folded like everything else: chunky shapes that
 // read from the TV's tilted camera. Each faces +x; the board turns it.
 
@@ -670,8 +704,79 @@ function basilisk(): THREE.Group {
   return g;
 }
 
+// ---------- the great beasts ----------
+// Bigger than any fauna: the Thunderbird perched on the centre peak, wings
+// half raised, lightning down its feathers; the Leviathan's coils breaking
+// the sea beside a harbor.
+
+const STORM = '#3d3f8f', STORM_LIGHT = '#8a91e0', BOLT = '#ffd23f';
+function thunderbird(): THREE.Group {
+  const g = group(
+    part(new THREE.DodecahedronGeometry(0.22, 0), STORM, { at: [0, 0.3, 0], scale: [1.5, 1.1, 1] }),
+    part(new THREE.DodecahedronGeometry(0.14, 0), STORM_LIGHT, { at: [0.18, 0.3, 0], scale: [1, 1.2, 1.2] }),
+    part(new THREE.DodecahedronGeometry(0.12, 0), STORM, { at: [0.36, 0.52, 0] }),
+    part(cone(0.06, 0.2, 4), BOLT, { at: [0.52, 0.5, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.25] }),
+    part(box(0.03, 0.03, 0.03), '#fff4b8', { at: [0.42, 0.57, 0.08], glow: 0.9, crease: false }),
+    part(box(0.03, 0.03, 0.03), '#fff4b8', { at: [0.42, 0.57, -0.08], glow: 0.9, crease: false }),
+    // A crest of three folded feathers.
+    ...[0, 1, 2].map((i) => part(cone(0.035, 0.18, 3), STORM_LIGHT, { at: [0.3 - i * 0.06, 0.66, 0], rot: [0, 0, 0.5 + i * 0.25], crease: false })),
+    // The tail fan, down and back.
+    part(cone(0.16, 0.42, 3), STORM, { at: [-0.4, 0.22, 0], rot: [0, 0, 1.9], scale: [1, 1, 0.3] }),
+    // Talons gripping the rock.
+    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, 0.08], crease: false }),
+    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, -0.08], crease: false }),
+  );
+  // The wings: raised in a wide V, each a folded fan with a bolt down it.
+  for (const side of [1, -1]) {
+    const wing = group(
+      part(cone(0.2, 0.85, 3), STORM, { at: [0, 0.42, 0], scale: [1, 1, 0.22] }),
+      part(cone(0.12, 0.6, 3), STORM_LIGHT, { at: [0.05, 0.36, 0.02], scale: [1, 1, 0.2] }),
+      part(box(0.04, 0.16, 0.02), BOLT, { at: [0.02, 0.5, 0.04], rot: [0, 0, 0.5], glow: 0.5, crease: false }),
+      part(box(0.04, 0.16, 0.02), BOLT, { at: [0.02, 0.36, 0.04], rot: [0, 0, -0.5], glow: 0.5, crease: false }),
+    );
+    wing.position.set(-0.02, 0.36, side * 0.14);
+    wing.rotation.set(side * -0.95, 0, 0.25);
+    g.add(wing);
+  }
+  return g;
+}
+
+const DEEP = '#1f6f8b', DEEP_DARK = '#164e63', FIN = '#7fe0d0';
+function leviathan(): THREE.Group {
+  const g = group(
+    // Coils breaking the water, smaller towards the tail.
+    part(new THREE.TorusGeometry(0.2, 0.08, 4, 9, Math.PI), DEEP, { at: [-0.18, 0, 0] }),
+    part(new THREE.TorusGeometry(0.14, 0.065, 4, 8, Math.PI), DEEP_DARK, { at: [-0.62, 0, 0.05] }),
+    part(cone(0.06, 0.26, 3), DEEP_DARK, { at: [-0.9, 0.08, 0.05], rot: [0, 0, 1.2], scale: [1, 1, 0.4] }),
+    // The neck rearing up, the head looking out.
+    part(cyl(0.07, 0.1, 0.62, 6), DEEP, { at: [0.22, 0.28, 0], rot: [0, 0, -0.25] }),
+    part(box(0.3, 0.13, 0.17), DEEP, { at: [0.36, 0.6, 0], rot: [0, 0, -0.2] }),
+    part(cone(0.08, 0.2, 4), DEEP_DARK, { at: [0.56, 0.55, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.2] }),
+    part(box(0.03, 0.03, 0.03), '#d9fff6', { at: [0.42, 0.65, 0.09], glow: 0.9, crease: false }),
+    part(box(0.03, 0.03, 0.03), '#d9fff6', { at: [0.42, 0.65, -0.09], glow: 0.9, crease: false }),
+  );
+  // Fins down its back and along the coils.
+  for (const [x, y, h] of [[0.3, 0.72, 0.16], [0.2, 0.52, 0.14], [0.13, 0.32, 0.12], [-0.18, 0.28, 0.13], [-0.62, 0.2, 0.1]]) {
+    g.add(part(cone(0.05, h, 3), FIN, { at: [x, y + h / 2, 0], rot: [0, 0, 0.45], scale: [1, 1, 0.35] }));
+  }
+  return g;
+}
+
+const PEAK_H = 1.5; // the centre peak's height: the Thunderbird perches on top
+
 function beastModel(key: string): THREE.Group {
-  return key === 'wolf_pack' ? wolfPack() : key === 'cave_bear' ? caveBear() : basilisk();
+  return key === 'wolf_pack' ? wolfPack() : key === 'cave_bear' ? caveBear() : key === 'thunderbird' ? thunderbird() : key === 'leviathan' ? leviathan() : basilisk();
+}
+
+// A folded paper border just inside a hex's edges: the hexes a great beast
+// holds, in its colour, and the freed peak's richer ground, in gold.
+function hexBorder(color: string): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i;
+    g.add(part(box(0.58, 0.025, 0.075), color, { at: [Math.cos(a) * 0.74, TILE_H + 0.045, Math.sin(a) * 0.74], rot: [0, -(a + Math.PI / 2), 0], crease: false }));
+  }
+  return g;
 }
 
 function nest(): THREE.Mesh {
@@ -1427,7 +1532,7 @@ export class Board3D {
     for (const h of g.map) {
       const t = this.tiles.get(h.k)!;
       t.hex = h;
-      const decorSig = h.building ? `b${h.building.type}` : h.fauna ? 'f' : '';
+      const decorSig = `${h.building ? `b${h.building.type}` : h.fauna ? 'f' : ''}${h.held ?? ''}${h.peakZone ? 'z' : ''}`;
       if (decorSig !== t.decorSig) regrow = true;
       t.decorSig = decorSig;
     }
@@ -1446,7 +1551,7 @@ export class Board3D {
     }
     for (const h of g.map) {
       const b = h.building;
-      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}` : '';
+      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${h.fauna ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
@@ -1455,13 +1560,14 @@ export class Board3D {
         this.built.delete(h.k);
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0), h);
-      // Pop up from the page when it's new; a new floor or upgrade pops up too.
-      const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig !== bsig);
+      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
+      // Pop up from the page when it's new; a new floor or upgrade pops up too
+      // (a beast arriving or leaving only greys or colours it).
+      const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
     }
-    // Fauna: in the middle of an open hex, or crouched at the front of the
-    // building it shuts down. It folds up like a building when it arrives.
+    // Fauna: on its dark lair in the middle of an open hex, or out in front
+    // of the building it shuts down. It folds up like a building when it arrives.
     for (const h of g.map) {
       const f = h.fauna;
       const fsig = f ? `${f.key}|${h.building ? 1 : 0}` : '';
@@ -1503,14 +1609,21 @@ export class Board3D {
     return dx || dz ? Math.atan2(dx, dz) : 0;
   }
 
-  private buildingGroup(b: NonNullable<HexView['building']>, facing: number): THREE.Group {
+  private buildingGroup(b: NonNullable<HexView['building']>, facing: number, shut: boolean): THREE.Group {
     const g = plate(b.owner, b.upgrade, this.plateMats);
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
+    // Shut down by a beast: the building goes to dull grey paper (its plate
+    // keeps its owner's colour) and sits back, so the beast in front is whole.
+    if (shut) {
+      model.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.material = shutPaper(o.material as THREE.MeshLambertMaterial);
+      });
+    }
     const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
     pop.position.set(0, GROUND, -0.6);
-    model.scale.setScalar(1.15);
-    model.position.set(offset[0], 0, offset[1] + 0.6);
+    model.scale.setScalar(shut ? 0.95 : 1.15);
+    model.position.set(offset[0], 0, offset[1] + 0.6 - (shut ? 0.2 : 0));
     model.rotation.y = facing;
     pop.add(model);
     g.add(pop);
@@ -1522,9 +1635,13 @@ export class Board3D {
     const g = new THREE.Group();
     const model = bake(beastModel(key));
     const pop = new THREE.Group();
-    const [x, z] = onBuilding ? [0.32, 0.42] : [0, 0.05];
-    pop.position.set(x, onBuilding ? GROUND : TOP, z);
-    model.scale.setScalar(onBuilding ? 0.85 : 1.15);
+    const great = key === 'thunderbird' || key === 'leviathan';
+    const [x, z] = onBuilding ? [0.08, 0.4] : [0, 0.05];
+    // The Thunderbird on its peak's summit; the Leviathan in the sea. Neither has a lair.
+    const y = key === 'thunderbird' ? TOP + PEAK_H - 0.2 : key === 'leviathan' ? -0.01 : onBuilding ? GROUND : TOP;
+    pop.position.set(x, y, z);
+    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : onBuilding ? 1 : 1.15);
+    if (!great) pop.add(lair(onBuilding ? 0.42 : 0.58));
     // Three-quarters to the room, half of them looking left.
     const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
     model.rotation.y = face;

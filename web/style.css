@@ -215,6 +215,11 @@ svg.token { flex: none; }
 .corner.titles li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .1em .3em; margin: .15em 0; }
 .corner.titles li > b { grid-column: 2 / 4; }
 .corner.titles .tvals { grid-column: 1 / 3; }
+/* The great beasts' race: one line each, what it's weak to until someone slays it. */
+.corner.titles li.beast { display: flex; gap: .3em; }
+.corner.titles li.beast > b { flex: 1; grid-column: auto; }
+.corner.titles li.beast .weak { display: inline-flex; align-items: center; gap: .1em; font-weight: 700; }
+.corner.titles li.beast.slain > b { text-decoration: line-through; color: var(--muted); }
 q { quotes: "“" "”"; }
 q::before { content: open-quote; }
 q::after { content: close-quote; }
@@ -592,3 +597,4 @@ button.on:disabled { opacity: 1; }
   body.phone.raiding.has-hand { padding-bottom: 3.6em; }
 }
 .huntbtn { width: 100%; margin-top: .4em; display: flex; align-items: center; justify-content: center; gap: .35em; }
+.huntname { margin: .2em 0 .5em; }
