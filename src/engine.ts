@@ -63,10 +63,16 @@ export interface Raid {
   combatRound: number;
 }
 
+export interface Die {
+  sides: number;
+  value: number;
+}
+
 export interface LogEntry {
   round: number;
   text: string;
   to?: number[]; // private to these players; public if absent
+  dice?: Die[]; // the dice behind this event, for clients to show
 }
 
 export type Title = 'army' | 'tower' | 'territory';
@@ -107,8 +113,11 @@ function newId(g: Game, prefix: string): string {
   return `${prefix}${g.nextId++}`;
 }
 
-function log(g: Game, text: string, to?: number[]) {
-  g.log.push(to ? { round: g.round, text, to } : { round: g.round, text });
+function log(g: Game, text: string, to?: number[], dice?: Die[]) {
+  const e: LogEntry = { round: g.round, text };
+  if (to) e.to = to;
+  if (dice) e.dice = dice;
+  g.log.push(e);
 }
 
 export function bundleText(b: Bundle): string {
@@ -345,9 +354,17 @@ function startRound(g: Game) {
   for (const p of turnOrder(g)) {
     const prod = production(g, p);
     const got: Bundle = {};
-    for (const r of RESOURCES) got[r] = prod[r].base + prod[r].dice.reduce((s, die) => s + roll(g.rng, die), 0);
+    const dice: Die[] = [];
+    for (const r of RESOURCES) {
+      got[r] = prod[r].base;
+      for (const sides of prod[r].dice) {
+        const value = roll(g.rng, sides);
+        dice.push({ sides, value });
+        got[r]! += value;
+      }
+    }
     gain(g.players[p], got);
-    log(g, `${pname(p)} produces ${bundleText(got)}.`);
+    log(g, `${pname(p)} produces ${bundleText(got)}.`, undefined, dice);
   }
   // Dragons heal, then eat and grow.
   for (const d of g.dragons) {
@@ -611,15 +628,18 @@ function resolveFlee(g: Game) {
   for (const ids of raid.flee) {
     for (const id of ids ?? []) {
       const d = dragonById(g, id);
-      const mine = roll(g.rng, TUNING.fleeDie) + stageStats(d)!.speed;
-      const theirs = roll(g.rng, TUNING.fleeDie) + chase;
+      const myDie = roll(g.rng, TUNING.fleeDie);
+      const theirDie = roll(g.rng, TUNING.fleeDie);
+      const mine = myDie + stageStats(d)!.speed;
+      const theirs = theirDie + chase;
+      const dice = [{ sides: TUNING.fleeDie, value: myDie }, { sides: TUNING.fleeDie, value: theirDie }];
       raid.fighters = raid.fighters.filter((x) => x !== id);
       if (mine >= theirs) {
-        log(g, `${pname(d.owner)}'s ${d.id} flees cleanly (${mine} vs ${theirs}).`);
+        log(g, `${pname(d.owner)}'s ${d.id} flees cleanly (${mine} vs ${theirs}).`, undefined, dice);
       } else {
         const dmg = (theirs - mine) * TUNING.fleeDamagePerPoint;
         d.damage = Math.min(stageStats(d)!.hp, d.damage + dmg);
-        log(g, `${pname(d.owner)}'s ${d.id} flees but is caught (${mine} vs ${theirs}) and takes ${dmg} damage${d.damage >= stageStats(d)!.hp ? ', limping home knocked out' : ''}.`);
+        log(g, `${pname(d.owner)}'s ${d.id} flees but is caught (${mine} vs ${theirs}) and takes ${dmg} damage${d.damage >= stageStats(d)!.hp ? ', limping home knocked out' : ''}.`, undefined, dice);
       }
     }
   }

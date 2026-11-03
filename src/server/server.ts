@@ -1,0 +1,190 @@
+// The board-lite web server: serves the TV and phone clients and runs rooms.
+// No dependencies: node:http, server-sent events for pushes, and the
+// browser's TypeScript is stripped of types on the fly (no build step).
+//
+//   node src/server/server.ts [--port 8080]
+//
+// The TV opens http://<this machine>:<port>/tv, phones open
+// http://<this machine>:<port>/ and type the room code.
+
+import { readFile } from 'node:fs/promises';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { stripTypeScriptTypes } from 'node:module';
+import { networkInterfaces } from 'node:os';
+import { extname, join, normalize, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Room, RoomError, type RoomOptions } from './room.ts';
+
+const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
+const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
+const MAX_BODY = 4096;
+
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.ts': 'text/javascript; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.svg': 'image/svg+xml',
+};
+
+const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html' };
+
+export function startServer(port: number, opts: RoomOptions = {}): { server: Server; rooms: Map<string, Room> } {
+  const rooms = new Map<string, Room>();
+  const stripped = new Map<string, { src: string; js: string }>();
+
+  setInterval(() => {
+    for (const [code, room] of rooms) {
+      if (Date.now() - room.lastActive > ROOM_IDLE_MS) {
+        room.close();
+        rooms.delete(code);
+      }
+    }
+  }, 10 * 60 * 1000).unref();
+
+  function getRoom(code: string): Room {
+    const room = rooms.get(code.toUpperCase());
+    if (!room) throw new RoomError(`No game with code ${code.toUpperCase()}. Check the code on the TV.`);
+    return room;
+  }
+
+  async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
+    let data = '';
+    for await (const chunk of req) {
+      data += chunk;
+      if (data.length > MAX_BODY) throw new RoomError('Request too large.');
+    }
+    try {
+      const v = JSON.parse(data || '{}');
+      return v && typeof v === 'object' ? v : {};
+    } catch {
+      throw new RoomError('Bad request.');
+    }
+  }
+
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+
+  function json(res: ServerResponse, status: number, value: unknown) {
+    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(value));
+  }
+
+  function events(req: IncomingMessage, res: ServerResponse, room: Room, tok: string | null) {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+    const send = () => res.write(`data: ${JSON.stringify(room.snapshot(tok))}\n\n`);
+    const unsubscribe = room.subscribe(send);
+    const disconnect = room.connect(tok);
+    send();
+    const ping = setInterval(() => res.write(': ping\n\n'), 20000);
+    req.on('close', () => {
+      clearInterval(ping);
+      unsubscribe();
+      disconnect();
+    });
+  }
+
+  async function api(req: IncomingMessage, res: ServerResponse, parts: string[], query: URLSearchParams) {
+    // GET /api/info -> the addresses phones can reach this server on
+    if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), port: (req.socket.localPort ?? 0) });
+    if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
+    // POST /api/rooms -> a new room, for the TV
+    if (parts.length === 1 && req.method === 'POST') {
+      const room = new Room(Room.newCode((c) => rooms.has(c)), opts);
+      rooms.set(room.code, room);
+      return json(res, 200, { code: room.code, hostToken: room.hostToken });
+    }
+    const room = getRoom(parts[1] ?? '');
+    const action = parts[2];
+    if (action === 'events' && req.method === 'GET') return events(req, res, room, query.get('token'));
+    // GET /api/rooms/CODE?token=... -> does the room exist, and is this token seated in it
+    if (!action && req.method === 'GET') return json(res, 200, { seated: room.seatOf(query.get('token') ?? '') >= 0, host: query.get('token') === room.hostToken });
+    if (req.method !== 'POST') return json(res, 404, { error: 'Not found.' });
+    const b = await body(req);
+    const tok = str(b.token);
+    const host = tok === room.hostToken;
+    switch (action) {
+      case 'join': {
+        const seat = room.join(str(b.name));
+        return json(res, 200, { token: seat.token });
+      }
+      case 'bot':
+        if (!room.canStart(tok)) throw new RoomError('Only the TV or the first player can add bots.');
+        room.addBot();
+        return json(res, 200, {});
+      case 'leave': {
+        // A player can leave the lobby; the TV or first player can remove anyone.
+        const i = typeof b.seat === 'number' ? b.seat : room.seatOf(tok);
+        if (i !== room.seatOf(tok) && !room.canStart(tok)) throw new RoomError('You can only remove yourself.');
+        room.leave(i);
+        return json(res, 200, {});
+      }
+      case 'start':
+        room.start(tok);
+        return json(res, 200, {});
+      case 'do':
+        if (host) throw new RoomError('The TV has no seat.');
+        room.command(tok, str(b.command));
+        return json(res, 200, {});
+    }
+    return json(res, 404, { error: 'Not found.' });
+  }
+
+  async function file(res: ServerResponse, path: string) {
+    const full = normalize(join(WEB, path));
+    if (!full.startsWith(WEB) || full.slice(WEB.length).split(sep).some((part) => part.startsWith('.'))) return json(res, 404, { error: 'Not found.' });
+    const ext = extname(full);
+    if (!TYPES[ext]) return json(res, 404, { error: 'Not found.' });
+    let text: string;
+    try {
+      text = await readFile(full, 'utf8');
+    } catch {
+      return json(res, 404, { error: 'Not found.' });
+    }
+    if (ext === '.ts') {
+      let hit = stripped.get(full);
+      if (hit?.src !== text) {
+        hit = { src: text, js: stripTypeScriptTypes(text, { mode: 'strip' }) };
+        stripped.set(full, hit);
+      }
+      text = hit.js;
+    }
+    res.writeHead(200, { 'content-type': TYPES[ext] ?? '', 'cache-control': 'no-cache' });
+    res.end(text);
+  }
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', 'http://x');
+    const parts = url.pathname.split('/').filter(Boolean);
+    try {
+      if (parts[0] === 'api') return await api(req, res, parts.slice(1), url.searchParams);
+      if (PAGES[url.pathname]) return await file(res, PAGES[url.pathname]);
+      return await file(res, url.pathname);
+    } catch (e) {
+      if (e instanceof RoomError) return json(res, 400, { error: e.message });
+      console.error(e);
+      if (!res.headersSent) json(res, 500, { error: 'Something went wrong on the server.' });
+    }
+  });
+  server.listen(port, '0.0.0.0');
+  return { server, rooms };
+}
+
+export function lanAddresses(): string[] {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((a) => a && a.family === 'IPv4' && !a.internal)
+    .map((a) => a!.address);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const i = process.argv.indexOf('--port');
+  const port = Number(i > 0 ? process.argv[i + 1] : process.env.PORT ?? 8080);
+  const { server } = startServer(port);
+  server.on('listening', () => {
+    const hosts = lanAddresses();
+    console.log(`board-lite is running on port ${port}.`);
+    console.log(`  TV:     http://localhost:${port}/tv${hosts.length ? `   (or http://${hosts[0]}:${port}/tv)` : ''}`);
+    for (const h of hosts) console.log(`  Phones: http://${h}:${port}/`);
+    if (!hosts.length) console.log('  No network address found: phones need to be on the same network as this machine.');
+  });
+}
