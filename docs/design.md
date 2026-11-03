@@ -17,7 +17,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - The full rules, not counting individual card text, fit on one printed page.
 - 5 resources (stone, timber, crystal, livestock, gold). No more.
 - 4 phases per global round. No more.
-- At most 10 building types and 6 upgrade types.
+- At most 6 upgrade types. (There is no cap on building types: the owner, 2026-11-03: "the 10 building limit is stupid and the exact opposite of what I want, I want lots of fun variety.")
 - At most 12 distinct non-dragon action card effects.
 - A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
 - At most 6 raid unit types, each just stats plus elemental strengths and weaknesses.
@@ -83,6 +83,11 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   1. Building cards.
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
 - Costs: upgrades skew gold-heavy; raw builds skew resource-heavy.
+- Building cards should be special and interesting (owner, 2026-11-03, after playing: "I basically always have too many building cards, and they don't feel fun or meaningful"):
+  - The basic production buildings are not cards; anyone can build them.
+  - Building cards are "special and more interesting, like buildings that scale with number of neighbors of a certain class, regardless of what team they are on. generally adjacency limited."
+  - Lots of variety: "I want lots of fun variety."
+  - Drawing: "draw two keep 1 is the correct direction".
 - Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
 ### Special projects
