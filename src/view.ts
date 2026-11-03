@@ -11,7 +11,7 @@ import { mapRadius } from './map.ts';
 
 const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.' };
 const BUILDING_LETTER: Record<string, string> = {
-  tower: 'T', quarry: 'q', lumber_camp: 'l', crystal_mine: 'c', pasture: 'p', roost: 'r', hatchery: 'h', market: 'm', caravan_post: 'v', tower_floor: 'T', monument: 'o',
+  tower: 'T', quarry: 'q', lumber_camp: 'l', crystal_mine: 'c', pasture: 'p', roost: 'r', hatchery: 'h', market: 'm', tower_floor: 'T', monument: 'o',
 };
 
 export function cardText(c: Card): string {
@@ -58,7 +58,7 @@ function mapText(g: Game): string[] {
   const R = mapRadius(g.players.length);
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains.');
-  lines.push('Buildings show as <owner><letter>: T tower, q quarry, l lumber camp, c crystal mine, p pasture, r roost, h hatchery, m market, v caravan post, o monument (lowercase=no upgrade, +=upgraded).');
+  lines.push('Buildings show as <owner><letter>: T tower, q quarry, l lumber camp, c crystal mine, p pasture, r roost, h hatchery, m market, o monument (lowercase=no upgrade, +=upgraded).');
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {

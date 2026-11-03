@@ -45,6 +45,12 @@ function randomTerrain(rng: Rng): Terrain {
   return 'plains';
 }
 
+// Seat N's homeland. Seats sitting next to each other on the map get
+// complementary pairs, and the first N pairs use every terrain about equally.
+export const HOMELANDS: [Terrain, Terrain][] = [
+  ['mountain', 'forest'], ['ley', 'meadow'], ['mountain', 'ley'], ['forest', 'meadow'], ['mountain', 'meadow'], ['forest', 'ley'],
+];
+
 export function generateMap(rng: Rng, players: number): Record<string, Hex> {
   const radius = mapRadius(players);
   const hexes: Record<string, Hex> = {};
@@ -53,13 +59,16 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
       hexes[key(q, r)] = { q, r, terrain: randomTerrain(rng) };
     }
   }
-  // Fair starts: every tower sits on plains with one of each terrain around it.
-  for (const spot of towerSpots(players)) {
+  // Homelands: every tower sits on plains, ringed by three hexes each of two
+  // production terrains. Neighbours get complementary pairs (stone and timber
+  // lands next to crystal and livestock lands), so players need each other.
+  towerSpots(players).forEach((spot, i) => {
     hexes[spot].terrain = 'plains';
-    const ring = shuffle(rng, ['mountain', 'forest', 'ley', 'meadow', 'plains', 'plains'] as Terrain[]);
-    neighbors(spot).forEach((n, i) => {
-      if (hexes[n]) hexes[n].terrain = ring[i];
+    const [a, b] = HOMELANDS[i];
+    const ring = shuffle(rng, [a, a, a, b, b, b]);
+    neighbors(spot).forEach((n, j) => {
+      if (hexes[n]) hexes[n].terrain = ring[j];
     });
-  }
+  });
   return hexes;
 }

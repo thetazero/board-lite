@@ -8,7 +8,7 @@ import { playOut } from '../src/bot.ts';
 import { RuleError, apply, newGame, score, waitingOn, type Game } from '../src/engine.ts';
 import { BUILDINGS, TUNING } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
-import { neighbors } from '../src/map.ts';
+import { HOMELANDS, neighbors } from '../src/map.ts';
 
 function advanceToRaidVote(g: Game) {
   while (g.phase === 'action') apply(g, g.turn, 'end');
@@ -100,9 +100,9 @@ test('buildings must touch your territory and match terrain', () => {
   assert.throws(() => apply(g, 0, `project quarry ${tower}`), RuleError); // occupied
   const far = Object.keys(g.map).find((k) => g.map[k].terrain === 'mountain' && !neighbors(k).some((n) => g.buildings[n]))!;
   assert.throws(() => apply(g, 0, `project quarry ${far}`), RuleError); // not touching
-  const wrong = neighbors(tower).find((k) => g.map[k]?.terrain === 'forest')!;
+  const wrong = neighbors(tower).find((k) => g.map[k]?.terrain === 'forest')!; // P1's homeland: mountain and forest
   assert.throws(() => apply(g, 0, `project quarry ${wrong}`), RuleError); // wrong terrain
-  const right = neighbors(tower).find((k) => g.map[k]?.terrain === 'mountain')!; // fair starts have one
+  const right = neighbors(tower).find((k) => g.map[k]?.terrain === 'mountain')!;
   apply(g, 0, `project quarry ${right}`);
   assert.equal(g.buildings[right].type, 'quarry');
   // Special projects cost double the card.
@@ -177,5 +177,16 @@ test('a playtest seat server plays one seat over MCP', () => {
     assert.match(res[3].result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('each tower is ringed by its homeland: three hexes each of two terrains', () => {
+  for (const n of [2, 3, 4, 5, 6]) {
+    const g = newGame(n, 9);
+    g.towers.forEach((t, i) => {
+      const ring = neighbors(t).map((k) => g.map[k].terrain).sort();
+      const [a, b] = HOMELANDS[i];
+      assert.deepEqual(ring, [a, a, a, b, b, b].sort());
+    });
   }
 });

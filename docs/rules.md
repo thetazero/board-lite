@@ -4,7 +4,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your resources and your hand. **Public** (the TV): the map, buildings, dragons, titles, hand sizes, trade offers.
 
-**Setup.** Each player has a tower (fixed spot by player count; the six hexes around it always hold one of each terrain), 2 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
+**Setup.** Each player has a tower (fixed spot by player count) ringed by its homeland, three hexes each of two terrains (stone and timber lands beside crystal and livestock lands); 2 stone, timber, crystal and livestock, and a random base hatchling. The first player moves one seat left each round.
 
 ## A round: four phases
 
@@ -15,7 +15,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Upgrade**: put an upgrade card on one of your buildings of its class. One upgrade per building; your tower counts as a points and a dragon building.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
    - **Special project** (no card): build a quarry, lumber camp, crystal mine, pasture or roost, or hatch a base egg of any element, for double the card's cost.
-   - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a market, 2:1 with a caravan post).
+   - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a market).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. Open offers expire when the turn ends.
 4. **Raid** (all at once). Repeat once per War Horn played this round.
    - **Vote**: three random kingdoms are shown; everyone secretly votes; ties are a coin flip.
@@ -37,4 +37,4 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 ## Cards
 
-Building cards and upgrades are listed with their text and cost in a player's view and in `src/data.ts`: 10 buildings (quarry, lumber camp, crystal mine, pasture, roost, hatchery, market, caravan post, tower floor, monument) and 4 upgrades (Workshop, Gilding, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, and 15 dragons (a base whelp and two special dragons per element).
+Building cards and upgrades are listed with their text and cost in a player's view and in `src/data.ts`: 9 buildings (quarry, lumber camp, crystal mine, pasture, roost, hatchery, market, tower floor, monument) and 4 upgrades (Workshop, Gilding, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, and 15 dragons (a base whelp and two special dragons per element).

@@ -83,7 +83,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
   1. Building cards.
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
 - Costs: upgrades skew gold-heavy; raw builds skew resource-heavy.
-- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
+- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market: a better bank rate). No defense buildings (see Raids).
 
 ### Special projects
 
@@ -152,6 +152,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 
 - Each player starts with a tower hex, some resources, and a starting dragon.
 - Tower placement is fixed by player count.
+- Provisional (see `docs/decisions.md`, player trading): each tower sits in a homeland of two production terrains, and neighbours get opposite ones, so players produce different things and need each other.
 
 ## Trading
 
