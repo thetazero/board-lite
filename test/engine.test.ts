@@ -145,6 +145,12 @@ test('trades are binding and move resources and cards', () => {
   apply(g, 1, 'offer P1 give 1 stone get 40 timber');
   assert.throws(() => apply(g, 0, `accept ${g.offers[0].id}`), RuleError);
   assert.equal(g.offers.length, 1);
+  // The acting player answers offers made to them before ending the turn; their own offers expire with it.
+  assert.throws(() => apply(g, 0, 'end'), /Answer P2's offer/);
+  apply(g, 0, `decline ${g.offers[0].id}`);
+  apply(g, 0, 'offer P2 give 1 stone get 1 timber');
+  apply(g, 0, 'end');
+  assert.equal(g.offers.length, 0);
 });
 
 test('buildings must touch your territory and match terrain', () => {
@@ -255,7 +261,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.equal(g.raid!.step, 'vote');
 });
 
-test('a dragon hurt in a raid heals but sits out the next round', () => {
+test('a dragon hurt in a raid heals and grows but sits out the next raid', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
   a.damage = 3; // hurt in this round's raid
@@ -267,10 +273,38 @@ test('a dragon hurt in a raid heals but sits out the next round', () => {
   assert.equal(g.round, 2);
   assert.equal(a.damage, 0);
   assert.equal(a.resting, 'hurt');
-  assert.equal(a.growth + a.stage * 10, ga, 'a resting dragon does not grow');
+  assert.ok(a.growth + a.stage * 10 > ga, 'a hurt dragon still grows');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
   assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
+});
+
+test('a hungry dragon neither grows nor raids', () => {
+  const g = newGame(2, 7);
+  const a = g.dragons[0];
+  const ga = a.growth + a.stage * 10;
+  advanceToRaidVote(g);
+  // Dragons eat in hatching order: one hatched earlier eats the tower's only livestock.
+  g.dragons.unshift({ ...a, id: 'd99' });
+  g.players[a.owner].resources.livestock = 0;
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
+  assert.equal(a.resting, 'hungry');
+  assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
+});
+
+test('a tower floor is built without a card, for gold', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  const before = score(g, p).buildings;
+  g.players[p].resources.gold = 0;
+  assert.throws(() => apply(g, p, 'build tower_floor'), RuleError);
+  g.players[p].resources = { ...g.players[p].resources, stone: 2, gold: 3 };
+  apply(g, p, 'build tower_floor');
+  assert.equal(g.buildings[g.towers[p]].floors, 1);
+  assert.equal(score(g, p).buildings, before + 1);
+  assert.equal(g.players[p].resources.gold, 0);
 });
 
 test('each round you draw two building cards and keep one; the other is discarded', () => {

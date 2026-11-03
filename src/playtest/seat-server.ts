@@ -5,15 +5,18 @@
 // are fixed by the command line, so the player can't see other hands, act for
 // another seat, or reach files, shell or anything else on the network.
 //
-//   node src/playtest/seat-server.ts <room-url> <token>
+//   node src/playtest/seat-server.ts <room-url> <token> [moves-file]
 //
-// The room URL looks like http://localhost:8080/ABCD.
+// The room URL looks like http://localhost:8080/ABCD. With a moves file, every
+// act and say is appended to it with the player's private reason ("why") and
+// what actually happened, so a playtest audit can read why each move was made.
+// Claude Code drops thinking from `claude -p` transcripts, so this is the record.
 
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 
-const [roomUrl, token] = process.argv.slice(2);
+const [roomUrl, token, movesFile] = process.argv.slice(2);
 const m = /^(https?:\/\/[^/]+)\/([A-Za-z]{4})\/?$/.exec(roomUrl ?? '');
 if (!m || !token) {
   console.error('Usage: seat-server.ts <room-url> <token>');
@@ -42,11 +45,23 @@ async function listen(timeoutSecs: number, head?: string): Promise<string> {
   return [head, ev.length ? `New events:\n${ev.map((e) => `  ${e}`).join('\n')}` : 'No new events.', r.status].filter(Boolean).join('\n');
 }
 
-async function act(command: string): Promise<string> {
+function record(command: string, why: string | undefined, outcome: string) {
+  if (!movesFile) return;
+  const time = new Date().toISOString().slice(11, 19);
+  appendFileSync(movesFile, `${time} ${command}\n${why ? `  why: ${why.replace(/\s+/g, ' ').trim()}\n` : ''}  -> ${outcome}\n`);
+}
+
+async function act(command: string, why?: string): Promise<string> {
   const r = await call('/do', { token, command });
-  if (r.error) return `Not allowed: ${r.error}`;
+  if (r.error) {
+    record(command, why, `not allowed: ${r.error}`);
+    return `Not allowed: ${r.error}`;
+  }
+  record(command, why, 'done');
   return listen(0, 'Done.');
 }
+
+const WHY = { type: 'string', description: 'Private: one or two sentences on why you chose this. No other player ever sees it; it is kept for the people studying the game after it ends.' };
 
 const TOOLS = [
   {
@@ -63,14 +78,14 @@ const TOOLS = [
   {
     name: 'act',
     description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "accept o40", "end", "vote 2", "commit d3", "ready", "fight", "bail", "discard c4". Returns what happened and your next options.',
-    inputSchema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
-    run: (a: { command: string }) => act(String(a.command ?? '')),
+    inputSchema: { type: 'object', properties: { command: { type: 'string' }, why: WHY }, required: ['command', 'why'] },
+    run: (a: { command: string; why?: string }) => act(String(a.command ?? ''), a.why),
   },
   {
     name: 'say',
     description: 'Talk to the table. Without "to", everyone hears it; with "to" (e.g. "P2"), only that player does. Allowed any time, even when it is not your decision. Talk binds no one: only accepted offers do.',
-    inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' } }, required: ['message'] },
-    run: (a: { message: string; to?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`),
+    inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' }, why: WHY }, required: ['message'] },
+    run: (a: { message: string; to?: string; why?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`, a.why),
   },
   {
     name: 'wait',
