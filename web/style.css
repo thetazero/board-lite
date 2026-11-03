@@ -185,8 +185,8 @@ svg.token { flex: none; }
 .tvdragon span { display: flex; align-items: center; gap: .35em; color: var(--muted); white-space: nowrap; }
 .tvdragon .hpbar { width: 3em; height: .45em; }
 .grow { color: var(--muted); letter-spacing: -.05em; }
-.st-hungry, .st-healing { font-style: normal; font-weight: 800; }
-.st-hungry { color: var(--warn); } .st-healing { color: var(--heal); }
+.st-hungry, .st-healing, .st-hunted { font-style: normal; font-weight: 800; }
+.st-hungry { color: var(--warn); } .st-healing { color: var(--heal); } .st-hunted { color: var(--heal); }
 /* The phone's and the raid's dragon chips. */
 .dchip { display: flex; align-items: center; gap: .3em; font-size: .85em; line-height: 1.15; }
 .dchip > div { display: flex; flex-direction: column; }
@@ -575,3 +575,4 @@ button.on:disabled { opacity: 1; }
   body.phone.raiding .handfan { display: none; }
   body.phone.raiding.has-hand { padding-bottom: 3.6em; }
 }
+.huntbtn { width: 100%; margin-top: .4em; display: flex; align-items: center; justify-content: center; gap: .35em; }

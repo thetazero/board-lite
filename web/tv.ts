@@ -147,6 +147,7 @@ function tvDragon(d: DragonView, all: DragonView[], roomy: boolean): string {
   const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>'
     : d.resting === 'hurt' ? '<em class="st-healing">healing</em>'
+    : d.resting === 'hunted' ? `<em class="st-hunted">hunted</em> ${hpBar(d.hp, d.maxHp)}`
     : d.stage ? hpBar(d.hp, d.maxHp) : '';
   return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow} ${state}</span></div></div>`;
 }
