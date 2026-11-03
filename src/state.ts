@@ -107,6 +107,7 @@ export interface CardView {
   dragons: string[];
   blocked: string | null; // why it can't be played right now, if known
   element?: string; // dragon cards: the dragon's element, for the card's art
+  dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
 export interface SeatState {
@@ -248,7 +249,8 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
-    return { ...base, text, element: d.element, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
+    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st) })) };
+    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];
   if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep it: it scores while in your hand.' };
