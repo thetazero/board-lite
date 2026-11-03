@@ -54,6 +54,11 @@ Living design doc. Decisions here were made in conversation with the project own
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
 - Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
+### Special projects
+
+- Always-available "special projects" let a player get unstuck on all the basic things without a card, such as building the basic buildings or getting a base dragon of each element.
+- They are expensive: always worse than the equivalent card.
+
 ## Map
 
 - One shared hex map.
@@ -102,13 +107,13 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - The game is played in large global rounds. Each global round has, in order:
   1. Production phase: "Catan lite". Production is tied to the building, not the hex (at least for now); each building has a base production plus a roll of its own, e.g. a quarry produces 1 stone plus a d3. The TV shows each player's production per resource as the summed base plus the dice, e.g. 12 + some number of dice for stone.
-  2. Card picking phase
+  2. Card picking phase: cards are drawn from a deck. Picking is free. Each player gets a fixed number per round, maybe 2 building cards and 1 action card.
   3. Action phase: playing action cards, trading, and building all happen here. Catan-style turns: players act one at a time, and anyone can trade with the acting player. Chosen over a simultaneous timed phase because turns force communication.
   4. Raid phase
 
 ## Open questions
 
-- Within the global round: how card picking works (what cards, from where), whether phases are simultaneous or in turn order.
+- Within the global round: whether phases are simultaneous or in turn order.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
 - Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
