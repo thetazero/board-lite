@@ -27,7 +27,7 @@ const TV = { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false };
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true };
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const FLEE_LEFT_MS = 7000; // the flee clock reads 7s
-const LAN = { lan: ['192.168.1.20'], port: 8080 }; // the address the TV shows
+const LAN = { lan: ['192.168.1.20'], tailscale: [] as string[], port: 8080 }; // the address the TV shows
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
