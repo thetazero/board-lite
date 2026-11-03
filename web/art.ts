@@ -443,3 +443,23 @@ export const KIND_ICON: Record<string, string> = {
 export function kindIcon(kind: string, size = 14, color = '#fff'): string {
   return `<svg class="kicon" width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${KIND_ICON[kind] ?? ''}</svg>`;
 }
+
+// ---------- small folded glyphs for card stats ----------
+
+const GLYPH: Record<string, string> = {
+  health: f([[0, 8], [-8, 0], [-8, -4], [-4, -7], [0, -3]], '#e5484d', 0.15) + f([[0, 8], [0, -3], [4, -7], [8, -4], [8, 0]], '#e5484d', -0.15),
+  attack: [-5, 0, 5].map((x) => f([[x - 3, 8], [x + 2.5, -8], [x + 3.5, -7], [x - 1, 8]], '#d9dde6', x < 0 ? 0.2 : -0.05)).join(''),
+  growth: f([[-6, -8], [6, -8], [0, 0]], '#e9b84a', 0.15) + f([[0, 0], [-6, 8], [6, 8]], '#e9b84a', -0.15) + f([[-7, -9], [7, -9], [7, -7.5], [-7, -7.5]], '#a0673a') + f([[-7, 7.5], [7, 7.5], [7, 9], [-7, 9]], '#a0673a'),
+};
+
+export function glyph(name: string, label: string, size = 1.1): string {
+  return `<svg class="glyph" style="width:${size}em;height:${size}em" viewBox="-10 -10 20 20" role="img" aria-label="${label}"><title>${label}</title>${GLYPH[name] ?? ''}</svg>`;
+}
+
+// A dragon at one life stage, for the stat rows: the card's dragon, smaller when younger.
+export function stageFigure(key: string, element: string, stage: number): string {
+  const build = key.endsWith('wyrm') ? 'wyrm' : key.endsWith('drake') ? 'drake' : 'whelp';
+  const c = element === 'air' ? '#7fb2c2' : element === 'ice' ? '#6fc2ea' : element === 'lightning' ? '#f2c230' : ELEMENT_COLORS[element] ?? '#ff5a36';
+  const s = [0.5, 0.72, 0.95][stage];
+  return `<svg class="stagefig" viewBox="-40 -42 80 56" aria-hidden="true">${at(0, 6, s, dragonFigure(c, BUILDS[build]))}</svg>`;
+}

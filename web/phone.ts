@@ -5,7 +5,7 @@ import type { CardView, PublicState, SeatState, Snapshot } from '../src/state.ts
 import {
   ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, elemIcon, esc, hpBar, icon, iconText, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
-import { ART_DEFS, cardArt, frameColor, kindIcon } from './art.ts';
+import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -235,7 +235,8 @@ function render() {
   else body = actionView(g, me);
   const den = !picking && (g.phase === 'action' || g.phase === 'discard') ? roost(g, me) : '';
   // Drawn cards fly into the hand, so the log doesn't also say so.
-  const recent = me.log.filter((e) => !e.text.startsWith('You draw ')).slice(-2).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
+  // Only this round's news: last round's raid choices don't linger into your turn.
+  const recent = me.log.filter((e) => e.round === g.round && !e.text.startsWith('You draw ')).slice(-2).map((e) => `<li>${named(e.text, names, g.dragons)}</li>`).join('');
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
@@ -299,6 +300,15 @@ function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''):
   </div>`;
 }
 
+// A dragon card's text is its numbers: each life stage drawn small with its
+// health and attack, how fast it grows, and one sentence on how it picks targets.
+function dragonStats(c: CardView): string {
+  const d = c.dragon!;
+  const rows = d.stages.map((st, i) => `<div class="drow">${stageFigure(c.key, c.element ?? 'fire', i)}<span>${glyph('health', 'health')}${st.hp}</span><span>${glyph('attack', 'attack')}${esc(st.attack)}</span></div>`).join('');
+  const sentence = `${d.targeting[0].toUpperCase()}${d.targeting.slice(1)}.`;
+  return `<div class="dstats">${rows}<div class="dgrow" title="Growth steps per life stage (a fed dragon grows a step each round)">${glyph('growth', 'growth steps per stage')}${d.growth} per stage</div></div><p class="ctext">${esc(sentence)}</p>`;
+}
+
 // A card tapped open: full size, its rule text, and how to play it.
 function cardZoom(c: CardView, me: Me, playable: boolean): string {
   let actions = '';
@@ -315,7 +325,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
       <div class="cart">${cardArt(c.kind, c.key, c.element)}<span class="ckind">${cornerMark(c)}</span></div>
       <b class="cname">${esc(c.name)}</b>
       <div class="ccost"><span>${costChips(c.cost, me)}</span><small>${KIND_LABEL[c.kind]}</small></div>
-      <p class="ctext">${iconText(esc(c.text))}</p>
+      ${c.dragon ? dragonStats(c) : `<p class="ctext">${iconText(esc(c.text))}</p>`}
     </div>
     <div class="zoomacts">${actions}</div>
     ${me.hand.length > 1 ? `<div class="zoomnav"><button class="ghost" data-zoomnav="-1" aria-label="Previous card">‹</button><span>${me.hand.indexOf(c) + 1} / ${me.hand.length}</span><button class="ghost" data-zoomnav="1" aria-label="Next card">›</button></div>` : ''}
@@ -334,7 +344,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean): string {
     const ready = playable && c.affordable && !c.blocked && c.needs !== 'unplayable';
     // --x: offset from the centre as a share of the spread; --r: tilt; --y: the arc's drop.
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
-    return cardFace(c, me, playable, `${pos}`, ready ? ' ready' : '');
+    return cardFace(c, me, playable, `${pos}`, `${ready ? ' ready' : ''}${c.name.length >= 10 ? ' longname' : ''}`);
   }).join('');
   return `<div class="handfan${discarding ? ' discarding' : ''}" style="--n:${n}">${cards}</div>`;
 }
