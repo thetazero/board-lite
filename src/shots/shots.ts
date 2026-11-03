@@ -27,7 +27,7 @@ const TV = { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false };
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true };
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const FLEE_LEFT_MS = 7000; // the flee clock reads 7s
-const LAN = { lan: ['192.168.1.20'], port: 8080 }; // the address the TV shows
+const LAN = { lan: ['192.168.1.20'], tailscale: [], port: 8080 }; // the address the TV shows
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -86,8 +86,10 @@ function findChrome(): string {
   return found;
 }
 
+// Each run gets its own profile, so two runs at once (from two worktrees) don't
+// collide on Chrome's profile lock. It's deleted when Chrome exits.
 async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
-  const profile = join(CACHE, 'chrome-profile');
+  const profile = join(CACHE, `chrome-profile-${process.pid}`);
   mkdirSync(profile, { recursive: true });
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
@@ -96,6 +98,11 @@ async function launchChrome(): Promise<{ proc: ChildProcess; url: string }> {
     '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  proc.on('exit', () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch { /* Chrome's helpers may still be writing; a leftover profile is harmless */ }
+  });
   const url = await new Promise<string>((ok, fail) => {
     let err = '';
     const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
