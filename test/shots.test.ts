@@ -18,6 +18,7 @@ test('every screenshot scene stages, the same way every time', () => {
       files.add(s.file);
       if (s.seat !== undefined) assert.ok(s.seat >= 0 && s.seat < scene.players, `${s.file} has a real seat`);
       if (s.live) assert.ok(scene.live, `${s.file} is live, so its scene says how far to play`);
+      if (s.fill || s.path || s.remember) assert.equal(s.seat, undefined, `${s.file} is a phone that hasn't joined`);
     }
     if (a.game) {
       publicState(a.game);
@@ -25,6 +26,6 @@ test('every screenshot scene stages, the same way every time', () => {
       if (scene.live) assert.ok(drive(a.game, a.rng, scene.live), `${scene.name} reaches its live end`);
     }
   }
-  // The set covers every player count the game supports.
-  assert.deepEqual([...new Set(SCENES.map((s) => s.players))].sort(), [2, 3, 4, 5, 6]);
+  // The games cover every player count the game supports.
+  assert.deepEqual([...new Set(SCENES.filter((s) => !s.lobby).map((s) => s.players))].sort(), [2, 3, 4, 5, 6]);
 });
