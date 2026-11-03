@@ -3,7 +3,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  PLAYER_COLORS, RESOURCES, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, elemIcon, esc, eventHtml, gainChips, hpBar,
+  PLAYER_COLORS, RESOURCES, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, elemIcon, esc, eventHtml, gainChips, hpBar,
   icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, watch,
 } from './common.ts';
 import { glyph } from './art.ts';
@@ -107,37 +107,73 @@ function renderLobby() {
 
 // ---------- the board ----------
 
+// "Ada", "Ada and Dax", "Ada, Dax and Eve".
+function nameList(ps: number[]): string {
+  const tags = ps.map((p) => playerTag(p, names));
+  return tags.length <= 1 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags.at(-1)}`;
+}
+
 function phaseLabel(g: PublicState): string {
   if (g.phase === 'over') return 'Game over';
   if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
-  if (g.phase === 'discard') return 'End of round: discarding';
+  if (g.phase === 'discard') return `End of round: ${g.waitingOn.length ? `${nameList(g.waitingOn)} discard${g.waitingOn.length === 1 ? 's' : ''} down to the hand limit` : 'discarding'}`;
   if (g.phase === 'cards') return 'Picking building cards';
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
 }
 
-function prodChips(prod: Record<string, { base: number; dice: number[] }>): string {
-  return RESOURCES.filter((r) => prod[r].base || prod[r].dice.length)
-    .map((r) => `<span class="chip">${resIcon(r, 1.2)}${prod[r].base}${prod[r].dice.length ? `<small>+${prod[r].dice.map((d) => `d${d}`).join('+')}</small>` : ''}</span>`)
-    .join('');
+// What one player is doing right now, if the table is waiting on them.
+function doing(g: PublicState, p: number): string {
+  if (!g.waitingOn.includes(p)) return '';
+  if (g.phase === 'action') return g.turn === p ? 'their turn' : 'answering a trade';
+  if (g.phase === 'discard') return 'discarding';
+  if (g.phase === 'cards') return 'picking a card';
+  if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'voting' : g.raid?.step === 'commit' ? 'sending dragons' : 'fight or bail?';
+  return '';
+}
+
+// A round's income: every resource, always in the same order, so the columns
+// line up from card to card; nothing coming in shows dimmed.
+function incomeRow(prod: Record<string, { base: number; dice: number[] }>): string {
+  return RESOURCES.map((r) => {
+    const x = prod[r];
+    const none = !x.base && !x.dice.length;
+    // "+d6", or "+2d6" for two of them.
+    const dice = [...new Set(x.dice)].sort((a, b) => b - a).map((s) => {
+      const k = x.dice.filter((d) => d === s).length;
+      return `<small>+${k > 1 ? k : ''}d${s}</small>`;
+    }).join('');
+    return `<span class="inc${none ? ' zero' : ''}">${resIcon(r, 1.25)}<b>${x.base < 0 ? '−' : '+'}${Math.abs(x.base)}</b>${dice}</span>`;
+  }).join('');
+}
+
+// A dragon on the TV: always its name, then its stage and how it is. A dragon
+// sitting out the round says why instead of showing its (full) health.
+function tvDragon(d: DragonView, all: DragonView[], roomy: boolean): string {
+  const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
+  const state = d.resting === 'hungry' ? '<em class="st-hungry">hungry</em>'
+    : d.resting === 'hurt' ? '<em class="st-healing">healing</em>'
+    : d.stage ? hpBar(d.hp, d.maxHp) : '';
+  return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow} ${state}</span></div></div>`;
 }
 
 function renderGame(g: PublicState) {
-  const waiting = new Set(g.waitingOn);
-  const many = g.players.length >= 5; // compact player cards so six fit
+  const n = g.players.length;
   const players = g.players.map((p, i) => {
-    const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge">${esc(t.name)}</span>`).join('');
-    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => dragonChip(d, many)).join('') || '<div class="none">no dragons</div>';
+    const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge" title="${esc(t.name)}">${icon(TITLE_ICON[t.key], 1.1)}</span>`).join('');
+    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => tvDragon(d, g.dragons, n <= 4)).join('') || '<div class="none">no dragons</div>';
     const seat = snap!.lobby.seats[i];
     const turn = g.phase === 'action' && g.turn === i;
+    const what = doing(g, i);
     return `
-      <div class="pcard${turn ? ' turn' : ''}${many ? ' compact' : ''}" style="--pc:${PLAYER_COLORS[i]}">
+      <div class="pcard${turn ? ' turn' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
           <span class="pname">${esc(names[i])}${seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
-          ${waiting.has(i) && g.phase !== 'over' ? '<span class="thinking">deciding…</span>' : ''}
-          <span class="pts">${icon('points', 1.5)}<b>${p.publicPoints}</b><small>/${g.pointsToWin}</small></span>
+          ${what ? `<span class="doing">${what}</span>` : ''}
+          ${titles}
+          <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
+          <span class="pts">${icon('points', 1.3)}<b>${p.publicPoints}</b></span>
         </div>
-        <div class="prow"><span class="chip cards" title="cards in hand">${icon('cards', 1.25)}${p.handSize}</span>${prodChips(p.production)}</div>
-        ${titles ? `<div class="prow">${titles}</div>` : ''}
+        <div class="prow"><span class="lbl">per round</span>${incomeRow(p.production)}</div>
         <div class="dragons">${dragons}</div>
       </div>`;
   }).join('');
@@ -146,8 +182,10 @@ function renderGame(g: PublicState) {
   // count it takes to hold it at all.
   const titles = g.titles.map((t) => `<li>${icon(TITLE_ICON[t.key], 1.3)}<b>${esc(t.name)}</b>
     <span class="tvals">${t.values.map((v, p) => `<span class="tval${t.holder === p ? ' held' : ''}${v < t.min ? ' under' : ''}" style="--pc:${PLAYER_COLORS[p]}">${v}</span>`).join('')}</span><small class="tmin">≥${t.min}</small></li>`).join('');
-  const log = g.log.map((e) => eventHtml(e, g, names)).filter(Boolean).slice(-7).map((h) => `<li>${h}</li>`).join('');
-  const talk = g.talk.slice(-6).map((e) => `<li>${talkLine(e.text, g)}</li>`).join('');
+  // Things that happened and what people said, in the order they did.
+  const feed = [...g.log.map((e) => ({ i: e.i, html: eventHtml(e, g, names), said: false })), ...g.talk.map((e) => ({ i: e.i, html: talkLine(e.text, g), said: true }))]
+    .filter((x) => x.html).sort((a, b) => a.i - b.i).slice(-8)
+    .map((x) => `<li${x.said ? ' class="said"' : ''}>${x.html}</li>`).join('');
   if (board3d === undefined) board3d = Board3D.supported() ? new Board3D() : null;
   const highlight = g.phase === 'action' ? g.turn : null;
   // The flat map needs a legend; the 3D board shows what things are.
@@ -162,26 +200,36 @@ function renderGame(g: PublicState) {
       <header class="topbar">
         <span class="round">Round ${g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
+        <span class="goal">first to <b>${g.pointsToWin}</b>${icon('points', 1.2)}</span>
         <span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>
       </header>
-      <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
-      <aside class="side">
-        ${players}
-        ${many ? '' : `<div class="panel titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul></div>`}
-        ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
-      </aside>
-      <footer class="ticker"><ul>${log}</ul><div class="talk"><h3>Table talk</h3><ul>${talk || '<li class="none">Nobody has said anything yet.</li>'}</ul></div></footer>
+      <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}</section>
+      <aside class="side p${n}">${players}</aside>
+      <footer class="ticker"><ul class="feed">${feed}</ul><div class="titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul></div></footer>
     </div>`;
   if (board3d) {
-    $('mapwrap').append(board3d.el);
+    $('mapwrap').prepend(board3d.el);
     board3d.update(g, highlight);
   }
-  // The ticker shows the newest lines at the bottom; an older one that only
+  fitSide();
+  // The feed shows the newest lines at the bottom; an older one that only
   // partly fits at the top is dropped rather than shown sliced in half.
-  for (const ul of app.querySelectorAll<HTMLElement>('.ticker ul')) {
+  for (const ul of app.querySelectorAll<HTMLElement>('.ticker ul.feed')) {
     const top = ul.getBoundingClientRect().top;
     while (ul.children.length > 1 && ul.firstElementChild!.getBoundingClientRect().top < top - 1) ul.firstElementChild!.remove();
   }
+}
+
+// The player cards start as large as their count allows (style.css) and step
+// down until they all fit: many dragons in a big game take more room.
+function fitSide() {
+  const side = app.querySelector<HTMLElement>('.side');
+  if (!side) return;
+  let px = parseFloat(getComputedStyle(side).fontSize);
+  const min = parseFloat(getComputedStyle(document.body).fontSize) * 1.05;
+  const rows = side.querySelectorAll<HTMLElement>('.phead, .prow, .dragons');
+  const over = () => side.scrollHeight > side.clientHeight + 1 || [...rows].some((r) => r.scrollWidth > r.clientWidth + 1);
+  while (over() && px > min) side.style.fontSize = `${(px = Math.max(min, px * 0.95))}px`;
 }
 
 // "P2 says: "hi"" -> the speaker's name, then what they said.
@@ -226,7 +274,7 @@ function renderRaid(g: PublicState) {
     // they're keeping their dragons home, that none of theirs can go, or how
     // many could while they're still choosing.
     const commitRow = (p: number) => {
-      const sent = raid.commits[p].map((id) => dragonChip(dragonById(id))).join('');
+      const sent = raid.commits[p].map((id) => dragonChip(dragonById(id), g.dragons)).join('');
       const able = g.dragons.filter((d) => d.owner === p && d.canRaid).length;
       let what: string;
       if (sent) what = `${sent} ${raid.ready[p] ? '<span class="ok">ready</span>' : '<span class="wait">choosing…</span>'}`;
@@ -239,7 +287,7 @@ function renderRaid(g: PublicState) {
     body = `<h1>${icon('raid', 1.1)} Who's going? <span class="tag">${icon('public', 1)}</span></h1>
       <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
   } else if (raid.step === 'bail') {
-    const rows = names.flatMap((_, p) => (raid.commits[p].length ? [`<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id))).join('')} ${check(raid.decided[p])}</li>`] : [])).join('');
+    const rows = names.flatMap((_, p) => (raid.commits[p].length ? [`<li>${playerTag(p, names)} ${raid.commits[p].map((id) => dragonChip(dragonById(id), g.dragons)).join('')} ${check(raid.decided[p])}</li>`] : [])).join('');
     body = `<h1>Fight or bail? <span class="tag">${icon('secret', 1)}</span></h1>
       <div class="raidrow">${targetCard(raid.target!)}<ul class="commits">${rows}</ul></div>`;
   }
