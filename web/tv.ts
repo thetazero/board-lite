@@ -102,8 +102,9 @@ function phaseLabel(g: PublicState): string {
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
 }
 
-function dragonChip(d: DragonView): string {
-  const status = d.status === 'ready' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
+function dragonChip(d: DragonView, compact = false): string {
+  const status = d.status === 'ready' || d.status === 'egg' ? '' : `<em class="st-${d.status}">${d.status}</em>`;
+  if (compact) return `<div class="dchip compact" title="${esc(d.name)}">${dragonBadge(d, 30)}<div><span>${STAGE_LABEL[d.stage]}</span>${d.stage ? hpBar(d.hp, d.maxHp) : ''}${status}</div></div>`;
   const hp = d.stage ? hpBar(d.hp, d.maxHp) : '';
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   return `<div class="dchip" title="${esc(d.name)}">${dragonBadge(d, 34)}<div><b>${esc(d.name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}</span>${hp}${status}</div></div>`;
@@ -117,13 +118,14 @@ function prodChips(prod: Record<string, { base: number; dice: number[] }>): stri
 
 function renderGame(g: PublicState) {
   const waiting = new Set(g.waitingOn);
+  const many = g.players.length >= 5; // compact player cards so six fit
   const players = g.players.map((p, i) => {
     const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge">${esc(t.name)}</span>`).join('');
-    const dragons = g.dragons.filter((d) => d.owner === i).map(dragonChip).join('') || '<div class="none">no dragons</div>';
+    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => dragonChip(d, many)).join('') || '<div class="none">no dragons</div>';
     const seat = snap!.lobby.seats[i];
     const turn = g.phase === 'action' && g.turn === i;
     return `
-      <div class="pcard${turn ? ' turn' : ''}" style="--pc:${PLAYER_COLORS[i]}">
+      <div class="pcard${turn ? ' turn' : ''}${many ? ' compact' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
           <span class="pname">${esc(names[i])}${seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
           ${waiting.has(i) && g.phase !== 'over' ? '<span class="thinking">deciding…</span>' : ''}
@@ -152,7 +154,7 @@ function renderGame(g: PublicState) {
       </section>
       <aside class="side">
         ${players}
-        <div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>
+        ${many ? '' : `<div class="panel"><h3>Titles <small>(2 points each)</small></h3><ul>${titles}</ul></div>`}
         ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       </aside>
       <footer class="ticker"><ul>${log}</ul></footer>

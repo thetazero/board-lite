@@ -2,6 +2,13 @@
 
 Provisional design calls made without the owner present, newest first. Each entry: the call, why, and what would change it. The owner reviews these; any can be reversed.
 
+## 2026-11-03: first TV and phone clients
+
+- **Call:** the 10-second flee clock lives in the server; anyone who hasn't chosen when it runs out stays. **Why:** the design gives 10 seconds and the engine left the timer to the clients; "stay" is the choice that changes nothing, so a distracted player is never dragged out of a fight. No other step has a clock: votes, commitments and fight-or-bail wait for everyone, as at a real table. **What would change it:** playtests where one slow player stalls every raid.
+- **Call:** no chat on the phones. **Why:** everyone is in one room, and eyes should stay on the TV and the people; talking is talking. The engine's `say`/`tell` stay for the CLI and Claude playtests.
+- **Call:** bots can fill seats from the lobby. **Why:** the random test bot already exists; it lets one person try the clients and lets a group of two test a three-seat game. It is not meant to play well.
+- **Call:** the TV shows a short production banner with dice at the start of each round and a banner for each raid's result; everything else is live state. **Why:** dice "shown on screen" and the raid cut scene are in the design; anything more is the graphics workstream.
+
 ## 2026-11-02: table talk and sandboxed playtests
 
 - **Call:** talk is an engine command (`say`, `tell P2`), allowed for anyone at any time, binding no one. **Why:** at a real table people talk whenever they like, so "when the game allows talk" is simply always; one rule with no timing questions. Putting it in the game log means the TV can show table talk later and playtest logs carry the conversation next to the moves. It adds no rule beyond "promises don't bind; only accepted trades do", which the design already implied. **What would change it:** playtests where unlimited private talk during the secret bail step makes raids pointless.

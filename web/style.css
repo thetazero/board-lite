@@ -93,6 +93,13 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .dragons { display: flex; flex-wrap: wrap; gap: .3em .8em; margin-top: .25em; }
 .dchip { display: flex; align-items: center; gap: .3em; font-size: .85em; line-height: 1.15; }
 .dchip > div { display: flex; flex-direction: column; }
+.pcard.compact { padding: .3em .6em; }
+.pcard.compact .pname { font-size: 1.15em; }
+.pcard.compact .pts b { font-size: 1.4em; }
+.pcard.compact .prow { margin-top: 0; }
+.pcard.compact .dragons { margin-top: .1em; gap: .2em .6em; }
+.dchip.compact { font-size: .75em; }
+.dchip.compact .hpbar { width: 3em; }
 .dchip .grow { color: var(--muted); letter-spacing: -.05em; }
 .dchip em { font-style: normal; font-size: .85em; }
 .st-hungry { color: #f2a33a; } .st-hurt { color: var(--bad); } .st-egg { color: var(--muted); }
