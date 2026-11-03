@@ -89,7 +89,7 @@ Living design doc. Decisions here were made in conversation with the project own
 
 ## Raids
 
-- Each raid phase has one raid candidate (a single neutral target).
+- Each raid phase has one raid target, chosen from 3 random candidates by a player vote; ties are resolved by a coin flip. Targets don't change in strength over the game.
 - The raid has two phases:
   1. Public commit: everyone knows exactly who is committing what. Once everyone hits ready, the commitments lock in.
   2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.
@@ -126,7 +126,27 @@ Living design doc. Decisions here were made in conversation with the project own
 
 - Order of play: globally visible things happen in turn order; local hidden things happen all at once, to keep the game fast ("make globally visible stuff turn order, local hidden stuff all at once"). So production resolves in turn order (it's just an animation), card picking is all at once, and the raid phase is all at once.
 
+## Setup
+
+- Each player starts with a tower hex, some resources, and a starting dragon.
+- Tower placement is fixed by player count.
+
+## Trading
+
+- Players trade with each other (resources and cards).
+- Bank trades at 4:1, like Catan; markets improve the rate.
+
+## Map generation
+
+- The hex map is randomly generated each game. It should be fun but legible on a TV screen.
+
+## Platform
+
+- A web game. Strong preference for TypeScript; no other stack preferences.
+- The phone client should be lightweight.
+
 ## Open questions
 
 - Tuning numbers (deferred; not answerable yet): N to win, points per title, costs, dice, unit stats, player count, game length.
 - Action cards: the full list. Known so far: dragon cards, an extra raid phase, cards that give resources, cards that grow dragons faster.
+- Trading: whether trades between players are binding once confirmed.
