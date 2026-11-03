@@ -67,7 +67,7 @@ function mapText(g: Game): string[] {
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
-  lines.push(`Fauna shows as {code} (no building there; a building under it produces nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes next to it (shown as {x}): nothing is built there until it is slain.`);
+  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {
@@ -122,7 +122,7 @@ export function targetText(t: string): string {
 
 export function faunaText(k: string): string {
   const x = faunaDef(k);
-  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; one try a round each` : `loot ${bundleText(x.loot)}`;
+  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; 1 try each round` : `loot ${bundleText(x.loot)}`;
   return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
 }
 
@@ -220,7 +220,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   const out: string[] = [];
   out.push(`You are ${pname(p)}. ${phaseText(g)}`);
   const hints = commandHints(g, p);
-  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingOn(g).map(pname).join(', ') || 'nobody'}.`);
+  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingOn(g).map(pname).join(', ') || 'no one'}.`);
   out.push('');
   out.push(`== Scores (first to ${TUNING.pointsToWin}; hidden points count at the end) ==`);
   for (let q = 0; q < g.players.length; q++) {
@@ -228,7 +228,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
     const extra = q === p ? ` + ${s.hidden} hidden = ${s.total}` : '';
     out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles}${s.beasts ? `, great beasts ${s.beasts}` : ''})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
   }
-  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'nobody' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
+  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'no one' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
   out.push('');
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${RESOURCES.map((r) => `${pl.resources[r]} ${r}`).join(', ')}`);
@@ -251,7 +251,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   const fauna = faunaOnMap(g);
   out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
   const slain = Object.entries(g.slain).map(([k, q]) => `${BEASTS[k].name} by ${pname(q)}`);
-  out.push(`Great beasts: one Thunderbird on the peak (${PEAK}) and one Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or next to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
+  out.push(`Great beasts: a Thunderbird on the peak (${PEAK}) and a Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
   if (g.phase === 'raid') {
     out.push('');
     out.push(...raidText(g, p));
