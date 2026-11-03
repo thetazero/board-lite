@@ -52,7 +52,7 @@ Living design doc. Decisions here were made in conversation with the project own
 - Two kinds of cards for them:
   1. Building cards.
   2. Building upgrade cards. An upgrade applies to a class of building and is placed on one specific building, which then looks different on the board.
-- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), defense (walls, watchtower), trade (market, caravan post: better bank trade rates).
+- Building classes so far: production (quarry, lumber camp, crystal mine, pasture), dragon (hatchery, roost), tower floors (victory points), trade (market, caravan post: better bank trade rates). No defense buildings (see Raids).
 
 ## Map
 
@@ -73,11 +73,20 @@ Living design doc. Decisions here were made in conversation with the project own
 - Growth is automatic while the dragon is fed, but different dragons take different amounts of time to grow.
 - Roosts house dragons and cap how many you can keep.
 
+## Raids
+
+- Each raid phase has one raid candidate (a single neutral target).
+- Each player privately chooses to commit dragons to the raid or not. Players don't know for sure whether anyone else commits.
+- After everyone has committed or not, a "bail out" button appears.
+- Loot is split evenly.
+- Action cards can add another raid phase.
+- No retaliation and no defense buildings.
+
 ## Open questions
 
 - Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: what elements do in raids; how players get dragon cards.
-- Raids and the raiding phase: targets, joint raids, loot splits, retaliation.
+- Raids: what players see before deciding to commit or bail (the target's strength? who or how much committed?); what happens to a failed raid and to dragons in it; whether bailing costs anything; what elements do in raids; when the raid phase falls in a turn.
 - Action cards: what they do.
 - Player count and game length.
