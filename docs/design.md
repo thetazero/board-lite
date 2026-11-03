@@ -81,9 +81,9 @@ Living design doc. Decisions here were made in conversation with the project own
   2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.
 - Bailing costs nothing except that you get no share of the loot.
 - Intended dynamic: a player can commit publicly to draw others in, then secretly bail, leaving the raid weaker than everyone expected. This is deliberate, not an exploit to fix ("that consequence is exactly the dynamic I want").
-- Loot is split evenly (among those who play).
+- Loot is split evenly (among those who play; see Combat for fled dragons).
 - Targets have units with stats and with elemental strengths and weaknesses.
-- On a lost raid, each dragon's flee strength is rolled against the defenders' chase strength. A dragon that fails to flee is out healing for a number of rounds, scaled by how badly it lost the roll.
+- Fleeing: a dragon's flee strength is rolled against the defenders' chase strength. A dragon that flees leaves the fight either way; failing the roll means it takes damage scaled by how badly it lost.
 
 ### Combat
 
@@ -93,15 +93,24 @@ Living design doc. Decisions here were made in conversation with the project own
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
 - After each round of combat, players get 10 seconds to choose whether to roll to flee.
-- A dragon that loses all its health takes a round to recover.
+- Healing: a dragon that loses all its health is out healing for one full global round. The owner's tentative idea: healing time simply scales with health lost ("Maybe healing just scaled by health lost works here").
+- Loot is split evenly among players whose dragons were still fighting at the end.
 - Action cards can add another raid phase.
 - No retaliation and no defense buildings.
 
+## Game structure
+
+- The game is played in large global rounds. Each global round has, in order:
+  1. Production phase
+  2. Card picking phase
+  3. Action card playing phase
+  4. Raid phase
+
 ## Open questions
 
-- Turn structure, and how players get building and upgrade cards (deferred to the turn discussion).
+- Within the global round: how production works (dice?), how card picking works (what cards, from where), how building and trading fit in, and whether phases are simultaneous or in turn order.
 - Where victory points come from. Raised so far: dragons (by life stage, decided), tower floors, raid trophies, hidden points on action cards, a title that changes hands.
 - Dragons: how players get dragon cards.
-- Raids: what a raid's loot is; when the raid phase falls in a turn; whether "a round to recover" means a game round; what happens to a dragon that fails its flee roll mid-fight; who shares the loot when some dragons fled.
+- Raids: what a raid's loot is; exact healing rule (settle the tentative "scaled by health lost").
 - Action cards: what they do.
 - Player count and game length.
