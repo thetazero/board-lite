@@ -13,14 +13,14 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 
 ## Code
 
-TypeScript, run directly by Node 22.18+ (no build step).
+TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `npm run serve`: the TV's board needs three.js.
 
 - `src/data.ts`: every card, unit, kingdom and tuning number; `src/datasheet.ts` turns them into `docs/datasheet.md`
 - `src/engine.ts`: the rules; `apply(game, seat, command)` is the only way to change a game
 - `src/view.ts`: what one seat may see, and its options
 - `src/cli.ts`: the command-line interface; `src/bot.ts`: a random bot for tests and sims; `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude players (hosting a playtest, or joining a room) and the per-seat MCP server they play through
-- `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients
+- `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
 - `src/shots/`: staged screenshots of the clients (`npm run shots`)
 
 `npm install`, then `npm test` (tests) and `npm run typecheck`. CI runs both. `npm test` fails if `docs/datasheet.md` is out of date: after changing `src/data.ts` or the rules, run `npm run datasheet` and commit the result.
