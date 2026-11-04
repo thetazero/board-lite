@@ -161,8 +161,6 @@ svg.token { flex: none; }
 .topbar .phase { font-size: 1.7em; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); padding: .05em .9em .1em; filter: drop-shadow(0 .12em .15em #0008); }
 .topbar .phase .ptag { color: color-mix(in oklab, var(--pc) 62%, #1a1218); }
 .topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
-.topbar .roomcode { color: var(--muted); font-size: 1.1em; }
-.topbar .roomcode b { color: var(--text); letter-spacing: .1em; }
 .mapwrap { position: absolute; inset: 0 calc(var(--colw) - 6vw) 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
 .board3d { flex: 1; min-height: 0; position: relative; }
@@ -739,3 +737,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .bvs b { font-size: 1.6em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
+/* A dragon in the roost is a button: tap it for its card. */
+.dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
+.dtap:active:not(:disabled) { transform: translateY(.08em); box-shadow: none; }
+/* A hatched dragon's card: where it is now, and its stage's row marked. */
+.card .dnow { display: inline-flex; align-items: center; gap: .3em; font-weight: 700; }
+.card .dnow .grow { color: #6a5d52; letter-spacing: -.05em; }
+.drow.now { background: color-mix(in oklab, var(--kc) 22%, transparent); border-radius: 2px; box-shadow: inset .2em 0 0 var(--kc); }

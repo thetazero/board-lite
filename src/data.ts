@@ -12,10 +12,10 @@ export type Element = (typeof ELEMENTS)[number];
 
 export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
-// How text names one hex of a terrain ("a mountain hex", "a ley line"). Terrain
+// How text names one hex of a terrain ("a mountain hex", "a crystal field hex"). Terrain
 // is a hex, so "meadow hex" can't be read as the building on it (#150).
 export const TERRAIN_NOUN: Record<Terrain, string> = {
-  mountain: 'mountain hex', forest: 'forest hex', ley: 'ley line', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex',
+  mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex',
 };
 // "a, b or c": how card text lists choices.
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
@@ -114,7 +114,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 6, crystal: 6, livestock: 4 }, 2),
   sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 6, crystal: 6, livestock: 4 }, 2),
   driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 8, crystal: 6, livestock: 6 }, 1),
-  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 6, timber: 6, livestock: 4 }, 2),
+  ley_spire: terrainMaker('Crystal Spire', 'mine', 'crystal', 'ley', { stone: 6, timber: 6, livestock: 4 }, 2),
   gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 6, timber: 6, livestock: 4 }, 2),
   smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 6, stone: 4, livestock: 6 }, 1),
   shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 6, timber: 6, crystal: 4 }, 2),
@@ -129,7 +129,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   monument: { name: 'Monument', class: 'monument', cost: { stone: 8, timber: 6, gold: 20 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
   // They count only what can't be bought without limit: terrain, or classes
   // that hold no basic building (monuments, trade buildings).
-  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 6, crystal: 6, gold: 20 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 6, crystal: 6, gold: 20 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent crystal field hex.', copies: 2 },
   lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 10, timber: 6, gold: 20 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
   guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 6, timber: 6, gold: 20 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
 };

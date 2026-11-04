@@ -49,8 +49,8 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **no one** | nobody | No player |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
-| **ley line** | ley | The terrain, every time |
-| **<terrain> hex** ("meadow hex", "forest hex") | a bare "meadow", "forest" | A hex of a terrain, built on or not, when a card counts it or a building must go on it. "ley line" is already a terrain's name and needs no "hex" |
+| **crystal field** | ley line, ley | The purple terrain crystal comes from, every time. One hex of it is a "crystal field hex" |
+| **<terrain> hex** ("meadow hex", "forest hex") | a bare "meadow", "forest" | A hex of a terrain, built on or not, when a card counts it or a building must go on it. |
 | **<resource> building** ("livestock building", "stone building") | pasture, quarry, lumber camp, mine (for a class) | Every building of a class: the basic building and the cards that make the same resource. A card that counts buildings says "building"; one that counts terrain says "hex", so the two never read alike (a Pasture stands on a meadow hex; "adjacent pasture" and "adjacent meadow" read the same) |
 
 Spelling is American ("harbor", "color"), to match the terrain and code names the CLI shows.

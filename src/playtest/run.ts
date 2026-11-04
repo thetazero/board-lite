@@ -12,6 +12,7 @@
 //
 //   node src/playtest/run.ts --models opus,haiku,haiku [--seed N] [--out DIR] [--serve PORT]
 //   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
+//   node src/playtest/run.ts --resume DIR   (bring a stopped runner's Claude players back to their seats)
 //
 // See docs/playtest.md and docs/play-vs-claude.md.
 
@@ -27,9 +28,11 @@ import { load } from '../store.ts';
 import { Room } from '../server/room.ts';
 import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.ts';
 import type { Lobby } from '../state.ts';
-import { FLOOR_MB, defaultPool, release, tryAcquire } from './slots.ts';
+import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
+import { readState, stateFile, type RunnerState } from './resume.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
+node src/playtest/run.ts --resume DIR [options]
 
   --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, or "bot"
   --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
@@ -42,6 +45,9 @@ const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
   --max-minutes N                   stop after this long (default 240)
   --stall-minutes N                 stop if nothing happens in the game for this long (default 15; 60 with --room)
   --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
+  --resume DIR                      bring the Claude players of a runner that stopped (low memory, Ctrl-C, a crash,
+                                    a restart) back into their own seats, in the same game, with their memory of it;
+                                    DIR is that runner's --out. With --room too, the room has moved (a new port).
 
 Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
 wait their turn when the pool is full or memory is short. See docs/playtest.md.`;
@@ -52,26 +58,31 @@ function opt(args: string[], name: string): string | undefined {
 }
 
 const args = process.argv.slice(2);
-const modelsArg = opt(args, '--models');
+const resumeDir = opt(args, '--resume');
+const resumed: RunnerState | null = resumeDir ? readState(resolve(resumeDir)) : null;
+const modelsArg = opt(args, '--models') ?? resumed?.seats.map((s) => s.model).join(',');
 if (!modelsArg || args.includes('--help')) {
   console.log(USAGE);
   process.exit(modelsArg ? 0 : 1);
 }
 const models = modelsArg.split(',').map((m) => m.trim()).filter(Boolean);
-const joinUrl = opt(args, '--room');
-if (joinUrl) {
+const joinUrl = opt(args, '--room') ?? (resumed && !resumed.hosted ? resumed.room : undefined);
+if (resumed) {
+  if (opt(args, '--models')) throw new Error('--resume brings back the same Claude players; leave out --models.');
+  if (resumed.pid && resumed.pid !== process.pid && alive(resumed.pid)) throw new Error(`The runner for ${resumeDir} is still running (process ${resumed.pid}).`);
+} else if (joinUrl) {
   if (!models.length || models.length > 5) throw new Error('Give 1 to 5 Claude seats in --models.');
   if (models.includes('bot')) throw new Error('With --room, add bots from the TV ("Add a bot"); --models is only for Claude seats.');
 } else if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
-const seed = Number(opt(args, '--seed') ?? Math.floor(Math.random() * 2 ** 31));
-const effort = opt(args, '--effort');
+const seed = Number(opt(args, '--seed') ?? resumed?.seed ?? Math.floor(Math.random() * 2 ** 31));
+const effort = opt(args, '--effort') ?? resumed?.effort;
 const budget = Number(opt(args, '--budget-usd') ?? 5);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
-const advice = opt(args, '--advice');
+const advice = opt(args, '--advice') ?? resumed?.advice;
 const servePort = opt(args, '--serve');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-const out = resolve(opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
+const out = resolve(resumeDir ?? opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
 
 const seatServer = fileURLToPath(new URL('./seat-server.ts', import.meta.url));
@@ -97,11 +108,15 @@ const lobby = async (): Promise<Lobby> => (await call('')).lobby;
 
 async function host() {
   gameFile = join(out, 'game.json');
-  if (existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
+  // Resuming a playtest this runner hosted: the room comes back from game.json
+  // and its seats file, under its own code and with every seat's token.
+  const code = resumed ? Room.savedCode(gameFile) : null;
+  if (resumed && !code) throw new Error(`Nothing to resume: ${gameFile} or its seats file is missing.`);
+  if (!resumed && existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
   const { server, rooms } = startServer(Number(servePort ?? 0), { botDelayMs: 300 }, [], servePort ? '0.0.0.0' : '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const port = (server.address() as AddressInfo).port;
-  hosted = new Room(Room.newCode((c) => rooms.has(c)), { botDelayMs: 300, file: gameFile });
+  hosted = new Room(code ?? Room.newCode((c) => rooms.has(c)), { botDelayMs: 300, file: gameFile });
   rooms.set(hosted.code, hosted);
   roomUrl = `http://127.0.0.1:${port}/${hosted.code}`;
   api = `http://127.0.0.1:${port}/api/rooms/${hosted.code}`;
@@ -122,9 +137,18 @@ function seatName(taken: string[]): string {
 
 // ---- Claude seats ----
 
-interface Seat { p: number; model: string; token: string; session: string; proc: ChildProcess | null; starts: number; cost: number; exitedAt: number }
+interface Seat { p: number; model: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; exitedAt: number }
 const seats: Seat[] = [];
 let table: Lobby['seats'] = []; // everyone at the table, once the game starts
+
+// Everything --resume needs to bring these Claude players back, rewritten as it changes.
+function saveState() {
+  const state: RunnerState = {
+    pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}),
+    seats: seats.map(({ p, model, token, session, starts, cost }) => ({ p, model, token, session, starts, cost })),
+  };
+  writeFileSync(stateFile(out), `${JSON.stringify(state, null, 2)}\n`);
+}
 
 function systemPrompt(s: Seat): string {
   const who = (q: number) => {
@@ -156,9 +180,14 @@ function startSeat(s: Seat) {
   const mcp = join(dir, 'mcp.json');
   writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token, join(out, `seat-${s.p + 1}.moves.txt`)] } } }));
   const first = s.starts === 0;
+  if (first && !s.session) s.session = randomUUID();
   const prompt = first
-    ? 'The game has started. Read the rules, then play until the game is over.'
-    : 'The game is not over yet. Keep playing: call wait, and act when it is your decision.';
+    ? resumed
+      ? 'The game is under way: you are taking your seat partway through. Read the rules, call view to see where things stand, then play until the game is over.'
+      : 'The game has started. Read the rules, then play until the game is over.'
+    : resumed && s.startsHere === 0
+      ? 'You were away from the table for a while (your connection to the game dropped), and now you are back in your seat. The game is not over yet and may have moved on: call view to see where things stand, then keep playing: call wait, and act when it is your decision.'
+      : 'The game is not over yet. Keep playing: call wait, and act when it is your decision.';
   const argv = [
     '-p', prompt,
     '--model', s.model,
@@ -175,6 +204,8 @@ function startSeat(s: Seat) {
     ...(effort ? ['--effort', effort] : []),
   ];
   s.starts++;
+  s.startsHere++;
+  saveState();
   const transcript = createWriteStream(join(out, `seat-${s.p + 1}.jsonl`), { flags: 'a' });
   const errLog = createWriteStream(join(out, `seat-${s.p + 1}.stderr.log`), { flags: 'a' });
   const proc = spawn('claude', argv, {
@@ -201,6 +232,7 @@ function startSeat(s: Seat) {
     note(`${pname(s.p)} (${s.model}) process exited with code ${code}; spent $${s.cost.toFixed(2)} so far.`);
     s.proc = null;
     s.exitedAt = Date.now();
+    saveState();
   });
   s.proc = proc;
   note(`${pname(s.p)} (${s.model}) ${first ? 'starts' : 'resumes'}.`);
@@ -276,7 +308,12 @@ async function main() {
   const stopAll = () => { for (const s of seats) s.proc?.kill('SIGTERM'); };
   process.on('SIGINT', () => { interrupted = true; stopAll(); });
   process.on('SIGTERM', () => { interrupted = true; stopAll(); });
-  process.on('exit', () => release(pool));
+  process.on('exit', () => {
+    release(pool);
+    if (seats.length) { // no runner holds this directory any more
+      try { const st = readState(out); delete st.pid; writeFileSync(stateFile(out), `${JSON.stringify(st, null, 2)}\n`); } catch { /* nothing saved */ }
+    }
+  });
   let status = 'running';
   if (!(await admit())) status = 'interrupted';
 
@@ -287,13 +324,15 @@ async function main() {
     roomUrl = `${m[1]}/${m[2].toUpperCase()}`;
     api = `${m[1]}/api/rooms/${m[2].toUpperCase()}`;
   } else await host();
-  note(`${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}.`);
-  if (status === 'running') {
+  note(`${resumed ? 'Resuming: ' : ''}${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}.`);
+  if (status === 'running' && resumed) await reclaim(resumed);
+  else if (status === 'running') {
     for (const model of models) {
       if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
       const name = seatName((await lobby()).seats.map((t) => t.name));
       const r = await call('/join', { name });
-      seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, cost: 0, exitedAt: 0 });
+      seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });
+      saveState();
       note(`${name} (${model}) takes seat ${r.seat}.`);
     }
     if (hosted) hosted.start(hosted.hostToken, seed);
@@ -337,7 +376,7 @@ async function main() {
     for (const s of seats) {
       if (s.proc) continue;
       if (s.cost >= budget) { status = `${pname(s.p)} hit its budget`; break; }
-      if (s.starts >= 30) { status = `${pname(s.p)} kept stopping`; break; }
+      if (s.startsHere >= 30) { status = `${pname(s.p)} kept stopping`; break; }
       if (Date.now() - s.exitedAt > 3000) startSeat(s);
     }
   }
@@ -346,7 +385,33 @@ async function main() {
   const results = writeResults(finalGame(), status, started);
   note(`Finished (${results.status}) after ${results.rounds} rounds. Winner: ${results.winner ? `${results.winner.seat} (${results.winner.model})` : 'none'}.`);
   note(`Results: ${join(out, 'results.json')}${results.rounds ? `; full log with talk: ${join(out, 'log.txt')}` : ''}.`);
+  if (status !== 'over' && seats.length && table.length) note(`The game isn't over. To bring the Claude players back to their seats: node src/playtest/run.ts --resume ${out}`);
   process.exit(0); // the hosted server would keep the process alive
+}
+
+// --resume: back into the seats this runner's Claude players held, in the game
+// under way. The old seat token still holds the seat unless the player quit or
+// someone took it over; then joining with the seat's name takes it back.
+async function reclaim(state: RunnerState) {
+  const l = await lobby();
+  if (!l.started) throw new Error(`The game in ${roomUrl} hasn't started, so there's nothing to resume; start a new runner with --room instead.`);
+  table = l.seats;
+  gameFile ||= l.file;
+  const now = await call(`/listen?token=${state.seats[0].token}&since=0&timeout=0`).catch(() => null);
+  if (now && /^The game is over/.test(now.status)) throw new Error(`The game in ${roomUrl} is already over.`);
+  for (const saved of state.seats) {
+    const name = table[saved.p]?.name;
+    if (!name) throw new Error(`Seat ${saved.p + 1} isn't in the game in ${roomUrl}; is this the right room?`);
+    const s: Seat = { ...saved, proc: null, startsHere: 0, exitedAt: 0 };
+    if (!(await call(`?token=${s.token}`)).seated) {
+      const r = await call('/join', { name }).catch((e: Error) => { throw new Error(`Can't take seat ${saved.p + 1} (${name}) back: ${e.message}`); });
+      s.token = r.token;
+    }
+    seats.push(s);
+    note(`${name} (${s.model}) is back in seat ${s.p + 1}${s.starts ? ', with its memory of the game so far' : ''}.`);
+  }
+  saveState();
+  note(`The table: ${table.map((t, q) => `${pname(q)} ${t.name} (${seatLabel(q)})`).join(', ')}.`);
 }
 
 void main();

@@ -917,6 +917,17 @@ function hasTradeSide(g: Game, p: number, s: TradeSide): boolean {
   return canAfford(g.players[p], s.res) && s.cards.every((id) => g.players[p].hand.some((c) => c.id === id));
 }
 
+function tradesNothing(s: TradeSide): boolean {
+  return !s.cards.length && !Object.values(s.res).some((n) => n);
+}
+
+// Why the player an offer is made to can't accept it now, or null if they can.
+export function acceptProblem(g: Game, o: Offer): string | null {
+  if (!hasTradeSide(g, o.from, o.give)) return `${pname(o.from)} no longer has what they offered.`;
+  if (!hasTradeSide(g, o.to, o.get)) return `You don't have ${tradeText(g, o.get)}.`;
+  return null;
+}
+
 function moveTradeSide(g: Game, from: number, to: number, s: TradeSide) {
   pay(g.players[from], s.res);
   gain(g.players[to], s.res);
@@ -1000,8 +1011,8 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     if (!o || o.to !== p) fail(`There is no offer "${args[0] ?? ''}" made to you.`);
     g.offers = g.offers.filter((x) => x !== o);
     if (verb === 'decline') return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from, give: tradeText(g, o!.give), get: tradeText(g, o!.get) });
-    if (!hasTradeSide(g, o!.from, o!.give)) fail(`${pname(o!.from)} no longer has what they offered.`);
-    if (!hasTradeSide(g, p, o!.get)) fail(`You don't have what offer ${o!.id} asks for.`);
+    const problem = acceptProblem(g, o!);
+    if (problem) fail(problem);
     const giveText = tradeText(g, o!.give), getText = tradeText(g, o!.get);
     moveTradeSide(g, o!.from, p, o!.give);
     moveTradeSide(g, p, o!.from, o!.get);
@@ -1014,7 +1025,13 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     const gi = args.indexOf('give'), ge = args.indexOf('get');
     if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold`);
     const o: Offer = { id: newId(g, 'o'), from: p, to, give: parseTradeSide(g, args.slice(gi + 1, ge)), get: parseTradeSide(g, args.slice(ge + 1)) };
+    if (tradesNothing(o.give) && tradesNothing(o.get)) fail(`That trades nothing for nothing: give or get something.`);
+    if (new Set([...o.give.cards, ...o.get.cards]).size < o.give.cards.length + o.get.cards.length) fail(`Name each card once.`);
     if (!hasTradeSide(g, p, o.give)) fail(`You don't have ${tradeText(g, o.give)}.`);
+    // Gold is public, so an ask for more than they have is refused here; the
+    // rest of what they hold is hidden, and is checked when they answer.
+    const gold = g.players[to].resources.gold;
+    if ((o.get.res.gold ?? 0) > gold) fail(`${pname(to)} has ${gold} gold.`);
     g.offers.push(o);
     return log(g, `${pname(p)} offers ${pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
   }
@@ -1244,7 +1261,8 @@ function talk(g: Game, p: number, verb: string, rest: string) {
   if (verb === 'tell') {
     const m = /^p(\d+)\s*(.*)$/is.exec(rest);
     const q = Number(m?.[1]) - 1;
-    if (!m || !(q >= 0 && q < g.players.length) || q === p) fail(`Tell whom? e.g. "tell P2 want my timber?"`);
+    if (m && q === p) fail(`You can't tell yourself.`);
+    if (!m || !(q >= 0 && q < g.players.length)) fail(`Tell whom? e.g. "tell P2 want my timber?"`);
     to = [p, q];
     rest = m![2].trim();
   }

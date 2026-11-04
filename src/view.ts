@@ -10,11 +10,11 @@ const P = (p: number) => `P${p + 1}`;
 const resText = (r: Res) => Object.entries(r).filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing';
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
+const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'C', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
 // Two letters per building on the text map.
 const BUILDING_CODE: Record<string, string> = {
   tower: 'TW', quarry: 'qu', lumber_camp: 'lc', crystal_mine: 'cm', pasture: 'pa', roost: 'ro',
-  cliff_works: 'cw', stonemason: 'sm', woodcutter: 'wc', sawmill: 'sw', driftwood_yard: 'dy', ley_spire: 'ls', gem_cutter: 'gc', smelter: 'se',
+  cliff_works: 'cw', stonemason: 'sm', woodcutter: 'wc', sawmill: 'sw', driftwood_yard: 'dy', ley_spire: 'cs', gem_cutter: 'gc', smelter: 'se',
   shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
   monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
@@ -50,7 +50,7 @@ function mapText(g: PublicState): string[] {
   const lines: string[] = [];
   const built = new Map(g.map.flatMap((h) => (h.building ? [[h.building.type, h.building.name] as const] : [])));
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
-  lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
+  lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
   if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   const rows = new Map<number, HexView[]>();
@@ -107,7 +107,10 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   const out: string[] = [];
   const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
   if (g.phase === 'action') {
-    for (const o of g.offers.filter((x) => x.to === you.seat)) out.push(`accept ${o.id}  |  decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})`);
+    for (const o of g.offers.filter((x) => x.to === you.seat)) {
+      const why = you.cantAccept[o.id];
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})${why ? ` ${why}` : ''}`);
+    }
     if (!you.myTurn) {
       out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn you may only trade with ${P(g.turn)})`);
       return out;

@@ -79,6 +79,8 @@ export function hexXZ(q: number, r: number): [number, number] {
   return [SQ3 * (q + r / 2), 1.5 * r];
 }
 
+const hexDist = (a: { q: number; r: number }, b: { q: number; r: number }) => Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.q + a.r - b.q - b.r));
+
 // Paper grain: soft blotches and fibres, multiplied into every colour.
 function paperTexture(): THREE.Texture {
   const c = document.createElement('canvas');
@@ -644,63 +646,104 @@ function shutPaper(m: THREE.MeshLambertMaterial): THREE.MeshLambertMaterial {
 }
 // Wild beasts holding hexes, folded like everything else: chunky shapes that
 // read from the TV's tilted camera. Each faces +x; the board turns it.
+//
+// Each is rigged like a dragon: a head, a tail, legs or wings on joints the
+// board moves (animateBeast), so a beast looks about, breathes and walks
+// rather than turning on the spot as one piece.
+
+// A joint at `pivot`, holding parts placed where they'd be without it.
+function joint(pivot: [number, number, number], ...parts: THREE.Object3D[]): THREE.Group {
+  const j = new THREE.Group();
+  j.position.set(...pivot);
+  for (const p of parts) {
+    p.position.sub(j.position);
+    j.add(p);
+  }
+  j.userData.base = j.position.clone();
+  return j;
+}
+
+interface BeastRig {
+  kind: 'wolf' | 'bear' | 'basilisk' | 'thunderbird' | 'leviathan';
+  body: THREE.Group; // the whole animal, for breathing and the gait's bob
+  head: THREE.Group; // the head, or the neck the head is on
+  tail?: THREE.Group;
+  legs?: THREE.Group[]; // front left, front right, back left, back right
+  wings?: THREE.Group[]; // left, right
+  coils?: THREE.Group[]; // the Leviathan's coils, head end first
+  phase: number;
+}
 
 const WOLF = '#9aa0a8', WOLF_DARK = '#5d626c', WOLF_LIGHT = '#e4e1da';
-function wolf(): THREE.Group {
-  const g = group(
-    part(box(0.36, 0.15, 0.15), WOLF, { at: [0, 0.21, 0] }),
-    part(box(0.13, 0.17, 0.17), WOLF_LIGHT, { at: [0.14, 0.22, 0], rot: [0, 0, 0.25] }),
+function wolf(phase: number): BeastRig {
+  const head = joint([0.2, 0.28, 0],
     part(cone(0.085, 0.24, 4), WOLF, { at: [0.3, 0.29, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.3] }),
     part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, 0.045], rot: [0, 0, -0.2] }),
     part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, -0.045], rot: [0, 0, -0.2] }),
-    part(cone(0.04, 0.22, 4), WOLF_DARK, { at: [-0.25, 0.25, 0], rot: [0, 0, 1.1] }),
     part(box(0.03, 0.02, 0.03), '#f2c230', { at: [0.27, 0.33, 0.05], glow: 0.6, crease: false }),
   );
-  for (const [x, z] of [[0.13, 0.05], [0.13, -0.05], [-0.13, 0.05], [-0.13, -0.05]]) g.add(part(box(0.045, 0.15, 0.045), WOLF_DARK, { at: [x, 0.075, z], crease: false }));
-  return g;
+  const tail = joint([-0.17, 0.26, 0], part(cone(0.04, 0.22, 4), WOLF_DARK, { at: [-0.25, 0.25, 0], rot: [0, 0, 1.1] }));
+  const legs = [[0.13, 0.05], [0.13, -0.05], [-0.13, 0.05], [-0.13, -0.05]].map(([x, z]) => joint([x, 0.15, z], part(box(0.045, 0.15, 0.045), WOLF_DARK, { at: [x, 0.075, z], crease: false })));
+  const body = group(
+    part(box(0.36, 0.15, 0.15), WOLF, { at: [0, 0.21, 0] }),
+    part(box(0.13, 0.17, 0.17), WOLF_LIGHT, { at: [0.14, 0.22, 0], rot: [0, 0, 0.25] }),
+    head, tail, ...legs,
+  );
+  return { kind: 'wolf', body, head, tail, legs, phase };
 }
 
-// A pack: three wolves, the leader in front.
+// A pack: three wolves, the leader in front, each moving on its own.
 function wolfPack(): THREE.Group {
   const g = new THREE.Group();
-  for (const [x, z, spin, s] of [[0.12, 0, 0, 1.1], [-0.2, 0.24, 0.35, 0.9], [-0.22, -0.22, -0.3, 0.9]]) {
-    const w = wolf();
-    w.position.set(x, 0, z);
-    w.rotation.y = spin;
-    w.scale.setScalar(s);
-    g.add(w);
+  const rigs: BeastRig[] = [];
+  for (const [x, z, spin, s, ph] of [[0.12, 0, 0, 1.1, 0], [-0.2, 0.24, 0.35, 0.9, 2.1], [-0.22, -0.22, -0.3, 0.9, 4.3]]) {
+    const w = wolf(ph);
+    const at = group(w.body);
+    at.position.set(x, 0, z);
+    at.rotation.y = spin;
+    at.scale.setScalar(s);
+    g.add(at);
+    rigs.push(w);
   }
+  g.userData.rigs = rigs;
   return g;
 }
 
 const BEAR = '#8a5a36', BEAR_DARK = '#5e3e26', BEAR_LIGHT = '#d8bc92';
 function caveBear(): THREE.Group {
-  const g = group(
-    part(new THREE.DodecahedronGeometry(0.24, 0), BEAR, { at: [-0.04, 0.3, 0], scale: [1.5, 1.05, 1.1] }),
+  const head = joint([0.22, 0.36, 0],
     part(new THREE.DodecahedronGeometry(0.16, 0), BEAR, { at: [0.33, 0.38, 0] }),
     part(box(0.14, 0.1, 0.12), BEAR_LIGHT, { at: [0.47, 0.34, 0] }),
     part(box(0.05, 0.04, 0.06), DARK, { at: [0.55, 0.37, 0], crease: false }),
     part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, 0.1] }),
     part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, -0.1] }),
   );
-  for (const [x, z] of [[0.2, 0.13], [0.2, -0.13], [-0.25, 0.13], [-0.25, -0.13]]) g.add(part(cyl(0.065, 0.075, 0.2, 5), BEAR_DARK, { at: [x, 0.1, z] }));
+  const legs = [[0.2, 0.13], [0.2, -0.13], [-0.25, 0.13], [-0.25, -0.13]].map(([x, z]) => joint([x, 0.2, z], part(cyl(0.065, 0.075, 0.2, 5), BEAR_DARK, { at: [x, 0.1, z] })));
+  const body = group(part(new THREE.DodecahedronGeometry(0.24, 0), BEAR, { at: [-0.04, 0.3, 0], scale: [1.5, 1.05, 1.1] }), head, ...legs);
+  const g = group(body);
+  g.userData.rigs = [{ kind: 'bear', body, head, legs, phase: 0 } satisfies BeastRig];
   return g;
 }
 
 const SCALE_GREEN = '#5aa84c', SCALE_DARK = '#3a7a33', CREST = '#e5484d';
 function basilisk(): THREE.Group {
-  const g = group(
-    // A coil on the ground, its neck rising from the front, the head looking out.
-    part(new THREE.TorusGeometry(0.24, 0.085, 4, 10, Math.PI * 1.7), SCALE_DARK, { at: [-0.08, 0.09, 0], rot: [Math.PI / 2, 0, 0.6] }),
-    part(new THREE.TorusGeometry(0.13, 0.07, 4, 8, Math.PI * 1.6), SCALE_GREEN, { at: [-0.08, 0.2, 0], rot: [Math.PI / 2, 0, 2.2] }),
+  // A coil on the ground, its neck rising from the front, the head looking out;
+  // the crest, red fins down the back of the head and neck.
+  const neck = joint([0.11, 0.11, 0],
     part(cyl(0.065, 0.09, 0.42, 5), SCALE_GREEN, { at: [0.2, 0.3, 0], rot: [0, 0, -0.45] }),
     part(box(0.2, 0.1, 0.13), SCALE_GREEN, { at: [0.33, 0.52, 0], rot: [0, 0, -0.15] }),
     part(cone(0.07, 0.16, 4), SCALE_DARK, { at: [0.48, 0.49, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.15] }),
     part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, 0.066], glow: 0.8, crease: false }),
     part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, -0.066], glow: 0.8, crease: false }),
+    ...[[0.3, 0.6, 0.16], [0.22, 0.5, 0.13], [0.15, 0.38, 0.11]].map(([x, y, h]) => part(cone(0.05, h, 3), CREST, { at: [x, y + h / 2, 0], rot: [0, 0, 0.5], scale: [1, 1, 0.35] })),
   );
-  // The crest: red fins down the back of the head and neck.
-  for (const [x, y, h] of [[0.3, 0.6, 0.16], [0.22, 0.5, 0.13], [0.15, 0.38, 0.11]]) g.add(part(cone(0.05, h, 3), CREST, { at: [x, y + h / 2, 0], rot: [0, 0, 0.5], scale: [1, 1, 0.35] }));
+  const body = group(
+    part(new THREE.TorusGeometry(0.24, 0.085, 4, 10, Math.PI * 1.7), SCALE_DARK, { at: [-0.08, 0.09, 0], rot: [Math.PI / 2, 0, 0.6] }),
+    part(new THREE.TorusGeometry(0.13, 0.07, 4, 8, Math.PI * 1.6), SCALE_GREEN, { at: [-0.08, 0.2, 0], rot: [Math.PI / 2, 0, 2.2] }),
+    neck,
+  );
+  const g = group(body);
+  g.userData.rigs = [{ kind: 'basilisk', body, head: neck, phase: 0 } satisfies BeastRig];
   return g;
 }
 
@@ -711,23 +754,18 @@ function basilisk(): THREE.Group {
 
 const STORM = '#3d3f8f', STORM_LIGHT = '#8a91e0', BOLT = '#ffd23f';
 function thunderbird(): THREE.Group {
-  const g = group(
-    part(new THREE.DodecahedronGeometry(0.22, 0), STORM, { at: [0, 0.3, 0], scale: [1.5, 1.1, 1] }),
-    part(new THREE.DodecahedronGeometry(0.14, 0), STORM_LIGHT, { at: [0.18, 0.3, 0], scale: [1, 1.2, 1.2] }),
+  const head = joint([0.3, 0.44, 0],
     part(new THREE.DodecahedronGeometry(0.12, 0), STORM, { at: [0.36, 0.52, 0] }),
     part(cone(0.06, 0.2, 4), BOLT, { at: [0.52, 0.5, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.25] }),
     part(box(0.03, 0.03, 0.03), '#fff4b8', { at: [0.42, 0.57, 0.08], glow: 0.9, crease: false }),
     part(box(0.03, 0.03, 0.03), '#fff4b8', { at: [0.42, 0.57, -0.08], glow: 0.9, crease: false }),
     // A crest of three folded feathers.
     ...[0, 1, 2].map((i) => part(cone(0.035, 0.18, 3), STORM_LIGHT, { at: [0.3 - i * 0.06, 0.66, 0], rot: [0, 0, 0.5 + i * 0.25], crease: false })),
-    // The tail fan, down and back.
-    part(cone(0.16, 0.42, 3), STORM, { at: [-0.4, 0.22, 0], rot: [0, 0, 1.9], scale: [1, 1, 0.3] }),
-    // Talons gripping the rock.
-    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, 0.08], crease: false }),
-    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, -0.08], crease: false }),
   );
+  // The tail fan, down and back.
+  const tail = joint([-0.2, 0.28, 0], part(cone(0.16, 0.42, 3), STORM, { at: [-0.4, 0.22, 0], rot: [0, 0, 1.9], scale: [1, 1, 0.3] }));
   // The wings: raised in a wide V, each a folded fan with a bolt down it.
-  for (const side of [1, -1]) {
+  const wings = [1, -1].map((side) => {
     const wing = group(
       part(cone(0.2, 0.85, 3), STORM, { at: [0, 0.42, 0], scale: [1, 1, 0.22] }),
       part(cone(0.12, 0.6, 3), STORM_LIGHT, { at: [0.05, 0.36, 0.02], scale: [1, 1, 0.2] }),
@@ -736,29 +774,45 @@ function thunderbird(): THREE.Group {
     );
     wing.position.set(-0.02, 0.36, side * 0.14);
     wing.rotation.set(side * -0.95, 0, 0.25);
-    g.add(wing);
-  }
+    wing.userData.side = side;
+    return wing;
+  });
+  const body = group(
+    part(new THREE.DodecahedronGeometry(0.22, 0), STORM, { at: [0, 0.3, 0], scale: [1.5, 1.1, 1] }),
+    part(new THREE.DodecahedronGeometry(0.14, 0), STORM_LIGHT, { at: [0.18, 0.3, 0], scale: [1, 1.2, 1.2] }),
+    // Talons gripping the rock.
+    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, 0.08], crease: false }),
+    part(box(0.06, 0.12, 0.04), BOLT, { at: [0.05, 0.08, -0.08], crease: false }),
+    head, tail, ...wings,
+  );
+  const g = group(body);
+  g.userData.rigs = [{ kind: 'thunderbird', body, head, tail, wings, phase: 0 } satisfies BeastRig];
   return g;
 }
 
 const DEEP = '#1f6f8b', DEEP_DARK = '#164e63', FIN = '#7fe0d0';
+const fin = (x: number, y: number, h: number) => part(cone(0.05, h, 3), FIN, { at: [x, y + h / 2, 0], rot: [0, 0, 0.45], scale: [1, 1, 0.35] });
 function leviathan(): THREE.Group {
-  const g = group(
-    // Coils breaking the water, smaller towards the tail.
-    part(new THREE.TorusGeometry(0.2, 0.08, 4, 9, Math.PI), DEEP, { at: [-0.18, 0, 0] }),
-    part(new THREE.TorusGeometry(0.14, 0.065, 4, 8, Math.PI), DEEP_DARK, { at: [-0.62, 0, 0.05] }),
-    part(cone(0.06, 0.26, 3), DEEP_DARK, { at: [-0.9, 0.08, 0.05], rot: [0, 0, 1.2], scale: [1, 1, 0.4] }),
-    // The neck rearing up, the head looking out.
+  // The neck rearing up, the head looking out, fins down its back.
+  const neck = joint([0.14, -0.02, 0],
     part(cyl(0.07, 0.1, 0.62, 6), DEEP, { at: [0.22, 0.28, 0], rot: [0, 0, -0.25] }),
     part(box(0.3, 0.13, 0.17), DEEP, { at: [0.36, 0.6, 0], rot: [0, 0, -0.2] }),
     part(cone(0.08, 0.2, 4), DEEP_DARK, { at: [0.56, 0.55, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.2] }),
     part(box(0.03, 0.03, 0.03), '#d9fff6', { at: [0.42, 0.65, 0.09], glow: 0.9, crease: false }),
     part(box(0.03, 0.03, 0.03), '#d9fff6', { at: [0.42, 0.65, -0.09], glow: 0.9, crease: false }),
+    fin(0.3, 0.72, 0.16), fin(0.2, 0.52, 0.14), fin(0.13, 0.32, 0.12),
   );
-  // Fins down its back and along the coils.
-  for (const [x, y, h] of [[0.3, 0.72, 0.16], [0.2, 0.52, 0.14], [0.13, 0.32, 0.12], [-0.18, 0.28, 0.13], [-0.62, 0.2, 0.1]]) {
-    g.add(part(cone(0.05, h, 3), FIN, { at: [x, y + h / 2, 0], rot: [0, 0, 0.45], scale: [1, 1, 0.35] }));
-  }
+  // Coils breaking the water, smaller towards the tail.
+  const coils = [
+    joint([-0.18, 0, 0], part(new THREE.TorusGeometry(0.2, 0.08, 4, 9, Math.PI), DEEP, { at: [-0.18, 0, 0] }), fin(-0.18, 0.28, 0.13)),
+    joint([-0.62, 0, 0.05],
+      part(new THREE.TorusGeometry(0.14, 0.065, 4, 8, Math.PI), DEEP_DARK, { at: [-0.62, 0, 0.05] }),
+      part(cone(0.06, 0.26, 3), DEEP_DARK, { at: [-0.9, 0.08, 0.05], rot: [0, 0, 1.2], scale: [1, 1, 0.4] }),
+      fin(-0.62, 0.2, 0.1)),
+  ];
+  const body = group(neck, ...coils);
+  const g = group(body);
+  g.userData.rigs = [{ kind: 'leviathan', body, head: neck, coils, phase: 0 } satisfies BeastRig];
   return g;
 }
 
@@ -766,6 +820,65 @@ const PEAK_H = 1.5; // the centre peak's height: the Thunderbird perches on top
 
 function beastModel(key: string): THREE.Group {
   return key === 'wolf_pack' ? wolfPack() : key === 'cave_bear' ? caveBear() : key === 'thunderbird' ? thunderbird() : key === 'leviathan' ? leviathan() : basilisk();
+}
+
+// A beast's joints at time t (seconds). `gait` is how far into walking it is
+// (0 standing, 1 in full stride) and `stride` the walk's own clock.
+//
+// Wolves look about, sniff the ground and wag their tails, and trot; the bear
+// breathes heavily and swings its low head, and lumbers; the basilisk's neck
+// weaves like a snake's, and it slithers; the Thunderbird turns its head in
+// a bird's quick jerks and now and then mantles its wings; the Leviathan's
+// coils roll through the water one after the other.
+function animateBeast(r: BeastRig, t: number, gait: number, stride: number) {
+  const ph = r.phase;
+  const lerp = (a: number, b: number) => a + (b - a) * gait;
+  const base = (j: THREE.Group) => j.userData.base as THREE.Vector3;
+  if (r.kind === 'wolf') {
+    const look = Math.sin(t * 0.4 + ph) * 0.45 + Math.sin(t * 0.17 + ph * 2) * 0.2;
+    const sniff = smooth(0.75, 0.95, Math.sin(t * 0.29 + ph * 1.7));
+    const w = stride * 11 + ph;
+    r.head.rotation.set(0, lerp(look * (1 - sniff * 0.6), 0), lerp(-0.45 * sniff, Math.sin(w * 2) * 0.05));
+    r.tail!.rotation.set(0, lerp(Math.sin(t * 1.7 + ph) * 0.28, Math.sin(w) * 0.15), lerp(0, 0.25));
+    r.legs!.forEach((l, i) => (l.rotation.z = (i === 0 || i === 3 ? 1 : -1) * Math.sin(w) * 0.6 * gait));
+    r.body.position.y = Math.abs(Math.sin(w)) * 0.025 * gait;
+    r.body.scale.y = 1 + Math.sin(t * 2.2 + ph) * 0.015 * (1 - gait);
+  } else if (r.kind === 'bear') {
+    const sway = Math.sin(t * 0.5 + ph) * 0.4;
+    const sniffAir = smooth(0.8, 0.97, Math.sin(t * 0.21 + 1));
+    const w = stride * 6.5;
+    r.head.rotation.set(0, lerp(sway * (1 - sniffAir), Math.sin(w / 2) * 0.15), lerp(-0.08 + Math.sin(t * 0.8) * 0.06 + sniffAir * 0.4, -0.12));
+    r.legs!.forEach((l, i) => (l.rotation.z = (i === 0 || i === 3 ? 1 : -1) * Math.sin(w) * 0.45 * gait));
+    r.body.rotation.x = Math.sin(w) * 0.06 * gait;
+    r.body.position.y = Math.abs(Math.sin(w)) * 0.015 * gait;
+    r.body.scale.set(1, 1 + Math.sin(t * 1.3) * 0.03 * (1 - gait), 1 + Math.sin(t * 1.3) * 0.02 * (1 - gait));
+  } else if (r.kind === 'basilisk') {
+    const w = stride * 5;
+    r.head.rotation.set(
+      lerp(Math.sin(t * 1.1 + ph) * 0.16, -Math.sin(w) * 0.25),
+      lerp(Math.sin(t * 0.6 + ph) * 0.35, 0),
+      lerp(Math.sin(t * 0.9 + ph) * 0.06, -0.2),
+    );
+    r.body.rotation.y = Math.sin(w) * 0.25 * gait;
+    r.body.scale.y = 1 + Math.sin(t * 1.6) * 0.03 * (1 - gait);
+  } else if (r.kind === 'thunderbird') {
+    // The head snaps to a new look every so often, then holds it.
+    const step = Math.floor(t * 0.7 + ph);
+    const at = (n: number) => Math.sin(n * 12.9898) * 0.65;
+    const f = t * 0.7 + ph - step;
+    r.head.rotation.set(0, at(step - 1) + (at(step) - at(step - 1)) * smooth(0, 0.12, f), Math.sin(t * 0.5) * 0.05);
+    const mantle = smooth(0.82, 0.96, Math.sin(t * 0.23 + ph));
+    for (const wing of r.wings!) {
+      const s = wing.userData.side as number;
+      wing.rotation.x = s * (-0.95 + Math.sin(t * 0.9) * 0.04 + mantle * (-0.35 + Math.sin(t * 7) * 0.3));
+    }
+    r.tail!.rotation.y = Math.sin(t * 0.6) * 0.08;
+    r.body.scale.y = 1 + Math.sin(t * 1.4) * 0.02;
+  } else {
+    r.head.rotation.set(0, Math.sin(t * 0.4 + ph) * 0.35, Math.sin(t * 0.7 + ph) * 0.06);
+    r.head.position.y = base(r.head).y + Math.sin(t * 1.1 + ph) * 0.03;
+    r.coils!.forEach((c, i) => (c.position.y = base(c).y + Math.sin(t * 1.1 + ph - (i + 1) * 1.2) * 0.04));
+  }
 }
 
 // A folded paper border just inside a hex's edges: the hexes a great beast
@@ -1451,7 +1564,16 @@ const canFly = (d: DragonView) => d.stage > 0 && d.status !== 'hurt' && d.status
 
 // ---------- the board ----------
 
-interface Built { sig: string; obj: THREE.Group; born: number }
+// walk: a beast that wandered here from the next hex, walking in from `from`
+// (where it stood, from where it stands now) since `at` on the board's clock.
+interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number } }
+
+// A wandering beast turns to face the next hex, walks there, and turns back
+// to face the room (seconds).
+const WALK_TURN = 0.5, WALK_GO = 2.2;
+
+// The shortest way from one heading to another.
+const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 export class Board3D {
   readonly el: HTMLDivElement;
@@ -1555,20 +1677,34 @@ export class Board3D {
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
     }
     // Fauna: on its dark lair in the middle of an open hex, or out in front
-    // of the building it shuts down. It folds up like a building when it arrives.
+    // of the building it shuts down. It folds up like a building when it
+    // arrives, unless it wandered in from the next hex: then it walks over.
+    const gone: { k: string; key: string; at: THREE.Vector3 }[] = [];
+    const fresh: HexView[] = [];
     for (const h of g.map) {
       const f = h.fauna;
       const fsig = f ? `${f.key}|${h.building ? 1 : 0}` : '';
       const had = this.beasts.get(h.k);
       if ((had?.sig ?? '') === fsig) continue;
       if (had) {
+        gone.push({ k: h.k, key: had.sig.split('|')[0], at: this.figureAt(had) });
         this.world.remove(had.obj);
         dispose(had.obj);
         this.beasts.delete(h.k);
       }
-      if (!f) continue;
+      if (f) fresh.push(h);
+    }
+    for (const h of fresh) {
+      const f = h.fauna!;
       const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
-      this.beasts.set(h.k, { sig: fsig, obj, born: animate ? now : -1e9 });
+      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: animate ? now : -1e9 };
+      const from = animate ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
+      if (from >= 0) {
+        entry.born = -1e9;
+        entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at: now };
+        gone.splice(from, 1);
+      }
+      this.beasts.set(h.k, entry);
     }
     this.placeDragons(g);
     this.firstUpdate = false;
@@ -1621,7 +1757,7 @@ export class Board3D {
 
   private beastGroup(key: string, onBuilding: boolean, k: string): THREE.Group {
     const g = new THREE.Group();
-    const model = bake(beastModel(key));
+    const model = bake(beastModel(key), true);
     const pop = new THREE.Group();
     const great = key === 'thunderbird' || key === 'leviathan';
     const [x, z] = onBuilding ? [0.08, 0.4] : [0, 0.05];
@@ -1634,12 +1770,39 @@ export class Board3D {
     const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
     model.rotation.y = face;
     model.userData.face = face;
-    model.userData.seed = hash(k) % 628 / 100;
+    const seed = hash(k) % 628 / 100;
+    for (const r of model.userData.rigs as BeastRig[]) r.phase += seed;
     pop.add(model);
     g.add(pop);
     g.userData.pop = pop;
     g.userData.figure = model;
     return g;
+  }
+
+  // Where a beast's figure stands, on the board.
+  private figureAt(b: Built): THREE.Vector3 {
+    return b.obj.position.clone().add((b.obj.userData.pop as THREE.Group).position);
+  }
+
+  // A beast where it stands, or walking over from the hex it wandered from.
+  private animateBeast(b: Built, t: number) {
+    const m = b.obj.userData.figure as THREE.Group;
+    const face = m.userData.face as number;
+    let gait = 0, stride = 0;
+    m.position.set(0, 0, 0);
+    m.rotation.y = face;
+    const since = b.walk ? t - b.walk.at : Infinity;
+    if (b.walk && since < WALK_GO + WALK_TURN * 2) {
+      const from = b.walk.from;
+      const heading = turnTo(face, Math.atan2(from.z, -from.x)); // +x towards here
+      const there = smooth(WALK_TURN, WALK_TURN + WALK_GO, since);
+      m.position.copy(from).multiplyScalar(1 - there);
+      const back = smooth(WALK_TURN + WALK_GO, WALK_GO + WALK_TURN * 2, since);
+      m.rotation.y = face + (heading - face) * smooth(0, WALK_TURN, since) * (1 - back);
+      gait = smooth(0, WALK_TURN * 0.6, since) * (1 - back);
+      stride = since;
+    } else delete b.walk;
+    for (const r of m.userData.rigs as BeastRig[]) animateBeast(r, t, gait, stride);
   }
 
   private buildMap(map: HexView[], sig: string) {
@@ -1850,11 +2013,7 @@ export class Board3D {
       m.emissiveIntensity = on ? 0.25 + 0.2 * Math.sin(t * 3) : 0;
     });
     for (const c of (this.decor.userData.floaters ?? []) as THREE.Object3D[]) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
-    // Beasts prowl: a slow turn back and forth where they stand.
-    for (const b of this.beasts.values()) {
-      const m = b.obj.userData.figure as THREE.Group;
-      m.rotation.y = m.userData.face + Math.sin(t * 0.5 + m.userData.seed) * 0.25;
-    }
+    for (const b of this.beasts.values()) this.animateBeast(b, t);
     for (const e of this.dragons.values()) this.animateDragon(e, t);
     this.renderer.render(this.scene, this.camera);
   }

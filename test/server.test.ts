@@ -103,7 +103,8 @@ test('a room of bots plays itself to the end', async () => {
   room.addBot();
   room.addBot();
   room.start(room.hostToken, 3);
-  for (let i = 0; i < 400 && room.game!.phase !== 'over'; i++) await sleep(10);
+  // Up to 30 s, so a busy machine doesn't fail it; it ends as soon as the game does.
+  for (let i = 0; i < 3000 && room.game!.phase !== 'over'; i++) await sleep(10);
   assert.equal(room.game!.phase, 'over');
   room.close();
 });

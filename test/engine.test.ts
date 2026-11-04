@@ -175,6 +175,25 @@ test('illegal moves are refused without changing the game', () => {
   assert.equal(JSON.stringify(g), before);
 });
 
+test('an offer must trade something real', () => {
+  const g = newGame(2, 11);
+  keepAll(g);
+  assert.throws(() => apply(g, 0, 'offer P2 give 0 stone get 0 gold'), /nothing for nothing/);
+  assert.throws(() => apply(g, 0, 'offer P2 give get'), /nothing for nothing/);
+  const card = g.players[0].hand[0];
+  assert.throws(() => apply(g, 0, `offer P2 give ${card.id} ${card.id} get 1 stone`), /Name each card once/);
+  // Gold is public: asking for more than they have is refused at once.
+  const gold = g.players[1].resources.gold;
+  assert.throws(() => apply(g, 0, `offer P2 give 1 stone get ${gold + 1} gold`), new RegExp(`P2 has ${gold} gold\\.`));
+  assert.equal(g.offers.length, 0);
+  // A gift, something for nothing, is still a trade.
+  apply(g, 0, 'offer P2 give 1 stone get');
+  assert.equal(seatState(g, 1).cantAccept[g.offers[0].id], undefined);
+  // An offer whose maker has since spent what it gives can't be accepted.
+  g.players[0].resources.stone = 0;
+  assert.deepEqual(seatState(g, 1).cantAccept, { [g.offers[0].id]: 'P1 no longer has what they offered.' });
+});
+
 test('trades are binding and move resources and cards', () => {
   const g = newGame(2, 11);
   keepAll(g);
@@ -186,10 +205,14 @@ test('trades are binding and move resources and cards', () => {
   assert.ok(!g.players[1].hand.some((c) => c.id === card.id));
   assert.equal(g.players[1].resources.stone, TUNING.startingResources.stone! + 1 + 1);
   assert.equal(g.offers.length, 0);
-  // Accepting an offer you can't pay for fails and leaves the offer open.
+  // Accepting an offer you can't pay for fails and leaves the offer open; the
+  // phone greys Accept and the view says why.
   apply(g, 1, 'offer P1 give 1 stone get 40 timber');
-  assert.throws(() => apply(g, 0, `accept ${g.offers[0].id}`), RuleError);
+  assert.throws(() => apply(g, 0, `accept ${g.offers[0].id}`), /You don't have 40 timber\./);
   assert.equal(g.offers.length, 1);
+  assert.deepEqual(seatState(g, 0).cantAccept, { [g.offers[0].id]: "You don't have 40 timber." });
+  assert.match(playerView(g, 0), new RegExp(`decline ${g.offers[0].id} .* You don't have 40 timber\\.`));
+  assert.ok(!playerView(g, 0).includes(`accept ${g.offers[0].id}`));
   // The acting player answers offers made to them before ending the turn; their own offers expire with it.
   assert.throws(() => apply(g, 0, 'end'), /Answer P2's offer/);
   apply(g, 0, `decline ${g.offers[0].id}`);
@@ -283,7 +306,8 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.ok(playerView(g, 0).includes('P3 says: "anyone want timber?"'));
   assert.ok(playerView(g, 0).includes('P2 to P1 (private): "I will bail, trust me"'));
   assert.ok(!playerView(g, 2).includes('I will bail'));
-  assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), RuleError);
+  assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), /You can't tell yourself\./);
+  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Tell whom\?/);
   assert.throws(() => apply(g, 0, 'say'), RuleError);
   advanceToRaidVote(g);
   apply(g, 0, 'say vote 2 with me');
