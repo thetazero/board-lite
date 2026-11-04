@@ -172,7 +172,7 @@ export interface SeatState {
 const res = (b: Bundle): Res => Object.fromEntries(RESOURCES.filter((r) => b[r]).map((r) => [r, b[r]!]));
 
 function attackText(a: { targets: number; dice: number; sides: number }) {
-  return `${a.targets > 1 ? `${a.targets}× ` : ''}${a.dice}d${a.sides}`;
+  return `${a.dice}d${a.sides}${a.targets > 1 ? ` on ${a.targets} targets` : ''}`;
 }
 
 const stageViews = (def: DragonDef): DragonStageView[] => def.stages.map((st) => ({ hp: st.hp, attack: attackText(st), power: combatPower(st) }));

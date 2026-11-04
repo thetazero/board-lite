@@ -256,6 +256,24 @@ class Tab {
     }
   }
 
+  // Waits for a selector, then stops every timer the page has, in the same
+  // task: a timed banner can't close between the match and the shot.
+  async hold(selector: string, ms: number) {
+    const ok = await this.eval<boolean>(`new Promise((r) => {
+      const end = performance.now() + ${ms};
+      const tick = () => {
+        if (document.querySelector(${JSON.stringify(selector)})) {
+          const top = setTimeout(() => {});
+          for (let i = 1; i <= top; i++) { clearTimeout(i); clearInterval(i); }
+          r(true);
+        } else if (performance.now() > end) r(false);
+        else setTimeout(tick, 30);
+      };
+      tick();
+    })`);
+    if (!ok) throw new Error(`Timed out waiting for ${selector}`);
+  }
+
   // Two animation frames: the last DOM change is painted.
   settle() {
     return this.eval('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))');
@@ -504,7 +522,8 @@ async function main() {
             }
             for (const sel of shot.clicks ?? []) await tab.click(sel);
             if (shot.press) await tab.press(shot.press.on, shot.press.dx ?? 0, shot.press.dy ?? 0);
-            if (shot.waitFor) await tab.waitFor(`document.querySelector(${JSON.stringify(shot.waitFor)})`, shot.waitFor, 30000);
+            if (shot.waitFor && shot.hold) await tab.hold(shot.waitFor, 30000);
+            else if (shot.waitFor) await tab.waitFor(`document.querySelector(${JSON.stringify(shot.waitFor)})`, shot.waitFor, 30000);
             if (shot.waitMs) await sleep(shot.waitMs);
             // A moving 3D board is shot frame by frame, at board clock times.
             const frames: (string | null)[] = shot.frames ? shot.frames.map((f) => (shot.flight ? `window.boardFlightAt?.(${f})` : String(f))) : [null];

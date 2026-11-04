@@ -183,11 +183,21 @@ export class Room {
     const ms = this.screens > 0 ? scenesMs(scenesOf(events)) : 0;
     if (!ms) return;
     this.sceneUntil = Math.max(Date.now(), this.sceneUntil) + ms;
+    this.wakeAfterScene();
+  }
+
+  // Once the scene is over, wake everyone it held (bots, CLI players, phones).
+  // Node's timers keep their own clock, so one can fire a moment before
+  // Date.now() says the scene is over (or the wall clock can step back): then
+  // it sets itself again rather than waking no one, which would leave a bot's
+  // turn waiting for good.
+  private wakeAfterScene() {
     if (this.sceneTimer) clearTimeout(this.sceneTimer);
     this.sceneTimer = setTimeout(() => {
       this.sceneTimer = null;
-      this.changed();
-    }, this.sceneUntil - Date.now());
+      if (this.sceneLeft()) this.wakeAfterScene();
+      else this.changed();
+    }, this.sceneLeft() + 1);
   }
 
   // How much longer the TV's scene runs (ms); 0 when there's none.
@@ -200,7 +210,7 @@ export class Room {
   private cleanName(name: string): string {
     const clean = tidyName(name);
     if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
-    if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}.`);
+    if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}: choose another name.`);
     return clean;
   }
 
@@ -447,13 +457,20 @@ export class Room {
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.sceneLeft()) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned) return;
+    if (this.sceneLeft()) {
+      if (!this.sceneTimer) this.wakeAfterScene(); // something must end the wait
+      return;
+    }
     const botPlays = (p: number) => this.seats[p]?.kind === 'bot' || !!this.seats[p]?.standIn;
     if (!waitingOn(g).some(botPlays)) return;
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
         if (this.abandoned) return;
+        // A scene began while this bot was waiting to move: it moves once the
+        // scene is over, when the scene's timer wakes the room.
+        if (this.sceneLeft()) return this.scheduleBot();
         this.mutate((g2) => {
           const p = waitingOn(g2).find(botPlays);
           if (p === undefined) return;

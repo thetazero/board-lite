@@ -79,7 +79,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
 
   function getRoom(code: string): Room {
     const room = rooms.get(code.toUpperCase());
-    if (!room) throw new RoomError(`No game with code ${code.toUpperCase()}. Check the code on the TV.`);
+    if (!room) throw new RoomError(`No room with code ${code.toUpperCase()}. Check the code on the TV.`);
     return room;
   }
 
