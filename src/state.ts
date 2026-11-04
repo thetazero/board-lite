@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable,
+  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -178,10 +178,10 @@ function dragonView(g: Game, d: Dragon): DragonView {
   };
 }
 
-function targetView(key: string, hp?: number[]): TargetView {
+function targetView(g: Game, key: string, hp?: number[]): TargetView {
   const t = TARGETS[key];
   return {
-    key, name: t.name, loot: res(t.loot), power: targetPower(key),
+    key, name: t.name, loot: res(lootOf(g, key)), power: targetPower(key),
     units: t.units.map((u, i) => {
       const x = UNITS[u];
       return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong };
@@ -250,9 +250,9 @@ export function publicState(g: Game, logLines = 60): PublicState {
     offers: g.offers.map((o) => ({ id: o.id, from: o.from, to: o.to, give: sideText(g, o.give), get: sideText(g, o.get) })),
     raid: raid && {
       step: raid.step,
-      candidates: raid.candidates.map((t) => targetView(t)),
+      candidates: raid.candidates.map((t) => targetView(g, t)),
       voted: raid.votes.map((v) => v !== null),
-      target: raid.target ? targetView(raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
+      target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
       commits: raid.commits,
       ready: raid.ready,
       decided: raid.choices.map((c) => c !== null),

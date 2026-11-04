@@ -148,7 +148,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 ## Raids
 
-- Each raid phase has one raid target, chosen from 3 random candidates by a player vote; ties are resolved by a coin flip. Targets don't change in strength over the game.
+- Each raid phase has one raid target, chosen by a player vote; ties are resolved by a coin flip. Targets don't change in strength over the game. *(Provisionally, #99: every kingdom is on the ballot, not 3 random candidates, and a kingdom's loot grows by 1 gold after every raid it doesn't fall in, back to its printed loot when it falls. Reasoning in the pull request for issue #99.)*
 - The raid has two phases:
   1. Public commit: everyone knows exactly who is committing what. Once everyone hits ready, the commitments lock in.
   2. Bail opportunity: each committed player makes a binary choice, bail or play, with no information shared.

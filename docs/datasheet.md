@@ -119,7 +119,7 @@ Cheapest paid point: Base dragon, adult at 3.7. Dearest: Ember Wyrm, Frost Wyrm,
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Fed to the end of the game, hatched in round 1, after 15 rounds (the owner's target) / 20 rounds (the random bots' median, see Game length): base dragon 6.7 / 8.3, wyrm 8.3 / 10, drake 7 / 8.7 per point. A building's points cost nothing more once built.
+Fed to the end of the game, hatched in round 1, after 15 rounds (the owner's target) / 19 rounds (the random bots' median, see Game length): base dragon 6.7 / 8, wyrm 8.3 / 9.7, drake 7 / 8.3 per point. A building's points cost nothing more once built.
 
 Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most buildings, tower included (at least 9).
 
@@ -156,16 +156,16 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (3 are offered each raid; average damage is the defenders' total a combat round). Loot grows with the square of power, so the last column, loot value per point of power sent, rises with difficulty:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power, so the last column, loot value per point of power sent, rises with difficulty:
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Loot value | Value per power |
 |---|---|---|---|---|---|---|---|
 | Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold | 6 | 0.8 |
-| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold | 20 | 1.1 |
-| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold | 32 | 1.3 |
-| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold | 44 | 1.6 |
-| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold | 68 | 1.9 |
-| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold | 112 | 2.5 |
+| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 3 gold | 16 | 0.8 |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 5 gold | 24 | 1 |
+| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 8 gold | 36 | 1.3 |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 15 gold | 60 | 1.7 |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 25 gold | 104 | 2.3 |
 
 Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
 
@@ -186,18 +186,24 @@ Chance the kingdom falls to one player's raiders fighting to the end, from 100 r
 | Abyss Wyrm (water), adult (22) | 100% | 100% | 11% | 25% | 20% | 0% |
 | Reef Drake (water), adult (17) | 100% | 93% | 0% | 0% | 0% | 0% |
 
-Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.2, young 0.5, adult 2.6. A Tower Floor takes 2 gold.
+Gold a lone base dragon expects from one raid on the kingdom that pays it best (if its vote wins), by how much extra gold the kingdoms have hoarded. A Tower Floor takes 2 gold.
+
+| Hoarded | Hatchling | Young | Adult |
+|---|---|---|---|
+| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 2.8 (Archer's Hold) |
+| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 5.6 (Archer's Hold) |
+| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 8.4 (Archer's Hold) |
 
 Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
 
 | Kingdom | Loot value | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
 |---|---|---|---|---|---|---|---|
 | Hamlet of Brindle (8) | 6 | 100% → 100% | 6 | 6 | 0 | about 0 | 0 |
-| Stormspire (35) | 68 | 67% → 82% | 45.6 | 52.5 | 3.1 | about 8 | 0.8 |
+| Stormspire (35) | 60 | 67% → 82% | 40.2 | 47.4 | 1.6 | about 4 | 0.8 |
 
 Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
 
-Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 19.7 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 6.4, and misses 2.9 raid rounds.
+Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 16.1 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 5.2, and misses 2.9 raid rounds.
 
 ## Fauna
 
@@ -318,6 +324,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 15 | 21 | 28 | 0 | 80% | 27% | 93% | 7%, median round 20 | 13%, median round 20 |
-| 3 | 15 | 20 | 31 | 0 | 77% | 57% | 97% | 23%, median round 19 | 20%, median round 21 |
-| 4 | 13 | 19 | 25 | 0 | 77% | 80% | 93% | 20%, median round 17 | 40%, median round 17 |
+| 2 | 13 | 19 | 27 | 0 | 73% | 40% | 83% | 10%, median round 21 | 7%, median round 19 |
+| 3 | 13 | 20 | 25 | 0 | 73% | 67% | 87% | 30%, median round 21 | 27%, median round 17 |
+| 4 | 14 | 17 | 25 | 0 | 67% | 70% | 87% | 23%, median round 16 | 23%, median round 17 |

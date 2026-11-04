@@ -421,26 +421,28 @@ function raids(): string {
   let salt = 1;
   // Gold a lone base dragon expects from each kingdom, by stage.
   const goldEach: number[][] = [];
+  const chance: number[][] = [];
   for (const stage of [1, 2, 3]) {
     const avg = targets.map((t) => {
       const all = baseKeys.map((k) => odds(t, [{ key: k, stage }], salt++));
       return { all, mean: all.reduce((s, o) => s + o, 0) / all.length };
     });
     goldEach.push(avg.map((a, i) => a.mean * (TARGETS[targets[i]].loot.gold ?? 0)));
+    chance.push(avg.map((a) => a.mean));
     rows.push([`Base dragon, ${STAGE_NAMES[stage]} (${combatPower(DRAGONS[baseKeys[0]].stages[stage - 1])})`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
   }
-  // Raiding alone, the best of the kingdoms offered: the average over every set of candidates.
-  const bestOf = (gold: number[]) => {
-    const sets: number[] = [];
-    const pick = (from: number, chosen: number[]) => {
-      if (chosen.length === TUNING.raidCandidates) return void sets.push(Math.max(...chosen.map((i) => gold[i])));
-      for (let i = from; i < gold.length; i++) pick(i + 1, [...chosen, i]);
-    };
-    pick(0, []);
-    return sets.reduce((s, x) => s + x, 0) / sets.length;
-  };
+  // Raiding alone, the kingdom that pays it best, when every kingdom has
+  // hoarded the same extra gold (it adds 1 after each raid it doesn't fall in).
   const floor = BUILDINGS.tower_floor;
-  const goldLine = `Gold a lone base dragon expects from one raid on the best of the ${TUNING.raidCandidates} kingdoms offered (if its vote wins): hatchling ${n1(bestOf(goldEach[0]))}, young ${n1(bestOf(goldEach[1]))}, adult ${n1(bestOf(goldEach[2]))}. A ${floor.name} takes ${floor.cost.gold} gold.`;
+  const best = (stage: number, extra: number) => {
+    const each = goldEach[stage].map((g, i) => g + chance[stage][i] * extra);
+    const i = each.indexOf(Math.max(...each));
+    return `${n1(each[i])} (${TARGETS[targets[i]].name})`;
+  };
+  const hoardRows = [0, 3, 6].map((x) => [x ? `${x} gold each` : 'none (printed loot)', best(0, x), best(1, x), best(2, x)]);
+  const goldLine = `Gold a lone base dragon expects from one raid on the kingdom that pays it best (if its vote wins), by how much extra gold the kingdoms have hoarded. A ${floor.name} takes ${floor.cost.gold} gold.
+
+${table(['Hoarded', 'Hatchling', 'Young', 'Adult'], hoardRows)}`;
   const pairCells = targets.map((t) => {
     const all = baseKeys.map((k) => odds(t, [{ key: k, stage: 2 }, { key: k, stage: 2 }], salt++));
     return pct(all.reduce((s, o) => s + o, 0) / all.length);
@@ -458,7 +460,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], uni
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (${TUNING.raidCandidates} are offered each raid; average damage is the defenders' total a combat round). Loot grows with the square of power, so the last column, loot value per point of power sent, rises with difficulty:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power, so the last column, loot value per point of power sent, rises with difficulty:
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot', 'Loot value', 'Value per power'], targetRows)}
 

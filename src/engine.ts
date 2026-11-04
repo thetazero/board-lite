@@ -143,6 +143,9 @@ export interface Game {
   offers: Offer[];
   raidsLeft: number;
   raid: Raid | null;
+  // Gold each kingdom has added to its printed loot: 1 after every raid it
+  // doesn't fall in, back to 0 when it falls (#99).
+  hoard: Record<string, number>;
   titles: Record<Title, number | null>;
   slain: Record<string, number>; // great beasts slain, and by whom
   beastTried: number[]; // the last round each player fought a great beast
@@ -424,6 +427,7 @@ export function newGame(players: number, seed: number): Game {
     offers: [],
     raidsLeft: 0,
     raid: null,
+    hoard: Object.fromEntries(Object.keys(TARGETS).map((t) => [t, 0])),
     titles: { army: null, tower: null, territory: null },
     slain: {},
     beastTried: Array(players).fill(0),
@@ -568,7 +572,7 @@ function startRaid(g: Game) {
   }
   g.raid = {
     step: 'vote',
-    candidates: shuffle(g.rng, Object.keys(TARGETS)).slice(0, TUNING.raidCandidates),
+    candidates: Object.keys(TARGETS),
     votes: Array(n).fill(null),
     target: null,
     commits: Array.from({ length: n }, () => []),
@@ -580,7 +584,19 @@ function startRaid(g: Game) {
   log(g, `Raid phase: vote for a target among ${g.raid.candidates.map((t, i) => `${i + 1}. ${TARGETS[t].name}`).join(', ')}.`, { k: 'raid', targets: g.raid.candidates });
 }
 
-function finishRaid(g: Game) {
+// A kingdom's loot now: its printed loot plus the gold it has hoarded.
+export function lootOf(g: Game, t: string): Bundle {
+  const loot = { ...TARGETS[t].loot };
+  const extra = g.hoard?.[t] ?? 0;
+  if (extra) loot.gold = (loot.gold ?? 0) + extra;
+  return loot;
+}
+
+// After every raid, each kingdom that didn't fall adds 1 gold to its loot, and
+// the one that fell is back to its printed loot.
+function finishRaid(g: Game, fell?: string) {
+  g.hoard ??= {};
+  for (const t of Object.keys(TARGETS)) g.hoard[t] = t === fell ? 0 : (g.hoard[t] ?? 0) + 1;
   g.raid = null;
   g.raidsLeft--;
   updateTitles(g);
@@ -769,7 +785,7 @@ function checkRaidOver(g: Game): boolean {
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
     const total = power.reduce((s, x) => s + x, 0);
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
-    const loot = TARGETS[raid.target!].loot;
+    const loot = lootOf(g, raid.target!);
     const shares: Bundle[] = g.players.map(() => ({}));
     // Each resource is split in proportion, rounded down; what's left over goes
     // to the player with the most power standing (the earlier seat on a tie).
@@ -783,7 +799,7 @@ function checkRaidOver(g: Game): boolean {
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
     log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
-    finishRaid(g);
+    finishRaid(g, raid.target!);
     return true;
   }
   if (raid.fighters.length === 0) {
