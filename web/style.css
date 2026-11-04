@@ -616,3 +616,33 @@ button.on:disabled { opacity: 1; }
 }
 .huntbtn { width: 100%; margin-top: .4em; display: flex; align-items: center; justify-content: center; gap: .35em; }
 .huntname { margin: .2em 0 .5em; }
+
+/* Joining by camera: the room's address as a QR code on the TV's join card. */
+.join-box:has(.qr) { display: flex; align-items: center; gap: 1.1em; padding-left: 1.1em; }
+.join-box .qr { flex: none; display: block; width: 9.5em; height: 9.5em; border-radius: 3px; box-shadow: 0 0 0 2px #2a1d3322; }
+.join-box .join-text { min-width: 0; }
+.join-box:has(.qr) .url { font-size: 1.45em; margin-bottom: .35em; }
+.join-box:has(.qr) .code span { font-size: 2.5em; }
+.join-box .how { color: #6b5a6e; font-size: .85em; margin-bottom: .1em; }
+.roomline { text-align: center; font-size: 1.2em; margin: 0; }
+/* A game that has started: the seats a phone can take back. */
+.joinform.seats p { margin: 0; text-align: center; }
+.joinform.inner { padding: 0; }
+.seatlist .seatbtn { display: flex; align-items: center; gap: .6em; width: 100%; padding: .45em .8em; background: var(--sheet); font-weight: 800; font-size: 1.15em; border-radius: 3px; border-left: .4em solid var(--pc); box-shadow: var(--lift); text-align: left; }
+.seatlist .seatbtn .tag { margin-left: auto; font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
+/* The menu under your name: out of the way, but always there. */
+.me .menubtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-size: 1.3em; line-height: 1; padding: .05em .35em .2em; margin: 0 -.5em 0 .3em; }
+.menuback { position: fixed; inset: 0; background: #0008; z-index: 40; }
+.menu { position: fixed; top: .6em; left: .6em; right: .6em; max-width: 26em; margin: 0 auto; z-index: 41; background: var(--grain), var(--sheet); --text: var(--ink); color: var(--ink); border-radius: 4px; box-shadow: var(--lift); padding: .8em 1em 1em; }
+.menu h3 { margin: 0 0 .3em; font-family: var(--serif); }
+.menu p { margin: 0 0 .7em; color: var(--ink-soft); }
+.menu .row { display: flex; gap: .5em; }
+button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
+/* Someone the table waits on is away: anyone can let a bot play for them. */
+.awayline { margin: .35em .7em 0; padding: .3em 1em; display: flex; align-items: center; gap: .5em; flex-wrap: wrap; font-weight: 600; color: var(--text); }
+.awayline button { margin-left: auto; }
+.toast.news { border-left-color: var(--accent); }
+.pcard .seatnote { display: block; color: var(--warn); font-weight: 700; font-size: .9em; }
+.join-box:has(.qr) .alt { font-size: .8em; margin: -.2em 0 .4em; }
+/* What just happened to this phone: news, not an error. */
+.joinform .news { margin: 0; text-align: center; font-weight: 700; padding: .45em .8em; background: var(--grain), var(--sheet); color: var(--ink); border-left: .4em solid var(--accent); border-radius: 3px; box-shadow: var(--lift); }

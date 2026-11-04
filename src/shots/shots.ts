@@ -43,7 +43,7 @@ const MAX_SCREENS = 4; // a long phone page is shot one screen at a time, scroll
 // (a card held open or the talk sheet open covers everything anyway).
 const COVERED = `(() => {
   const cards = [...document.querySelectorAll('.handfan .card')].map((c) => c.getBoundingClientRect()).filter((r) => r.height);
-  if (!cards.length || document.querySelector('.zoom, .talkbar.open')) return [];
+  if (!cards.length || document.querySelector('.zoom, .talkbar.open, .menu')) return []; // a sheet over the hand
   const hits = new Set();
   for (const el of document.querySelectorAll('#app *')) {
     if (el.closest('.handfan, .talkbar, .toast')) continue;

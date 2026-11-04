@@ -105,3 +105,32 @@ export function playOut(g: Game, rng: Rng, maxSteps = 20000): number {
   while (g.phase !== 'over' && steps++ < maxSteps) botStep(g, rng);
   return steps;
 }
+
+// The move made for a seat whose player has gone (quit, or away while the
+// table waits on them): as little as possible, so it keeps the game moving
+// without spending their resources, sending their dragons or taking a trade.
+// It answers offers with a decline, ends the turn, keeps the first building
+// card, votes for the first target, sends no dragons, and discards the
+// oldest cards.
+export function standInCommands(g: Game, p: number): string[] {
+  const pl = g.players[p];
+  if (g.phase === 'action') return [...g.offers.filter((o) => o.to === p).map((o) => `decline ${o.id}`), ...(g.turn === p ? ['end'] : [])];
+  if (g.phase === 'cards') return pl.choice.length ? [`keep ${pl.choice[0].id}`] : [];
+  if (g.phase === 'discard') return [`discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`];
+  const raid = g.raid!;
+  if (raid.step === 'vote') return ['vote 1'];
+  if (raid.step === 'commit') return raid.commits[p].length ? ['commit none'] : ['ready'];
+  return ['bail'];
+}
+
+export function standInMove(g: Game, p: number): string {
+  for (const cmd of standInCommands(g, p)) {
+    try {
+      apply(g, p, cmd);
+      return cmd;
+    } catch (e) {
+      if (!(e instanceof RuleError)) throw e;
+    }
+  }
+  throw new Error(`The stand-in found no legal move for P${p + 1} in phase ${g.phase}`);
+}

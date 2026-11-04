@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { botMove } from '../bot.ts';
+import { botMove, standInMove } from '../bot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { publicState, seatState, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { afterMove, playerView, publicStatus, seatStatus, visibleLog } from '../view.ts';
@@ -25,6 +25,13 @@ export interface Seat {
   kind: SeatKind; // player: someone holds the token (phone or CLI); bot: the server plays it; open: nobody yet (claim by joining)
   connected: number; // open event streams
   seen: number; // last request from this seat (ms epoch); the CLI doesn't hold a stream
+  // Mid-game, a bot makes this player's moves (as little as it can: bot.ts
+  // standInMove) when they quit, or when someone at the table asks it to
+  // because the table is waiting on them and they're away. Their own phone
+  // coming back hands the seat back; after quitting, they (or anyone) take it
+  // back by joining with its name.
+  standIn: boolean;
+  left: boolean; // quit: no phone holds the seat any more
 }
 
 export class RoomError extends Error {}
@@ -59,7 +66,7 @@ export class Room {
     // every seat starts open, and players claim them by joining.
     if (existsSync(this.file)) {
       this.cached = load(this.file);
-      this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0 }));
+      this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
     }
   }
 
@@ -92,11 +99,27 @@ export class Room {
     return clean;
   }
 
-  // Before the game, joining adds a seat. Once it's running, a phone can still
-  // take over an open seat (one nobody's phone holds).
+  // Someone is at this seat: a bot, a phone holding its stream open, or a CLI
+  // or Claude player that asked something in the last minute.
+  here(s: Seat): boolean {
+    return s.kind === 'bot' || (!s.left && (s.connected > 0 || Date.now() - s.seen < 60000));
+  }
+
+  // Before the game, joining adds a seat. Once it's running, joining with the
+  // name of a seat nobody is at takes it back (a player on a new phone, or
+  // after quitting, or someone taking over for a player who left); any other
+  // name takes an open seat (one nobody holds, in a saved game hosted again).
   join(name: string, kind: SeatKind = 'player'): Seat {
-    const clean = this.cleanName(name);
     if (this.game) {
+      const typed = name.replace(/\s+/g, ' ').trim().toLowerCase();
+      const own = this.seats.find((s) => s.kind === 'player' && s.name.toLowerCase() === typed);
+      if (own && kind === 'player') {
+        if (this.here(own)) throw new RoomError(`${own.name} is playing on another phone.`);
+        Object.assign(own, { token: token(), standIn: false, left: false, seen: Date.now() });
+        this.changed();
+        return own;
+      }
+      const clean = this.cleanName(name);
       const open = this.seats.find((s) => s.kind === 'open');
       if (!open || kind !== 'player') throw new RoomError('That game has already started and every seat is taken.');
       open.name = clean;
@@ -105,8 +128,9 @@ export class Room {
       this.changed();
       return open;
     }
+    const clean = this.cleanName(name);
     if (this.seats.length >= MAX_PLAYERS) throw new RoomError(`The game is full (${MAX_PLAYERS} players).`);
-    const seat: Seat = { name: clean, token: token(), kind, connected: 0, seen: Date.now() };
+    const seat: Seat = { name: clean, token: token(), kind, connected: 0, seen: Date.now(), standIn: false, left: false };
     this.seats.push(seat);
     this.changed();
     return seat;
@@ -124,6 +148,28 @@ export class Room {
     if (this.game) throw new RoomError('The game has started.');
     if (!this.seats[seatIndex]) throw new RoomError('No such player.');
     this.seats.splice(seatIndex, 1);
+    this.changed();
+  }
+
+  // Mid-game, a player quits: a bot makes their moves from now on, and their
+  // phone no longer holds the seat.
+  quit(tok: string) {
+    const p = this.playerSeat(tok);
+    if (!this.game) return this.leave(p);
+    if (this.game.phase === 'over') throw new RoomError('The game is over.');
+    Object.assign(this.seats[p], { token: token(), standIn: true, left: true });
+    this.changed();
+  }
+
+  // Anyone at the table lets a bot play for a player who is away.
+  standInFor(tok: string, seat: number) {
+    this.playerSeat(tok);
+    const s = this.seats[seat];
+    if (!this.game || this.game.phase === 'over') throw new RoomError('The game is not running.');
+    if (!s || s.kind !== 'player') throw new RoomError('No such player.');
+    if (s.standIn) return;
+    if (this.here(s)) throw new RoomError(`${s.name} is back.`);
+    s.standIn = true;
     this.changed();
   }
 
@@ -162,7 +208,26 @@ export class Room {
   private playerSeat(tok: string): number {
     const p = this.seatOf(tok);
     if (p < 0 || this.seats[p].kind !== 'player') throw new RoomError('You are not in this game.');
+    this.back(this.seats[p]);
     return p;
+  }
+
+  // A CLI or Claude player waiting on the table (wait, listen) is at their seat
+  // as much as a phone holding its stream open. Returns the hand-back.
+  private holding(p: number): () => void {
+    const s = this.seats[p];
+    s.connected++;
+    return () => {
+      s.connected--;
+      s.seen = Date.now();
+    };
+  }
+
+  // A player a bot was playing for while they were away is back.
+  private back(s: Seat) {
+    if (!s.standIn || s.left) return;
+    s.standIn = false;
+    this.changed();
   }
 
   // ---- the same game as text, for players at the command line ----
@@ -188,6 +253,7 @@ export class Room {
   // Resolves when this seat has a decision to make, the game ends, or time runs out.
   wait(tok: string, timeoutMs: number): Promise<{ text: string; code: number }> {
     const p = this.playerSeat(tok);
+    const left = this.holding(p);
     return new Promise((done) => {
       const check = (): boolean => {
         const g = this.game;
@@ -198,6 +264,7 @@ export class Room {
       const finish = (text: string, code: number) => {
         clearTimeout(timer);
         unsubscribe();
+        left();
         done({ text, code });
         return true;
       };
@@ -230,10 +297,12 @@ export class Room {
       return waitingOn(g).includes(p) && !awaitingAnswer;
     };
     if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
+    const left = this.holding(p);
     return new Promise((done) => {
       const finish = () => {
         clearTimeout(timer);
         unsubscribe();
+        left();
         done(result());
       };
       const timer = setTimeout(finish, timeoutMs);
@@ -261,13 +330,16 @@ export class Room {
   private scheduleBot() {
     const g = this.game;
     if (this.botTimer || !g || g.phase === 'over') return;
-    if (!waitingOn(g).some((p) => this.seats[p]?.kind === 'bot')) return;
+    const botPlays = (p: number) => this.seats[p]?.kind === 'bot' || !!this.seats[p]?.standIn;
+    if (!waitingOn(g).some(botPlays)) return;
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
         this.mutate((g2) => {
-          const p = waitingOn(g2).find((q) => this.seats[q]?.kind === 'bot');
-          if (p !== undefined) botMove(g2, p, this.botRng);
+          const p = waitingOn(g2).find(botPlays);
+          if (p === undefined) return;
+          if (this.seats[p].kind === 'bot') botMove(g2, p, this.botRng);
+          else standInMove(g2, p);
         });
       } catch (e) {
         console.error(`Room ${this.code}: a bot is stuck:`, e);
@@ -282,7 +354,7 @@ export class Room {
       code: this.code,
       started: !!this.game,
       // Phones hold a stream open; a CLI player counts as here if it asked anything in the last minute.
-      seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: s.kind === 'bot' || s.connected > 0 || Date.now() - s.seen < 60000 })),
+      seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left })),
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       file: this.file,
@@ -309,6 +381,7 @@ export class Room {
     const s = this.seats.find((x) => x.token === tok);
     if (!s) return () => {};
     s.connected++;
+    this.back(s);
     this.changed();
     return () => {
       s.connected--;

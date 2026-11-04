@@ -8,6 +8,7 @@ import {
 } from './common.ts';
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
 import { Board3D } from './board3d.ts';
+import { qrSvg } from './qr.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -44,6 +45,7 @@ async function boot() {
 
 function onSnapshot(s: Snapshot) {
   const first = !snap?.game && !!s.game && seenLog < 0;
+  if (snap?.game && s.game) seatNews(snap, s);
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
   if (!s.game) {
@@ -61,6 +63,19 @@ function onSnapshot(s: Snapshot) {
   renderGame(s.game);
   queueBanners(s.game, fresh);
   updateOverlay(s.game);
+}
+
+// Mid-game, the table hears when someone quits, when a bot starts playing for
+// someone who's away, and when a seat is taken back.
+function seatNews(before: Snapshot, now: Snapshot) {
+  now.lobby.seats.forEach((s, i) => {
+    const was = before.lobby.seats[i];
+    if (!was || s.kind !== 'player') return;
+    const who = esc(s.name);
+    if (s.left && !was.left) note(`${who} quits. A bot plays for them.`);
+    else if (s.standIn && !was.standIn) note(`${who} is away. A bot plays for them.`);
+    else if (!s.standIn && was.standIn) note(`${who} is back.`);
+  });
 }
 
 // ---------- lobby ----------
@@ -93,11 +108,15 @@ function renderLobby() {
       </div>
       <div class="lobby-main">
         <div class="join-box">
-          <div class="step">Join on your phone</div>
-          <div class="url">${esc(joinUrl())}</div>
-          ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
-          <div class="step">Room code</div>
-          <div class="code">${[...l.code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+          ${qrSvg(`http://${joinUrl()}`, 'the room\'s address')}
+          <div class="join-text">
+            <div class="step">Join on your phone</div>
+            <div class="how">Point its camera at the code, or open</div>
+            <div class="url">${esc(joinUrl())}</div>
+            ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
+            <div class="step">Room code</div>
+            <div class="code">${[...l.code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+          </div>
         </div>
         <div class="table">
           <ul class="seatcards">${seats}</ul>
@@ -148,6 +167,20 @@ function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: numbe
   return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
 }
 
+// Why a seat isn't a person playing right now.
+function seatTag(seat: Snapshot['lobby']['seats'][number] | undefined): string {
+  if (!seat || seat.standIn) return '';
+  if (seat.kind === 'open') return ' <small>(open seat)</small>';
+  return seat.connected ? '' : ' <small>(away)</small>';
+}
+
+// A bot playing for a player says so on its own line: the table should know
+// those moves aren't theirs.
+function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string {
+  if (!seat?.standIn) return '';
+  return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: a bot plays for them</span>`;
+}
+
 function renderGame(g: PublicState) {
   const n = g.players.length;
   const players = g.players.map((p, i) => {
@@ -160,12 +193,12 @@ function renderGame(g: PublicState) {
     return `
       <div class="pcard${turn ? ' turn' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
-          <span class="pname">${esc(names[i])}${seat?.kind === 'open' ? ' <small>(open seat)</small>' : seat && !seat.connected ? ' <small>(away)</small>' : ''}</span>
+          <span class="pname">${esc(names[i])}${seatTag(seat)}</span>
           ${titles}
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
           <span class="pts">${icon('points', 1.3)}<b>${p.publicPoints}</b></span>
         </div>
-        ${what ? `<span class="doing">${what}</span>` : ''}
+        ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
       </div>`;
   });
@@ -498,6 +531,15 @@ function showBanner(b: Banner) {
     setRaidBanner(false);
     if (snap?.game) updateOverlay(snap.game);
   }, b.ms);
+}
+
+// News for the table, not an error: shown longer, without the error's red edge.
+function note(html: string) {
+  const t = document.createElement('div');
+  t.className = 'toast news';
+  t.innerHTML = html;
+  document.body.append(t);
+  setTimeout(() => t.remove(), 8000);
 }
 
 function toast(e: unknown) {
