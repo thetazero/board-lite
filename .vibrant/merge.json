@@ -1,4 +1,0 @@
-{
-  "ci": true,
-  "command": "gh pr merge {pr} --squash"
-}
