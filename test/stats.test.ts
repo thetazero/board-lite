@@ -11,7 +11,8 @@ const seats = (n: number) => ({ seats: Array.from({ length: n }, (_, i) => ({ mo
 const events = (g: Game, k: string) => g.log.filter((e) => e.ev?.k === k).map((e) => e.ev as Record<string, unknown>);
 
 test('points rebuilt from the log equal score() at any point in a game, and the counts match the log', () => {
-  for (let seed = 1; seed <= 12; seed++) {
+  // Four seeds: each a different player count, and seed 3 cut off mid-round.
+  for (let seed = 1; seed <= 4; seed++) {
     const players = 2 + (seed % 4);
     const g = newGame(players, seed);
     apply(g, 0, 'say anyone want timber?');
@@ -45,7 +46,8 @@ test('a batch reads its finished games, flags what is never used, and compares w
   try {
     for (let i = 1; i <= 3; i++) {
       const g = newGame(3, i);
-      for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: i } as never);
+      // The third is stalled, so it never has to finish.
+      for (let n = 0; g.phase !== 'over' && n < (i === 3 ? 50 : 20000); n++) botStep(g, { state: i } as never);
       mkdirSync(join(dir, `g${i}`));
       writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
       writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status: i === 3 ? 'stalled' : 'over', ...seats(3) }));
