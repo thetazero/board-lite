@@ -343,10 +343,15 @@ export function foeStack(units: UnitView[], size = 2): string {
   return `<div class="foes">${kinds.map(({ u, n }) => `
     <div class="foe">
       <span class="foe-pic">${unitIcon(u.name, size)}</span>
-      <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ` : ''}${esc(u.name)}</b>
+      <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ${esc(plural(u.name))}` : esc(u.name)}</b>
       <span class="foe-stats">${statTag('Health', u.maxHp)}${statTag('Attack', esc(u.attack))}</span>
       ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}${u.strong.length ? `<span class="foe-elem strong">Strong against ${elemWords(u.strong)}</span>` : ''}</span>
     </div>`).join('')}</div>`;
+}
+
+// "Frost Golem" -> "Frost Golems"; names already plural ("Archers", "Militia") stay.
+function plural(name: string): string {
+  return /s$|Militia$/.test(name) ? name : `${name}s`;
 }
 
 // What a fight pays, labelled: "Loot 3 timber 2 gold", or the points a great beast is worth.

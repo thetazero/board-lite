@@ -498,11 +498,11 @@ function waitText(g: PublicState): string {
   return `Waiting for ${w || 'the table'}.`;
 }
 
-// The raid's step by its rules name, and the kingdom once there is one: "Commit: Brindle".
+// The raid's step by its rules name. The kingdom is named on its panel below,
+// which every raid screen shows, whatever you've done.
 function raidStep(g: PublicState): string {
   const r = g.raid!;
-  const step = r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or bail';
-  return `${icon('raid', 1.3)} ${step}${r.target && r.step !== 'vote' ? `: ${esc(r.target.name)}` : ''}`;
+  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or bail'}`;
 }
 
 // The menu under your name: quitting is there, out of the way of the game.
