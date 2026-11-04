@@ -267,7 +267,6 @@ function renderGame(g: PublicState) {
         <span class="round">Round ${bannerTop?.round ?? g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
         <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
-        ${remote ? '' : `<span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>`}
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul>
