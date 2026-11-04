@@ -10,7 +10,7 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 - Screenshots of the TV and phones in staged situations, for look tuning: `npm run shots` ([`docs/clients.md`](docs/clients.md#staged-screenshots-for-look-tuning))
 - Play from the command line: [`docs/cli.md`](docs/cli.md)
 - Play against Claude, at the same table as phone players: [`docs/play-vs-claude.md`](docs/play-vs-claude.md)
-- Tuning datasheet, generated from the code: [`docs/datasheet.md`](docs/datasheet.md): every number and what it adds up to (payback rounds, cost per point, raid odds). Read it before and after changing any number; `npm run datasheet` regenerates it.
+- Tuning datasheet, generated from the code: [`docs/datasheet.md`](docs/datasheet.md): the raw rules: every cost, output, stat and point, with nothing simulated. Read it before and after changing any number; `npm run datasheet` regenerates it.
 - Sandboxed Claude playtests (one Claude per seat, game tools only): [`docs/playtest.md`](docs/playtest.md)
 
 ## Code
