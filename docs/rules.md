@@ -42,7 +42,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts. No other building is worth points: not production buildings, not the tower, not its floors.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
 - Great beasts: 2 each to whoever slays it, for good.
-- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 10). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 

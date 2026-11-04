@@ -35,7 +35,7 @@ export const TUNING = {
   titlePoints: 2,
   // A title needs at least this much: dragon points, tower floors, gold. The
   // hoard's is a Monument's gold: keep it for the title or spend it on one (#109).
-  titleMinimum: { army: 10, tower: 4, hoard: 10 },
+  titleMinimum: { army: 10, tower: 4, hoard: 20 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -165,17 +165,19 @@ export interface ActionDef {
   copies: number;
 }
 
+// The action deck was doubled in #201 (with two of each dragon) so that adding
+// one card doesn't swing the mix; Windfall was made rarer, not doubled.
 export const ACTIONS: Record<string, ActionDef> = {
-  windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 5 },
-  treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 4 },
-  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 4 },
-  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons. It can raid this round.', copies: 3 },
-  war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 3 },
-  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
+  windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 4 },
+  treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 10 },
+  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 10 },
+  healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons. It can raid this round.', copies: 8 },
+  war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 6 },
+  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 8 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
-  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 4 },
-  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'basilisk', cost: { crystal: 1 }, text: 'Place a Basilisk on any land hex with no tower or beast.', copies: 2 },
+  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 8 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'basilisk', cost: { crystal: 1 }, text: 'Place a Basilisk on any land hex with no tower or beast.', copies: 4 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';
@@ -221,7 +223,7 @@ const baseStages: [DragonStage, DragonStage, DragonStage] = [
 ];
 
 function baseDragon(element: Element, name: string): DragonDef {
-  return { name, element, growthTime: 2, stages: baseStages, targeting: 'random', cost: { crystal: 6, livestock: 4 }, copies: 1, base: true };
+  return { name, element, growthTime: 2, stages: baseStages, targeting: 'random', cost: { crystal: 6, livestock: 4 }, copies: 2, base: true };
 }
 
 export const DRAGONS: Record<string, DragonDef> = {
@@ -231,43 +233,43 @@ export const DRAGONS: Record<string, DragonDef> = {
   air_whelp: baseDragon('air', 'Air Dragon'),
   water_whelp: baseDragon('water', 'Water Dragon'),
   ember_wyrm: {
-    name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
+    name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 2,
     stages: [{ hp: 7, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 1, dice: 2, sides: 8 }, { hp: 24, targets: 2, dice: 3, sides: 8 }],
   },
   cinder_drake: {
-    name: 'Cinder Drake', element: 'fire', growthTime: 2, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4 }, copies: 1,
+    name: 'Cinder Drake', element: 'fire', growthTime: 2, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4 }, copies: 2,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 11, targets: 2, dice: 1, sides: 6 }, { hp: 18, targets: 3, dice: 1, sides: 8 }],
   },
   frost_wyrm: {
-    name: 'Frost Wyrm', element: 'ice', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
+    name: 'Frost Wyrm', element: 'ice', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 2,
     stages: [{ hp: 9, targets: 1, dice: 1, sides: 6 }, { hp: 17, targets: 1, dice: 2, sides: 6 }, { hp: 30, targets: 1, dice: 3, sides: 8 }],
   },
   rime_drake: {
-    name: 'Rime Drake', element: 'ice', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 1,
+    name: 'Rime Drake', element: 'ice', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 2,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 12, targets: 1, dice: 2, sides: 6 }, { hp: 20, targets: 2, dice: 2, sides: 8 }],
   },
   storm_wyrm: {
-    name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
-    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 20, targets: 4, dice: 1, sides: 8 }],
+    name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 2,
+    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 24, targets: 4, dice: 1, sides: 8 }],
   },
   bolt_drake: {
-    name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4 }, copies: 1,
+    name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4 }, copies: 2,
     stages: [{ hp: 5, targets: 1, dice: 1, sides: 8 }, { hp: 10, targets: 1, dice: 2, sides: 8 }, { hp: 20, targets: 1, dice: 4, sides: 8 }],
   },
   sky_wyrm: {
-    name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
+    name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 2,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 2, dice: 1, sides: 8 }, { hp: 22, targets: 2, dice: 2, sides: 8 }],
   },
   zephyr_drake: {
-    name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 8, livestock: 4 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 17, targets: 3, dice: 1, sides: 6 }],
+    name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 8, livestock: 4 }, copies: 2,
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 20, targets: 3, dice: 1, sides: 8 }],
   },
   abyss_wyrm: {
-    name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
+    name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 2,
     stages: [{ hp: 8, targets: 1, dice: 1, sides: 8 }, { hp: 16, targets: 2, dice: 1, sides: 8 }, { hp: 28, targets: 2, dice: 2, sides: 8 }],
   },
   reef_drake: {
-    name: 'Reef Drake', element: 'water', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 1,
+    name: 'Reef Drake', element: 'water', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 2,
     stages: [{ hp: 7, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 1, dice: 2, sides: 6 }, { hp: 21, targets: 2, dice: 2, sides: 6 }],
   },
 };
