@@ -6,7 +6,7 @@
 // stage unless it takes away what the scene shows.
 
 import { botStep, standInMove } from '../bot.ts';
-import { ACTIONS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
 import { apply, buildableHexes, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Game } from '../engine.ts';
 import { PEAK, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
@@ -985,6 +985,18 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // A message near the 300-character limit (#133): the TV feed keeps who
+    // said it and ends it in "…", rather than cutting off its top.
+    name: 'talk-long-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      apply(g, (g.turn + 1) % 3, `say ${'I really need crystal for the dragon. '.repeat(7).trim()}`);
+    },
+    shots: () => [{ file: 'tv-talk-long-3p', caption: 'TV: a message near the length limit, cut short at its end', client: 'tv', sizes: true }],
+  },
+  {
     // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
     // another player's building, a wolf pack beside the acting player's tower.
     // The acting player holds both fauna cards and has a young dragon to send.
@@ -999,7 +1011,7 @@ export const SCENES: Scene[] = [
       g.map[theirs].fauna = 'cave_bear';
       const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
       g.map[open].fauna = 'wolf_pack';
-      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+      readyDragons(g, p);
       giveHand(g, p, ['wolf_call', 'rouse_bear', 'windfall']);
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 6));
     },
@@ -1085,14 +1097,15 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       const p = g.turn;
       buildingsAtLeast(g, 3);
-      for (const h of Object.values(g.map)) delete h.fauna;
+      // The great beasts stay where they are: the TV lists them as alive.
+      for (const h of Object.values(g.map)) if (h.fauna && !BEASTS[h.fauna]) delete h.fauna;
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       for (const t of ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor']) {
-        const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k]);
+        const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k] && !g.map[k].fauna);
         open.slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       }
-      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+      readyDragons(g, p);
     },
     shots: (g) => {
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
@@ -1279,6 +1292,14 @@ function wonRaid(g: Game) {
 }
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
+// Player p's dragons, at least young and raid-ready, with this round's lines
+// about them sitting out taken off the log so the feed doesn't contradict them.
+function readyDragons(g: Game, p: number) {
+  const mine = new Set(g.dragons.filter((x) => x.owner === p).map((d) => d.id));
+  for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+  g.log = g.log.filter((e) => !(e.ev?.k === 'rest' && mine.has(e.ev.d)));
+}
+
 function beastHunters(g: Game) {
   const p = g.turn;
   g.dragons = g.dragons.filter((d) => d.owner !== p);

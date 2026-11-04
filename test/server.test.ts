@@ -118,6 +118,10 @@ test('lobby rules: names, size, joining late', () => {
   room.join('Ada');
   assert.throws(() => room.join('ada'), /already called/);
   assert.throws(() => room.join('   '), /Pick a name/);
+  assert.throws(() => room.join('\u200B\u200B\u200B'), /Pick a name/, 'zero-width spaces are no name');
+  assert.throws(() => room.join('\u3164\u2800\u200D'), /Pick a name/, 'nor are blank fillers');
+  assert.equal(room.join('Bo\u200Bb').name, 'Bob', 'an invisible character inside a name is dropped');
+  room.leave(1);
   assert.throws(() => room.start(room.hostToken), /at least 2/);
   for (let i = 0; i < 5; i++) room.addBot();
   assert.throws(() => room.join('Late'), /full/);
@@ -318,6 +322,15 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.ok(rooms.get(solo)!.game, 'one phone and a bot is a game');
     // The table view a phone shows is the TV page as a watcher: three.js isn't loaded for it.
     assert.match(await (await fetch(`${base}/tv.ts`)).text(), /await import\('\.\/board3d\.ts'\)/);
+
+    // Both pages have an icon, so no browser logs a missing favicon.
+    for (const path of ['/favicon.svg', '/favicon.ico']) {
+      const icon = await fetch(`${base}${path}`);
+      assert.equal(icon.status, 200, path);
+      assert.equal(icon.headers.get('content-type'), 'image/svg+xml');
+      await icon.text();
+    }
+    for (const path of ['/', '/tv']) assert.match(await (await fetch(`${base}${path}`)).text(), /rel="icon" href="\/favicon.svg"/, path);
 
     // The clients are served with their TypeScript types stripped.
     const page = await fetch(`${base}/`);

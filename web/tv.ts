@@ -227,7 +227,7 @@ function renderGame(g: PublicState) {
           <span class="pname">${esc(names[i])}${seatTag(seat)}</span>
           ${titles}
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
-          <span class="pts">${icon('points', 1.3)}<b>${p.publicPoints}</b></span>
+          <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
@@ -494,6 +494,9 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
       }
       if (t) {
         t.querySelector('.hpbar')!.outerHTML = hpBar(now, max);
+        // Hits can land faster than a number fades: the new one replaces the
+        // last, so a −4 and a −8 never read as one −48.
+        t.querySelectorAll('.dmg').forEach((old) => old.remove());
         const pop = document.createElement('span');
         pop.className = 'dmg';
         pop.textContent = `−${h.dmg}`;

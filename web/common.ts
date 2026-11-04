@@ -218,7 +218,8 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
   switch (ev.k) {
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
-    case 'rest': return `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">Healing</em>' : '<em class="st-hungry">Hungry</em>'}`;
+    // Said as what happens, the log's own verbs; a dragon no longer in the game has nothing to show.
+    case 'rest': return g.dragons.some((x) => x.id === ev.d) ? `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">sits out to heal</em>' : '<em class="st-hungry">goes hungry</em>'}` : '';
     case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
     case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
@@ -416,7 +417,7 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
     return `<li class="${s.place === 1 ? 'won' : ''}${s.p === me ? ' you' : ''}">
       <span class="place">${ORDINAL[s.place - 1]}</span>
       <span class="who">${playerTag(s.p, names)}${s.tied ? ' <span class="tie">tie</span>' : ''}</span>
-      ${secret > 0 ? `<small class="hiddenpts" title="secret points">${icon('cards', 1.1)}+${secret}</small>` : '<span></span>'}
+      ${secret > 0 ? `<small class="hiddenpts" title="Secret Hoard cards in hand, counted in the total">${secret}${icon('points', 0.9)} in hand</small>` : '<span></span>'}
       <b class="total">${s.total}${icon('points', 1.25)}</b></li>`;
   }).join('');
   return `<ol class="standings">${rows}</ol>`;
