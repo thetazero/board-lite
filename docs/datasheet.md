@@ -17,33 +17,33 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 
 | Name | Kind | Copies | Cost | Does | Points |
 |---|---|---|---|---|---|
-| Quarry | basic building | — | 4 timber, 4 crystal, 3 livestock | Makes 1d4 stone each round. | — |
-| Lumber Camp | basic building | — | 4 stone, 4 crystal, 3 livestock | Makes 1d4 timber each round. | — |
-| Crystal Mine | basic building | — | 4 stone, 4 timber, 3 livestock | Makes 1d4 crystal each round. | — |
-| Pasture | basic building | — | 3 stone, 4 timber, 4 crystal | Makes 1d4 livestock each round. | — |
-| Roost | basic building | — | 2 stone, 2 timber | Houses 2 more dragons. | — |
-| Tower Floor | basic building | — | 3 stone, 2 gold | Adds a floor to your tower. Floors count toward Tallest Tower. | — |
-| Cliff Works | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent mountain. | — |
-| Stonemason | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent quarry. | — |
-| Woodcutter's Hut | building card | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent forest. | — |
-| Sawmill | building card | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent lumber camp. | — |
-| Driftwood Yard | building card | 1 | 4 stone, 3 crystal, 3 livestock | Makes 1 timber each round for each adjacent ocean hex. | — |
-| Ley Spire | building card | 2 | 3 stone, 3 timber, 2 livestock | Makes 1 crystal each round for each adjacent ley line. | — |
-| Gem Cutter | building card | 2 | 3 stone, 3 timber, 2 livestock | Makes 1 crystal each round for each adjacent mine. | — |
-| Smelter | building card | 1 | 2 stone, 3 timber, 3 livestock | Makes 1 crystal each round for each adjacent quarry. | — |
-| Shepherd's Fold | building card | 2 | 3 stone, 3 timber, 2 crystal | Makes 1 livestock each round for each adjacent meadow. | — |
-| Drovers' Barn | building card | 2 | 2 stone, 3 timber, 3 crystal | Makes 1 livestock each round for each adjacent pasture. | — |
-| Fishery | building card | 1 | 3 stone, 4 timber, 3 crystal | Makes 1 livestock each round for each adjacent ocean hex. | — |
-| Hatchery | building card | 2 | 3 stone, 3 timber, 3 crystal | Your dragons grow 1 extra step each round. | — |
-| Port | building card | 3 | 1 stone, 3 timber, 1 livestock | You trade with the bank at 3:1. | — |
-| Market | building card | 2 | 3 stone, 3 timber, 3 crystal, 2 gold | Makes 1 gold each round for each adjacent trade building. | — |
-| Monument | building card | 2 | 4 stone, 3 timber, 10 gold | Worth 1 point for each adjacent monument. | 1 each |
-| Standing Stones | building card | 2 | 3 stone, 3 crystal, 10 gold | Worth 1 point for each adjacent ley line. | 1 each |
-| Lighthouse | building card | 2 | 5 stone, 3 timber, 10 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
-| Guildhall | building card | 1 | 3 stone, 3 timber, 10 gold | Worth 1 point for each adjacent trade building. | 1 each |
-| Workshop | upgrade | 4 | 4 stone, 4 timber, 1 crystal | This quarry, lumber camp, mine or pasture makes 2 more. | — |
-| Nesting Grounds | upgrade | 3 | 2 stone, 1 timber | This roost, hatchery or tower houses 2 more dragons. | — |
-| Trade Charter | upgrade | 3 | 2 stone, 4 gold | This port or market makes 1 more gold each round. | — |
+| Quarry | basic building | — | 8 timber, 8 crystal, 6 livestock | Makes 1d4 stone each round. | — |
+| Lumber Camp | basic building | — | 8 stone, 8 crystal, 6 livestock | Makes 1d4 timber each round. | — |
+| Crystal Mine | basic building | — | 8 stone, 8 timber, 6 livestock | Makes 1d4 crystal each round. | — |
+| Pasture | basic building | — | 6 stone, 8 timber, 8 crystal | Makes 1d4 livestock each round. | — |
+| Roost | basic building | — | 4 stone, 4 timber | Houses 2 more dragons. | — |
+| Tower Floor | basic building | — | 6 stone, 4 gold | Adds a floor to your tower. Floors count toward Tallest Tower. | — |
+| Cliff Works | building card | 2 | 6 timber, 6 crystal, 4 livestock | Makes 1 stone each round for each adjacent mountain. | — |
+| Stonemason | building card | 2 | 6 timber, 6 crystal, 4 livestock | Makes 1 stone each round for each adjacent quarry. | — |
+| Woodcutter's Hut | building card | 2 | 6 stone, 6 crystal, 4 livestock | Makes 1 timber each round for each adjacent forest. | — |
+| Sawmill | building card | 2 | 6 stone, 6 crystal, 4 livestock | Makes 1 timber each round for each adjacent lumber camp. | — |
+| Driftwood Yard | building card | 1 | 8 stone, 6 crystal, 6 livestock | Makes 1 timber each round for each adjacent ocean hex. | — |
+| Ley Spire | building card | 2 | 6 stone, 6 timber, 4 livestock | Makes 1 crystal each round for each adjacent ley line. | — |
+| Gem Cutter | building card | 2 | 6 stone, 6 timber, 4 livestock | Makes 1 crystal each round for each adjacent mine. | — |
+| Smelter | building card | 1 | 4 stone, 6 timber, 6 livestock | Makes 1 crystal each round for each adjacent quarry. | — |
+| Shepherd's Fold | building card | 2 | 6 stone, 6 timber, 4 crystal | Makes 1 livestock each round for each adjacent meadow. | — |
+| Drovers' Barn | building card | 2 | 4 stone, 6 timber, 6 crystal | Makes 1 livestock each round for each adjacent pasture. | — |
+| Fishery | building card | 1 | 6 stone, 8 timber, 6 crystal | Makes 1 livestock each round for each adjacent ocean hex. | — |
+| Hatchery | building card | 2 | 6 stone, 6 timber, 6 crystal | Your dragons grow 1 extra step each round. | — |
+| Port | building card | 3 | 2 stone, 6 timber, 2 livestock | You trade with the bank at 3:1. | — |
+| Market | building card | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
+| Monument | building card | 2 | 8 stone, 6 timber, 20 gold | Worth 1 point for each adjacent monument. | 1 each |
+| Standing Stones | building card | 2 | 6 stone, 6 crystal, 20 gold | Worth 1 point for each adjacent ley line. | 1 each |
+| Lighthouse | building card | 2 | 10 stone, 6 timber, 20 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
+| Guildhall | building card | 1 | 6 stone, 6 timber, 20 gold | Worth 1 point for each adjacent trade building. | 1 each |
+| Workshop | upgrade | 4 | 8 stone, 8 timber, 2 crystal | This quarry, lumber camp, mine or pasture makes 2 more. | — |
+| Nesting Grounds | upgrade | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
+| Trade Charter | upgrade | 3 | 4 stone, 8 gold | This port or market makes 1 more gold each round. | — |
 | Windfall | action card | 5 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | 4 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | 4 | 3 gold | Grow one of your dragons to its next life stage. | — |
@@ -52,21 +52,21 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Secret Hoard | action card | 4 | nothing | Worth 1 point while in your hand. | 1 |
 | Wolf Call | action card | 2 | 1 crystal, 2 gold | Place a Wolf Pack on any land hex with no tower or beast. | — |
 | Rouse the Bear | action card | 1 | 2 crystal, 3 gold | Place a Cave Bear on any land hex with no tower or beast. | — |
-| Fire Dragon | base dragon | 1 | 3 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Ice Dragon | base dragon | 1 | 3 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Lightning Dragon | base dragon | 1 | 3 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Air Dragon | base dragon | 1 | 3 crystal, 2 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Water Dragon | base dragon | 1 | 3 crystal, 2 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Ember Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | fire, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Cinder Drake | dragon card | 1 | 4 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Frost Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | ice, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Rime Drake | dragon card | 1 | 4 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Storm Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | lightning, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Bolt Drake | dragon card | 1 | 4 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Sky Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | air, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Zephyr Drake | dragon card | 1 | 4 crystal, 2 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Abyss Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | water, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Reef Drake | dragon card | 1 | 4 crystal, 2 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Fire Dragon | base dragon | 1 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Ice Dragon | base dragon | 1 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Lightning Dragon | base dragon | 1 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Air Dragon | base dragon | 1 | 6 crystal, 4 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Water Dragon | base dragon | 1 | 6 crystal, 4 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Ember Wyrm | dragon card | 1 | 8 crystal, 4 livestock, 2 gold | fire, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Cinder Drake | dragon card | 1 | 8 crystal, 4 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Frost Wyrm | dragon card | 1 | 8 crystal, 4 livestock, 2 gold | ice, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Rime Drake | dragon card | 1 | 8 crystal, 4 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Storm Wyrm | dragon card | 1 | 8 crystal, 4 livestock, 2 gold | lightning, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Bolt Drake | dragon card | 1 | 8 crystal, 4 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Sky Wyrm | dragon card | 1 | 8 crystal, 4 livestock, 2 gold | air, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Zephyr Drake | dragon card | 1 | 8 crystal, 4 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Abyss Wyrm | dragon card | 1 | 8 crystal, 4 livestock, 2 gold | water, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Reef Drake | dragon card | 1 | 8 crystal, 4 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
 
 ## Basic production buildings
 
@@ -74,12 +74,12 @@ Anyone may build these, no card needed.
 
 | Building | Terrain | Cost | Makes each round |
 |---|---|---|---|
-| Quarry | mountain | 4 timber, 4 crystal, 3 livestock | d4 stone (avg 2.5) |
-| Lumber Camp | forest | 4 stone, 4 crystal, 3 livestock | d4 timber (avg 2.5) |
-| Crystal Mine | ley | 4 stone, 4 timber, 3 livestock | d4 crystal (avg 2.5) |
-| Pasture | meadow | 3 stone, 4 timber, 4 crystal | d4 livestock (avg 2.5) |
+| Quarry | mountain | 8 timber, 8 crystal, 6 livestock | d4 stone (avg 2.5) |
+| Lumber Camp | forest | 8 stone, 8 crystal, 6 livestock | d4 timber (avg 2.5) |
+| Crystal Mine | ley | 8 stone, 8 timber, 6 livestock | d4 crystal (avg 2.5) |
+| Pasture | meadow | 6 stone, 8 timber, 8 crystal | d4 livestock (avg 2.5) |
 
-Workshop (4 stone, 4 timber, 1 crystal): makes 2 more a round.
+Workshop (8 stone, 8 timber, 2 crystal): makes 2 more a round.
 
 ## Land
 
@@ -100,22 +100,22 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 | Card | Class | Counts | Cost | Each one adds |
 |---|---|---|---|---|
-| Cliff Works | quarry | mountain hexes | 3 timber, 3 crystal, 2 livestock | 1 stone a round |
-| Stonemason | quarry | quarries (anyone's) | 3 timber, 3 crystal, 2 livestock | 1 stone a round |
-| Woodcutter's Hut | lumber camp | forest hexes | 3 stone, 3 crystal, 2 livestock | 1 timber a round |
-| Sawmill | lumber camp | lumber camps (anyone's) | 3 stone, 3 crystal, 2 livestock | 1 timber a round |
-| Driftwood Yard | lumber camp | ocean hexes | 4 stone, 3 crystal, 3 livestock | 1 timber a round |
-| Ley Spire | mine | ley hexes | 3 stone, 3 timber, 2 livestock | 1 crystal a round |
-| Gem Cutter | mine | mines (anyone's) | 3 stone, 3 timber, 2 livestock | 1 crystal a round |
-| Smelter | mine | quarries (anyone's) | 2 stone, 3 timber, 3 livestock | 1 crystal a round |
-| Shepherd's Fold | pasture | meadow hexes | 3 stone, 3 timber, 2 crystal | 1 livestock a round |
-| Drovers' Barn | pasture | pastures (anyone's) | 2 stone, 3 timber, 3 crystal | 1 livestock a round |
-| Fishery | pasture | ocean hexes | 3 stone, 4 timber, 3 crystal | 1 livestock a round |
-| Market | trade building | trade buildings (anyone's) | 3 stone, 3 timber, 3 crystal, 2 gold | 1 gold a round |
-| Monument | monument | monuments (anyone's) | 4 stone, 3 timber, 10 gold | 1 point |
-| Standing Stones | monument | ley hexes | 3 stone, 3 crystal, 10 gold | 1 point |
-| Lighthouse | monument | ocean hexes | 5 stone, 3 timber, 10 gold | 1 point |
-| Guildhall | monument | trade buildings (anyone's) | 3 stone, 3 timber, 10 gold | 1 point |
+| Cliff Works | quarry | mountain hexes | 6 timber, 6 crystal, 4 livestock | 1 stone a round |
+| Stonemason | quarry | quarries (anyone's) | 6 timber, 6 crystal, 4 livestock | 1 stone a round |
+| Woodcutter's Hut | lumber camp | forest hexes | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
+| Sawmill | lumber camp | lumber camps (anyone's) | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
+| Driftwood Yard | lumber camp | ocean hexes | 8 stone, 6 crystal, 6 livestock | 1 timber a round |
+| Ley Spire | mine | ley hexes | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
+| Gem Cutter | mine | mines (anyone's) | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
+| Smelter | mine | quarries (anyone's) | 4 stone, 6 timber, 6 livestock | 1 crystal a round |
+| Shepherd's Fold | pasture | meadow hexes | 6 stone, 6 timber, 4 crystal | 1 livestock a round |
+| Drovers' Barn | pasture | pastures (anyone's) | 4 stone, 6 timber, 6 crystal | 1 livestock a round |
+| Fishery | pasture | ocean hexes | 6 stone, 8 timber, 6 crystal | 1 livestock a round |
+| Market | trade building | trade buildings (anyone's) | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
+| Monument | monument | monuments (anyone's) | 8 stone, 6 timber, 20 gold | 1 point |
+| Standing Stones | monument | ley hexes | 6 stone, 6 crystal, 20 gold | 1 point |
+| Lighthouse | monument | ocean hexes | 10 stone, 6 timber, 20 gold | 1 point |
+| Guildhall | monument | trade buildings (anyone's) | 6 stone, 6 timber, 20 gold | 1 point |
 
 ## Points
 
@@ -123,21 +123,21 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
-| Monument, 2 neighbours | 4 stone, 3 timber, 10 gold | 2 | 2 stone, 1.5 timber, 5 gold | now |
-| Standing Stones, 2 neighbours | 3 stone, 3 crystal, 10 gold | 2 | 1.5 stone, 1.5 crystal, 5 gold | now |
-| Lighthouse, 2 neighbours | 5 stone, 3 timber, 10 gold | 2 | 2.5 stone, 1.5 timber, 5 gold | now |
-| Guildhall, 2 neighbours | 3 stone, 3 timber, 10 gold | 2 | 1.5 stone, 1.5 timber, 5 gold | now |
+| Monument, 2 neighbours | 8 stone, 6 timber, 20 gold | 2 | 4 stone, 3 timber, 10 gold | now |
+| Standing Stones, 2 neighbours | 6 stone, 6 crystal, 20 gold | 2 | 3 stone, 3 crystal, 10 gold | now |
+| Lighthouse, 2 neighbours | 10 stone, 6 timber, 20 gold | 2 | 5 stone, 3 timber, 10 gold | now |
+| Guildhall, 2 neighbours | 6 stone, 6 timber, 20 gold | 2 | 3 stone, 3 timber, 10 gold | now |
 | Secret Hoard (action card) | nothing | 1 | nothing | now, uses a hand slot |
-| Base dragon, hatchling | 3 crystal, 2 livestock + 2 livestock | 1 | 3 crystal, 4 livestock | 2 rounds |
-| Base dragon, young | 3 crystal, 2 livestock + 4 livestock | 2 | 1.5 crystal, 3 livestock | 4 rounds |
-| Base dragon, adult | 3 crystal, 2 livestock + 6 livestock | 3 | 1 crystal, 2.7 livestock | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 4 crystal, 2 livestock, 1 gold + 3 livestock | 1 | 4 crystal, 5 livestock, 1 gold | 3 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 4 crystal, 2 livestock, 1 gold + 6 livestock | 2 | 2 crystal, 4 livestock, 0.5 gold | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 4 crystal, 2 livestock, 1 gold + 9 livestock | 3 | 1.3 crystal, 3.7 livestock, 0.3 gold | 9 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, hatchling | 4 crystal, 2 livestock + 2 livestock | 1 | 4 crystal, 4 livestock | 2 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, young | 4 crystal, 2 livestock + 4 livestock | 2 | 2 crystal, 3 livestock | 4 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 4 crystal, 2 livestock + 6 livestock | 3 | 1.3 crystal, 2.7 livestock | 6 rounds |
-| Base dragon by special project, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 2 crystal, 3.3 livestock | 6 rounds |
+| Base dragon, hatchling | 6 crystal, 4 livestock + 2 livestock | 1 | 6 crystal, 6 livestock | 2 rounds |
+| Base dragon, young | 6 crystal, 4 livestock + 4 livestock | 2 | 3 crystal, 4 livestock | 4 rounds |
+| Base dragon, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 2 crystal, 3.3 livestock | 6 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 8 crystal, 4 livestock, 2 gold + 3 livestock | 1 | 8 crystal, 7 livestock, 2 gold | 3 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 8 crystal, 4 livestock, 2 gold + 6 livestock | 2 | 4 crystal, 5 livestock, 1 gold | 6 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 8 crystal, 4 livestock, 2 gold + 9 livestock | 3 | 2.7 crystal, 4.3 livestock, 0.7 gold | 9 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, hatchling | 8 crystal, 4 livestock + 2 livestock | 1 | 8 crystal, 6 livestock | 2 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, young | 8 crystal, 4 livestock + 4 livestock | 2 | 4 crystal, 4 livestock | 4 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 8 crystal, 4 livestock + 6 livestock | 3 | 2.7 crystal, 3.3 livestock | 6 rounds |
+| Base dragon by special project, adult | 12 crystal, 8 livestock + 6 livestock | 3 | 4 crystal, 4.7 livestock | 6 rounds |
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
@@ -149,17 +149,17 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 
 | Dragon | Element | Cost | Growth time | Targets | Hatchling | Young | Adult |
 |---|---|---|---|---|---|---|---|
-| Base dragon (any element) | any | 3 crystal, 2 livestock | 2 | random | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **17**: 20hp 2×2d6 (14) |
-| Ember Wyrm | fire | 4 crystal, 2 livestock, 1 gold | 3 | weak_to_me | **6**: 7hp 1×1d8 (4.5) | **11**: 14hp 1×2d8 (9) | **25**: 24hp 2×3d8 (27) |
-| Cinder Drake | fire | 4 crystal, 2 livestock | 2 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **9**: 11hp 2×1d6 (7) | **16**: 18hp 3×1d8 (13.5) |
-| Frost Wyrm | ice | 4 crystal, 2 livestock, 1 gold | 3 | strongest_attacker | **6**: 9hp 1×1d6 (3.5) | **11**: 17hp 1×2d6 (7) | **20**: 30hp 1×3d8 (13.5) |
-| Rime Drake | ice | 4 crystal, 2 livestock | 2 | weak_to_me | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **19**: 20hp 2×2d8 (18) |
-| Storm Wyrm | lightning | 4 crystal, 2 livestock, 1 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **19**: 20hp 4×1d8 (18) |
-| Bolt Drake | lightning | 4 crystal, 2 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **19**: 20hp 1×4d8 (18) |
-| Sky Wyrm | air | 4 crystal, 2 livestock, 1 gold | 3 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **11**: 13hp 2×1d8 (9) | **20**: 22hp 2×2d8 (18) |
-| Zephyr Drake | air | 4 crystal, 2 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **13**: 17hp 3×1d6 (10.5) |
-| Abyss Wyrm | water | 4 crystal, 2 livestock, 1 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
-| Reef Drake | water | 4 crystal, 2 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
+| Base dragon (any element) | any | 6 crystal, 4 livestock | 2 | random | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **17**: 20hp 2×2d6 (14) |
+| Ember Wyrm | fire | 8 crystal, 4 livestock, 2 gold | 3 | weak_to_me | **6**: 7hp 1×1d8 (4.5) | **11**: 14hp 1×2d8 (9) | **25**: 24hp 2×3d8 (27) |
+| Cinder Drake | fire | 8 crystal, 4 livestock | 2 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **9**: 11hp 2×1d6 (7) | **16**: 18hp 3×1d8 (13.5) |
+| Frost Wyrm | ice | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 9hp 1×1d6 (3.5) | **11**: 17hp 1×2d6 (7) | **20**: 30hp 1×3d8 (13.5) |
+| Rime Drake | ice | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **19**: 20hp 2×2d8 (18) |
+| Storm Wyrm | lightning | 8 crystal, 4 livestock, 2 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **19**: 20hp 4×1d8 (18) |
+| Bolt Drake | lightning | 8 crystal, 4 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **19**: 20hp 1×4d8 (18) |
+| Sky Wyrm | air | 8 crystal, 4 livestock, 2 gold | 3 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **11**: 13hp 2×1d8 (9) | **20**: 22hp 2×2d8 (18) |
+| Zephyr Drake | air | 8 crystal, 4 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **13**: 17hp 3×1d6 (10.5) |
+| Abyss Wyrm | water | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
+| Reef Drake | water | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
 
 ## Raids
 
@@ -227,11 +227,11 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 113 | 22% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 98 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 124 | 24% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 63 | 12% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 110 | 22% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| stone | 226 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 196 | 20% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 241 | 24% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 126 | 13% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 201 | 20% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
