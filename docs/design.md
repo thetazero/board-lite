@@ -117,7 +117,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Lots of variety: "I want lots of fun variety."
   - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: one per resource (quarry, lumber camp, mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
+- Building classes so far: one per resource (stone, timber, crystal and livestock buildings, each holding its basic building: quarry, lumber camp, crystal mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
 
 ### Special projects
 

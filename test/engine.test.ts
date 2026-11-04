@@ -367,7 +367,7 @@ test('building cards count their neighbours, whoever owns them', () => {
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
   for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
   g.map[spot].terrain = 'plains';
-  // Cliff Works makes 1 stone each round for each adjacent mountain.
+  // Cliff Works makes 1 stone each round for each adjacent mountain hex.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);
   const stone = () => production(g, 0).stone.base;
