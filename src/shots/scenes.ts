@@ -455,6 +455,11 @@ export const SCENES: Scene[] = [
       },
       { file: 'phone-trade-own-offer-4p', caption: "Phone: your own offer out, on someone else's turn", client: 'phone', seat: (g!.turn + 2) % 4 },
       {
+        // It changes the room: the acting player accepts the offer made to them.
+        file: 'phone-trade-accepted-4p', caption: 'Phone: the player you offered accepts', client: 'phone', seat: (g!.turn + 2) % 4,
+        then: (room) => room.mutate((g2) => apply(g2, g2.turn, `accept ${g2.offers.find((o) => o.to === g2.turn)!.id}`)), waitFor: '.notices .toast',
+      },
+      {
         // Last: it changes the room. The offerer has spent what they offered, so Accept is off and says why.
         file: 'phone-trade-cant-accept-4p', caption: 'Phone: an offer the offerer can no longer pay (Accept is off, with the reason)', client: 'phone', seat: (g!.turn + 1) % 4,
         then: (room) => room.mutate((g2) => drain(g2, g2.turn)), waitFor: '.offer.in .blocked',
@@ -553,7 +558,7 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 1300 }],
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2700 }],
   },
   {
     // The same raid, on a raider's phone while the TV replays it.
@@ -584,7 +589,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 2200 }],
+    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     name: 'discard-4p',
@@ -605,7 +610,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 2 && g.phase === 'action',
     setup: (g) => toDiscard(g, [0]),
     live: bots((g) => g.phase === 'action'),
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 900 }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 1700 }],
   },
   {
     name: 'production-done-6p',

@@ -1562,8 +1562,17 @@ const canFly = (d: DragonView) => d.stage > 0 && d.status !== 'hurt' && d.status
 interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number } }
 
 // A wandering beast turns to face the next hex, walks there, and turns back
-// to face the room (seconds).
-const WALK_TURN = 0.5, WALK_GO = 2.2;
+// to face the room (seconds): an unhurried walk, so it's still going when
+// someone looks up from their phone.
+const WALK_TURN = 0.7, WALK_GO = 3.4;
+
+// What just changed on the board stays marked for a while: a glowing gold
+// outline round its hex (round the building's plate, which is in its owner's
+// colour), pulsing gently and fading out after FRESH_S seconds.
+// The table is often looking at their phones when it happens; whoever looks
+// up late still sees what's new.
+const FRESH_S = 12;
+const MARK = '#ffe27a';
 
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
@@ -1586,6 +1595,7 @@ export class Board3D {
   private bounds = new THREE.Box3();
   private fitPoints: THREE.Vector3[] = []; // what the camera must keep in view
   private firstUpdate = true;
+  private marks = new Map<string, { mesh: THREE.Mesh; born: number }>(); // by hex
 
   constructor() {
     this.el = document.createElement('div');
@@ -1668,6 +1678,7 @@ export class Board3D {
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
       this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
+      if (fresh) this.mark(h, now);
     }
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
@@ -1698,9 +1709,31 @@ export class Board3D {
         gone.splice(from, 1);
       }
       this.beasts.set(h.k, entry);
+      if (animate) this.mark(h, now);
     }
     this.placeDragons(g);
     this.firstUpdate = false;
+  }
+
+  private mark(h: HexView, now: number) {
+    this.unmark(h.k);
+    const geo = new THREE.RingGeometry(0.86, 1.0, 6, 1, Math.PI / 6); // corners where the tile's are
+    geo.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: MARK, transparent: true, opacity: 0, depthWrite: false }));
+    const [x, z] = hexXZ(h.q, h.r);
+    mesh.position.set(x, TILE_H + TILE_LIFT + 0.015, z); // just over the tile's peak, so its folds never cut it
+    mesh.renderOrder = 2;
+    this.scene.add(mesh);
+    this.marks.set(h.k, { mesh, born: now });
+  }
+
+  private unmark(k: string) {
+    const m = this.marks.get(k);
+    if (!m) return;
+    this.scene.remove(m.mesh);
+    m.mesh.geometry.dispose();
+    (m.mesh.material as THREE.Material).dispose();
+    this.marks.delete(k);
   }
 
   // ---------- building the scene ----------
@@ -1804,6 +1837,7 @@ export class Board3D {
       dispose(o);
     }
     this.tiles.clear();
+    for (const k of [...this.marks.keys()]) this.unmark(k);
     this.built.clear();
     this.beasts.clear();
     this.dragons.clear();
@@ -2008,6 +2042,15 @@ export class Board3D {
         pop.rotation.x = 0;
         pop.scale.y = 1;
       }
+    }
+    for (const [k, m] of this.marks) {
+      const age = t - m.born;
+      if (age > FRESH_S) {
+        this.unmark(k);
+        continue;
+      }
+      const fade = Math.min(1, age / 0.4) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
+      (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * (0.8 + 0.2 * Math.cos(age * 3.5));
     }
     // The acting player's plates glow gently.
     this.plateMats.forEach((m, i) => {
