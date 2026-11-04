@@ -107,7 +107,10 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   const out: string[] = [];
   const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
   if (g.phase === 'action') {
-    for (const o of g.offers.filter((x) => x.to === you.seat)) out.push(`accept ${o.id}  |  decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})`);
+    for (const o of g.offers.filter((x) => x.to === you.seat)) {
+      const why = you.cantAccept[o.id];
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})${why ? ` ${why}` : ''}`);
+    }
     if (!you.myTurn) {
       out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn you may only trade with ${P(g.turn)})`);
       return out;

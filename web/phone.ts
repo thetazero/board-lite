@@ -545,7 +545,8 @@ function roost(g: PublicState, me: Me): string {
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => o.to === me.seat).map((o) => `
     <div class="offer in">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
-      <div class="row"><button class="primary" data-accept="${o.id}">Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
+      ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
+      <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
     <div class="offer out">You offer ${playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
   // Build & bank and Trade open over the table and close again; the hand is always below.
@@ -682,7 +683,11 @@ function tradeView(g: PublicState, me: Me): string {
   if (!others.includes(trade.to)) trade.to = others[0];
   const who = others.map((i) => `<button data-to="${i}" class="${trade.to === i ? 'on' : ''}" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i])}</button>`).join('');
   // One row per resource: what you give and what you get side by side.
-  const rows = RESOURCES.map((r) => `${resIcon(r, 1.4)}${stepper('give', r, trade.give[r] ?? 0, me.resources[r])}${stepper('get', r, trade.get[r] ?? 0, 99)}`).join('');
+  // Gold is public, so you can't ask for more than they have; the rest of what
+  // they hold is hidden, and they find out when they answer.
+  const theirGold = g.players[trade.to].gold;
+  if ((trade.get.gold ?? 0) > theirGold) trade.get.gold = theirGold;
+  const rows = RESOURCES.map((r) => `${resIcon(r, 1.4)}${stepper('give', r, trade.give[r] ?? 0, me.resources[r])}${stepper('get', r, trade.get[r] ?? 0, r === 'gold' ? theirGold : 99)}`).join('');
   // Cards are offered from the hand itself, the same cards as everywhere: tapped
   // ones rise out of the fan and are named here.
   const offered = me.hand.filter((c) => trade.cards.has(c.id));
