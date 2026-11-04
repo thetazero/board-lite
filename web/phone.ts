@@ -658,7 +658,7 @@ function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''):
 // the roost names it, with its health and attack, how fast it grows, and one sentence on how it picks targets.
 // A hatched dragon's card marks the stage it's at now.
 function dragonStats(key: string, element: string, d: { growth: number; targeting: string; stages: DragonStageView[] }, now = 0): string {
-  const rows = d.stages.map((st, i) => `<div class="drow${i + 1 === now ? ' now' : ''}"><span class="sfig">${stageFigure(key, element, i)}<small>${STAGE_LABEL[i + 1]}</small></span>${statTag('Health', st.hp)}${statTag('Attack', esc(st.attack))}</div>`).join('');
+  const rows = d.stages.map((st, i) => `<div class="drow${i + 1 === now ? ' now' : ''}"><span class="sfig">${stageFigure(key, element, i)}<small>${STAGE_LABEL[i + 1]}</small></span><span class="dvals">${statTag('Health', st.hp)}${statTag('Attack', esc(st.attack))}</span></div>`).join('');
   const sentence = `${d.targeting[0].toUpperCase()}${d.targeting.slice(1)}.`;
   return `<div class="dstats">${rows}<div class="dgrow">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it's fed</div></div><p class="ctext">${esc(sentence)}</p>`;
 }
