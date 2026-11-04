@@ -494,6 +494,9 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
       }
       if (t) {
         t.querySelector('.hpbar')!.outerHTML = hpBar(now, max);
+        // Hits can land faster than a number fades: the new one replaces the
+        // last, so a −4 and a −8 never read as one −48.
+        t.querySelectorAll('.dmg').forEach((old) => old.remove());
         const pop = document.createElement('span');
         pop.className = 'dmg';
         pop.textContent = `−${h.dmg}`;

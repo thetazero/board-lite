@@ -39,6 +39,18 @@ export interface Seat {
   left: boolean; // quit: no phone holds the seat any more
 }
 
+// A name as the table shows it: spaces collapsed, no control or invisible
+// characters (zero-width spaces, blank fillers), at most 12 characters. A
+// joiner inside an emoji stays.
+function tidyName(name: string): string {
+  const clean = name
+    .replace(/\s+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}\u115F\u1160\u2800\u3164\uFFA0]/gu, (c) => (c === '\u200D' ? c : ''))
+    .replace(/ +/g, ' ')
+    .trim();
+  return Array.from(clean).slice(0, 12).join('').trim();
+}
+
 export class RoomError extends Error {}
 
 const LETTERS = 'BCDFGHJKLMNPQRSTVWXZ'; // no vowels: no accidental words
@@ -185,8 +197,8 @@ export class Room {
   // ---- lobby ----
 
   private cleanName(name: string): string {
-    const clean = name.replace(/\s+/g, ' ').trim().slice(0, 12);
-    if (!clean) throw new RoomError('Pick a name.');
+    const clean = tidyName(name);
+    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
     if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}.`);
     return clean;
   }
@@ -214,7 +226,7 @@ export class Room {
   // name takes an open seat (one nobody holds, in a saved game hosted again).
   join(name: string, kind: SeatKind = 'player'): Seat {
     if (this.game) {
-      const typed = name.replace(/\s+/g, ' ').trim().toLowerCase();
+      const typed = tidyName(name).toLowerCase();
       const own = this.seats.find((s) => s.kind === 'player' && s.name.toLowerCase() === typed);
       if (own && kind === 'player') {
         if (this.here(own)) throw new RoomError(`${own.name} is playing on another phone.`);
