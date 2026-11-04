@@ -272,6 +272,13 @@ export const DRAGONS: Record<string, DragonDef> = {
   },
 };
 
+// What goes into each deck: every card of these kinds, its copies times.
+// Basic buildings have no copies and are in neither deck.
+export const DECKS = {
+  building: [BUILDINGS, UPGRADES],
+  action: [ACTIONS, DRAGONS],
+} as const satisfies Record<string, Record<string, { copies?: number }>[]>;
+
 export interface UnitDef extends Attack {
   name: string;
   strong: Element[]; // takes half damage from these
