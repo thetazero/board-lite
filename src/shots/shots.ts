@@ -455,6 +455,7 @@ async function main() {
               url = `${base}${shot.path ?? `/${code}`}?n=${n++}`;
               if (shot.remember) storage.name = shot.remember;
             }
+            const screenGone = shot.screen ? room.connect(null) : null;
             await tab.load(url, device, { storage, loading: shot.loading });
             // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
             if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
@@ -502,6 +503,7 @@ async function main() {
               console.log(`${changed ? '* ' : '  '}${name}.png${pngs.length > 1 ? ` (${pngs.length} screens)` : ''}  ${Date.now() - ts} ms`);
             }
             if (shot.offline) await tab.offline(false);
+            screenGone?.();
           } catch (e) {
             failures++;
             await tab.offline(false).catch(() => {});

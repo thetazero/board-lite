@@ -12,6 +12,7 @@ import {
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
+import { FIGHT_LEAD_MS, ROLL_SPIN_MS, ROLL_STAGGER_MS, hitStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -73,8 +74,12 @@ function onSnapshot(s: Snapshot) {
   }
   const fresh = log.filter((e) => e.i > seenLog);
   if (fresh.length) seenLog = fresh.at(-1)!.i;
-  renderGame(s.game);
   queueBanners(s.game, fresh);
+  // While a scene plays, the board, the panels, the feed and the titles stay
+  // as they were when it began, so nothing in the corners gives its ending
+  // away; they catch up when it's over.
+  if (!shown || (!bannerUp && !banners.length)) renderGame(s.game);
+  else renderGame(shown);
   updateOverlay(s.game);
 }
 
@@ -155,9 +160,9 @@ function nameList(ps: number[]): string {
 }
 
 function phaseLabel(g: PublicState): string {
+  if (bannerTop) return bannerTop.phase;
   if (g.phase === 'over') return 'Game over';
   if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
-  if (raidBanner) return 'Raid';
   if (g.phase === 'discard') return `End of round: ${g.waitingOn.length ? `${nameList(g.waitingOn)} discard${g.waitingOn.length === 1 ? 's' : ''} down to the hand limit` : 'discarding'}`;
   if (g.phase === 'cards') return 'Everyone keeps a building card';
   return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
@@ -165,7 +170,7 @@ function phaseLabel(g: PublicState): string {
 
 // What one player is doing right now, if the table is waiting on them.
 function doing(g: PublicState, p: number): string {
-  if (!g.waitingOn.includes(p)) return '';
+  if (bannerUp || !g.waitingOn.includes(p)) return ''; // during a scene, everyone watches
   if (g.phase === 'action') return g.turn === p ? 'Taking a turn' : 'Answering an offer';
   if (g.phase === 'discard') return 'Discarding';
   if (g.phase === 'cards') return 'Keeping a card';
@@ -194,7 +199,10 @@ function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string 
   return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: a bot plays for them</span>`;
 }
 
+let shown: PublicState | null = null; // the state the board is drawn from
+
 function renderGame(g: PublicState) {
+  shown = g;
   const n = g.players.length;
   const players = g.players.map((p, i) => {
     const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge" title="${esc(t.name)}">${icon(TITLE_ICON[t.key], 1.1)}</span>`).join('')
@@ -246,7 +254,7 @@ function renderGame(g: PublicState) {
       <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
       ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       <header class="topbar">
-        <span class="round">Round ${g.round}</span>
+        <span class="round">Round ${bannerTop?.round ?? g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
         <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
         ${remote ? '' : `<span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>`}
@@ -354,38 +362,36 @@ function renderRaid(g: PublicState) {
 // Short banners for things that just happened, shown one after another: the
 // result of a raid, production dice at the start of a round. The raid screen
 // and the final scores show whenever no banner is up.
-interface Banner { html: string; ms: number; raid?: boolean; play?: (el: HTMLElement) => void }
-let raidBanner = false; // a raid's fight is on screen: the top bar still says "Raid"
+// top: what the top bar says while it's up (the board under it is held as it
+// was, so its own round and phase may have moved on).
+interface Banner { html: string; ms: number; top?: { round: number; phase: string }; play?: (el: HTMLElement) => void }
+let bannerTop: Banner['top'] | null = null;
 const banners: Banner[] = [];
 let bannerUp = false;
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
-  for (const e of fresh) {
-    const ev = e.ev;
-    if (ev?.k === 'fight') banners.push(fightBanner(g, e, fresh));
-    if (ev?.k === 'hunt') banners.push(huntBanner(g, e, fresh));
-    if (ev?.k === 'noRaid') banners.push({ html: `<div class="result"><h1>${eventHtml(e, g, names)}</h1></div>`, ms: 4000, raid: true });
-    if (ev?.k === 'round') {
-      const rolls = fresh.filter((x) => x.i > e.i && x.round === e.round && x.ev?.k === 'produce' && x.dice?.length);
-      banners.push(rollBanner(e.round, rolls));
-    }
-  }
+  for (const sc of scenesOf(fresh)) banners.push(banner(g, sc, fresh));
 }
 
-// A new round's production, as the table would roll it: one player at a
-// time, their dice tumbling and landing, for everyone to watch. Only the
+function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
+  if (sc.kind === 'roll') return rollBanner(fresh[sc.at].round, sc.rolls.map((j) => fresh[j]), sc.ms);
+  if (sc.kind === 'fight') return fightBanner(g, sc, fresh);
+  if (sc.kind === 'hunt') return huntBanner(g, sc, fresh);
+  return { html: `<div class="result"><h1>${eventHtml(fresh[sc.at], g, names)}</h1></div>`, ms: sc.ms, top: { round: fresh[sc.at].round, phase: 'Raid' } };
+}
+
+// A new round's production, as the table would roll it: everyone's dice
+// tumbling, each player's a moment after the last's, and landing. Only the
 // rolls: what they bring in is each player's own business, on their phone.
 // A round nobody rolls in still opens with its number, briefly.
-const ROLL_MS = 1300;
-function rollBanner(round: number, rolls: EventView[]): Banner {
+function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   const rows = rolls.map((x) => {
     const p = (x.ev as Extract<EventView['ev'], { k: 'produce' }>).p;
     return `<li style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="dice">${x.dice!.map((d) => dieFace(d.sides, d.value, 'rolling')).join('')}</span></li>`;
   }).join('');
   const play = (el: HTMLElement) => {
     el.querySelectorAll<HTMLElement>('.production li').forEach((li, k) => setTimeout(() => {
-      el.querySelector('.production li.now')?.classList.remove('now');
-      li.classList.add('up', 'now');
+      li.classList.add('up');
       // Spin the dice for a moment, then land on what they rolled.
       const dice = li.querySelectorAll<HTMLElement>('.die.rolling');
       const finals = Array.from(dice, (d) => d.querySelector('b')!.textContent);
@@ -396,23 +402,22 @@ function rollBanner(round: number, rolls: EventView[]): Banner {
           d.querySelector('b')!.textContent = finals[i];
           d.classList.remove('rolling');
         });
-      }, ROLL_MS * 0.6);
-    }, 300 + k * ROLL_MS));
+      }, ROLL_SPIN_MS);
+    }, 300 + k * ROLL_STAGGER_MS));
   };
-  return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<ul>${rows}</ul>` : ''}</div>`, ms: rolls.length ? 300 + rolls.length * ROLL_MS + 1500 : 1500, play };
+  return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<ul>${rows}</ul>` : ''}</div>`, ms, play, top: { round, phase: 'Production' } };
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow: the
 // dragons on one side, the defenders on the other, a stroke from each attacker
 // to what it hits, health bars falling as the hits land, then who won and what
 // they took. Whoever bailed is shown flown home, under the fighters.
-const HIT_MS = 300;
-function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
+type Combat = Extract<EventView['ev'], { k: 'combat' }>;
+function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fresh: EventView[]): Banner {
+  const e = fresh[sc.at];
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
-  const later = fresh.filter((x) => x.i > e.i);
-  const endAt = later.findIndex((x) => x.ev?.k === 'raidEnd');
-  const rounds = (endAt < 0 ? later : later.slice(0, endAt)).flatMap((x) => (x.ev?.k === 'combat' ? [x.ev] : []));
-  const end = endAt < 0 ? null : (later[endAt].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
+  const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
+  const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
   // This raid's bails: the ones logged since its commitments locked (maybe
   // in an earlier update than the fight's, so from the whole log).
   const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
@@ -428,28 +433,26 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
     ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, fled, ev.units, rounds, outcome, true);
+  return battle(g, head, dragons, fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
 // A fight against fauna, a great beast or not: one player's dragons against
 // it, to the end, played out like a raid's, then what they got for it. Every
 // fight in the game gets this replay, so the table sees it happen.
-function huntBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
-  const ev = e.ev as Extract<EventView['ev'], { k: 'hunt' }>;
-  const later = fresh.filter((x) => x.i > e.i);
-  const endAt = later.findIndex((x) => x.ev?.k === 'cleared');
-  const rounds = (endAt < 0 ? later : later.slice(0, endAt)).flatMap((x) => (x.ev?.k === 'combat' ? [x.ev] : []));
-  const end = endAt < 0 ? null : (later[endAt].ev as Extract<EventView['ev'], { k: 'cleared' }>);
+function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh: EventView[]): Banner {
+  const ev = fresh[sc.at].ev as Extract<EventView['ev'], { k: 'hunt' }>;
+  const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
+  const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'cleared' }>);
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
   const great = g.beasts.some((b) => b.key === ev.fauna);
   const outcome = !end ? '' : !end.won ? `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`
     : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
     : `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${icon(ev.fauna, 1.4)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, '', [{ name: ev.name, hp: ev.hp }], rounds, outcome, false);
+  return battle(g, head, dragons, '', [{ name: ev.name, hp: ev.hp }], rounds, outcome, undefined, sc.ms);
 }
 
-function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number }[], rounds: Extract<EventView['ev'], { k: 'combat' }>[], outcome: string, raid: boolean): Banner {
+function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
   const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(d.maxHp, d.maxHp)}</div>`).join('');
   const foes = units.map((u, i) => `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
   const html = `<div class="result fight">
@@ -457,7 +460,7 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
       <div class="battle"><div class="bside">${side}${fled}</div><div class="bvs"><small>round</small><b class="cround"></b></div><div class="bside foes">${foes}</div></div>
       <div class="outcome">${outcome}</div></div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
-  const step = Math.min(HIT_MS, 5000 / Math.max(1, hits.length));
+  const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {
     const hp = new Map<string, [number, number]>();
     dragons.forEach((d) => hp.set(`d${d.id}`, [d.maxHp, d.maxHp]));
@@ -488,13 +491,13 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
         setTimeout(() => pop.remove(), 900);
         if (now <= 0) t.classList.add('down');
       }
-    }, 800 + n * step));
+    }, FIGHT_LEAD_MS + n * step));
     setTimeout(() => {
       battle.querySelector('.beam')?.remove();
       el.querySelector('.outcome')!.classList.add('show');
-    }, 800 + hits.length * step + 400);
+    }, FIGHT_LEAD_MS + hits.length * step + 400);
   };
-  return { html, ms: 800 + hits.length * step + 4500, play, raid };
+  return { html, ms, play, top };
 }
 
 // A line from one fighter's facing edge to another's, drawn over the battle.
@@ -528,25 +531,24 @@ function updateOverlay(g: PublicState) {
   el.innerHTML = '';
 }
 
-function setRaidBanner(on: boolean) {
-  raidBanner = on;
-  const ph = app.querySelector('.topbar .phase');
-  if (ph && snap?.game) ph.innerHTML = phaseLabel(snap.game);
-}
-
 function showBanner(b: Banner) {
   const el = $('overlay');
   bannerUp = true;
+  bannerTop = b.top ?? null;
   cut(true);
-  setRaidBanner(!!b.raid);
   el.className = 'overlay banner';
   el.innerHTML = b.html;
   b.play?.(el);
+  if (shown) renderGame(shown); // no one is being waited on while it plays
   setTimeout(() => {
     bannerUp = false;
-    setRaidBanner(false);
-    if (snap?.game) updateOverlay(snap.game);
-    if (!bannerUp) cut(false);
+    bannerTop = null;
+    if (!snap?.game) return;
+    updateOverlay(snap.game);
+    if (!bannerUp) {
+      renderGame(snap.game); // the scenes are over: the board catches up
+      cut(false);
+    }
   }, b.ms);
 }
 
