@@ -28,11 +28,16 @@ export async function post(path: string, body: Record<string, unknown>): Promise
   return data;
 }
 
-// Live snapshots of a room. Reconnects on its own if the connection drops.
+// Live snapshots of a room. Reconnects on its own if the connection drops, and
+// at once when the page comes back into view or the network comes back: a
+// phone that slept or lost Wi-Fi can hold a stream that looks open but is dead.
 export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void): () => void {
   let es: EventSource | null = null;
   let closed = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   const open = () => {
+    clearTimeout(retry);
+    es?.close();
     es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : ''}`);
     es.onmessage = (e) => {
       onStatus(true);
@@ -41,13 +46,24 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     es.onerror = () => {
       onStatus(false);
       es?.close();
-      if (!closed) setTimeout(open, 1500);
+      if (!closed) retry = setTimeout(open, 1500);
     };
   };
+  let hiddenAt = 0;
+  const seen = () => {
+    if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+    else if (!closed && Date.now() - hiddenAt > 3000) open();
+  };
+  const online = () => !closed && open();
+  document.addEventListener('visibilitychange', seen);
+  addEventListener('online', online);
   open();
   return () => {
     closed = true;
+    clearTimeout(retry);
     es?.close();
+    document.removeEventListener('visibilitychange', seen);
+    removeEventListener('online', online);
   };
 }
 

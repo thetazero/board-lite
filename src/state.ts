@@ -350,7 +350,8 @@ export type SeatKind = 'player' | 'bot' | 'open';
 export interface Lobby {
   code: string;
   started: boolean;
-  seats: { name: string; kind: SeatKind; connected: boolean }[];
+  // standIn: a bot makes this player's moves (they quit: left, or they're away).
+  seats: { name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean }[];
   minPlayers: number;
   maxPlayers: number;
   file: string; // where the server saves the game
