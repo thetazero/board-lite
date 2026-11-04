@@ -1,9 +1,12 @@
-/* board-lite: TV and phone, one folded-paper world.
-   The table is a sheet of night paper (the lobby's sky); everything on it is
-   cut from paper too: panels are cream sheets with faint fold facets, buttons
-   are creased tabs that stand up off the sheet and press flat, banners are
-   ribbons with notched ends like the cards' name strips. Words on paper are
-   ink; player colours are inked darker there so yellow still reads. */
+/* board-lite: TV and phone, one folded-paper world, the same as the board's.
+   The table is a sheet of night-blue construction paper (the lobby's sky);
+   everything on it is cut from paper too. Paper here is matte: grain, soft
+   clouds of pulp, crisp square-cut edges and at most one faint crease, never a
+   sheen. A sheet lying on another casts a short, hard shadow (its thickness)
+   and a soft one under it. Buttons are tabs of coloured card that stand up off
+   the sheet and press flat; banners are ribbons with notched ends like the
+   cards' name strips. Words on paper are ink; player colours are inked darker
+   there so yellow still reads. */
 
 :root {
   --bg: #1d1934;
@@ -20,23 +23,33 @@
   --heal: #ff8f8f;
   --hit: #ff7a59;
   /* paper */
-  --paper: #f3ead7;
-  --paper-hi: #faf4e6;
-  --paper-lo: #e9dec6;
-  --paper-edge: #c4b08a;
+  --paper: #f1e7d0;
+  --paper-hi: #f7f0de;
+  --paper-lo: #e8dcc0;
+  --paper-edge: #bfa982;
   --ink: #2b2228;
   --ink-soft: #6b5a6e;
   --serif: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
-  /* a sheet: three faint facets, as if folded and opened flat again */
-  --sheet: var(--grain), linear-gradient(118deg, var(--paper-hi) 0 34%, var(--paper) 34% 71%, var(--paper-lo) 71%);
-  --lift: 0 .12em 0 var(--paper-edge), 0 .45em .9em #0b081a99;
+  /* fine grain: specks of fibre */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .4 0 0 0 0 .3 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* the pulp's clouds: paper is never one flat colour */
+  --mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.016' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .34 0 0 0 0 .2 .28 0 0 0 -.105'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* the night table's own grain and clouds, in lighter fibre */
+  --table-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .8 0 0 0 0 1 .75 0 0 0 -.42'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --table-mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.008' numOctaves='3' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .85 .26 0 0 0 -.1'/%3E%3C/filter%3E%3Crect width='420' height='420' filter='url(%23n)'/%3E%3C/svg%3E");
+  --table: var(--table-grain), var(--table-mottle), radial-gradient(ellipse 120% 90% at 50% 40%, var(--bg2), var(--bg) 72%);
+  /* a sheet: matte, lit a little from above, one faint crease where it was folded and opened flat */
+  --crease: linear-gradient(97deg, transparent 63%, #ffffff55 63% calc(63% + 1px), #6b553010 calc(63% + 1px));
+  --sheet: var(--grain), var(--mottle), var(--crease), linear-gradient(180deg, var(--paper-hi), var(--paper) 45%, var(--paper-lo));
+  /* paper lying on the table: its cut edge, a second sheet of darker stock under it, a hard
+     shadow as thick as card and a soft one under both */
+  --lift: inset 0 1px 0 #fffbf0aa, 0 .1em 0 var(--paper-edge), .2em .24em 0 -.04em #cdb68c, .2em .24em 0 -.02em #0b081a40, .26em .38em .1em -.04em #0b081a66, .2em .7em 1em -.15em #0b081ab3;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-body { background: var(--grain), radial-gradient(ellipse 120% 90% at 50% 40%, var(--bg2), var(--bg) 70%) fixed var(--bg); }
+body { background: var(--table); background-color: var(--bg); background-attachment: scroll, scroll, fixed; }
 
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
@@ -49,21 +62,22 @@ body { background: var(--grain), radial-gradient(ellipse 120% 90% at 50% 40%, va
 :is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
 :is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
-.panel, .roost, .offer, .ptarget, .big-note, .mylog, .ally, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 4px; }
+.panel, .roost, .offer, .ptarget, .big-note, .mylog, .ally, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
-/* Buttons: a creased paper tab standing up off the sheet; pressed, it lies flat. */
-button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), linear-gradient(172deg, var(--paper-hi) 0 48%, var(--paper-lo) 48%); border: 0; border-radius: 4px; padding: .5em .9em; cursor: pointer;
-  box-shadow: 0 .16em 0 var(--paper-edge), 0 .3em .5em #0b081a66; transition: transform .08s, box-shadow .08s; }
-button:active:not(:disabled) { transform: translateY(.14em); box-shadow: 0 .02em 0 var(--paper-edge), 0 .1em .2em #0b081a66; }
-button:disabled { opacity: .45; cursor: default; box-shadow: 0 .06em 0 var(--paper-edge); }
-button.primary { --text: #fff; --muted: #e3e9ff; color: #fff; background: var(--grain), linear-gradient(172deg, #5585e8 0 48%, #3a68cf 48%); box-shadow: 0 .16em 0 #213f8a, 0 .3em .5em #0b081a77; text-shadow: 0 1px 0 #0004; }
-button.primary:active:not(:disabled) { box-shadow: 0 .02em 0 #213f8a; }
-/* ghost: a pencilled outline, no paper; light on the night table, ink on a sheet */
-button.ghost { background: transparent; --text: var(--paper); color: var(--paper); box-shadow: inset 0 0 0 2px #f3ead766; }
-:is(.talkbar, .panel, .pmap) button.ghost { --text: var(--ink); color: var(--ink); box-shadow: inset 0 0 0 2px #2b222840; }
+/* Buttons: a tab of matte card standing up off the sheet, as thick as its
+   hard edge below; pressed, it lies flat. Plain is cream card, primary blue,
+   ghost the table's own night card (a kraft tab on a sheet), chosen gold. */
+button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); border: 0; border-radius: 2px; padding: .5em .9em; cursor: pointer;
+  --edge: var(--paper-edge); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a66; transition: transform .08s, box-shadow .08s; }
+button:active:not(:disabled) { transform: translateY(.14em); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .02em 0 var(--edge), 0 .06em .1em #0b081a66; }
+button:disabled { opacity: .45; cursor: default; box-shadow: 0 .06em 0 var(--edge); }
+button.primary { --text: #fff; --muted: #e3e9ff; --edge: #213f8a; color: #fff; background: var(--grain), var(--mottle), linear-gradient(180deg, #4d7bdf, #3c68cb); box-shadow: inset 0 1px 0 #ffffff40, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; text-shadow: 0 1px 0 #0003; }
+button.primary:active:not(:disabled) { box-shadow: inset 0 1px 0 #ffffff40, 0 .02em 0 var(--edge); }
+button.ghost { --text: var(--paper); --edge: #15112a; color: var(--paper); background: var(--table-grain), var(--mottle), linear-gradient(180deg, #4b4279, #3d3567); box-shadow: inset 0 1px 0 #ffffff24, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; }
+:is(.talkbar, .panel, .pmap) button.ghost { --text: var(--ink); --edge: #a38a5c; color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #e6d7b6, #d8c59e); box-shadow: inset 0 1px 0 #fffbf080, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a55; }
 button.small { padding: .2em .5em; font-size: .85em; }
 button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
-input, select { font: inherit; background: var(--grain), #fffaf0; border: 1px solid var(--paper-edge); border-radius: 4px; padding: .5em; box-shadow: inset 0 .12em .2em #0002; }
+input, select { font: inherit; background: var(--grain), #fffaf0; border: 1px solid var(--paper-edge); border-radius: 2px; padding: .5em; box-shadow: inset 0 .12em .2em #0002; }
 small { color: var(--muted); }
 /* Headings and banners in the cards' book face. */
 .title, .topbar .phase, .production h1, .result h1, .endbox h1, .raidbox h1, .target h2, .result.fight h2, .panel h3, .corner.titles h3, .pover h1, .plobby h1, .pbody h2, .trade h3, .phone .status { font-family: var(--serif); }
@@ -93,7 +107,7 @@ small { color: var(--muted); }
 .die.rolling { animation: shake .18s infinite; }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
-.toast { position: fixed; left: 50%; bottom: 1.5em; transform: translateX(-50%) rotate(-.6deg); background: var(--sheet); border-left: .4em solid var(--bad); box-shadow: var(--lift); font-weight: 600; padding: .7em 1em; border-radius: 3px; z-index: 50; max-width: 90vw; }
+.toast { position: fixed; left: 50%; bottom: 1.5em; transform: translateX(-50%) rotate(-.6deg); background: var(--sheet); border-left: .4em solid var(--bad); box-shadow: var(--lift); font-weight: 600; padding: .7em 1em; border-radius: 2px; z-index: 50; max-width: 90vw; }
 .offline-note { display: none; position: fixed; top: 0; left: 0; right: 0; background: var(--grain), #c0392b; color: #fff; font-weight: 700; text-align: center; padding: .3em; z-index: 60; box-shadow: 0 .2em .4em #0006; }
 body.offline .offline-note { display: block; }
 
@@ -117,7 +131,7 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .subtitle { margin: 0; color: var(--muted); font-size: 1.3em; }
 .lobby-main { flex: 1; display: flex; gap: 2.5em; align-items: center; justify-content: center; padding: 1em 2em; min-width: 0; }
 /* how to join, on a sheet of paper */
-.join-box { flex: none; background: var(--sheet); color: #2a1d33; border-radius: 4px; padding: 1em 2em 1.2em; font-size: 1.3em; text-align: center; box-shadow: .3em .4em 0 #0006; transform: rotate(-.6deg); }
+.join-box { flex: none; background: var(--sheet); color: #2a1d33; border-radius: 2px; padding: 1em 2em 1.2em; font-size: 1.3em; text-align: center; box-shadow: var(--lift); transform: rotate(-.6deg); }
 .join-box .step { color: #6b5a6e; font-weight: 700; }
 .join-box .url { font-size: 1.9em; font-weight: 800; margin: .1em 0 .5em; }
 .join-box .alt { color: #6b5a6e; margin: -.5em 0 .5em; }
@@ -125,7 +139,7 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .join-box .code span { font-size: 3.4em; font-weight: 900; width: 1.25em; line-height: 1.3; background: #2a1d33; color: var(--accent); border-radius: 6px; box-shadow: 0 .12em 0 #0005; }
 .table { min-width: 0; flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; gap: 1em; }
 .seatcards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(7em, 12em)); gap: .8em; font-size: 1.35em; }
-.seatcard { position: relative; height: 4.2em; display: flex; align-items: center; gap: .5em; padding: 0 .8em; background: var(--sheet); color: #2a1d33; border-radius: 4px; border-top: .35em solid var(--pc); box-shadow: .15em .2em 0 #0006; }
+.seatcard { position: relative; height: 4.2em; display: flex; align-items: center; gap: .5em; padding: 0 .8em; background: var(--sheet); color: #2a1d33; border-radius: 2px; border-top: .35em solid var(--pc); box-shadow: var(--lift); }
 .seatcard .pname { color: #2a1d33; font-weight: 800; font-size: 1.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seatcard .tag { font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 .seatcard.open { background: transparent; border: 2px dashed #f3ead740; box-shadow: none; }
@@ -166,9 +180,9 @@ svg.token { flex: none; }
 .side.p2 { font-size: 1.6em; } .side.p3, .side.p4 { font-size: 1.45em; }
 .side.p5, .side.p6 { font-size: 1.3em; }
 /* each player a sheet, their colour a folded strip down its edge; the one whose turn it is is tinted and ringed */
-.pcard { background: var(--sheet); border-left: .4em solid var(--pc); border-radius: 3px; padding: .3em .6em .4em; box-shadow: var(--lift); }
-.pcard.turn { background: var(--grain), linear-gradient(118deg, color-mix(in srgb, var(--pc) 10%, var(--paper-hi)) 0 34%, color-mix(in srgb, var(--pc) 16%, var(--paper)) 34% 71%, color-mix(in srgb, var(--pc) 20%, var(--paper-lo)) 71%);
-  box-shadow: 0 0 0 .18em var(--pc), 0 .5em 1.1em #0b081acc; }
+.pcard { background: var(--sheet); border-left: .4em solid var(--pc); border-radius: 2px; padding: .3em .6em .4em; box-shadow: var(--lift); }
+.pcard.turn { background: var(--grain), var(--mottle), var(--crease), linear-gradient(180deg, color-mix(in srgb, var(--pc) 12%, var(--paper-hi)), color-mix(in srgb, var(--pc) 18%, var(--paper-lo)));
+  box-shadow: 0 0 0 .18em var(--pc), .06em .3em 0 color-mix(in srgb, var(--pc) 45%, #0b081a), .1em .7em 1.1em -.1em #0b081acc; }
 .phead { display: flex; align-items: center; gap: .45em; white-space: nowrap; }
 .pname { font-size: 1.3em; font-weight: 800; color: var(--pc); line-height: 1.1; }
 .pcard > .doing { display: inline-block; margin: .1em 0; }
@@ -202,7 +216,7 @@ svg.token { flex: none; }
 .offers li { margin: .15em 0; }
 
 /* The bottom corners: what happened and what was said, and the titles. */
-.side .corner { background: var(--sheet); box-shadow: var(--lift); border-radius: 3px; padding: .3em .7em; font-size: clamp(15px, 1.15vw, 28px); flex: none; }
+.side .corner { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .3em .7em; font-size: clamp(15px, 1.15vw, 28px); flex: none; }
 .feedbox ul.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; max-height: 7.2em; overflow: hidden; }
 .feedbox li { padding: .05em 0; color: var(--muted); display: flex; align-items: center; gap: .35em; flex-wrap: wrap; }
 .feedbox li .chip { margin-right: .15em; }
@@ -226,11 +240,11 @@ q::after { content: close-quote; }
 
 /* TV overlays */
 .overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #140f2ae8; }
-.overlay.raid { background: var(--grain), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); }
+.overlay.raid { background: var(--table-mottle), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); }
 .overlay.banner { background: #140f2ad0; animation: fadein .3s; }
 @keyframes fadein { from { opacity: 0; } }
 /* the TV's big moments: a large sheet laid on the table, its top-right corner folded down */
-.production, .result, .endbox { position: relative; background: var(--sheet); border-radius: 3px; padding: 1.2em 2.5em; min-width: 40em; text-align: center; box-shadow: 0 .18em 0 var(--paper-edge), 0 1.2em 2.4em #05030fcc;
+.production, .result, .endbox { position: relative; background: var(--sheet); border-radius: 2px; padding: 1.2em 2.5em; min-width: 40em; text-align: center; box-shadow: 0 .18em 0 var(--paper-edge), 0 1.2em 2.4em #05030fcc;
   clip-path: polygon(0 0, calc(100% - 2.2em) 0, 100% 2.2em, 100% 100%, 0 100%); }
 .production::before, .result::before, .endbox::before { content: ''; position: absolute; z-index: 2; top: 0; right: 0; width: 2.2em; height: 2.2em; background: linear-gradient(225deg, transparent 50%, var(--paper-edge) 50%, #e1d2b2 75%); box-shadow: -.1em .1em .25em #0004; }
 .production h1, .result h1, .endbox h1 { margin: .2em 0 .6em; font-size: 2.3em; }
@@ -264,7 +278,7 @@ q::after { content: close-quote; }
 .raidbox h1 small { font-size: .5em; }
 .raidbox .sub { color: var(--muted); font-size: 1.2em; margin: 0 0 .8em; }
 .candidates { display: flex; gap: 1em; justify-content: center; align-items: stretch; }
-.target { background: var(--sheet); box-shadow: var(--lift); border-radius: 3px; padding: .8em 1.2em; text-align: left; min-width: 24em; position: relative; }
+.target { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .8em 1.2em; text-align: left; min-width: 24em; position: relative; }
 .target h2 { margin: 0 0 .4em; font-size: 1.6em; }
 .target .num { position: absolute; top: -.5em; left: -.5em; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: #111; font-weight: 900; font-size: 1.4em; display: flex; align-items: center; justify-content: center; }
 .weak { color: var(--good); } .strong { color: var(--warn); }
@@ -286,7 +300,7 @@ q::after { content: close-quote; }
 .arena { display: flex; gap: 2em; justify-content: center; align-items: center; }
 .arena .vs { opacity: .6; }
 .raiders { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .5em; font-size: 1.4em; min-width: 14em; }
-.raider { --text: var(--ink); --muted: var(--ink-soft); color: var(--text); display: flex; align-items: center; gap: .6em; background: var(--sheet); box-shadow: var(--lift); padding: .3em .8em; border-radius: 3px; border-left: 5px solid var(--pc); min-height: 3.3em; }
+.raider { --text: var(--ink); --muted: var(--ink-soft); color: var(--text); display: flex; align-items: center; gap: .6em; background: var(--sheet); box-shadow: var(--lift); padding: .3em .8em; border-radius: 2px; border-left: 5px solid var(--pc); min-height: 3.3em; }
 .raider > .ptag { min-width: 3.5em; text-align: left; }
 .raider .rds { flex: 1; display: flex; gap: .4em; align-items: center; }
 .raider.out { opacity: .55; }
@@ -307,7 +321,7 @@ q::after { content: close-quote; }
 .result.fight h2 { font-size: 1.8em; margin: .2em 0 .6em; display: flex; gap: .4em; align-items: center; justify-content: center; }
 .battle { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1.5em; align-items: center; }
 .bside { display: flex; flex-direction: column; gap: .5em; }
-.fighter { position: relative; display: flex; align-items: center; gap: .6em; background: var(--grain), linear-gradient(172deg, var(--paper-lo) 0 50%, #e2d5b9 50%); box-shadow: 0 .1em 0 var(--paper-edge); border-radius: 3px; padding: .35em .8em; font-size: 1.3em; border-left: 5px solid var(--pc, #8a8f9c); transition: opacity .3s; }
+.fighter { position: relative; display: flex; align-items: center; gap: .6em; background: var(--grain), var(--mottle), linear-gradient(180deg, #ece1c8, #e0d2b4); box-shadow: inset 0 1px 0 #fffbf080, 0 .1em 0 var(--paper-edge), .04em .18em .08em #0b081a40; border-radius: 2px; padding: .35em .8em; font-size: 1.3em; border-left: 5px solid var(--pc, #8a8f9c); transition: opacity .3s; }
 .fighter b { flex: 1; text-align: left; color: color-mix(in oklab, var(--pc, var(--text)) 72%, #1a1218); }
 .fighter.unit { flex-direction: row-reverse; border-left: 0; border-right: 5px solid #8a8496; }
 .fighter.unit b { text-align: right; color: var(--text); }
@@ -368,7 +382,7 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .plobby p { margin: 0; }
 .muted { color: var(--muted); }
 .seatlist { list-style: none; padding: 0; margin: .4em 0; display: flex; flex-direction: column; gap: .4em; text-align: left; }
-.seatlist li { display: flex; align-items: center; gap: .6em; padding: .35em .8em; background: var(--sheet); color: #2a1d33; font-weight: 800; font-size: 1.15em; border-radius: 3px; border-left: .4em solid var(--pc); box-shadow: var(--lift); }
+.seatlist li { display: flex; align-items: center; gap: .6em; padding: .35em .8em; background: var(--sheet); color: #2a1d33; font-weight: 800; font-size: 1.15em; border-radius: 2px; border-left: .4em solid var(--pc); box-shadow: var(--lift); }
 .seatlist li.me { box-shadow: 0 0 0 2px var(--pc); }
 .seatlist .tag { font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* your header: a sheet with your colour folded over its top, your resources on the strip below */
@@ -401,7 +415,7 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
    name on a strip of the kind's coloured paper (dragons: their element), the
    cost on the stock below. A faint grain sits over all of it. */
 .handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.9em; z-index: 15; width: min(100vw, 34em); height: calc(9.4em * var(--hs, 1)); transform: translateX(-50%); pointer-events: none; }
-.handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: linear-gradient(to top, var(--bg) 55%, transparent); }
+.handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: var(--table); background-color: var(--bg); background-attachment: fixed; -webkit-mask-image: linear-gradient(to top, #000 55%, transparent); mask-image: linear-gradient(to top, #000 55%, transparent); }
 .handfan.empty { height: auto; pointer-events: auto; text-align: center; }
 .handfan.empty .hint { position: relative; margin: 0 1em .8em; }
 /* Each card: placed by its share of the spread (--x), tilted (--r) and dropped along the arc (--y). */
@@ -422,9 +436,9 @@ body.phone.has-hand { padding-bottom: calc(5.1em + 9.4em * var(--hs, 1)); } /* t
 body.phone.hand-below .handfan { position: relative; left: auto; bottom: auto; transform: none; margin: .4em auto 0; }
 body.phone.hand-below .handfan::before { display: none; }
 body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
-.card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
+.card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 4px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #b9a47e, 1px 3px 1px #0b081a55, 2px 7px 12px #0b081a88; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .cart { position: relative; aspect-ratio: 10 / 7; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px #0002, 0 1px 2px #0003 inset; }
 .cart svg.art { display: block; width: 100%; height: 100%; }
 .ckind { position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--kc); border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper), 0 1px 3px #0006; }
@@ -537,7 +551,7 @@ body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100
 .talkbar.open > .latest { display: none; }
 .talkbar .sheet header { display: flex; justify-content: space-between; align-items: center; }
 .talkbar .sheet ul { flex: 1; overflow-y: auto; list-style: none; margin: .3em 0; padding: 0; display: flex; flex-direction: column; gap: .35em; }
-.talkbar .sheet li { background: var(--paper-hi); border-radius: 3px; padding: .4em .6em; box-shadow: 0 .1em 0 var(--paper-edge); max-width: 88%; align-self: flex-start; }
+.talkbar .sheet li { background: var(--grain), var(--paper-hi); border-radius: 2px; padding: .4em .6em; box-shadow: 0 .1em 0 var(--paper-edge), .04em .16em .08em #0b081a33; max-width: 88%; align-self: flex-start; }
 .talkbar .sheet li.private { border-left: 3px solid var(--accent); }
 .talkbar .sheet li.mine { align-self: flex-end; background: #dfe8f7; }
 .talkbar .sheet li small { color: var(--muted); }
@@ -560,8 +574,8 @@ body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100
 .proj b { min-width: 6.5em; }
 /* Anything chosen (a tab, a player, a resource, a dragon, a vote) is lit the
    same way, gold on gold, and stays lit once made. */
-button.on { background: var(--grain), linear-gradient(172deg, #ffdc6e 0 48%, #f0bb34 48%); box-shadow: 0 .16em 0 #a8801c, 0 .3em .5em #0b081a66; color: var(--ink); }
-.who button.on { background: var(--grain), linear-gradient(172deg, color-mix(in srgb, var(--pc) 80%, #fff) 0 48%, var(--pc) 48%); box-shadow: 0 .16em 0 color-mix(in srgb, var(--pc) 60%, #000), 0 .3em .5em #0b081a66; }
+button.on { --edge: #a8801c; background: var(--grain), var(--mottle), linear-gradient(180deg, #fcd660, #f0bb34); color: var(--ink); }
+.who button.on { --edge: color-mix(in srgb, var(--pc) 60%, #000); background: var(--grain), var(--mottle), linear-gradient(180deg, color-mix(in srgb, var(--pc) 88%, #fff), var(--pc)); }
 .who button.on .ptag, .who button.on { color: var(--ink); }
 button.on:disabled { opacity: 1; }
 .row.big2 > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15em; }
