@@ -39,7 +39,8 @@ async function boot() {
     board3d = null;
     return watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
   }
-  Board3DClass = (await import('./board3d.ts')).Board3D;
+  // If three.js can't load, the TV still runs, on the flat map.
+  Board3DClass = await import('./board3d.ts').then((m) => m.Board3D, (e) => (console.error('No 3D board:', e), null));
   hostToken = localStorage.getItem(`tv:${code}`) ?? '';
   if (code) {
     const ok = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => r.ok).catch(() => false);
