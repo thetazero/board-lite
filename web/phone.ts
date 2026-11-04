@@ -1,10 +1,14 @@
 // The phone: one player's hidden hand and their choices. Everything public
 // is on the TV, so this stays small: resources, cards, and the decision at hand.
+// A game with no TV (remote mode: the room was made on a phone) also shows the
+// table: the TV's page for the room, in a frame over this one, behind a
+// You / Table switch, and cut to on its own while a cutscene plays.
 
 import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
   ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
+import { qrSvg } from './qr.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -90,6 +94,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <button class="primary big" type="submit">Join</button>
         <p class="error">${esc(err)}</p>
+        ${known ? '' : '<div class="hostline"><p>No TV: start a game on this phone, and the others join from it.</p><button id="host" type="button">New game</button></div>'}
       </form>
     </div>`;
   wireJoin();
@@ -98,6 +103,18 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
 function wireJoin() {
   const form = document.getElementById('join') as HTMLFormElement | null;
   if (!form) return;
+  // A game with no TV: this phone makes the room and is its first player.
+  const host = document.getElementById('host');
+  if (host) host.onclick = async () => {
+    const name = document.getElementById('name') as HTMLInputElement;
+    if (!name.reportValidity()) return;
+    try {
+      const r = await post('/api/rooms', { remote: true });
+      await join(String(r.code), name.value.trim(), name.value.trim());
+    } catch (er) {
+      renderJoin(er instanceof Error ? er.message : String(er), { code: '', name: name.value });
+    }
+  };
   form.onsubmit = async (e) => {
     e.preventDefault();
     const c = (document.getElementById('code') as HTMLInputElement).value.trim().toUpperCase();
@@ -162,6 +179,7 @@ function onSnapshot(s: Snapshot) {
   }
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
+  if (s.lobby.remote) table.show(code);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
   if (key(prev) !== key(s)) {
@@ -199,6 +217,7 @@ function seatIndex(): number {
 
 function leaveToJoin(msg: string) {
   talk.el.remove();
+  table.hide();
   seenHand = null;
   stop?.();
   stop = null;
@@ -221,10 +240,11 @@ function renderLobby() {
       <div class="hero">${tableScene([pc])}</div>
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
       <p class="muted">Room <b>${esc(l.code)}</b></p>
+      ${l.remote ? invite(l.code) : ''}
       <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
       ${first ? `<button id="start" class="primary big" ${l.seats.length >= l.minPlayers ? '' : 'disabled'}>Start game</button>
         <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
-      : '<p class="hint">The first player or the TV starts the game.</p>'}
+      : `<p class="hint">${l.remote ? 'The first player starts the game.' : 'The first player or the TV starts the game.'}</p>`}
       <button id="leave" class="ghost">Leave</button>
     </div>`;
   if (first) {
@@ -236,6 +256,85 @@ function renderLobby() {
     leaveToJoin('');
   });
 }
+
+// A game with no TV: the others join from this phone's screen, at the address
+// this phone reached the server on, or (on the server's own machine) the
+// address the TV would show.
+let lan: { lan: string[]; tailscale: string[]; port: number } | null = null;
+function invite(c: string): string {
+  const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+  if (local && !lan) {
+    fetch('/api/info').then((r) => r.json()).then((v) => {
+      lan = v;
+      if (snap && !snap.game) renderLobby();
+    }).catch(() => {});
+  }
+  const host = local && lan ? `${lan.lan[0] ?? lan.tailscale[0] ?? location.hostname}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}` : location.host;
+  const url = `${host}/${c}`;
+  return `<div class="invite">${qrSvg(`${location.protocol}//${url}`, 'the room\'s address')}
+    <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>`;
+}
+
+// ---------- the table, in a game with no TV ----------
+
+// The TV's page for the room, in a frame over this page, kept loaded (and
+// hidden) for the whole game so its cutscenes are queued as they happen. The
+// switch sits by the talk bar in both views. While a cutscene plays (the round's
+// dice, a raid's or a beast's fight) the frame tells this page, and the phone
+// cuts to the table and back after, unless the player switched by hand.
+const table = (() => {
+  let wrap: HTMLElement | null = null;
+  let sw: HTMLElement | null = null;
+  let room = '';
+  let on = false;
+  let auto = false; // showing the table because a cutscene cut to it
+  const set = (v: boolean) => {
+    on = v;
+    document.body.classList.toggle('table-on', v);
+    sw?.querySelectorAll<HTMLElement>('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === v)));
+    wrap?.setAttribute('aria-hidden', String(!v));
+  };
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
+    if (e.data.on && !on) {
+      auto = true;
+      set(true);
+    } else if (!e.data.on && auto) {
+      auto = false;
+      set(false);
+    }
+  });
+  return {
+    show(c: string) {
+      if (wrap && room === c) return;
+      this.hide();
+      room = c;
+      wrap = document.createElement('div');
+      wrap.className = 'tableview';
+      wrap.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(c)}&remote" title="The table"></iframe>`;
+      sw = document.createElement('div');
+      sw.className = 'viewswitch';
+      sw.setAttribute('role', 'group');
+      sw.setAttribute('aria-label', 'View');
+      sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
+      sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
+        auto = false;
+        set(b.dataset.view === 'table');
+      }));
+      document.body.append(wrap, sw);
+      document.body.classList.add('remote');
+      set(false);
+    },
+    hide() {
+      wrap?.remove();
+      sw?.remove();
+      wrap = sw = null;
+      room = '';
+      auto = false;
+      document.body.classList.remove('remote', 'table-on');
+    },
+  };
+})();
 
 // ---------- the game ----------
 

@@ -652,3 +652,79 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .join-box:has(.qr) .alt { font-size: .8em; margin: -.2em 0 .4em; }
 /* What just happened to this phone: news, not an error. */
 .joinform .news { margin: 0; text-align: center; font-weight: 700; padding: .45em .8em; background: var(--grain), var(--sheet); color: var(--ink); border-left: .4em solid var(--accent); border-radius: 3px; box-shadow: var(--lift); }
+
+/* ================= A game with no TV (remote mode) =================
+   On the phone: the table view is the TV's page for the room in a frame over
+   the phone's own page, shown by the You / Table switch by the talk bar. */
+.tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; background: #140f2a; }
+.tableview iframe { display: block; width: 100%; height: 100%; border: 0; }
+body.table-on .tableview { visibility: visible; }
+body.table-on { overflow: hidden; }
+body.table-on .talkbar { z-index: 36; }
+body.remote .talkbar > .latest { padding-right: 9.5em; }
+.viewswitch { position: fixed; right: .5em; bottom: .45em; z-index: 37; display: flex; border-radius: 99px; box-shadow: 0 .14em 0 var(--paper-edge), .05em .28em .12em #0b081a55; }
+.viewswitch button { font: inherit; font-weight: 800; padding: .45em .85em; margin: 0; box-shadow: none; transform: none; border-radius: 0; }
+.viewswitch button:first-child { border-radius: 99px 0 0 99px; }
+.viewswitch button:last-child { border-radius: 0 99px 99px 0; }
+.viewswitch button[aria-pressed="true"] { background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); color: var(--ink); }
+body:has(.talkbar.open) .viewswitch { display: none; }
+/* the lobby and the join form */
+.invite { --text: var(--ink); --muted: var(--ink-soft); color: var(--ink); display: flex; align-items: center; gap: .8em; text-align: left; background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .6em; }
+.invite svg.qr { width: 7.5em; height: 7.5em; flex: none; }
+.invite p { margin: 0; display: flex; flex-direction: column; gap: .2em; }
+.invite .url { font-weight: 800; word-break: break-all; }
+.hostline { display: flex; flex-direction: column; gap: .5em; border-top: 1px dashed var(--line); padding-top: 1em; text-align: center; }
+.hostline p { margin: 0; color: var(--muted); }
+
+/* The table view itself (tv.ts with ?remote): the board, then the players,
+   then the feed and the titles, one after another down a phone's screen. */
+body.tv.remote { font-size: 15px; overflow: auto; }
+.remote .board { height: auto; overflow: visible; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: .45em; padding: .5em .5em 4.6em; }
+.remote .board > *, .remote .side > .corner { grid-column: 1 / -1; min-width: 0; }
+.remote .side { display: contents; font-size: 1em; }
+.remote .side > .pcard { grid-column: auto; order: 3; font-size: .9em; min-width: 0; overflow: hidden; align-self: stretch; }
+.remote .side > .corner { order: 4; margin: 0; font-size: 1em; }
+.remote .side > .corner.titles { order: 5; }
+.remote .topbar { position: static; order: 0; flex-wrap: wrap; gap: .3em .6em; padding: .1em 0; }
+.remote .topbar .round { font-size: 1.15em; }
+.remote .topbar .phase { font-size: 1.2em; }
+.remote .topbar .goal { font-size: 1em; }
+.remote .mapwrap { position: static; order: 1; }
+.remote .mapwrap svg.map { flex: none; height: auto; max-height: 70vh; }
+.remote .mapwrap .legend { display: none; }
+.remote .board > .offers { position: static; order: 2; transform: none; max-width: none; font-size: 1em; }
+.remote .pcard .phead { flex-wrap: wrap; white-space: normal; }
+.remote .pcard .doing { white-space: normal; }
+.remote .tvdragon b, .remote .tvdragon span { white-space: normal; flex-wrap: wrap; }
+.remote .feedbox ul.feed { max-height: none; }
+/* the big moments, sized for a phone and scrolled if they don't fit */
+.remote .overlay { overflow-y: auto; align-items: flex-start; padding: .6em .5em 4.6em; }
+.remote .overlay > * { margin: auto 0; }
+.remote .overlay.raid { background-color: #140f2a; }
+.remote :is(.production, .result, .endbox) { min-width: 0; width: 100%; padding: .8em .9em; }
+.remote .endbox { padding: 0 0 1em; }
+.remote :is(.production, .result, .endbox) h1 { font-size: 1.6em; }
+.remote .production ul { font-size: 1.3em; }
+.remote .production li > b:first-child { min-width: 4.5em; }
+.remote .endbox svg.scene { height: 8em; }
+.remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
+.remote .raidbox { width: 100%; max-height: none; overflow: visible; }
+.remote .raidbox h1 { font-size: 1.7em; }
+.remote .target { min-width: 0; width: 100%; padding: .6em .8em; }
+.remote .target h2 { font-size: 1.25em; }
+.remote .target .foes { font-size: 1em; }
+.remote .target .loot { font-size: 1.15em; }
+.remote .target .num { font-size: 1.1em; }
+.remote .status { font-size: 1.1em; }
+.remote .arena { flex-direction: column; gap: .6em; }
+.remote .arena .vs { display: none; }
+.remote .raiders { font-size: 1em; min-width: 0; width: 100%; }
+.remote .result.fight { min-width: 0; }
+.remote .result.fight h2 { font-size: 1.2em; flex-wrap: wrap; }
+.remote .battle { gap: .4em; }
+.remote .fighter { font-size: .85em; padding: .3em .4em; gap: .3em; flex-wrap: wrap; }
+.remote .fighter .hpbar { width: 100%; height: .6em; }
+.remote .fighter svg { width: 2.2em; height: 2.2em; }
+.remote .bvs b { font-size: 1.6em; }
+.remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
+.remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }

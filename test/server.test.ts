@@ -222,6 +222,17 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'say hi' })).status, 400, 'the seat is no longer theirs');
     assert.equal((await post(`/api/rooms/${made.code}/join`, { name: 'ADA' })).status, 200, 'taken back by name');
 
+    // A game with no TV: a phone makes the room, and its first player adds bots and starts.
+    assert.equal(rooms.get(made.code)!.lobby().remote, false, 'a TV-made room has a TV');
+    const solo = (await post('/api/rooms', { remote: true })).body.code;
+    assert.equal(rooms.get(solo)!.lobby().remote, true);
+    const me = (await post(`/api/rooms/${solo}/join`, { name: 'Ada' })).body.token;
+    assert.equal((await post(`/api/rooms/${solo}/bot`, { token: me })).status, 200);
+    assert.equal((await post(`/api/rooms/${solo}/start`, { token: me })).status, 200);
+    assert.ok(rooms.get(solo)!.game, 'one phone and a bot is a game');
+    // The table view a phone shows is the TV page as a watcher: three.js isn't loaded for it.
+    assert.match(await (await fetch(`${base}/tv.ts`)).text(), /await import\('\.\/board3d\.ts'\)/);
+
     // The clients are served with their TypeScript types stripped.
     const page = await fetch(`${base}/`);
     assert.match(await page.text(), /phone\.ts/);
@@ -229,6 +240,9 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.match(js.headers.get('content-type')!, /javascript/);
     assert.doesNotMatch(await js.text(), /import type|: string\)/);
     assert.equal((await fetch(`${base}/tsconfig.json`)).status, 404);
+    // A script the browser already has comes back as a 304 (the phone's table view reuses the phone's).
+    const tag = (await fetch(`${base}/common.ts`)).headers.get('etag')!;
+    assert.equal((await fetch(`${base}/common.ts`, { headers: { 'if-none-match': tag } })).status, 304);
     assert.equal((await fetch(`${base}/%2e%2e/package.json`)).status, 404);
   } finally {
     for (const r of rooms.values()) r.close();
