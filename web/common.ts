@@ -186,7 +186,7 @@ export function buildingChip(type: string, owner: number, upgrade: string | null
   return `<svg class="bchip" width="${size}" height="${size}" viewBox="-11 -11 22 22">${ownedMark(type, owner, 9.5, cls)}${badge}</svg>`;
 }
 
-export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower', territory: 'territory' };
+export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower' };
 
 // What just happened, drawn rather than told: who did it (their name in their
 // colour), then the thing itself as the board and the cards show it. Returns ''

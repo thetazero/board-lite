@@ -125,8 +125,8 @@ export type GameEvent =
   | { k: 'talk' }
   | { k: 'mine' }; // a private line for the player it went to
 
-export type Title = 'army' | 'tower' | 'territory';
-export const TITLE_NAMES: Record<Title, string> = { army: 'Strongest Dragon Army', tower: 'Tallest Tower', territory: 'Largest Territory' };
+export type Title = 'army' | 'tower';
+export const TITLE_NAMES: Record<Title, string> = { army: 'Strongest Dragon Army', tower: 'Tallest Tower' };
 
 export interface Game {
   version: 1;
@@ -319,12 +319,12 @@ export function madeResource(def: BuildingDef): Resource | null {
   return def.produces?.resource ?? (RESOURCES.find((r) => def.makes?.[r]) ?? null);
 }
 
-// Points a building at hex k is worth right now, its upgrade included.
+// Points a building at hex k is worth right now. Only point cards (monuments)
+// are worth any; the tower and its floors are not.
 export function buildingPoints(g: Game, k: string): number {
   const b = g.buildings[k];
-  const up = b.upgrade ? UPGRADES[b.upgrade].points ?? 0 : 0;
-  if (b.type === 'tower') return b.floors * BUILDINGS.tower_floor.points! + up;
-  return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]) + up;
+  if (b.type === 'tower') return 0;
+  return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]);
 }
 
 // Is hex k on or next to the peak, once the Thunderbird has fallen?
@@ -353,8 +353,7 @@ export function production(g: Game, p: number): Record<Resource, { base: number;
 
 function titleValue(g: Game, p: number, t: Title): number {
   if (t === 'army') return g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + TUNING.dragonPointsByStage[d.stage], 0);
-  if (t === 'tower') return g.buildings[g.towers[p]].floors;
-  return ownedBuildings(g, p).length;
+  return g.buildings[g.towers[p]].floors;
 }
 
 export function titleValues(g: Game, t: Title): number[] {
@@ -428,7 +427,7 @@ export function newGame(players: number, seed: number): Game {
     raidsLeft: 0,
     raid: null,
     hoard: Object.fromEntries(Object.keys(TARGETS).map((t) => [t, 0])),
-    titles: { army: null, tower: null, territory: null },
+    titles: { army: null, tower: null },
     slain: {},
     beastTried: Array(players).fill(0),
     winner: null,

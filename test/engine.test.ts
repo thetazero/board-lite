@@ -214,14 +214,13 @@ test('a title needs its minimum as well as the lead', () => {
   const g = newGame(2, 6);
   keepAll(g);
   g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
-  const free = Object.keys(g.map).filter((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k]);
-  const own = (n: number) => { for (const k of free.slice(0, n)) g.buildings[k] = { type: 'roost', owner: 0, upgrade: null, floors: 0 }; };
-  own(TUNING.titleMinimum.territory - 2); // with the tower, one short of the minimum
+  const tower = g.buildings[g.towers[0]];
+  tower.floors = TUNING.titleMinimum.tower - 1; // the lead, one short of the minimum
   apply(g, 0, 'bank stone timber');
-  assert.equal(g.titles.territory, null);
-  own(TUNING.titleMinimum.territory - 1);
+  assert.equal(g.titles.tower, null);
+  tower.floors = TUNING.titleMinimum.tower;
   apply(g, 0, 'bank stone timber');
-  assert.equal(g.titles.territory, 0);
+  assert.equal(g.titles.tower, 0);
 });
 
 test('waitingOn always names someone until the game ends', () => {
@@ -310,7 +309,7 @@ test('a hungry dragon neither grows nor raids', () => {
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
 });
 
-test('a tower floor is built without a card, for gold', () => {
+test('a tower floor is built without a card, for gold, and is worth no points', () => {
   const g = newGame(2, 7);
   keepAll(g);
   const p = g.turn;
@@ -320,7 +319,7 @@ test('a tower floor is built without a card, for gold', () => {
   g.players[p].resources = { ...g.players[p].resources, ...BUILDINGS.tower_floor.cost };
   apply(g, p, 'build tower_floor');
   assert.equal(g.buildings[g.towers[p]].floors, 1);
-  assert.equal(score(g, p).buildings, before + 1);
+  assert.equal(score(g, p).buildings, before); // floors count only toward Tallest Tower
   assert.equal(g.players[p].resources.gold, 0);
 });
 

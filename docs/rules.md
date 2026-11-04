@@ -39,11 +39,11 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 ## Points
 
 - Dragons: hatchling 1, young 2, adult 3. Eggs 0.
-- Tower floor 1 (3 stone and 2 gold, no card: raid loot always has a way into points); other monuments as their card says (most count what's adjacent); Gilding +2.
+- Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts. No other building is worth points: not production buildings, not the tower, not its floors.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
 - Great beasts: 2 each to whoever slays it, for good.
-- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10), Tallest Tower (most floors, at least 4), Largest Territory (most buildings, at least 9). The holder keeps a title on a tie.
+- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10) and Tallest Tower (most floors, at least 4). Tower floors (3 stone and 2 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 
-Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost, tower floor. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 18 buildings across the 7 classes, most of which count what's adjacent, and 4 upgrades (Workshop, Gilding, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, Wolf Call, Rouse the Bear, and 15 dragons (a base dragon named for its element, like the Fire Dragon, and 2 special dragons per element).
+Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost, tower floor. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 18 buildings across the 7 classes, most of which count what's adjacent, and 3 upgrades (Workshop, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, Wolf Call, Rouse the Bear, and 15 dragons (a base dragon named for its element, like the Fire Dragon, and 2 special dragons per element).

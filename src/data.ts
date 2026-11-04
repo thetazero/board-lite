@@ -33,8 +33,8 @@ export const TUNING = {
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
-  // A title needs at least this much: dragon points, tower floors, buildings (tower included).
-  titleMinimum: { army: 10, tower: 4, territory: 9 },
+  // A title needs at least this much: dragon points, tower floors.
+  titleMinimum: { army: 10, tower: 4 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -98,8 +98,9 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
   pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
-  // The always-open way to turn gold, which comes from raids, into points.
-  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 2 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },
+  // Worth no points itself: floors count only toward Tallest Tower, a side
+  // quest and a sink for raid gold (#98).
+  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 2 }, onTower: true, text: 'Adds a floor to your tower. Floors count toward Tallest Tower.' },
   // Building cards. Most count their neighbours.
   cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 3, crystal: 3, livestock: 2 }, 2),
   stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 3, crystal: 3, livestock: 2 }, 2),
@@ -115,12 +116,15 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 3, timber: 3, crystal: 3 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { stone: 3, timber: 3, crystal: 3, gold: 2 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
-  monument: { name: 'Monument', class: 'monument', cost: { stone: 3, timber: 2, gold: 3 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
-  // Point cards count only what can't be bought without limit: terrain, or
-  // classes that hold no basic building (monuments, trade buildings).
-  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 2, crystal: 2, gold: 3 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
-  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 4, timber: 2, gold: 3 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
-  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 2, timber: 2, gold: 3 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
+  // Point cards: the only buildings worth points, and dear (#98). Raid gold is
+  // meant to come in big numbers, so a point costs a lot of it, and at the
+  // bank's 4:1 a point can't be had cheaply from surplus.
+  monument: { name: 'Monument', class: 'monument', cost: { stone: 4, timber: 3, gold: 10 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
+  // They count only what can't be bought without limit: terrain, or classes
+  // that hold no basic building (monuments, trade buildings).
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 3, crystal: 3, gold: 10 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
+  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 5, timber: 3, gold: 10 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
+  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 3, timber: 3, gold: 10 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
 };
 
 export const BASIC_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].basic);
@@ -131,7 +135,6 @@ export interface UpgradeDef {
   cost: Bundle;
   text: string;
   baseBonus?: number; // more of what the building makes
-  points?: number;
   dragonCapacity?: number;
   makes?: Bundle;
   copies: number;
@@ -139,7 +142,6 @@ export interface UpgradeDef {
 
 export const UPGRADES: Record<string, UpgradeDef> = {
   workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 1 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
-  gilding: { name: 'Gilding', appliesTo: ['monument'], cost: { gold: 4 }, points: 2, text: 'This tower or monument is worth 2 more points.', copies: 3 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 2, timber: 1 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
   trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 4, stone: 2 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
