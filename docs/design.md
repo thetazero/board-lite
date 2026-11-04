@@ -215,7 +215,7 @@ The owner's calls (2026-11-03), after playing the first clients:
 - "I want cool looking cards with graphics that look like cards, I want the game board to be 3d and fun, and for buildings to literally be built and stand on the board, I want dragons to look cool and fly around their homes from time to time. but otherwise just chill at home"
 - The phone's copy of the map stays flat: "yup flat simplified version probably".
 - TV camera: "top down view will make some graphics tricky", "Yup agreed probably a slight tilt is optimal", "while keeping the simple mobile view flat".
-- Icons, not words: "we should constantly use icons over words for things like wood, and make the icons look better too".
+- Icons for the core resources, and few icons overall: "we should constantly use icons over words for things like wood, and make the icons look better too"; later (2026-11-03): "Icons are good. we should use icons for core resources, there should not be that many icons".
 - Show, don't tell: "things should be show not tell, there should just be an animation where cards are added to your hand" (said of the phone's "You draw Quarry, Crystal Mine, Rime Drake." line).
 
 ## Open questions
