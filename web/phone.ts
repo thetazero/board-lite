@@ -383,8 +383,8 @@ function header(g: PublicState, me: Me): string {
     const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
     return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}</small></div>`;
   }).join('');
-  // Points held as cards in the hand count too: shown as a card with how many.
-  const hidden = me.hiddenPoints ? `<small class="hiddenpts">${icon('cards', 1.1)}${me.hiddenPoints}${icon('points', 0.9)}</small>` : '';
+  // Points held as cards in the hand count too: said in words, so it can't read as a card count.
+  const hidden = me.hiddenPoints ? `<small class="hiddenpts" title="Secret Hoard cards in your hand, counted in the total">${me.hiddenPoints}${icon('points', 0.9)} in hand</small>` : '';
   // Name, points and resources stay on screen together while the page scrolls.
   return `
     <div class="mehead" style="--pc:${PLAYER_COLORS[me.seat]}">
