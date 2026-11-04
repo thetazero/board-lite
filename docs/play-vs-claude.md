@@ -20,12 +20,22 @@ npm run serve -- --flee-seconds 60
    node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
    ```
 
-   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name. They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats.
+   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name. They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats; bring them back with `--resume` (below).
 4. **Start:** press **Start game** on the TV (or on the first player's phone). Bots can fill seats too ("Add a bot").
 
 Claude players start the moment the game does. Each is a `claude -p` process of 300 to 400 MB, and they share the machine-wide limit of 6 Claude seats with any playtests running (see [`playtest.md`](playtest.md#how-many-games-run-at-once)). If the slots aren't free, the runner prints `Waiting to start: ...` and only joins the lobby once they are, so wait for the Claude players to show up on the TV before you press Start.
 
 Other `run.ts` options work here too: `--budget-usd` (default $5 per Claude player for the whole game), `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
+
+## If the Claude players stop
+
+If the runner stops before the game ends (Ctrl-C, low memory, a crash, a restart), the game waits on the Claude players' seats. Bring the same players back into their own seats, remembering the game so far:
+
+```
+node src/playtest/run.ts --resume ~/.cache/board-lite/playtests/<time>-<models>
+```
+
+The runner prints this command, with its directory filled in, when it stops early. Add `--room URL` if the room's address changed (the server restarted on another port). See [Resuming a game](playtest.md#resuming-a-game).
 
 ## Talking with Claude
 

@@ -33,7 +33,7 @@ export function memAvailableMb(): number {
 
 export interface Holder { pid: number; seats: number; out: string; since: string }
 
-function alive(pid: number): boolean {
+export function alive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
