@@ -1227,7 +1227,11 @@ export function apply(g: Game, p: number, command: string): void {
   const [verb = '', ...args] = command.trim().split(/\s+/);
   const v = verb.toLowerCase();
   if (v === 'say' || v === 'tell') return talk(g, p, v, command.trim().slice(verb.length).trim());
-  const snapshot = structuredClone(g);
+  // A refused command changes nothing. The log only ever grows, so it is cut
+  // back rather than copied: copying it on every command made long games slow.
+  const { log: _, ...rest } = g;
+  const snapshot = structuredClone(rest);
+  const logged = g.log.length;
   try {
     if (g.phase === 'cards') cardsCommand(g, p, v, args);
     else if (g.phase === 'action') actionCommand(g, p, v, args);
@@ -1235,7 +1239,8 @@ export function apply(g: Game, p: number, command: string): void {
     else discardCommand(g, p, v, args);
     updateTitles(g);
   } catch (e) {
-    Object.assign(g, snapshot); // a refused command changes nothing
+    Object.assign(g, snapshot);
+    g.log.length = logged;
     throw e;
   }
 }

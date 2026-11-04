@@ -626,12 +626,14 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 82,
+    seed: 105,
     until: (g) => {
       if (g.round < 4 || g.phase !== 'action') return false;
-      const c = structuredClone(g);
-      giveHand(c, c.turn, ALL_CARDS);
-      return blockedReasons(c, c.turn).length >= 6 && seatState(c, c.turn).hand.some((x) => !x.blocked && !x.affordable);
+      const hand = g.players[g.turn].hand;
+      giveHand(g, g.turn, ALL_CARDS);
+      const ok = blockedReasons(g, g.turn).length >= 6 && seatState(g, g.turn).hand.some((x) => !x.blocked && !x.affordable);
+      g.players[g.turn].hand = hand;
+      return ok;
     },
     setup: (g) => giveHand(g, g.turn, ALL_CARDS),
     shots: (g) => {
