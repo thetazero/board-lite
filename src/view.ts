@@ -36,7 +36,7 @@ export function cardText(c: CardView): string {
 function dragonLine(d: DragonView): string {
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
   const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
-  const healing = `healing: raids again in round ${d.backIn}`;
+  const healing = `healing: can raid again from round ${d.backIn}`;
   const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought fauna: no raids this round${d.hp < d.maxHp ? `; ${healing}` : ''}` };
   const status = d.canRaid ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : healing;
   return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
