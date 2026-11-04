@@ -8,6 +8,7 @@
 // The TV opens http://<this machine>:<port>/tv, phones open
 // http://<this machine>:<port>/ and type the room code.
 
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { stripTypeScriptTypes } from 'node:module';
@@ -95,9 +96,10 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     // GET /api/info -> the addresses phones can reach this server on
     if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), tailscale: tailscaleAddresses(), port: (req.socket.localPort ?? 0) });
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
-    // POST /api/rooms -> a new room, for the TV
+    // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone, for a game with no TV
     if (parts.length === 1 && req.method === 'POST') {
-      const room = new Room(Room.newCode((c) => rooms.has(c), opts.dir), opts);
+      const remote = (await body(req)).remote === true;
+      const room = new Room(Room.newCode((c) => rooms.has(c), opts.dir), { ...opts, remote });
       rooms.set(room.code, room);
       server.emit('room', room); // for whoever runs the server: how to seat terminal and Claude players
       return json(res, 200, { code: room.code, hostToken: room.hostToken });
@@ -160,7 +162,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     res.end(body.endsWith('\n') ? body : `${body}\n`);
   }
 
-  async function file(res: ServerResponse, path: string) {
+  async function file(req: IncomingMessage, res: ServerResponse, path: string) {
     const full = normalize(join(WEB, path));
     if (!full.startsWith(WEB) || full.slice(WEB.length).split(sep).some((part) => part.startsWith('.'))) return json(res, 404, { error: 'Not found.' });
     const ext = extname(full);
@@ -179,7 +181,15 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       }
       text = hit.js;
     }
-    res.writeHead(200, { 'content-type': TYPES[ext] ?? '', 'cache-control': 'no-cache' });
+    // Always checked with the server (no-cache), but a page the browser already
+    // has comes back as a 304: a phone showing the table loads the shared
+    // scripts once, and a reload costs almost nothing.
+    const etag = `"${createHash('sha1').update(text).digest('base64url')}"`;
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, { etag, 'cache-control': 'no-cache' });
+      return res.end();
+    }
+    res.writeHead(200, { 'content-type': TYPES[ext] ?? '', 'cache-control': 'no-cache', etag });
     res.end(text);
   }
 
@@ -195,10 +205,10 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     const parts = url.pathname.split('/').filter(Boolean);
     try {
       if (parts[0] === 'api') return await api(req, res, parts.slice(1), url.searchParams);
-      if (PAGES[url.pathname]) return await file(res, PAGES[url.pathname]);
+      if (PAGES[url.pathname]) return await file(req, res, PAGES[url.pathname]);
       if (VENDOR[url.pathname]) return await vendor(res, VENDOR[url.pathname]);
-      if (/^\/[A-Za-z]{4}\/?$/.test(url.pathname)) return await file(res, 'phone.html'); // a room's address
-      return await file(res, url.pathname);
+      if (/^\/[A-Za-z]{4}\/?$/.test(url.pathname)) return await file(req, res, 'phone.html'); // a room's address
+      return await file(req, res, url.pathname);
     } catch (e) {
       if (e instanceof RoomError) return json(res, 400, { error: e.message });
       console.error(e);

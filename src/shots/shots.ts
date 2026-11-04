@@ -349,11 +349,11 @@ function makeRoom(staged: Staged, code: string): Room {
   if (staged.game) {
     mkdirSync(join(CACHE, 'rooms'), { recursive: true });
     save(file, staged.game);
-    room = new Room(code, { file, botDelayMs: NEVER });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote });
     // A hosted saved game starts with every seat open; otherwise everyone is seated.
     if (!scene.resume) room.seats.forEach((s, i) => Object.assign(s, { name: names[i], kind: scene.bots?.includes(i) ? 'bot' : 'player' }));
   } else {
-    room = new Room(code, { file, botDelayMs: NEVER });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote });
     for (let i = 0; i < scene.players - scene.lobby!.bots; i++) room.join(names[i]);
     for (let i = 0; i < scene.lobby!.bots; i++) room.addBot();
   }
@@ -431,9 +431,9 @@ async function main() {
       const room = makeRoom(st, code);
       rooms.set(code, room);
       for (const shot of st.scene.shots(st.game)) {
-        const own: [string, Device] = ['', shot.client === 'tv' ? TV : PHONE];
+        const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? TV : PHONE];
         // A shot that changes the room itself (a `then`, a live move, typing) is taken at one size only.
-        const sizes = (shot.sizes || everySize) && !shot.then && !shot.live && !shot.fill ? [own, ...SIZES[shot.client]] : [own];
+        const sizes = (shot.sizes || everySize) && !shot.then && !shot.live && !shot.fill ? [own, ...SIZES[shot.table ? 'phone' : shot.client]] : [own];
         // Its taps can still change the room (Leave takes the seat away): each size starts from the room as it was.
         const before = sizes.length > 1 ? keep(room) : null;
         for (const [size, device] of sizes) {
@@ -443,7 +443,9 @@ async function main() {
           try {
             const storage: Record<string, string> = {};
             let url: string;
-            if (shot.client === 'tv') {
+            if (shot.table) {
+              url = `${base}/tv?room=${code}&remote&n=${n++}`;
+            } else if (shot.client === 'tv') {
               url = `${base}/tv?room=${code}&n=${n++}`;
               if (!shot.guest) storage[`tv:${code}`] = room.hostToken; // the TV that made the room: its buttons work
               tab.info = shot.tailscale ? { ...LAN, tailscale: TAILSCALE } : LAN;
@@ -454,6 +456,8 @@ async function main() {
               if (shot.remember) storage.name = shot.remember;
             }
             await tab.load(url, device, { storage, loading: shot.loading });
+            // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
+            if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
             if (shot.live) {
               room.mutate((g) => drive(g, st.rng, st.scene.live!));
               await sleep(100);
@@ -530,7 +534,7 @@ function contactSheet(done: Done[], prev: string | null): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   // Every screen at the same scale (a TV pixel is a third, a phone pixel 0.6), so sizes compare at a glance.
   const card = (d: Done) => {
-    const w = Math.round(d.width * (d.client === 'tv' ? 1 / 3 : 0.6));
+    const w = Math.round(d.width * (d.client === 'tv' && !d.table ? 1 / 3 : 0.6));
     const imgs = Array.from({ length: d.screens }, (_, i) => `<a href="${pngName(d.file, i)}"><img src="${pngName(d.file, i)}" loading="lazy" style="width:${w}px"></a>`).join('');
     return `<figure class="${d.changed ? 'changed' : ''}">
     <div class="screens">${imgs}</div>
