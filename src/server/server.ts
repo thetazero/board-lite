@@ -18,7 +18,15 @@ import { fileURLToPath } from 'node:url';
 import { Room, RoomError, type RoomOptions } from './room.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
-const THREE_BUILD = fileURLToPath(new URL('../../node_modules/three/build/', import.meta.url));
+// Found the way Node finds any package, so a checkout that shares a parent's
+// node_modules (a git worktree inside the repo) still serves it.
+const THREE_BUILD = (() => {
+  try {
+    return fileURLToPath(new URL('./', import.meta.resolve('three')));
+  } catch {
+    return fileURLToPath(new URL('../../node_modules/three/build/', import.meta.url));
+  }
+})();
 const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three.module.js', '/vendor/three/three.core.js': 'three.core.js' };
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
 const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
