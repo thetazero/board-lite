@@ -553,7 +553,7 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 1300 }],
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2700 }],
   },
   {
     // The same raid, on a raider's phone while the TV replays it.
@@ -584,7 +584,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 2200 }],
+    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     name: 'discard-4p',
@@ -605,7 +605,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 2 && g.phase === 'action',
     setup: (g) => toDiscard(g, [0]),
     live: bots((g) => g.phase === 'action'),
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 900 }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 1700 }],
   },
   {
     name: 'production-done-6p',
