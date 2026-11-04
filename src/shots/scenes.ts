@@ -673,6 +673,9 @@ export const SCENES: Scene[] = [
     shots: () => [
       { file: 'tv-late-2p', caption: 'TV, late game (2 players)', client: 'tv' },
       { file: 'tv-flight-2p', caption: "TV: a dragon's flight round its home", client: 'tv', flight: true, frames: [0.08, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95] },
+      // Taking off and landing, a fiftieth of a flight (0.2 s) apart: it turns and spreads its wings over a few frames.
+      { file: 'tv-takeoff-2p', caption: 'TV: a dragon takes off, easing into flight', client: 'tv', flight: true, frames: [-0.02, 0, 0.02, 0.04, 0.06, 0.08] },
+      { file: 'tv-landing-2p', caption: 'TV: a dragon lands, folding its wings', client: 'tv', flight: true, frames: [0.96, 0.98, 1, 1.02, 1.04, 1.06, 1.1] },
     ],
   },
   {
@@ -1066,6 +1069,25 @@ export const SCENES: Scene[] = [
         }),
         waitMs: 1500, // the board has the move before its clock starts
         frames: [0, 0.4, 0.9, 1.5, 2.1, 2.9, 4],
+      },
+      {
+        // The wolf pack is cleared: it folds down flat, and the hex's scenery grows back round where it stood.
+        file: 'tv-fauna-leave-3p', caption: 'TV: the wolf pack is cleared, folding down, and the hex grows back', client: 'tv',
+        then: (room) => room.mutate((g2) => {
+          delete g2.map[Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!].fauna;
+        }),
+        waitMs: 1500,
+        frames: [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.1],
+      },
+      {
+        // A dragon grows a stage: the same dragon, growing to its new size.
+        file: 'tv-dragon-grow-3p', caption: 'TV: a dragon grows a stage', client: 'tv',
+        then: (room) => room.mutate((g2) => {
+          const d = g2.dragons.find((x) => x.owner === g2.turn && x.stage > 0 && x.stage < 3)!;
+          d.stage++;
+        }),
+        waitMs: 1500,
+        frames: [0, 0.2, 0.4, 0.6, 0.9],
       },
       { file: 'phone-fauna-turn-3p', caption: 'Phone: your turn, with fauna to clear', client: 'phone', seat: g!.turn },
       { file: 'phone-fauna-pick-3p', caption: 'Phone: choosing which beast to clear', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
