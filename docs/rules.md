@@ -2,7 +2,7 @@
 
 You are a wizard who raises dragons. Build out from your tower, hatch and feed dragons, raid neutral kingdoms for gold, and be first to **20 points**. All numbers live in `src/data.ts` and are first guesses awaiting playtests.
 
-**Hidden** (your phone): your resources and your hand. **Public** (the TV): the map, buildings, dragons, titles, hand sizes, trade offers.
+**Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
 **Setup.** The land is random and ringed by ocean, with one natural harbor on each coast. Wild **fauna** holds some hexes: wolves 2 steps from the nearest tower, bears 3, a basilisk further out. Two **great beasts**: the Thunderbird on the mountain peak at the centre, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a random base dragon egg. The first player moves 1 seat left each round.
 
@@ -42,7 +42,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts. No other building is worth points: not production buildings, not the tower, not its floors.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
 - Great beasts: 2 each to whoever slays it, for good.
-- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10) and Tallest Tower (most floors, at least 4). Tower floors (3 stone and 2 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 10). Tower floors (3 stone and 2 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 

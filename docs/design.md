@@ -71,8 +71,8 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 ## Hidden vs public state
 
-- Hidden, on your phone: resource tokens, building cards and action cards.
-- Public, on the TV: dragons and buildings, on the shared map.
+- Hidden, on your phone: resource tokens other than gold, building cards and action cards.
+- Public, on the TV: dragons and buildings, on the shared map, and everyone's gold, which the Largest Hoard title counts. The owner (2026-11-03): "yeah make gold public, that totally fits the theme".
 
 ## Resources
 

@@ -161,7 +161,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points (at least 10) and most tower floors (at least 4). Tower floors are worth nothing else.
+Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most gold (at least 10). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 
@@ -357,12 +357,12 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 41. Last column: 
 
 30 games per player count between the random bot (`src/bot.ts`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-Army held and Tower held: share of games that end with someone holding each title (it needs 10 dragon points or 4 tower floors).
+Army held, Tower held and Hoard held: share of games that end with someone holding each title (it needs 10 dragon points, 4 tower floors or 10 gold).
 
 The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
 
-| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Thunderbird slain | Leviathan slain |
-|---|---|---|---|---|---|---|---|---|
-| 2 | 17 | 26 | 35 | 0 | 100% | 73% | 50%, median round 23 | 50%, median round 25 |
-| 3 | 18 | 27 | 35 | 0 | 100% | 100% | 57%, median round 25 | 57%, median round 23 |
-| 4 | 18 | 24 | 31 | 0 | 100% | 100% | 67%, median round 23 | 70%, median round 22 |
+| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Hoard held | Thunderbird slain | Leviathan slain |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 | 17 | 26 | 33 | 0 | 100% | 70% | 93% | 43%, median round 23 | 40%, median round 24 |
+| 3 | 17 | 25 | 35 | 0 | 100% | 100% | 93% | 40%, median round 25 | 47%, median round 23 |
+| 4 | 18 | 23 | 31 | 0 | 100% | 100% | 100% | 63%, median round 22 | 67%, median round 22 |

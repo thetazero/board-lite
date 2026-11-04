@@ -258,7 +258,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}${hatcheryNote}
 
-Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}) and most tower floors (at least ${TUNING.titleMinimum.tower}). Tower floors are worth nothing else.`;
+Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
 }
 
 function dragons(): string {
@@ -630,7 +630,7 @@ function length(): string {
   const rows = botGames().map(({ players, games }) => {
     const rounds: number[] = [];
     let stalled = 0;
-    const held = { army: 0, tower: 0 };
+    const held = { army: 0, tower: 0, hoard: 0 };
     const slain: Record<string, number[]> = Object.fromEntries(Object.keys(BEASTS).map((k) => [k, []]));
     for (const g of games) {
       if (g.phase === 'over') rounds.push(g.round);
@@ -649,11 +649,11 @@ function length(): string {
 
 ${GAMES} games per player count between the random bot (\`src/bot.ts\`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-Army held and Tower held: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points or ${TUNING.titleMinimum.tower} tower floors).
+Army held, Tower held and Hoard held: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points, ${TUNING.titleMinimum.tower} tower floors or ${TUNING.titleMinimum.hoard} gold).
 
 The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
 
-${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
+${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Hoard held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
 }
 
 export function datasheet(): string {
