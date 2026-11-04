@@ -33,6 +33,7 @@ export interface Shot {
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
   waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
+  hold?: boolean; // the moment `waitFor` matches, the page's timers stop: a timed banner stays up for the shot, however slow the machine
   live?: boolean; // load the page, then let the scene's `live` moves happen, then shoot
   screen?: boolean; // phone: a TV is watching the room too, so its scenes hold the phones
   sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
@@ -636,7 +637,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 1700 }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitFor: '#overlay .production li.up:nth-child(3)', hold: true }],
   },
   {
     name: 'production-done-6p',
@@ -649,7 +650,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
+    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
   },
   {
     name: 'late-6p',
@@ -1279,7 +1280,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
+    shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
   },
   {
     name: 'remote-fight-3p',
