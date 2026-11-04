@@ -3,7 +3,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, esc, eventHtml, foeStack, gainChips, hpBar, powerTag,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, esc, eventHtml, foeStack, gainChips, hpBar, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
 } from './common.ts';
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
@@ -89,7 +89,7 @@ function renderLobby() {
   app.innerHTML = `
     <div class="lobby">
       <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}
-        <div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p></div>
+        <div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p></div>
       </div>
       <div class="lobby-main">
         <div class="join-box">

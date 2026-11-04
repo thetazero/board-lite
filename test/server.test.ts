@@ -12,6 +12,8 @@ import { Room, RoomError } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
 import type { Snapshot } from '../src/state.ts';
+import { TUNING } from '../src/data.ts';
+import { POINTS_TO_WIN } from '../web/common.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-test-')); // a few small game files
@@ -67,6 +69,10 @@ test('a room of bots plays itself to the end', async () => {
   for (let i = 0; i < 400 && room.game!.phase !== 'over'; i++) await sleep(10);
   assert.equal(room.game!.phase, 'over');
   room.close();
+});
+
+test("the lobby and the join form name the game's real goal", () => {
+  assert.equal(POINTS_TO_WIN, TUNING.pointsToWin, 'web/common.ts POINTS_TO_WIN must match TUNING.pointsToWin');
 });
 
 test('lobby rules: names, size, joining late', () => {

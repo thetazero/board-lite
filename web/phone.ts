@@ -3,7 +3,7 @@
 
 import type { CardView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -68,7 +68,7 @@ function renderJoin(err = '', typed?: { code: string; name: string }) {
     <div class="joinpage">
       <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
       <form class="joinform" id="join">
-        <p class="subtitle">Wizards raise dragons. First to ${iconText('15 points')} wins.</p>
+        <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
         <label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(typed?.code ?? code)}" required></label>
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <button class="primary big" type="submit">Join</button>
@@ -314,7 +314,7 @@ function roost(g: PublicState, me: Me): string {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => o.to === me.seat).map((o) => `
-    <div class="offer in">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> for your <b>${iconText(esc(o.get))}</b>
+    <div class="offer in">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
       <div class="row"><button class="primary" data-accept="${o.id}">Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
     <div class="offer out">You offer ${playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
@@ -330,7 +330,9 @@ function actionView(g: PublicState, me: Me): string {
     ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} Clear fauna</button>` : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : incoming ? '<button id="end" class="primary big endturn" disabled>Answer the offer to end your turn</button>' : '<button id="end" class="primary big endturn">End turn</button>';
-  return `${incoming}${mine}${tabs}${content}${clear}${end}`;
+  // End turn sits above an open panel, so a long one (Build & bank runs past the
+  // screen) never pushes it down under the hand.
+  return `${incoming}${mine}${tabs}${clear}${end}${content}`;
 }
 
 // "1 dragon", "2 dragons".
@@ -579,7 +581,8 @@ function raidView(g: PublicState, me: Me): string {
       const d = dragon(id);
       return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
     }).join('');
-    return `${targetPanel(raid.target!)}${list}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${dragons(committed.size)} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
+    const hint = !ready && !committed.size ? '<p class="hint"><small>Tap dragons to send them.</small></p>' : '';
+    return `${targetPanel(raid.target!)}${list}${hint}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${dragons(committed.size)} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
