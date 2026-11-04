@@ -286,12 +286,18 @@ export function powerTag(n: number, cls = ''): string {
   return `<span class="stat power ${cls}" title="combat power">${glyph('power', 'combat power')}${n}</span>`;
 }
 
-// Why a dragon sits out, or its health. A healing one shows the rounds until it can raid.
+// Why a dragon sits out, or its health. A healing one says how many rounds
+// until it can raid, in words: a bare "Healing 3" leaves "3 what?" (#161).
 export function dragonState(d: DragonView, round: number): string {
   if (d.resting === 'hungry') return '<em class="st-hungry">Hungry</em>';
   if (d.resting === 'hunted') return `<em class="st-hunted">Fought</em>${hpBar(d.hp, d.maxHp)}`;
-  if (d.backIn !== null && !d.canRaid) { const n = d.backIn - round; return `<em class="st-healing" title="Raid-ready again in ${n} round${n === 1 ? '' : 's'}">Healing ${n}</em>`; }
+  if (d.backIn !== null && !d.canRaid) return `<em class="st-healing" title="Raid-ready again in round ${d.backIn}">${healingText(d.backIn - round)}</em>`;
   return d.stage ? hpBar(d.hp, d.maxHp) : '';
+}
+
+// "Healing: raids in 3 rounds", counting this round's raids: 1 means it raids next round.
+export function healingText(n: number): string {
+  return `Healing: raids in ${n} round${n === 1 ? '' : 's'}`;
 }
 
 export function hpBar(hp: number, max: number): string {

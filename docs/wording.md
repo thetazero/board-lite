@@ -21,7 +21,7 @@ The game should read like a well-edited board game: the box's rulebook, the card
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear" |
 | **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Vote", "Commit", "Fight or bail", "End of round" |
 | **Status** (what someone is doing, on a TV panel or the top bar) | Sentence case, present tense, short: a present participle for what a player is doing, a statement for the table. | "Taking a turn", "Voting", "Choosing a card", "Everyone keeps a building card" |
-| **State tag** (a dragon or building, at a glance) | Sentence case, one or two words: why it's out of play. | "Hungry", "Healing 2", "Fought" (cleared fauna this round) |
+| **State tag** (a dragon or building, at a glance) | Sentence case, one or two words: why it's out of play. A number in a tag says what it counts. | "Hungry", "Healing: raids in 2 rounds", "Fought" (cleared fauna this round) |
 | **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax bails", "No one raids" |
 | **Why you can't** (a greyed card, an error) | A statement of the reason, then, if there's a fix, a colon and an imperative. Full stop. | "No room for another dragon: build a roost first.", "You can't afford 2 stone." |
 | **Rules** (`docs/rules.md`) | Second person, present tense, as above; "may" for a choice, no "should", and "must" only where breaking it is possible and matters. | "On your turn, you may play an action card." |
