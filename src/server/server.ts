@@ -32,7 +32,8 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
-const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html' };
+// A browser that ignores the pages' icon link still asks for /favicon.ico.
+const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html', '/favicon.ico': 'favicon.svg' };
 
 // `resume`: host again every room saved in the last few hours (a restart), each
 // under its own code, so the TV and phones reconnect to the same seats.

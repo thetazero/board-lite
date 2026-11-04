@@ -779,6 +779,18 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // A message near the 300-character limit (#133): the TV feed keeps who
+    // said it and ends it in "…", rather than cutting off its top.
+    name: 'talk-long-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      apply(g, (g.turn + 1) % 3, `say ${'I really need crystal for the dragon. '.repeat(7).trim()}`);
+    },
+    shots: () => [{ file: 'tv-talk-long-3p', caption: 'TV: a message near the length limit, cut short at its end', client: 'tv', sizes: true }],
+  },
+  {
     // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
     // another player's building, a wolf pack beside the acting player's tower.
     // The acting player holds both fauna cards and has a young dragon to send.
