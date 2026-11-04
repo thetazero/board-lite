@@ -4,7 +4,8 @@
 // swaps for another with nothing in between. For auditing how the game
 // moves (issue #169) and checking a fix:
 //
-//   npm run motion [-- --players 3] [--seed 7] [--minutes 8] [--delay 1500] [--out DIR]
+//   npm run motion [-- --players 3] [--seed 7] [--minutes 8] [--delay 1500] [--flat] [--out DIR]
+//   npm run motion -- --report DIR    (report.md again, from a run's log)
 //
 // Unlike `npm run shots`, nothing is frozen: the clock runs, CSS animates and
 // the bots play (each move after --delay ms, standing in for people). A probe
@@ -19,7 +20,7 @@
 // It shares `npm run shots`'s turn: one Chrome on the machine at a time.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -40,7 +41,10 @@ const players = Number(flag('players', '3'));
 const seed = Number(flag('seed', '7'));
 const minutes = Number(flag('minutes', '8'));
 const delay = Number(flag('delay', '1500'));
-const out = resolve(flag('out', join(CACHE, 'motion', 'latest')));
+// --flat: the TV without WebGL (its flat map), so a CPU-rendered board doesn't starve the page of frames: for clear clips of the overlays.
+const flat = process.argv.includes('--flat');
+const NO_WEBGL = `{ const get = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (k, ...a) { return /webgl/.test(k) ? null : get.call(this, k, ...a); }; }\n`;
+const out = resolve(flag('report', flag('out', join(CACHE, 'motion', 'latest'))));
 const CLIPS_PER_KIND = 3;
 const BEFORE_S = 0.7, AFTER_S = 1.1; // a clip: this long before the moment and after it
 
@@ -207,7 +211,7 @@ class Page {
     await p.send('Runtime.addBinding', { name: 'motionProbe' });
     await p.send('Emulation.setDeviceMetricsOverride', device);
     await p.send('Page.addScriptToEvaluateOnNewDocument', {
-      source: Object.entries(storage).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n') + PROBE,
+      source: (flat ? NO_WEBGL : '') + Object.entries(storage).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n') + PROBE,
     });
     cdp.on((method, params, session) => {
       if (session !== sessionId) return;
@@ -257,7 +261,37 @@ function kindOf(p: Probe): string | null {
   return null;
 }
 
+// report.md, from log.jsonl: the kinds of jump by how often they came, each
+// with its clips (named the way the run named them: the first few of each
+// kind, numbered in order). Written as the run goes, so a run stopped early
+// still has one; `--report DIR` writes it again for a run's folder.
+function report(dir: string, about: string): number {
+  const kinds = new Map<string, { n: number; first: Probe; clips: string[] }>();
+  let clipNo = 0;
+  const lines = existsSync(join(dir, 'log.jsonl')) ? readFileSync(join(dir, 'log.jsonl'), 'utf8').split('\n').filter(Boolean) : [];
+  for (const line of lines) {
+    const p = JSON.parse(line) as Probe;
+    const k = kindOf(p);
+    if (!k) continue;
+    let e = kinds.get(k);
+    if (!e) kinds.set(k, (e = { n: 0, first: p, clips: [] }));
+    e.n++;
+    if (e.clips.length < CLIPS_PER_KIND) e.clips.push(clipName(++clipNo, p));
+  }
+  const rows = [...kinds.entries()].sort((a, b) => b[1].n - a[1].n);
+  const md = ['# Motion audit', '', `${about} Each line: how often it was seen, then its clips (clips/NAME.gif, and clips/NAME.strip.jpg with each frame's time from the moment; the frames in clips/NAME/).`, '',
+    ...rows.map(([k, e]) => `- **${k}** ×${e.n}${e.clips.length ? `: ${e.clips.join(', ')}` : ''}\n  first: \`${JSON.stringify(e.first)}\``)];
+  writeFileSync(join(dir, 'report.md'), md.join('\n') + '\n');
+  return rows.length;
+}
+
+const clipName = (n: number, p: Probe) => `${String(n).padStart(3, '0')}-${p.page}-${p.kind}`;
+
 async function main() {
+  if (process.argv.includes('--report')) {
+    console.log(`${report(out, "Written again from the run's log.")} kinds of jump. Report: ${join(out, 'report.md')}`);
+    return;
+  }
   mkdirSync(SHOTS, { recursive: true });
   await takeTurn(join(SHOTS, 'run.lock'), (h) => console.log(`Waiting for another screenshot run to finish: process ${h.pid} in ${h.cwd}. Only one runs at a time.`));
   rmSync(`${out}.previous`, { recursive: true, force: true });
@@ -288,7 +322,7 @@ async function main() {
     if (!entry) kinds.set(k, (entry = { n: 0, first: p, clips: [] }));
     entry.n++;
     if (entry.clips.length >= CLIPS_PER_KIND) return;
-    const name = `${String(++clipNo).padStart(3, '0')}-${p.page}-${p.kind}`;
+    const name = clipName(++clipNo, p);
     entry.clips.push(name);
     pending.push(sleep(AFTER_S * 1000 + 300).then(() => clip(pages[p.page], p.t, name)));
   };
@@ -307,7 +341,9 @@ async function main() {
     writeFileSync(join(dir, 'frames.txt'), `${list.join('\n')}\nfile 'f${String(frames.length - 1).padStart(3, '0')}.jpg'\n`);
     writeFileSync(join(dir, 'times.txt'), frames.map((f, i) => `f${String(i).padStart(3, '0')}.jpg ${((f.t - t) / 1000).toFixed(3)}s`).join('\n') + '\n');
     // A strip: up to 10 frames from just before the moment on, each labelled with its time from the moment.
-    const strip = frames.map((f, i) => ({ f, i })).filter(({ f }) => f.t >= t - 250).slice(0, 10);
+    const all = frames.map((f, i) => ({ f, i }));
+    const strip = all.filter(({ f }) => f.t >= t - 250).slice(0, 10);
+    if (strip.length < 2) strip.unshift(...all.filter(({ f }) => f.t < t - 250).slice(-(3 - strip.length))); // a still screen paints few frames
     try {
       execFileSync('montage', [...strip.flatMap(({ f, i }) => ['-label', `${((f.t - t) / 1000).toFixed(2)} s`, `f${String(i).padStart(3, '0')}.jpg`]),
         '-tile', `${strip.length}x1`, '-geometry', page === pages.tv ? '480x270+4+4' : '195x422+4+4', '-pointsize', '16', '-background', '#222', '-fill', '#eee', join('..', `${name}.strip.jpg`)], { cwd: dir });
@@ -351,6 +387,7 @@ async function main() {
       // The server's bots can miss their turn when a scene's end timer fires a moment
       // early (they wait out the scene, and nothing asks them again): nudge them.
       if (ticks % 20 === 0 && !room.sceneLeft()) room.changed();
+      if (ticks % 120 === 0) report(out, `Round ${g.round} so far.`);
       if (++ticks % 8 === 0) process.stdout.write(`\r  ${Math.round((Date.now() - t0) / 1000)} s, round ${g.round}, ${g.phase}       `);
     }
     console.log(room.game?.phase === 'over' ? '\n  The game is over.' : '\n  Time is up.');
@@ -363,11 +400,8 @@ async function main() {
     await chrome.gone;
   }
 
-  const rows = [...kinds.entries()].sort((a, b) => b[1].n - a[1].n);
-  const md = [`# Motion audit: ${players} bots, seed ${seed}`, '', `${Math.round((Date.now() - t0) / 1000)} s of play, round ${room.game?.round}${room.game?.phase === 'over' ? ', to the end of the game' : ''}. Each line: how often it was seen, then its clips (clips/NAME.gif, clips/NAME.strip.jpg with each frame's time from the moment, the frames in clips/NAME/).`, '',
-    ...rows.map(([k, e]) => `- **${k}** ×${e.n}${e.clips.length ? `: ${e.clips.join(', ')}` : ''}\n  first: \`${JSON.stringify(e.first)}\``)];
-  writeFileSync(join(out, 'report.md'), md.join('\n') + '\n');
-  console.log(`${rows.length} kinds of jump. Report: ${join(out, 'report.md')}`);
+  const n = report(out, `${players} bots, seed ${seed}, a move every ${delay} ms: ${Math.round((Date.now() - t0) / 1000)} s of play, to round ${room.game?.round}${room.game?.phase === 'over' ? ', the end of the game' : ` (stopped after ${minutes} min)`}.`);
+  console.log(`${n} kinds of jump. Report: ${join(out, 'report.md')}`);
   process.exit(0);
 }
 

@@ -115,6 +115,8 @@ Only one run goes at a time on the machine, whichever tab or worktree starts it:
 ```
 npm run motion                   # 3 bots, seed 7, a move a second and a half apart, up to 8 minutes
 npm run motion -- --minutes 45 --delay 1000 --players 4 --seed 3 --out DIR
+npm run motion -- --flat         # the TV without its 3D board (the flat map), so the overlays get every frame
+npm run motion -- --report DIR   # write a run's report.md again from its log
 ```
 
 plays a bot game on the TV and one phone (seat 1's, which the script plays) in real time, nothing frozen, and reports motion that jumps instead of moving. A probe in each page reports, as it happens:
@@ -125,7 +127,7 @@ plays a bot game on the TV and one phone (seat 1's, which the script plays) in r
 - **swap:** what fills the screen changed (the TV's overlay, the phone's screen) with nothing fading or moving on the way;
 - **pop:** a toast or a row that comes and goes with no animation.
 
-Each kind gets up to three clips, the frames Chrome painted around the moment: `clips/NAME.gif` and `clips/NAME.strip.jpg` (each frame labelled with its time from the moment). `report.md` lists the kinds by how often they happened; `log.jsonl` has every event. It writes to `~/.cache/board-lite/motion/latest/` and takes the same one-at-a-time turn as `npm run shots`. The 3D board renders on the CPU here, so the clips' frame rate says nothing about a real TV: the probes time the pages' own changes.
+Each kind gets up to three clips, the frames Chrome painted around the moment: `clips/NAME.gif` and `clips/NAME.strip.jpg` (each frame labelled with its time from the moment). `report.md` lists the kinds by how often they happened; `log.jsonl` has every event. It writes to `~/.cache/board-lite/motion/latest/` and takes the same one-at-a-time turn as `npm run shots`. The 3D board renders on the CPU here, so the clips' frame rate says nothing about a real TV (and a busy board leaves the TV's clips few frames: `--flat` for clear clips of the overlays); the probes time the pages' own changes. The report is written as the run goes, so a run stopped early still has one.
 
 ## How it's built
 
