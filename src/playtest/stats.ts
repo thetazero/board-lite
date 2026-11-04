@@ -85,7 +85,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     players: g.players.map((pl) => ({ ...pl, hand: [] })),
     buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrade: null, floors: 0 }])),
     dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => ({ ...d, stage: 0 })),
-    titles: { army: null, tower: null }, slain: {},
+    titles: { army: null, tower: null, hoard: null }, slain: {},
   };
   const dragon = (id: string) => r.dragons.find((d) => d.id === id)!;
   const snap = () => {
@@ -237,7 +237,7 @@ const CATALOG: { what: string; keys: string[]; uses: (s: GameStats) => Count; se
 // ---------- markdown ----------
 
 const P = (p: number | null) => (p === null ? 'no one' : `P${p + 1}`);
-const TITLES = ['army', 'tower'];
+const TITLES = ['army', 'tower', 'hoard'];
 const title = (t: string) => t[0].toUpperCase() + t.slice(1);
 const avg = (x: number, n: number) => (n ? (x / n).toFixed(1).replace(/\.0$/, '') : '-');
 const bySeat = (xs: number[]) => xs.map((x, p) => `P${p + 1} ${x}`).join(', ');

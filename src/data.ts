@@ -32,8 +32,9 @@ export const TUNING = {
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
-  // A title needs at least this much: dragon points, tower floors.
-  titleMinimum: { army: 10, tower: 4 },
+  // A title needs at least this much: dragon points, tower floors, gold. The
+  // hoard's is a Monument's gold: keep it for the title or spend it on one (#109).
+  titleMinimum: { army: 10, tower: 4, hoard: 10 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
