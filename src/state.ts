@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -96,7 +96,7 @@ export interface PublicState {
   turnOrder: number[];
   pointsToWin: number;
   waitingOn: number[];
-  players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
+  players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -155,6 +155,7 @@ export interface SeatState {
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean };
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   huntable: string[]; // hexes of the beasts I may fight now (one try at a great beast a round)
+  cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   myChoice: 'fight' | 'bail' | null;
   log: EventView[]; // private events for me
@@ -228,7 +229,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, production: production(g, p), bankRate: bankRate(g, p) };
+      return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
@@ -337,6 +338,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
+    cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     myChoice: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),

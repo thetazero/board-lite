@@ -3,7 +3,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
 import {
-  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
+  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
   dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, lootOf, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
@@ -132,7 +132,10 @@ export function commandHints(g: Game, p: number): string[] {
   const pl = g.players[p];
   const out: string[] = [];
   if (g.phase === 'action') {
-    for (const o of g.offers.filter((x) => x.to === p)) out.push(`accept ${o.id}  |  decline ${o.id}   (${pname(o.from)} gives ${tradeText(g, o.give)} for ${tradeText(g, o.get)})`);
+    for (const o of g.offers.filter((x) => x.to === p)) {
+      const why = acceptProblem(g, o);
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${pname(o.from)} gives ${tradeText(g, o.give)} for ${tradeText(g, o.get)})${why ? ` ${why}` : ''}`);
+    }
     if (p !== g.turn) {
       out.push(`offer ${pname(g.turn)} give <items> get <items>   (out of turn you may only trade with ${pname(g.turn)})`);
       return out;
