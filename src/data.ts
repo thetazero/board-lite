@@ -12,9 +12,10 @@ export type Element = (typeof ELEMENTS)[number];
 
 export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
-// How text names one hex of a terrain ("a mountain", "a ley line").
+// How text names one hex of a terrain ("a mountain hex", "a ley line"). Terrain
+// is a hex, so "meadow hex" can't be read as the building on it (#150).
 export const TERRAIN_NOUN: Record<Terrain, string> = {
-  mountain: 'mountain', forest: 'forest', ley: 'ley line', meadow: 'meadow', plains: 'plains hex', harbor: 'harbor', ocean: 'ocean hex',
+  mountain: 'mountain hex', forest: 'forest hex', ley: 'ley line', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex',
 };
 // "a, b or c": how card text lists choices.
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
@@ -58,9 +59,12 @@ export const TUNING = {
 // buildings that make the same resource.
 export const CLASSES = ['quarry', 'lumber', 'mine', 'pasture', 'dragon', 'monument', 'trade'] as const;
 export type BuildingClass = (typeof CLASSES)[number];
-// How card text names one building of a class.
+// How card text names one building of a class. A class is always a "building",
+// and the four resource classes are named for what they make, so a card that
+// counts buildings never reads like one that counts terrain ("livestock
+// building", not "pasture", next to "meadow hex"; #150).
 export const CLASS_NAMES: Record<BuildingClass, string> = {
-  quarry: 'quarry', lumber: 'lumber camp', mine: 'mine', pasture: 'pasture', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
+  quarry: 'stone building', lumber: 'timber building', mine: 'crystal building', pasture: 'livestock building', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
 };
 // The tower is a monument (it holds floors) and a dragon building (it houses one).
 export const TOWER_CLASSES: BuildingClass[] = ['monument', 'dragon'];
@@ -144,7 +148,7 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 8, stone: 8, crystal: 2 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 8, stone: 8, crystal: 2 }, baseBonus: 2, text: 'This stone, timber, crystal or livestock building makes 2 more.', copies: 4 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
   trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 8, stone: 4 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };

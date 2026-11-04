@@ -938,7 +938,7 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (g.buildings[k]) fail(`${k} already has a building.`);
   if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it first.`);
   if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from an adjacent hex: slay it first.`);
-  if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on ${TERRAIN_NOUN[def.terrain]}; ${k} is ${TERRAIN_NOUN[hex.terrain]}.`);
+  if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on a ${TERRAIN_NOUN[def.terrain]}; ${k} is a ${TERRAIN_NOUN[hex.terrain]}.`);
   if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} isn't adjacent to any of your buildings.`);
   return k;
 }

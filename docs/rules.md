@@ -34,7 +34,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **2 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and shrugs off lightning, air and water; the Leviathan is weak to lightning and shrugs off water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
-**Adjacent hexes.** Every building has a class (quarry, lumber camp, mine, pasture, dragon building, monument or trade building); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain (built on or not) or buildings of a class, whoever owns them. The count is always the current one: an adjacent building built later counts too.
+**Adjacent hexes.** Every building has a class (stone building, timber building, crystal building, livestock building, dragon building, monument or trade building; each basic building that makes a resource is in that resource's class, with the building cards that make the same); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain, built on or not ("each adjacent meadow hex"), or buildings of a class, whoever owns them ("each adjacent livestock building"). The count is always the current one: an adjacent building built later counts too.
 
 ## Points
 
