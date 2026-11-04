@@ -1,7 +1,6 @@
 // All content and tuning numbers live here. Numbers are first guesses, to be
 // tuned by playtests (see docs/design.md, open questions).
-// docs/datasheet.md shows what these numbers add up to (payback, cost per
-// point, raid odds). After changing any, run `npm run datasheet` and read the
+// docs/datasheet.md lists these numbers as the raw rules. After changing any, run `npm run datasheet` and read the
 // diff; `npm test` fails until it is regenerated.
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
