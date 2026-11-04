@@ -102,7 +102,15 @@ const best = (g: Game) => Math.max(...g.players.map((_, p) => score(g, p).total)
 const dragonsOf = (g: Game, p: number) => g.dragons.filter((d) => d.owner === p);
 const buildingsOf = (g: Game, p: number) => Object.values(g.buildings).filter((b) => b.owner === p).length;
 // The acting player can play a building card on a hex right now.
-const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.kind === 'building' && c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
+// A building card the acting player has a hex for, affordable or not.
+const placeableCard = (g: Game, p: number) => seatState(g, p).hand.find((c) => c.kind === 'building' && c.needs === 'hex' && !c.blocked && c.hexes.length);
+// Tops up the acting player's resources to pay for that card. Bots rarely
+// afford one in round 2, so the early scenes add what is missing.
+function affordACard(g: Game) {
+  const c = placeableCard(g, g.turn)!;
+  const have = g.players[g.turn].resources;
+  for (const [r, n] of Object.entries(c.cost) as [keyof typeof have, number][]) have[r] = Math.max(have[r], n);
+}
 const committed = (g: Game) => g.raid!.commits.filter((c) => c.length).length;
 const fightingPlayers = (g: Game) => new Set(g.raid!.fighters.map((id) => g.dragons.find((d) => d.id === id)!.owner)).size;
 
@@ -191,7 +199,8 @@ export const SCENES: Scene[] = [
     name: 'early-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
@@ -217,7 +226,8 @@ export const SCENES: Scene[] = [
     name: 'build-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     live: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
     shots: () => [{ file: 'tv-build-3p', caption: 'TV: a new building pops up from the page', client: 'tv', live: true, frames: [0, 0.15, 0.3, 0.45, 0.7, 1.2] }],
   },
@@ -626,7 +636,7 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 105,
+    seed: 140,
     until: (g) => {
       if (g.round < 4 || g.phase !== 'action') return false;
       const hand = g.players[g.turn].hand;
@@ -927,7 +937,8 @@ export const SCENES: Scene[] = [
     players: 3,
     seed: 1,
     remote: true,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     shots: (g) => [
       { file: 'phone-remote-you-3p', caption: 'No TV: your own view, with the You / Table switch by the talk bar', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-remote-table-3p', caption: 'No TV: the table view, switched to', client: 'phone', seat: g!.turn, clicks: ['.viewswitch [data-view=table]'], waitFor: '.table-on', waitMs: 600, sizes: true },

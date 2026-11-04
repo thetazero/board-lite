@@ -32,8 +32,9 @@ export const TUNING = {
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
-  // A title needs at least this much: dragon points, tower floors.
-  titleMinimum: { army: 10, tower: 4 },
+  // A title needs at least this much: dragon points, tower floors, gold. The
+  // hoard's is a Monument's gold: keep it for the title or spend it on one (#109).
+  titleMinimum: { army: 10, tower: 4, hoard: 10 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -92,38 +93,38 @@ const classMaker = (name: string, cls: BuildingClass, r: Resource, per: Building
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
-  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
-  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
-  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
-  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
-  roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 8, livestock: 6, crystal: 8 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 8, crystal: 8, livestock: 6 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 8, timber: 8, livestock: 6 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 8, crystal: 8, stone: 6 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
+  roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 4, timber: 4 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // Worth no points itself: floors count only toward Tallest Tower, a side
   // quest and a sink for raid gold (#98).
-  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 2 }, onTower: true, text: 'Adds a floor to your tower. Floors count toward Tallest Tower.' },
+  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 6, gold: 4 }, onTower: true, text: 'Adds a floor to your tower. Floors count toward Tallest Tower.' },
   // Building cards. Most count their neighbours.
-  cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 3, crystal: 3, livestock: 2 }, 2),
-  stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 3, crystal: 3, livestock: 2 }, 2),
-  woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 3, crystal: 3, livestock: 2 }, 2),
-  sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 3, crystal: 3, livestock: 2 }, 2),
-  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 4, crystal: 3, livestock: 3 }, 1),
-  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 3, timber: 3, livestock: 2 }, 2),
-  gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 3, timber: 3, livestock: 2 }, 2),
-  smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 3, stone: 2, livestock: 3 }, 1),
-  shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 3, timber: 3, crystal: 2 }, 2),
-  drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 3, crystal: 3, stone: 2 }, 2),
-  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 3, timber: 4, crystal: 3 }, 1),
-  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 3, timber: 3, crystal: 3 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
-  port: { name: 'Port', class: 'trade', cost: { timber: 3, stone: 1, livestock: 1 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
-  market: { name: 'Market', class: 'trade', cost: { stone: 3, timber: 3, crystal: 3, gold: 2 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
+  cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 6, crystal: 6, livestock: 4 }, 2),
+  stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 6, crystal: 6, livestock: 4 }, 2),
+  woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 6, crystal: 6, livestock: 4 }, 2),
+  sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 6, crystal: 6, livestock: 4 }, 2),
+  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 8, crystal: 6, livestock: 6 }, 1),
+  ley_spire: terrainMaker('Ley Spire', 'mine', 'crystal', 'ley', { stone: 6, timber: 6, livestock: 4 }, 2),
+  gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 6, timber: 6, livestock: 4 }, 2),
+  smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 6, stone: 4, livestock: 6 }, 1),
+  shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 6, timber: 6, crystal: 4 }, 2),
+  drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 6, crystal: 6, stone: 4 }, 2),
+  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 6, timber: 8, crystal: 6 }, 1),
+  hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 6, timber: 6, crystal: 6 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
+  port: { name: 'Port', class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
+  market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
   // Point cards: the only buildings worth points, and dear (#98). Raid gold is
   // meant to come in big numbers, so a point costs a lot of it, and at the
   // bank's 4:1 a point can't be had cheaply from surplus.
-  monument: { name: 'Monument', class: 'monument', cost: { stone: 4, timber: 3, gold: 10 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
+  monument: { name: 'Monument', class: 'monument', cost: { stone: 8, timber: 6, gold: 20 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
   // They count only what can't be bought without limit: terrain, or classes
   // that hold no basic building (monuments, trade buildings).
-  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 3, crystal: 3, gold: 10 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
-  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 5, timber: 3, gold: 10 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
-  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 3, timber: 3, gold: 10 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 6, crystal: 6, gold: 20 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent ley line.', copies: 2 },
+  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 10, timber: 6, gold: 20 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
+  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 6, timber: 6, gold: 20 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
 };
 
 export const BASIC_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].basic);
@@ -140,9 +141,9 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 1 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
-  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 2, timber: 1 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
-  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 4, stone: 2 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 8, stone: 8, crystal: 2 }, baseBonus: 2, text: 'This quarry, lumber camp, mine or pasture makes 2 more.', copies: 4 },
+  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
+  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 8, stone: 4 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';
@@ -213,7 +214,7 @@ const baseStages: [DragonStage, DragonStage, DragonStage] = [
 ];
 
 function baseDragon(element: Element, name: string): DragonDef {
-  return { name, element, growthTime: 2, stages: baseStages, targeting: 'random', cost: { crystal: 3, livestock: 2 }, copies: 1, base: true };
+  return { name, element, growthTime: 2, stages: baseStages, targeting: 'random', cost: { crystal: 6, livestock: 4 }, copies: 1, base: true };
 }
 
 export const DRAGONS: Record<string, DragonDef> = {
@@ -223,43 +224,43 @@ export const DRAGONS: Record<string, DragonDef> = {
   air_whelp: baseDragon('air', 'Air Dragon'),
   water_whelp: baseDragon('water', 'Water Dragon'),
   ember_wyrm: {
-    name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
+    name: 'Ember Wyrm', element: 'fire', growthTime: 3, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
     stages: [{ hp: 7, targets: 1, dice: 1, sides: 8 }, { hp: 14, targets: 1, dice: 2, sides: 8 }, { hp: 24, targets: 2, dice: 3, sides: 8 }],
   },
   cinder_drake: {
-    name: 'Cinder Drake', element: 'fire', growthTime: 2, targeting: 'lowest_health', cost: { crystal: 4, livestock: 2 }, copies: 1,
+    name: 'Cinder Drake', element: 'fire', growthTime: 2, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4 }, copies: 1,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 11, targets: 2, dice: 1, sides: 6 }, { hp: 18, targets: 3, dice: 1, sides: 8 }],
   },
   frost_wyrm: {
-    name: 'Frost Wyrm', element: 'ice', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
+    name: 'Frost Wyrm', element: 'ice', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
     stages: [{ hp: 9, targets: 1, dice: 1, sides: 6 }, { hp: 17, targets: 1, dice: 2, sides: 6 }, { hp: 30, targets: 1, dice: 3, sides: 8 }],
   },
   rime_drake: {
-    name: 'Rime Drake', element: 'ice', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 4, livestock: 2 }, copies: 1,
+    name: 'Rime Drake', element: 'ice', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 1,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 12, targets: 1, dice: 2, sides: 6 }, { hp: 20, targets: 2, dice: 2, sides: 8 }],
   },
   storm_wyrm: {
-    name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
+    name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
     stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 20, targets: 4, dice: 1, sides: 8 }],
   },
   bolt_drake: {
-    name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 4, livestock: 2 }, copies: 1,
+    name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4 }, copies: 1,
     stages: [{ hp: 5, targets: 1, dice: 1, sides: 8 }, { hp: 10, targets: 1, dice: 2, sides: 8 }, { hp: 20, targets: 1, dice: 4, sides: 8 }],
   },
   sky_wyrm: {
-    name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
+    name: 'Sky Wyrm', element: 'air', growthTime: 3, targeting: 'lowest_health', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
     stages: [{ hp: 6, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 2, dice: 1, sides: 8 }, { hp: 22, targets: 2, dice: 2, sides: 8 }],
   },
   zephyr_drake: {
-    name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 4, livestock: 2 }, copies: 1,
+    name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 8, livestock: 4 }, copies: 1,
     stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 17, targets: 3, dice: 1, sides: 6 }],
   },
   abyss_wyrm: {
-    name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 4, livestock: 2, gold: 1 }, copies: 1,
+    name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
     stages: [{ hp: 8, targets: 1, dice: 1, sides: 8 }, { hp: 16, targets: 2, dice: 1, sides: 8 }, { hp: 28, targets: 2, dice: 2, sides: 8 }],
   },
   reef_drake: {
-    name: 'Reef Drake', element: 'water', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 4, livestock: 2 }, copies: 1,
+    name: 'Reef Drake', element: 'water', growthTime: 2, targeting: 'weak_to_me', cost: { crystal: 8, livestock: 4 }, copies: 1,
     stages: [{ hp: 7, targets: 1, dice: 1, sides: 6 }, { hp: 13, targets: 1, dice: 2, sides: 6 }, { hp: 21, targets: 2, dice: 2, sides: 6 }],
   },
 };

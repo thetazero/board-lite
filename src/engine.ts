@@ -125,8 +125,8 @@ export type GameEvent =
   | { k: 'talk' }
   | { k: 'mine' }; // a private line for the player it went to
 
-export type Title = 'army' | 'tower';
-export const TITLE_NAMES: Record<Title, string> = { army: 'Strongest Dragon Army', tower: 'Tallest Tower' };
+export type Title = 'army' | 'tower' | 'hoard';
+export const TITLE_NAMES: Record<Title, string> = { army: 'Strongest Dragon Army', tower: 'Tallest Tower', hoard: 'Largest Hoard' };
 
 export interface Game {
   version: 1;
@@ -353,7 +353,8 @@ export function production(g: Game, p: number): Record<Resource, { base: number;
 
 function titleValue(g: Game, p: number, t: Title): number {
   if (t === 'army') return g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + TUNING.dragonPointsByStage[d.stage], 0);
-  return g.buildings[g.towers[p]].floors;
+  if (t === 'tower') return g.buildings[g.towers[p]].floors;
+  return g.players[p].resources.gold;
 }
 
 export function titleValues(g: Game, t: Title): number[] {
@@ -363,7 +364,7 @@ export function titleValues(g: Game, t: Title): number[] {
 // A title goes to the single strict leader, once they reach its minimum; the
 // holder keeps it on a tie.
 function updateTitles(g: Game) {
-  for (const t of Object.keys(g.titles) as Title[]) {
+  for (const t of Object.keys(TITLE_NAMES) as Title[]) {
     const vals = titleValues(g, t);
     const best = Math.max(...vals);
     const leaders = vals.flatMap((v, p) => (v === best ? [p] : []));
@@ -427,7 +428,7 @@ export function newGame(players: number, seed: number): Game {
     raidsLeft: 0,
     raid: null,
     hoard: Object.fromEntries(Object.keys(TARGETS).map((t) => [t, 0])),
-    titles: { army: null, tower: null },
+    titles: { army: null, tower: null, hoard: null },
     slain: {},
     beastTried: Array(players).fill(0),
     winner: null,
