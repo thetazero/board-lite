@@ -44,14 +44,14 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Workshop | upgrade | 4 | 8 stone, 8 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more. | — |
 | Nesting Grounds | upgrade | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
 | Trade Charter | upgrade | 3 | 4 stone, 8 gold | This port or market makes 1 more gold each round. | — |
-| Windfall | action card | 2 | nothing | Gain 3 of one resource other than gold. | — |
-| Buried Treasure | action card | 4 | nothing | Gain 2 gold. | — |
-| Growth Elixir | action card | 4 | 3 gold | Grow one of your dragons to its next life stage. | — |
-| Healing Potion | action card | 3 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
-| War Horn | action card | 3 | 1 crystal | Hold 1 more raid this round. | — |
-| Secret Hoard | action card | 4 | nothing | Worth 1 point while in your hand. | 1 |
-| Wolf Call | action card | 4 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
-| Rouse the Bear | action card | 2 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
+| Windfall | action card | 4 | nothing | Gain 3 of one resource other than gold. | — |
+| Buried Treasure | action card | 10 | nothing | Gain 2 gold. | — |
+| Growth Elixir | action card | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
+| Healing Potion | action card | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
+| War Horn | action card | 6 | 1 crystal | Hold 1 more raid this round. | — |
+| Secret Hoard | action card | 8 | nothing | Worth 1 point while in your hand. | 1 |
+| Wolf Call | action card | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | 1 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Ice Dragon | base dragon | 1 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Lightning Dragon | base dragon | 1 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
@@ -205,8 +205,8 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 | Card | Sends | Cost | Copies |
 |---|---|---|---|
-| Wolf Call | Cave Bear | 1 crystal | 4 |
-| Rouse the Bear | Basilisk | 1 crystal | 2 |
+| Wolf Call | Cave Bear | 1 crystal | 8 |
+| Rouse the Bear | Basilisk | 1 crystal | 4 |
 
 ## Great beasts
 
@@ -227,15 +227,15 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 226 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 196 | 20% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 243 | 25% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 126 | 13% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 194 | 20% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| stone | 226 | 22% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 196 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 252 | 25% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 126 | 12% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 212 | 21% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
-Building deck 43 cards (18 buildings, 3 upgrades), action deck 41.
+Building deck 43 cards (18 buildings, 3 upgrades), action deck 73.
 
 | Card | Deck | Copies | Share of deck |
 |---|---|---|---|
@@ -260,13 +260,13 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 41.
 | Workshop | building deck (upgrade) | 4 | 9% |
 | Nesting Grounds | building deck (upgrade) | 3 | 7% |
 | Trade Charter | building deck (upgrade) | 3 | 7% |
-| Windfall | action | 2 | 5% |
-| Buried Treasure | action | 4 | 10% |
-| Growth Elixir | action | 4 | 10% |
-| Healing Potion | action | 3 | 7% |
-| War Horn | action | 3 | 7% |
-| Secret Hoard | action | 4 | 10% |
-| Wolf Call | action | 4 | 10% |
-| Rouse the Bear | action | 2 | 5% |
+| Windfall | action | 4 | 5% |
+| Buried Treasure | action | 10 | 14% |
+| Growth Elixir | action | 10 | 14% |
+| Healing Potion | action | 8 | 11% |
+| War Horn | action | 6 | 8% |
+| Secret Hoard | action | 8 | 11% |
+| Wolf Call | action | 8 | 11% |
+| Rouse the Bear | action | 4 | 5% |
 | Any upgrade (3 kinds) | building deck (upgrade) | 10 | 23% |
-| Any dragon (15 kinds) | action | 15 | 37% |
+| Any dragon (15 kinds) | action | 15 | 21% |

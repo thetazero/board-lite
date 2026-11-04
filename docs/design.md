@@ -50,7 +50,7 @@ Playtests showed that refusing to trade and taking land first were the only ways
 - Clearing fauna "its not a raid but uses the same combat system". Anyone can clear any fauna ("anyone"), and clearing pays "some livestock? (food)", scaled by how strong the beast is.
 - "you can chose to fight fauna or raid (but maybe this is a dragon level choice)… maybe you can go half half": each dragon either fights fauna or raids in a round, never both, so a player can split their dragons.
 - New fauna comes only from action cards: "card only for now". The board doesn't respawn it.
-- Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies). A beast a card sent gives no loot, so placing one never hands a rival a prize.
+- Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies; 8 and 4 since the action deck doubled in #201). A beast a card sent gives no loot, so placing one never hands a rival a prize.
 - Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
 
 ### Great beasts
