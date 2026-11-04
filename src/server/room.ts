@@ -2,8 +2,9 @@
 // client uses the same interface: phones, the TV and the CLI (people or
 // Claude playtest seats) all join with a name, get a seat token, and send the
 // engine's commands through the room; every change is pushed to whoever is
-// watching. The game is saved to a file after each change (the same format
-// the CLI's file mode uses), so a server restart or a CLI look loses nothing.
+// watching. Every client gets the same JSON (src/state.ts) and shows it its own
+// way: the server builds no text. The game is saved to a file after each change,
+// so a server restart loses nothing.
 // Who sits where is saved beside it (<game>.seats.json: the code, the TV's and
 // each seat's token), so after a restart the room comes back under its own
 // code and every phone, the TV and each CLI player reconnect to their own seat.
@@ -14,8 +15,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
-import { publicState, seatState, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
-import { afterMove, playerView, publicStatus, seatStatus, visibleLog } from '../view.ts';
+import { publicState, seatState, visibleEvents, type EventView, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { load, save, withLock } from '../store.ts';
 import { scenesMs, scenesOf } from '../../web/scenes.ts';
 
@@ -37,6 +37,18 @@ export interface Seat {
   // back by joining with its name.
   standIn: boolean;
   left: boolean; // quit: no phone holds the seat any more
+}
+
+// A name as the table shows it: spaces collapsed, no control or invisible
+// characters (zero-width spaces, blank fillers), at most 12 characters. A
+// joiner inside an emoji stays.
+function tidyName(name: string): string {
+  const clean = name
+    .replace(/\s+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}\u115F\u1160\u2800\u3164\uFFA0]/gu, (c) => (c === '\u200D' ? c : ''))
+    .replace(/ +/g, ' ')
+    .trim();
+  return Array.from(clean).slice(0, 12).join('').trim();
 }
 
 export class RoomError extends Error {}
@@ -104,8 +116,8 @@ export class Room {
     if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
     if (existsSync(this.file)) {
       this.cached = load(this.file);
-      // A saved game with no seats file (from the CLI's file mode): every seat
-      // starts open, and players claim them by joining.
+      // A saved game with no seats file: every seat starts open, and players
+      // claim them by joining.
       if (this.seats.length !== this.cached.players.length) {
         this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
       }
@@ -185,8 +197,8 @@ export class Room {
   // ---- lobby ----
 
   private cleanName(name: string): string {
-    const clean = name.replace(/\s+/g, ' ').trim().slice(0, 12);
-    if (!clean) throw new RoomError('Pick a name.');
+    const clean = tidyName(name);
+    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
     if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}.`);
     return clean;
   }
@@ -214,7 +226,7 @@ export class Room {
   // name takes an open seat (one nobody holds, in a saved game hosted again).
   join(name: string, kind: SeatKind = 'player'): Seat {
     if (this.game) {
-      const typed = name.replace(/\s+/g, ' ').trim().toLowerCase();
+      const typed = tidyName(name).toLowerCase();
       const own = this.seats.find((s) => s.kind === 'player' && s.name.toLowerCase() === typed);
       if (own && kind === 'player') {
         if (this.here(own)) throw new RoomError(`${own.name} is playing on another phone.`);
@@ -299,13 +311,9 @@ export class Room {
 
   // ---- play ----
 
-  // A player's command. Returns what that player saw happen and their next
-  // options, as text (what the CLI prints; phones ignore it).
-  command(tok: string, cmd: string): string {
-    const p = this.playerSeat(tok);
-    const before = this.game ? visibleLog(this.game, p).length : 0;
-    this.act(p, cmd);
-    return afterMove(this.game!, p, before);
+  // A player's command, through the engine.
+  command(tok: string, cmd: string) {
+    this.act(this.playerSeat(tok), cmd);
   }
 
   private playerSeat(tok: string): number {
@@ -334,68 +342,54 @@ export class Room {
     this.changed();
   }
 
-  // ---- the same game as text, for players at the command line ----
-
-  viewText(tok: string, logLines = 25): string {
-    const p = this.playerSeat(tok);
-    if (!this.game) return `You are seat ${p + 1} (${this.seats[p].name}) in room ${this.code}. The game hasn't started.\n${this.statusText()}`;
-    return `${this.tableLine(p)}\n${playerView(this.game, p, logLines)}`;
+  // What a client that holds no stream open (the CLI, a Claude seat) asks for:
+  // the snapshot a phone gets. Asking counts as being at the seat.
+  state(tok: string): Snapshot {
+    if (tok && tok !== this.hostToken) this.playerSeat(tok);
+    return this.snapshot(tok || null);
   }
 
-  // Who sits where: the engine calls players P1, P2...; people know each other by name.
-  tableLine(p = -1): string {
-    const who = this.seats.map((s, i) => `P${i + 1} ${s.name}${i === p ? ' (you)' : s.kind === 'bot' ? ' (bot)' : s.kind === 'open' ? ' (open seat)' : ''}`);
-    return `Table: ${who.join(', ')}.`;
-  }
-
-  statusText(): string {
-    const names = this.seats.map((s, i) => `P${i + 1} ${s.name}${s.kind === 'bot' ? ' (bot)' : s.kind === 'open' ? ' (open seat)' : ''}`).join(', ');
-    if (!this.game) return `Room ${this.code}, in the lobby: ${names || 'nobody yet'}. ${MIN_PLAYERS} to ${MAX_PLAYERS} players; the TV or the first player starts.`;
-    return `Room ${this.code}: ${names}.\n${publicStatus(this.game)}`;
-  }
-
-  // Resolves when this seat has a decision to make, the game ends, or time runs out.
-  wait(tok: string, timeoutMs: number): Promise<{ text: string; code: number }> {
+  // Resolves when this seat has a decision to make (code 0), the game ends
+  // (0), or time runs out (2), with the seat's snapshot.
+  wait(tok: string, timeoutMs: number): Promise<{ code: number; state: Snapshot }> {
     const p = this.playerSeat(tok);
     const left = this.holding(p);
     return new Promise((done) => {
       const check = (): boolean => {
         const g = this.game;
-        if (g?.phase === 'over') return finish('The game is over.', 0);
-        if (g && waitingOn(g).includes(p) && !this.sceneLeft()) return finish(`P${p + 1}: your decision. Run "view" to see the board.`, 0);
+        if (g?.phase === 'over') return finish(0);
+        if (g && waitingOn(g).includes(p) && !this.sceneLeft()) return finish(0);
         return false;
       };
-      const finish = (text: string, code: number) => {
+      const finish = (code: number) => {
         clearTimeout(timer);
         unsubscribe();
         left();
-        done({ text, code });
+        done({ code, state: this.snapshot(tok) });
         return true;
       };
-      const timer = setTimeout(() => finish(this.game ? `Still waiting on: ${waitingOn(this.game).map((q) => `P${q + 1}`).join(', ')}.` : 'The game has not started yet.', 2), timeoutMs);
+      const timer = setTimeout(() => finish(2), timeoutMs);
       const unsubscribe = this.subscribe(() => void check());
       check();
     });
   }
 
   // For a player who follows the game as it goes (a Claude seat's tool server):
-  // the events this seat can see from index `since` of its visible log, and its
-  // status. With a timeout it waits until it's this seat's decision, someone
-  // else talks, the game ends, or time runs out. On its own turn with an offer
-  // out, it waits for an answer rather than returning at once.
-  listen(tok: string, since: number, timeoutMs: number): Promise<{ events: string[]; next: number; status: string }> {
+  // every event this seat can see from log index `since` on, the index to ask
+  // from next time, and its snapshot. With a timeout it waits until it's this
+  // seat's decision, someone else talks, the game ends, or time runs out. On its
+  // own turn with an offer out, it waits for an answer rather than returning at once.
+  listen(tok: string, since: number, timeoutMs: number): Promise<{ events: EventView[]; next: number; state: Snapshot }> {
     const p = this.playerSeat(tok);
     const result = () => {
       const g = this.game;
-      if (!g) return { events: [], next: 0, status: `The game hasn't started yet. ${this.tableLine(p)}` };
-      const v = visibleLog(g, p);
-      return { events: v.slice(since).map((e) => `[r${e.round}] ${e.text}`), next: v.length, status: seatStatus(g, p) };
+      return { events: g ? visibleEvents(g, p, since) : [], next: g ? g.log.length : 0, state: this.snapshot(tok) };
     };
     const ready = (): boolean => {
       const g = this.game;
       if (!g) return false;
       if (g.phase === 'over') return true;
-      const others = visibleLog(g, p).slice(since).filter((e) => !e.text.startsWith(`P${p + 1} `));
+      const others = visibleEvents(g, p, since).filter((e) => !e.text.startsWith(`P${p + 1} `));
       if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
       const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
       return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft();

@@ -35,7 +35,7 @@ Nobody stalls the table:
 - **Quit:** the **⋯** next to your name on the phone opens **Quit game**. A bot plays your seat for the rest of the game, and the TV says so. To come back, open the room's address and tap your name (anyone can take a seat that was quit the same way). If every player quits, the game ends: the bots stop, the TV says so, and the server forgets the room after 10 minutes unless someone comes back.
 - **Away:** when the table waits on someone whose phone is gone (closed, asleep, out of range), everyone else's phone shows "Ada is away." with **Let a bot play**, a minute after their phone went. The bot plays for them until their phone is back, which hands the seat back at once.
 
-The bot that plays for someone does as little as it can (`standInMove` in `src/bot.ts`): it declines offers, ends the turn, keeps the first building card, votes for the first target, sends no dragons and discards the oldest cards. It changes no rule: it only makes the moves the player would have to make for the game to go on. A TV that reloads keeps its room (the code is in its address). The server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change, and who sits where beside it (`<code>.seats.json`). After a restart, `npm run serve` hosts every room from the last 6 hours again under its own code: the TV and the phones reconnect on their own, each player to their own seat. A phone whose room the server no longer has goes back to the join form and says so. `npm run serve -- --game <file>` hosts one saved game: one the server hosted before keeps its code and seats; one started in the CLI's file mode has every seat open for players to claim by joining.
+The bot that plays for someone does as little as it can (`standInMove` in `src/bot.ts`): it declines offers, ends the turn, keeps the first building card, votes for the first target, sends no dragons and discards the oldest cards. It changes no rule: it only makes the moves the player would have to make for the game to go on. A TV that reloads keeps its room (the code is in its address). The server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change, and who sits where beside it (`<code>.seats.json`). After a restart, `npm run serve` hosts every room from the last 6 hours again under its own code: the TV and the phones reconnect on their own, each player to their own seat. A phone whose room the server no longer has goes back to the join form and says so. `npm run serve -- --game <file>` hosts one saved game: one the server hosted before keeps its code and seats; one with no seats file beside it has every seat open for players to claim by joining.
 
 ## Playing with no TV
 
@@ -51,7 +51,7 @@ A game made on a TV is the same as before: no switch, no table on the phones.
 
 ## Playing from the command line
 
-A CLI player sits at the same table. Use the room's address in place of a game file, and the seat token `join` gives you in place of the seat number:
+A CLI player sits at the same table: they join with the room's address and a name, and use the seat token `join` gives them in every command after:
 
 ```
 node src/cli.ts join http://192.168.1.20:8080/ABCD Claude    # prints your seat and token
@@ -60,7 +60,7 @@ node src/cli.ts do   http://192.168.1.20:8080/ABCD <token> build c12 2,-1
 node src/cli.ts wait http://192.168.1.20:8080/ABCD <token>
 ```
 
-Everything else is as in [`cli.md`](cli.md): the same view, the same commands, the same replies. The TV and phones update the moment a CLI player moves, and the other way round. If the first player to join is at the CLI, `node src/cli.ts start <room> <token>` starts the game.
+Everything else is in [`cli.md`](cli.md). The CLI gets the same JSON a phone does and prints it as text. The TV and phones update the moment a CLI player moves, and the other way round. If the first player to join is at the CLI, `node src/cli.ts start <room> <token>` starts the game.
 
 ## What's where
 
@@ -111,6 +111,6 @@ writes screenshots of the TV and phones in staged situations to `~/.cache/board-
 ## How it's built
 
 - `src/server/server.ts`: one `node:http` server. It serves `web/`, three.js for the TV's 3D board (from `node_modules`, at `/vendor/three/`), and the room API (create, join, add bot, start, leave, quit, a bot for someone away, do a command, plus text `view`/`wait`/`status` for the CLI) and pushes a fresh snapshot to every TV and phone over server-sent events whenever anything changes. The browser code is TypeScript; the server strips its types as it serves it (Node's `stripTypeScriptTypes`), so there's no build step here either.
-- `src/server/room.ts`: a room's game, its seats (each player, phone or CLI, holds a secret token for its seat), and the bots. Every decision goes through the engine's `apply`, as in the CLI's file mode.
-- `src/state.ts`: the JSON each client gets. Every log line carries its event as data (`GameEvent` in `src/engine.ts`) next to the CLI's text; the clients draw the event and never print the text. The TV's part holds only public state; a phone's part adds that one player's resources, hand and private events. Nothing else about other players is ever sent to a phone.
+- `src/server/room.ts`: a room's game, its seats (each player, phone or CLI, holds a secret token for its seat), and the bots. Every decision goes through the engine's `apply`.
+- `src/state.ts`: the JSON each client gets. Every log line carries its event as data (`GameEvent` in `src/engine.ts`) next to its text; the TV and phones draw the event, and the CLI and Claude players print the text (`src/view.ts` turns a snapshot into text). The TV's part holds only public state; a phone's part adds that one player's resources, hand and private events. Nothing else about other players is ever sent to a phone.
 - `web/`: `tv.ts` (with `?remote`, the table view inside a phone in a game with no TV: the flat map, laid out for a phone, and a message to the phone when a cutscene starts and ends), `phone.ts`, the TV's 3D board `board3d.ts` (three.js, loaded only on a real TV; the TV falls back to the flat map without WebGL), the shared `common.ts` (the phone's flat map, connection, the final standings), `qr.ts` (the TV's QR code of the room's address, no dependencies; `test/qr.test.ts` checks it against a reference encoder), `icons.ts` (the game's one icon set, folded-paper style: resources, points, cards, elements, and the tower and basic buildings), `art.ts` (the card pictures, and the lobby's and game over's scenes: folded-paper subjects on layered cut paper, inline SVG, nothing to download) and `style.css`. `npm run typecheck` checks them too.

@@ -32,7 +32,15 @@ let openCard: string | null = null;
 let selected = new Set<string>(); // discard picks
 let trade = fresh();
 let bank = { give: 'stone', get: 'gold', times: 1 };
-let busy = false;
+// Commands go to the server one at a time, in the order they were tapped:
+// quick taps queue up instead of being lost. A tap that repeats the last
+// command still waiting (the same button twice) is a double tap, and is dropped.
+const outbox: string[] = [];
+let sending = false;
+// The dragons this phone has picked to send on the raid, ahead of the server:
+// each tap toggles one against the last pick, not against a snapshot that
+// hasn't caught up yet. Null once the server shows the same.
+let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
@@ -193,6 +201,7 @@ function onSnapshot(s: Snapshot) {
     openCard = null;
     if (s.game.phase !== 'action') trade = fresh();
   }
+  settleDraft();
   // The TV (or, with no TV, each phone's table view) is playing a scene (a
   // fight, the round's roll): the whole table watches it, and the next
   // decision waits until it's over. Nothing that
@@ -357,11 +366,36 @@ const table = (() => {
 // ---------- the game ----------
 
 function send(command: string) {
-  if (busy) return;
-  busy = true;
-  post(`/api/rooms/${code}/do`, { token, command })
-    .catch(toast)
-    .finally(() => (busy = false));
+  if (outbox[outbox.length - 1] === command) return;
+  outbox.push(command);
+  if (!sending) void flush();
+}
+
+async function flush() {
+  sending = true;
+  while (outbox.length) {
+    try {
+      await post(`/api/rooms/${code}/do`, { token, command: outbox[0] });
+      outbox.shift();
+    } catch (e) {
+      // What was tapped after it was tapped expecting it to work: drop it too.
+      outbox.length = 0;
+      const drafted = commitDraft;
+      commitDraft = null;
+      toast(e);
+      if (drafted && snap?.game) render(); // back to the dragons the server has
+    }
+  }
+  sending = false;
+  settleDraft();
+}
+
+// The server has caught up with the dragons picked: show its state again.
+function settleDraft() {
+  if (!commitDraft || sending) return;
+  const raid = snap?.game?.raid;
+  const mine = raid && raid.step === 'commit' ? raid.commits[snap!.seat] : null;
+  if (!mine || (mine.length === commitDraft.length && mine.every((id) => commitDraft!.includes(id)))) commitDraft = null;
 }
 
 function on(id: string, fn: () => unknown) {
@@ -383,8 +417,8 @@ function header(g: PublicState, me: Me): string {
     const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
     return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}</small></div>`;
   }).join('');
-  // Points held as cards in the hand count too: shown as a card with how many.
-  const hidden = me.hiddenPoints ? `<small class="hiddenpts">${icon('cards', 1.1)}${me.hiddenPoints}${icon('points', 0.9)}</small>` : '';
+  // Points held as cards in the hand count too: said in words, so it can't read as a card count.
+  const hidden = me.hiddenPoints ? `<small class="hiddenpts" title="Secret Hoard cards in your hand, counted in the total">${me.hiddenPoints}${icon('points', 0.9)} in hand</small>` : '';
   // Name, points and resources stay on screen together while the page scrolls.
   return `
     <div class="mehead" style="--pc:${PLAYER_COLORS[me.seat]}">
@@ -786,7 +820,7 @@ function raidView(g: PublicState, me: Me): string {
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return `${roost(g, me)}${targetPanel(raid.target!)}`; // nobody fit to go: the roost shows why
     const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
-    return `${targetPanel(raid.target!)}${sendPicker(g, me, new Set(raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
+    return `${targetPanel(raid.target!)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
@@ -1044,21 +1078,22 @@ function wire(g: PublicState, me: Me) {
   // raid
   bind('[data-vote]', (el) => send(`vote ${el.dataset.vote}`));
   bind('[data-commit]', (el) => {
-    const cur = new Set(g.raid!.commits[me.seat]);
+    const cur = new Set(commitDraft ?? g.raid!.commits[me.seat]);
     const id = el.dataset.commit!;
     if (cur.has(id)) cur.delete(id);
     else cur.add(id);
-    send(`commit ${[...cur].join(' ') || 'none'}`);
+    commitDraft = [...cur];
+    render();
+    send(`commit ${commitDraft.join(' ') || 'none'}`);
   });
   on('ready', () => send('ready'));
   // Staying home drops any dragons tapped first, then locks in with none.
   on('stayhome', () => {
-    if (busy) return;
-    busy = true;
-    const go = (command: string) => post(`/api/rooms/${code}/do`, { token, command });
-    return (g.raid!.commits[me.seat].length ? go('commit none') : Promise.resolve()).then(() => go('ready'))
-      .catch(toast)
-      .finally(() => (busy = false));
+    if ((commitDraft ?? g.raid!.commits[me.seat]).length) {
+      commitDraft = [];
+      send('commit none');
+    }
+    send('ready');
   });
   on('fight', () => send('fight'));
   on('bail', () => send('bail'));

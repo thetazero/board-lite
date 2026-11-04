@@ -2,36 +2,39 @@
 
 Needs Node 22.18 or newer (it runs the TypeScript directly). Run `npm install` once, then use `node src/cli.ts <command>` (or `npm run game -- <command>`).
 
-The game lives in a JSON file. Every command loads it, does one thing and saves it, under a lock, so one session can play every seat or several separate processes can each play one seat of the same game. The file holds the whole game, hidden parts included, so a player who must not cheat should only get the CLI, never the file. Setting `BOARD_LITE_SEAT=2` restricts a shell to seat 2. Keep game files on disk (e.g. `~/.cache/board-lite/`), not in `/tmp`.
-
-To sit at a game hosted by the server (the one the TV and phones use), put the room's address where the game file goes and your seat token where the seat number goes: see [`clients.md`](clients.md#playing-from-the-command-line). It's the same game and the same commands.
+The CLI is a client of the board-lite server, like a phone: every game lives on a server (`npm run serve`), in a room. You join a room with a name and get a seat token; the token is your seat, and the server only ever shows it what that seat may see. The CLI asks the server for the same JSON a phone gets and prints it as text. A CLI player can sit at a table with phones, a TV, Claude players and bots (see [`clients.md`](clients.md#playing-from-the-command-line)), or open a room of their own with no TV.
 
 ## Commands
 
 ```
-node src/cli.ts new <game.json> [--players 2-6] [--seed N]   start a game
-node src/cli.ts view <game.json> <seat> [--log N]            what that seat sees, and its options
-node src/cli.ts do <game.json> <seat> <command...>           make a decision as that seat
-node src/cli.ts wait <game.json> <seat> [--timeout SECS]     block until that seat has a decision
-node src/cli.ts status <game.json>                           public summary: phase, who we're waiting on
-node src/cli.ts bot <game.json> <seat>                       a random bot makes one decision for that seat
+node src/cli.ts new [server-url]                             open a room with no TV; prints its address
+node src/cli.ts join <room-url> <name>                       take a seat; prints your token
+node src/cli.ts bot <room-url> <token>                       add a bot to the room (first player only)
+node src/cli.ts start <room-url> <token>                     start the game (first player only)
+node src/cli.ts view <room-url> <token> [--log N]            what your seat sees, and its options
+node src/cli.ts do <room-url> <token> <command...>           make a decision
+node src/cli.ts wait <room-url> <token> [--timeout SECS]     block until you have a decision to make
+node src/cli.ts status <room-url>                            public summary: phase, who we're waiting on
 node src/cli.ts rules                                        print docs/rules.md
-node src/cli.ts sim [--games N] [--players N] [--seed N]     bot-vs-bot games, for rough tuning stats
+node src/cli.ts sim [--games N] [--players N] [--seed N]     bot-vs-bot games, run locally, for rough tuning stats
 ```
 
-Seats are 1-based. `view` shows only what that player may see: their own resources and hand, plus everything public (map, buildings, dragons, scores without hidden points, titles, hand sizes, open trade offers, raid state) and the recent events visible to them. It ends with **Your options**, the commands that seat can use right now. After `do`, the CLI prints the new events and either your next options or who it's waiting on. A refused command prints `Not allowed: <reason>`, exits 1, and changes nothing.
+A server URL looks like `http://localhost:8080` (the default for `new`); a room URL like `http://192.168.1.20:8080/ABCD`. `view` shows only what your seat may see: your own resources and hand, plus everything public (map, buildings, dragons, scores without hidden points, titles, hand sizes, open trade offers, raid state) and the recent events visible to you. It ends with **Your options**, the commands you can use right now. After `do`, the CLI prints the new events and either your next options or who it's waiting on. A refused command prints `Not allowed: <reason>`, exits 1, and changes nothing.
 
-## The loop for playing every seat
+## A game at the terminal
 
 ```
-node src/cli.ts new ~/.cache/board-lite/g1.json --players 3
-node src/cli.ts status ~/.cache/board-lite/g1.json     # "Waiting on: P1"
-node src/cli.ts view ~/.cache/board-lite/g1.json 1     # read P1's view and options
-node src/cli.ts do ~/.cache/board-lite/g1.json 1 build c49 1,0
-node src/cli.ts do ~/.cache/board-lite/g1.json 1 end
+npm run serve                                              # in another terminal
+node src/cli.ts new                                        # "Room ABCD is open: http://localhost:8080/ABCD"
+node src/cli.ts join http://localhost:8080/ABCD Ada        # prints Ada's token
+node src/cli.ts bot http://localhost:8080/ABCD <token>     # a bot takes seat 2
+node src/cli.ts start http://localhost:8080/ABCD <token>
+node src/cli.ts view http://localhost:8080/ABCD <token>    # read your view and options
+node src/cli.ts do http://localhost:8080/ABCD <token> keep c49
+node src/cli.ts wait http://localhost:8080/ABCD <token>    # until it's your decision again
 ```
 
-Repeat: `status` to see whose decision it is, `view` that seat, `do` its decision. In the simultaneous steps (raid vote, commit, fight-or-bail, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only.
+Repeat: `wait`, `view`, `do`. To play several seats yourself, `join` once per seat, each with its own name and token. In the simultaneous steps (raid vote, commit, fight-or-bail, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only. Phones can join the same room from the join form with its code.
 
 ## Decision commands
 

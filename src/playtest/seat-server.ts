@@ -15,6 +15,8 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+import type { EventView, Snapshot } from '../state.ts';
+import { eventLine, seatStatus, seatView } from '../view.ts';
 
 const [roomUrl, token, movesFile] = process.argv.slice(2);
 const m = /^(https?:\/\/[^/]+)\/([A-Za-z]{4})\/?$/.exec(roomUrl ?? '');
@@ -24,7 +26,7 @@ if (!m || !token) {
 }
 const api = `${m[1]}/api/rooms/${m[2].toUpperCase()}`;
 const WAIT_SECS = Number(process.env.BOARD_LITE_WAIT_SECS ?? 60);
-let seen = 0; // how much of this seat's visible log the player has been shown
+let seen = 0; // the game log index the player has been shown events up to
 
 async function call(path: string, body?: object): Promise<Record<string, any>> {
   const r = await fetch(api + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
@@ -41,8 +43,8 @@ async function listen(timeoutSecs: number, head?: string): Promise<string> {
   const r = await call(`/listen${q({ token, since: seen, timeout: timeoutSecs })}`);
   if (r.error) return `Error: ${r.error}`;
   seen = r.next;
-  const ev: string[] = r.events;
-  return [head, ev.length ? `New events:\n${ev.map((e) => `  ${e}`).join('\n')}` : 'No new events.', r.status].filter(Boolean).join('\n');
+  const ev: EventView[] = r.events;
+  return [head, ev.length ? `New events:\n${ev.map((e) => `  ${eventLine(e)}`).join('\n')}` : 'No new events.', seatStatus(r.state as Snapshot)].filter(Boolean).join('\n');
 }
 
 function record(command: string, why: string | undefined, outcome: string) {
@@ -69,10 +71,10 @@ const TOOLS = [
     description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board, recent events, and your options when it is your decision.',
     inputSchema: { type: 'object', properties: { log: { type: 'number', description: 'How many recent events to include (default 25).' } } },
     run: async (a: { log?: number }) => {
-      const r = await call(`/view${q({ token, log: a.log ?? 25 })}`);
+      const r = await call(`/state${q({ token })}`);
       if (r.error) return `Error: ${r.error}`;
       await listen(0); // the view shows the recent events: don't repeat them on the next wait
-      return String(r.text);
+      return seatView(r as Snapshot, a.log ?? 25);
     },
   },
   {

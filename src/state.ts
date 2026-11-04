@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -17,7 +17,7 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; floors: number } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
   peak?: 'held' | 'free'; // the Thunderbird's peak
@@ -95,6 +95,8 @@ export interface PublicState {
   turn: number;
   turnOrder: number[];
   pointsToWin: number;
+  titlePoints: number; // what each title is worth
+  faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   waitingOn: number[];
   players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
@@ -105,6 +107,7 @@ export interface PublicState {
   dragons: DragonView[];
   offers: { id: string; from: number; to: number; give: string; get: string }[];
   raid: RaidView | null;
+  kingdoms: TargetView[]; // every kingdom and the loot it holds now
   raidsLeft: number;
   winner: number | null;
   finalTotals: number[] | null;
@@ -190,9 +193,10 @@ function targetView(g: Game, key: string, hp?: number[]): TargetView {
   };
 }
 
-export function faunaView(key: string): FaunaView {
+// A beast, with the loot it gives: a card-sent one gives none.
+export function faunaView(key: string, loot: Bundle = faunaDef(key).loot): FaunaView {
   const x = faunaDef(key);
-  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong, loot: res(x.loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
+  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong, loot: res(loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
 }
 
 function sideText(g: Game, s: TradeSide): string {
@@ -207,14 +211,19 @@ function sideText(g: Game, s: TradeSide): string {
 // Table talk (say and tell), as the engine logs it.
 export const isTalk = (text: string) => / says: "| \(private\): "/.test(text);
 
-function events(g: Game, keep: (e: Game['log'][number]) => boolean, n: number): EventView[] {
+function events(g: Game, keep: (e: Game['log'][number]) => boolean, n: number, since = 0): EventView[] {
   const out: EventView[] = [];
-  for (let i = g.log.length - 1; i >= 0 && out.length < n; i--) {
+  for (let i = g.log.length - 1; i >= since && out.length < n; i--) {
     const e = g.log[i];
     if (!keep(e)) continue;
     out.push({ i, round: e.round, text: e.text, ...(e.dice ? { dice: e.dice } : {}), ...(e.ev ? { ev: e.ev } : {}), ...(e.to ? { private: true } : {}) });
   }
   return out.reverse();
+}
+
+/** Every event seat p may see from log index `since` on, talk included. */
+export function visibleEvents(g: Game, p: number, since = 0): EventView[] {
+  return events(g, (e) => !e.to || e.to.includes(p), Infinity, since);
 }
 
 export function publicState(g: Game, logLines = 60): PublicState {
@@ -226,6 +235,8 @@ export function publicState(g: Game, logLines = 60): PublicState {
     turn: g.turn,
     turnOrder: turnOrder(g),
     pointsToWin: TUNING.pointsToWin,
+    titlePoints: TUNING.titlePoints,
+    faunaWanderOdds: TUNING.faunaWanderOdds,
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
@@ -243,8 +254,8 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, floors: b.floors } : null,
-        fauna: h.fauna ? faunaView(h.fauna) : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors } : null,
+        fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
       };
     }),
     dragons: g.dragons.map((d) => dragonView(g, d)),
@@ -260,6 +271,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       fighting: Array.from({ length: n }, (_, p) => raid.fighters.some((id) => g.dragons.find((d) => d.id === id)!.owner === p)),
       fighters: raid.fighters,
     },
+    kingdoms: Object.keys(TARGETS).map((t) => targetView(g, t)),
     raidsLeft: g.raidsLeft,
     winner: g.winner,
     finalTotals: g.phase === 'over' ? g.players.map((_, p) => score(g, p).total) : null,
@@ -301,7 +313,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are adults.' };
   }
-  if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!), needs: 'hex', hexes: faunaHexes(g) };
+  if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!, {}), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
     const ids = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };

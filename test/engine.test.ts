@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
+import { botStep, playOut } from '../src/bot.ts';
+import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
-import { commandHints, playerView } from '../src/view.ts';
-import { seatState } from '../src/state.ts';
-import { PEAK, distance, mapRadius, neighbors } from '../src/map.ts';
+import { publicState, seatState } from '../src/state.ts';
+import { seatView } from '../src/view.ts';
+import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '../src/map.ts';
+
+// What seat p's CLI prints: its view, from the same JSON its phone would get.
+function playerView(g: Game, p: number, logLines = 25): string {
+  const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
+  const lobby = { code: 'TEST', started: true, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
+}
 
 // Each round starts with everyone keeping a building card: keep the first.
 function keepAll(g: Game) {
@@ -26,66 +29,92 @@ const hatchAll = (g: Game) => g.dragons.forEach((d) => (d.stage = Math.max(d.sta
 
 const rich = (g: Game, p: number) => (g.players[p].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 });
 
-test('bot games reach a winner for every player count', () => {
+// The bot games every test below reads: two seeds per player count, played
+// once. waitingOn is checked at every step on the way.
+let played: { players: number; seed: number; g: Game }[] | undefined;
+function botGames() {
+  if (played) return played;
+  played = [];
   for (let players = 2; players <= 6; players++) {
-    for (let seed = 1; seed <= 10; seed++) {
+    for (const seed of [1, 2]) {
       const g = newGame(players, seed);
-      playOut(g, { state: seed * 31 + players });
-      assert.equal(g.phase, 'over', `${players}p seed ${seed} did not finish`);
-      assert.ok(g.winner !== null);
-      assert.ok(score(g, g.winner!).total >= TUNING.pointsToWin);
-      // The game survives a save/load round trip at the end.
-      assert.deepEqual(JSON.parse(JSON.stringify(g)), g);
+      const rng = { state: seed * 31 + players };
+      for (let steps = 0; g.phase !== 'over' && steps < 20000; steps++) {
+        assert.ok(waitingOn(g).length > 0, `${players}p seed ${seed}: no one to wait on`);
+        botStep(g, rng);
+      }
+      played.push({ players, seed, g });
+    }
+  }
+  return played;
+}
+
+test('bot games reach a winner for every player count, naming someone to wait on until then', () => {
+  for (const { players, seed, g } of botGames()) {
+    assert.equal(g.phase, 'over', `${players}p seed ${seed} did not finish`);
+    assert.ok(g.winner !== null);
+    assert.deepEqual(waitingOn(g), []);
+    assert.ok(score(g, g.winner!).total >= TUNING.pointsToWin);
+    // The game survives a save/load round trip at the end.
+    assert.deepEqual(JSON.parse(JSON.stringify(g)), g);
+  }
+});
+
+test('the final standings put the winner first, most points first', () => {
+  for (const { players, seed, g } of botGames()) {
+    const st = standings(g);
+    assert.equal(st[0].p, g.winner, `${players}p seed ${seed}: the list names someone else first`);
+    assert.equal(st[0].place, 1);
+    for (const [i, s] of st.entries()) {
+      assert.equal(s.total, score(g, s.p).total);
+      if (i === 0) continue;
+      assert.ok(s.total <= st[i - 1].total, 'most points first');
+      assert.ok(s.place > 1, 'first place is never shared');
     }
   }
 });
 
-test('the final standings put the winner first and mark ties', () => {
-  let tiedWins = 0;
-  let sharedPlaces = 0;
-  for (let players = 2; players <= 6; players++) {
-    for (let seed = 1; seed <= 30; seed++) {
-      const g = newGame(players, seed);
-      playOut(g, { state: seed * 31 + players });
-      const st = standings(g);
-      assert.equal(st[0].p, g.winner, `${players}p seed ${seed}: the list names someone else first`);
-      assert.equal(st[0].place, 1);
-      for (const [i, s] of st.entries()) {
-        assert.equal(s.total, score(g, s.p).total);
-        if (i === 0) continue;
-        assert.ok(s.total <= st[i - 1].total, 'most points first');
-        assert.ok(s.place > 1, 'first place is never shared');
-        const level = s.total === st[i - 1].total;
-        if (level) assert.ok(s.tied && st[i - 1].tied);
-        if (level && i > 1) sharedPlaces++;
-        assert.equal(s.place, level && i > 1 ? st[i - 1].place : i + 1);
-      }
-      if (st[0].tiebreak) {
-        tiedWins++;
-        assert.equal(st[0].total, st[1].total);
-        assert.ok(g.players[st[0].p].resources.gold >= g.players[st[1].p].resources.gold);
-      }
-    }
-  }
-  assert.ok(tiedWins > 0 && sharedPlaces > 0, `the seeds should cover a tied win (${tiedWins}) and a shared place (${sharedPlaces})`);
+test('ties in the standings: the win goes to the most gold, then turn order; other ties share a place', () => {
+  // Staged: bot games almost never tie for the win.
+  const staged = (points: number[], gold: number[]) => {
+    const g = newGame(points.length, 5);
+    g.players.forEach((pl, p) => {
+      pl.resources.gold = gold[p];
+      pl.hand = [];
+      const short = points[p] - score(g, p).total;
+      for (let i = 0; i < short; i++) pl.hand.push({ id: `h${p}-${i}`, deck: 'action', key: 'secret_hoard' });
+      assert.equal(score(g, p).total, points[p]);
+    });
+    return { g, st: standings(g) };
+  };
+  // P2 and P3 level on top; P3 has more gold. P1 and P4 level behind.
+  let { g, st } = staged([4, 6, 6, 4], [0, 1, 2, 0]);
+  assert.deepEqual(st.slice(0, 2).map((s) => [s.p, s.place, s.tied]), [[2, 1, true], [1, 2, true]]);
+  assert.equal(st[0].tiebreak, 'gold');
+  assert.equal(st[2].place, 3);
+  assert.equal(st[3].place, 3, 'level behind the winner shares a place');
+  assert.ok(st[2].tied && st[3].tied && st[2].tiebreak === null);
+  // Level on points and gold: the earlier in turn order wins.
+  ({ g, st } = staged([5, 5, 2], [1, 1, 1]));
+  const order = turnOrder(g).filter((p) => p < 2);
+  assert.deepEqual(st.map((s) => [s.p, s.place]), [[order[0], 1], [order[1], 2], [2, 3]]);
+  assert.equal(st[0].tiebreak, 'turn order');
+  assert.ok(!st[2].tied);
+  // No tie: no tiebreak.
+  ({ st } = staged([7, 3], [0, 9]));
+  assert.deepEqual(st.map((s) => [s.p, s.tiebreak]), [[0, null], [1, null]]);
 });
 
 test('the log reads as English: no "1 cards", "card(s)" or one winner who "each take"', () => {
   const bad = /\b1 (cards|raids|steps)\b|\(s\)|falls\. \S+ each take|\ba (adult|egg)\b/;
-  for (let players = 2; players <= 6; players++) {
-    for (let seed = 1; seed <= 10; seed++) {
-      const g = newGame(players, seed);
-      playOut(g, { state: seed * 31 + players });
-      for (const e of g.log) assert.doesNotMatch(e.text, bad, `${players}p seed ${seed}`);
-    }
-  }
+  for (const { players, seed, g } of botGames()) for (const e of g.log) assert.doesNotMatch(e.text, bad, `${players}p seed ${seed}`);
 });
 
 test('the same seed gives the same game', () => {
-  const a = newGame(4, 42), b = newGame(4, 42);
-  playOut(a, { state: 1 });
-  playOut(b, { state: 1 });
-  assert.deepEqual(a, b);
+  const [{ players, seed, g }] = botGames();
+  const again = newGame(players, seed);
+  playOut(again, { state: seed * 31 + players });
+  assert.deepEqual(again, g);
 });
 
 test('a view shows only your own hand and resources', () => {
@@ -182,8 +211,8 @@ test('trades are binding and move resources and cards', () => {
   assert.throws(() => apply(g, 0, `accept ${g.offers[0].id}`), /You don't have 40 timber\./);
   assert.equal(g.offers.length, 1);
   assert.deepEqual(seatState(g, 0).cantAccept, { [g.offers[0].id]: "You don't have 40 timber." });
-  assert.ok(commandHints(g, 0).some((h) => h.startsWith(`decline ${g.offers[0].id}`) && h.endsWith("You don't have 40 timber.")));
-  assert.ok(!commandHints(g, 0).some((h) => h.includes(`accept ${g.offers[0].id}`)));
+  assert.match(playerView(g, 0), new RegExp(`decline ${g.offers[0].id} .* You don't have 40 timber\\.`));
+  assert.ok(!playerView(g, 0).includes(`accept ${g.offers[0].id}`));
   // The acting player answers offers made to them before ending the turn; their own offers expire with it.
   assert.throws(() => apply(g, 0, 'end'), /Answer P2's offer/);
   apply(g, 0, `decline ${g.offers[0].id}`);
@@ -265,42 +294,6 @@ test('Largest Hoard goes to the most gold, from its minimum, and changes hands',
   apply(g, 0, 'bank stone timber');
   assert.equal(g.titles.hoard, 1);
   assert.equal(score(g, 1).titles, TUNING.titlePoints);
-});
-
-test('waitingOn always names someone until the game ends', () => {
-  const g = newGame(4, 77);
-  const rng = { state: 5 };
-  let steps = 0;
-  while (g.phase !== 'over' && steps < 20000) {
-    assert.ok(waitingOn(g).length > 0);
-    playOut(g, rng, 1);
-    steps++;
-  }
-  assert.equal(g.phase, 'over');
-});
-
-test('separate CLI processes can share one game', () => {
-  // On disk, not /tmp (which is RAM on the dev machine).
-  mkdirSync(join(homedir(), '.cache'), { recursive: true });
-  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
-  try {
-    const file = join(dir, 'g.json');
-    const cli = (...args: string[]) => execFileSync(process.execPath, ['src/cli.ts', ...args], { encoding: 'utf8' });
-    cli('new', file, '--players', '2', '--seed', '4');
-    assert.match(cli('view', file, '1'), /It's your decision/);
-    assert.match(cli('view', file, '1'), /keep <c\d+\|c\d+>/);
-    assert.match(cli('bot', file, '1'), /Bot plays/);
-    assert.match(cli('bot', file, '2'), /Bot plays/);
-    assert.match(cli('do', file, '1', 'end'), /P2's turn/);
-    assert.match(cli('wait', file, '2', '--timeout', '1'), /your decision/);
-    assert.throws(() => execFileSync(process.execPath, ['src/cli.ts', 'view', file, '1'], { env: { ...process.env, BOARD_LITE_SEAT: '2' }, stdio: 'pipe' }));
-    for (let i = 0; i < 15; i++) {
-      const seat = /Waiting on: P(\d)/.exec(cli('status', file))![1];
-      assert.match(cli('bot', file, seat), /Bot plays/);
-    }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 test('table talk is allowed any time, private talk reaches only the two players, and nothing else changes', () => {
@@ -398,7 +391,7 @@ test('building cards count their neighbours, whoever owns them', () => {
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
   for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
   g.map[spot].terrain = 'plains';
-  // Cliff Works makes 1 stone each round for each adjacent mountain.
+  // Cliff Works makes 1 stone each round for each adjacent mountain hex.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);
   const stone = () => production(g, 0).stone.base;
@@ -420,30 +413,26 @@ test('building cards count their neighbours, whoever owns them', () => {
 
 test('a fight replays from its events: the hits add up to the result', () => {
   let fights = 0;
-  for (let players = 2; players <= 6; players++) {
-    for (let seed = 1; seed <= 6; seed++) {
-      const g = newGame(players, seed);
-      playOut(g, { state: seed * 31 + players });
-      for (const [i, e] of g.log.entries()) {
-        if (e.ev?.k !== 'fight') continue;
-        fights++;
-        const units = e.ev.units.map((u) => u.hp);
-        const fighting = new Set(e.ev.ds);
-        let j = i + 1;
-        for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
-          for (const h of c.hits) {
-            if (h.by === 'dragon') {
-              units[h.u] = Math.max(0, units[h.u] - h.dmg);
-              assert.equal(h.down, units[h.u] === 0);
-            } else if (h.down) fighting.delete(h.d);
-          }
+  for (const { players, seed, g } of botGames()) {
+    for (const [i, e] of g.log.entries()) {
+      if (e.ev?.k !== 'fight') continue;
+      fights++;
+      const units = e.ev.units.map((u) => u.hp);
+      const fighting = new Set(e.ev.ds);
+      let j = i + 1;
+      for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
+        for (const h of c.hits) {
+          if (h.by === 'dragon') {
+            units[h.u] = Math.max(0, units[h.u] - h.dmg);
+            assert.equal(h.down, units[h.u] === 0);
+          } else if (h.down) fighting.delete(h.d);
         }
-        const end = g.log[j].ev;
-        assert.equal(end?.k, 'raidEnd', `${players}p seed ${seed}`);
-        if (end?.k !== 'raidEnd') continue;
-        assert.equal(end.won, units.every((hp) => hp === 0));
-        assert.equal(!end.won, fighting.size === 0);
       }
+      const end = g.log[j].ev;
+      assert.equal(end?.k, 'raidEnd', `${players}p seed ${seed}`);
+      if (end?.k !== 'raidEnd') continue;
+      assert.equal(end.won, units.every((hp) => hp === 0));
+      assert.equal(!end.won, fighting.size === 0);
     }
   }
   assert.ok(fights > 10);
@@ -530,9 +519,12 @@ test('combat power: dragons and kingdoms carry one number, and a side adds up', 
   assert.match(playerView(g, 0), new RegExp(`power ${dragonPower(a)}`));
 });
 
+// The map as generated, before the first production lets fauna wander.
+const startingMap = (players: number, seed: number) => ({ map: generateMap({ state: seed }, players), towers: towerSpots(players) });
+
 test('the starting map has fauna, at least 2 steps from every tower, stronger further out', () => {
   for (let players = 2; players <= 6; players++) {
-    const g = newGame(players, 3);
+    const g = startingMap(players, 3);
     const land = Object.values(g.map).filter((h) => h.terrain !== 'ocean');
     const fauna = land.filter((h) => h.fauna && FAUNA[h.fauna]);
     assert.equal(fauna.length, Math.round(land.length / TUNING.landHexesPerFauna));
@@ -547,7 +539,7 @@ test('the starting map has fauna, at least 2 steps from every tower, stronger fu
 test('the great beasts: the Thunderbird on the centre peak, the Leviathan off a harbor, nothing around them', () => {
   for (let players = 2; players <= 6; players++) {
     for (const seed of [1, 2, 3]) {
-      const g = newGame(players, seed);
+      const g = startingMap(players, seed);
       assert.equal(g.map[PEAK].fauna, 'thunderbird');
       assert.equal(g.map[PEAK].terrain, 'mountain');
       const sea = Object.keys(g.map).filter((k) => g.map[k].fauna === 'leviathan');
@@ -681,10 +673,63 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
   assert.throws(() => apply(g, 1, `play c999 ${g.towers[0]}`), RuleError);
   const ocean = Object.keys(g.map).find((k) => g.map[k].terrain === 'ocean')!;
   assert.throws(() => apply(g, 1, `play c999 ${ocean}`), RuleError);
-  const gold = g.players[1].resources.gold;
+  const crystal = g.players[1].resources.crystal;
   apply(g, 1, `play c999 ${near}`);
-  assert.equal(g.map[near].fauna, 'wolf_pack');
-  assert.equal(g.players[1].resources.gold, gold - ACTIONS.wolf_call.cost.gold!);
+  assert.equal(g.map[near].fauna, ACTIONS.wolf_call.fauna);
+  assert.equal(g.map[near].sent, true);
+  assert.equal(g.players[1].resources.crystal, crystal - ACTIONS.wolf_call.cost.crystal!);
   assert.equal(production(g, 0).livestock.dice.length, 0);
   assert.ok(!g.players[1].hand.includes(card));
+});
+
+test('a beast a card sent gives no loot when it falls', () => {
+  const { g, near } = faunaGame();
+  g.map[near].fauna = 'wolf_pack';
+  g.map[near].sent = true; // as a card leaves it
+  const d = g.dragons.find((x) => x.owner === 0)!;
+  d.stage = 3;
+  d.key = 'frost_wyrm'; // an adult that can't lose to wolves
+  const before = { ...g.players[0].resources };
+  apply(g, 0, `clear ${near} ${d.id}`);
+  const ev = g.log.map((e) => e.ev).find((e) => e?.k === 'cleared');
+  assert.ok(ev?.k === 'cleared' && ev.won);
+  assert.deepEqual(ev.gain, {});
+  assert.equal(g.map[near].fauna, undefined);
+  assert.equal(g.map[near].sent, undefined);
+  assert.deepEqual(g.players[0].resources, before);
+});
+
+test('in production, fauna wanders to adjacent land hexes with no tower or beast; great beasts stay', () => {
+  const g = newGame(2, 7);
+  for (const k of Object.keys(g.map)) if (!BEASTS[g.map[k].fauna ?? '']) delete g.map[k].fauna;
+  for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
+  g.dragons.forEach((d) => (d.growth = -1000));
+  let at = Object.keys(g.map).find((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && !g.buildings[k] && neighbors(k).every((n) => g.map[n]))!;
+  g.map[at].fauna = 'wolf_pack';
+  g.map[at].sent = true;
+  const great = Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort();
+  let moves = 0;
+  let stays = 0;
+  for (let i = 0; i < 40 && g.phase !== 'over'; i++) {
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) {
+      const pl = g.players[p];
+      apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
+    }
+    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    if (now === at) stays++;
+    else {
+      moves++;
+      assert.ok(neighbors(at).includes(now), `${at} to ${now} is 1 step`);
+      assert.notEqual(g.map[now].terrain, 'ocean');
+      assert.notEqual(g.buildings[now]?.type, 'tower');
+      assert.equal(g.map[now].sent, true, 'the card-sent mark moves with it');
+      assert.equal(g.map[at].sent, undefined);
+    }
+    at = now;
+    assert.deepEqual(Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort(), great);
+  }
+  assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
+  assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
 });

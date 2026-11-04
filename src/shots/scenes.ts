@@ -6,7 +6,7 @@
 // the scene's seed, the next seeds are tried, in order.
 
 import { botStep } from '../bot.ts';
-import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
 import { apply, newGame, score, turnOrder, waitingOn, type Game } from '../engine.ts';
 import { PEAK, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
@@ -102,7 +102,15 @@ const best = (g: Game) => Math.max(...g.players.map((_, p) => score(g, p).total)
 const dragonsOf = (g: Game, p: number) => g.dragons.filter((d) => d.owner === p);
 const buildingsOf = (g: Game, p: number) => Object.values(g.buildings).filter((b) => b.owner === p).length;
 // The acting player can play a building card on a hex right now.
-const canPlaceCard = (g: Game, p: number) => seatState(g, p).hand.some((c) => c.kind === 'building' && c.needs === 'hex' && c.affordable && !c.blocked && c.hexes.length);
+// A building card the acting player has a hex for, affordable or not.
+const placeableCard = (g: Game, p: number) => seatState(g, p).hand.find((c) => c.kind === 'building' && c.needs === 'hex' && !c.blocked && c.hexes.length);
+// Tops up the acting player's resources to pay for that card. Bots rarely
+// afford one in round 2, so the early scenes add what is missing.
+function affordACard(g: Game) {
+  const c = placeableCard(g, g.turn)!;
+  const have = g.players[g.turn].resources;
+  for (const [r, n] of Object.entries(c.cost) as [keyof typeof have, number][]) have[r] = Math.max(have[r], n);
+}
 const committed = (g: Game) => g.raid!.commits.filter((c) => c.length).length;
 const fightingPlayers = (g: Game) => new Set(g.raid!.fighters.map((id) => g.dragons.find((d) => d.id === id)!.owner)).size;
 
@@ -191,7 +199,8 @@ export const SCENES: Scene[] = [
     name: 'early-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
@@ -217,7 +226,8 @@ export const SCENES: Scene[] = [
     name: 'build-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     live: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
     shots: () => [{ file: 'tv-build-3p', caption: 'TV: a new building pops up from the page', client: 'tv', live: true, frames: [0, 0.15, 0.3, 0.45, 0.7, 1.2] }],
   },
@@ -626,12 +636,14 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 82,
+    seed: 140,
     until: (g) => {
       if (g.round < 4 || g.phase !== 'action') return false;
-      const c = structuredClone(g);
-      giveHand(c, c.turn, ALL_CARDS);
-      return blockedReasons(c, c.turn).length >= 6 && seatState(c, c.turn).hand.some((x) => !x.blocked && !x.affordable);
+      const hand = g.players[g.turn].hand;
+      giveHand(g, g.turn, ALL_CARDS);
+      const ok = blockedReasons(g, g.turn).length >= 6 && seatState(g, g.turn).hand.some((x) => !x.blocked && !x.affordable);
+      g.players[g.turn].hand = hand;
+      return ok;
     },
     setup: (g) => giveHand(g, g.turn, ALL_CARDS),
     shots: (g) => {
@@ -767,6 +779,18 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // A message near the 300-character limit (#133): the TV feed keeps who
+    // said it and ends it in "…", rather than cutting off its top.
+    name: 'talk-long-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      apply(g, (g.turn + 1) % 3, `say ${'I really need crystal for the dragon. '.repeat(7).trim()}`);
+    },
+    shots: () => [{ file: 'tv-talk-long-3p', caption: 'TV: a message near the length limit, cut short at its end', client: 'tv', sizes: true }],
+  },
+  {
     // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
     // another player's building, a wolf pack beside the acting player's tower.
     // The acting player holds both fauna cards and has a young dragon to send.
@@ -780,7 +804,7 @@ export const SCENES: Scene[] = [
       g.map[theirs].fauna = 'cave_bear';
       const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
       g.map[open].fauna = 'wolf_pack';
-      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+      readyDragons(g, p);
       giveHand(g, p, ['wolf_call', 'rouse_bear', 'windfall']);
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 6));
     },
@@ -865,14 +889,15 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && g.phase === 'action' && Object.values(g.buildings).filter((b) => b.type !== 'tower').length >= 3,
     setup: (g) => {
       const p = g.turn;
-      for (const h of Object.values(g.map)) delete h.fauna;
+      // The great beasts stay where they are: the TV lists them as alive.
+      for (const h of Object.values(g.map)) if (h.fauna && !BEASTS[h.fauna]) delete h.fauna;
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       for (const t of ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor']) {
-        const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k]);
+        const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k] && !g.map[k].fauna);
         open.slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       }
-      for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+      readyDragons(g, p);
     },
     shots: (g) => {
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
@@ -925,7 +950,8 @@ export const SCENES: Scene[] = [
     players: 3,
     seed: 1,
     remote: true,
-    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
+    setup: affordACard,
     shots: (g) => [
       { file: 'phone-remote-you-3p', caption: 'No TV: your own view, with the You / Table switch by the talk bar', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-remote-table-3p', caption: 'No TV: the table view, switched to', client: 'phone', seat: g!.turn, clicks: ['.viewswitch [data-view=table]'], waitFor: '.table-on', waitMs: 600, sizes: true },
@@ -1032,6 +1058,14 @@ export const SCENES: Scene[] = [
 ];
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
+// Player p's dragons, at least young and raid-ready, with this round's lines
+// about them sitting out taken off the log so the feed doesn't contradict them.
+function readyDragons(g: Game, p: number) {
+  const mine = new Set(g.dragons.filter((x) => x.owner === p).map((d) => d.id));
+  for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+  g.log = g.log.filter((e) => !(e.ev?.k === 'rest' && mine.has(e.ev.d)));
+}
+
 function beastHunters(g: Game) {
   const p = g.turn;
   g.dragons = g.dragons.filter((d) => d.owner !== p);

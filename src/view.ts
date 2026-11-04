@@ -1,13 +1,14 @@
-// What one player is allowed to see, as text. Everything here is either
-// public (the TV) or this player's own hidden state (their phone).
+// The game as text, for players at the command line (src/cli.ts) and Claude
+// players (src/playtest/seat-server.ts). It reads only the JSON the server
+// sends every client (src/state.ts, a phone's snapshot) and prints what a
+// phone draws: nothing here knows the rules, and nothing hidden from a player
+// is ever in their snapshot.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
-import {
-  PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, lootOf, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
-  type Card, type Dragon, type Game, type Title,
-} from './engine.ts';
-import { PEAK, mapRadius, nearBeast } from './map.ts';
+import type { CardView, DragonView, EventView, FaunaView, HexView, PublicState, Res, SeatState, Snapshot, TargetView } from './state.ts';
+
+const P = (p: number) => `P${p + 1}`;
+const resText = (r: Res) => Object.entries(r).filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing';
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'L', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
 // Two letters per building on the text map.
@@ -19,256 +20,242 @@ const BUILDING_CODE: Record<string, string> = {
 };
 const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
+const faunaCode = (key: string) => FAUNA_CODE[key] ?? key[0].toUpperCase();
+const STAGES = ['hatchling', 'young', 'adult']; // a dragon card's stages, in order (STAGE_NAMES in src/data.ts)
 
-export function cardText(c: Card): string {
-  const kind = cardKind(c);
-  const cost = bundleText(cardCost(c));
-  if (kind === 'building') {
-    const b = BUILDINGS[c.key];
-    return `${c.id} ${b.name} [building, class ${CLASS_NAMES[b.class]}${b.terrain ? `, on ${b.terrain}` : ''}] cost ${cost}: ${b.text}`;
-  }
-  if (kind === 'upgrade') {
-    const u = UPGRADES[c.key];
-    return `${c.id} ${u.name} [upgrade for a ${u.appliesTo.map((x) => CLASS_NAMES[x]).join(' or ')}] cost ${cost}: ${u.text}`;
-  }
-  if (kind === 'action') {
-    const a = ACTIONS[c.key];
-    return `${c.id} ${a.name} [action] cost ${cost}: ${a.text}`;
-  }
-  return `${c.id} ${DRAGONS[c.key].name} [dragon egg] cost ${cost}: ${dragonCardText(c.key)}`;
+function unitStats(u: { power: number; hp: number; attack: string; weak: string[]; strong: string[] }): string {
+  return `combat power ${u.power}; ${u.hp}hp ${u.attack}${u.weak.length ? ` weak:${u.weak.join('/')}` : ''}${u.strong.length ? ` strong:${u.strong.join('/')}` : ''}`;
 }
 
-export function dragonCardText(k: string): string {
-  const d = DRAGONS[k];
-  const st = d.stages.map((s, i) => `${STAGE_NAMES[i + 1]} ${s.hp}hp ${s.targets}x${s.dice}d${s.sides} power ${combatPower(s)}`).join(' / ');
-  return `${d.element}, grows every ${d.growthTime === 1 ? 'step' : `${d.growthTime} steps`}, ${TARGETING_TEXT[d.targeting]}; ${st}`;
+export function cardText(c: CardView): string {
+  const kind = c.kind === 'dragon' ? 'dragon egg' : c.kind;
+  const stages = c.dragon ? ` ${c.dragon.stages.map((s, i) => `${STAGES[i]} ${s.hp}hp ${s.attack} power ${s.power}`).join(' / ')}.` : '';
+  return `${c.id} ${c.name} [${kind}] cost ${resText(c.cost)}: ${c.text}${stages}`;
 }
 
-function dragonLine(g: Game, d: Dragon): string {
-  const st = stageStats(d);
-  const def = DRAGONS[d.key];
-  const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${def.growthTime}`;
-  const health = st ? `${st.hp - d.damage}/${st.hp}hp` : 'egg';
-  const healing = `healing: raids again in round ${backInRound(g, d)}`;
-  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought fauna: no raids this round${d.damage ? `; ${healing}` : ''}` };
-  const status = canRaid(d) ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : healing;
-  return `${d.id} ${pname(d.owner)} ${dragonName(d)} (${def.element} ${STAGE_NAMES[d.stage]}, ${growth}, ${st ? `power ${dragonPower(d)}, ` : ''}${health}, ${status}) — ${TARGETING_TEXT[def.targeting]}${st ? `, attacks ${st.targets}x${st.dice}d${st.sides}` : ''}`;
+function dragonLine(d: DragonView): string {
+  const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
+  const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
+  const healing = `healing: raids again in round ${d.backIn}`;
+  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought fauna: no raids this round${d.hp < d.maxHp ? `; ${healing}` : ''}` };
+  const status = d.canRaid ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : healing;
+  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
-function productionText(g: Game, p: number): string {
-  const prod = production(g, p);
-  return RESOURCES.filter((r) => prod[r].base || prod[r].dice.length)
-    .map((r) => `${r} ${prod[r].base}${prod[r].dice.map((d) => `+d${d}`).join('')}`)
-    .join(', ');
+function amounts(x: Record<string, { base: number; dice: number[] }>): string {
+  return Object.entries(x).filter(([, v]) => v.base || v.dice.length).map(([r, v]) => `${r} ${v.base}${v.dice.map((d) => `+d${d}`).join('')}`).join(', ') || 'nothing';
 }
 
-function mapText(g: Game): string[] {
-  const R = mapRadius(g.players.length) + 1;
+function mapText(g: PublicState): string[] {
   const lines: string[] = [];
-  lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
-  lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
-  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
-  for (let r = -R; r <= R; r++) {
-    const cells: string[] = [];
-    for (let q = -R; q <= R; q++) {
-      const k = `${q},${r}`;
-      const hex = g.map[k];
-      if (!hex) continue;
-      const b = g.buildings[k];
-      const label = b ? `${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}` : '';
-      const held = hex.fauna ? `{${FAUNA_CODE[hex.fauna]}}` : nearBeast(g.map, k) && hex.terrain !== 'ocean' ? '{x}' : '';
-      cells.push(`${k}:${TERRAIN_LETTER[hex.terrain]}${k === PEAK ? '^' : ''}${label ? `[${label}]` : ''}${held}`);
-    }
+  const built = new Map(g.map.flatMap((h) => (h.building ? [[h.building.type, h.building.name] as const] : [])));
+  const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
+  lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
+  lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
+  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  const rows = new Map<number, HexView[]>();
+  for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
+  for (const r of [...rows.keys()].sort((a, b) => a - b)) {
+    const cells = rows.get(r)!.sort((a, b) => a.q - b.q).map((h) => {
+      const b = h.building;
+      const label = b ? `[${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}]` : '';
+      const held = h.fauna ? `{${faunaCode(h.fauna.key)}}` : h.held ? '{x}' : '';
+      return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}`;
+    });
     lines.push(`  ${' '.repeat(Math.abs(r) * 4)}${cells.join('  ')}`);
   }
   return lines;
 }
 
-function raidText(g: Game, p: number): string[] {
+export function targetText(t: TargetView): string {
+  return `${t.name} — combat power ${t.power}; defenders: ${t.units.map((u) => `${u.name} (${unitStats(u)})`).join(', ')}; loot ${resText(t.loot)} (split by the combat power each player still has fighting at the end)`;
+}
+
+export function faunaText(f: FaunaView): string {
+  const prize = f.points !== undefined ? `great beast: ${f.points} point for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card sent it';
+  return `${f.name} (${unitStats(f)}; ${prize})`;
+}
+
+function commitPower(g: PublicState, ids: string[]): number {
+  return ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0);
+}
+
+function raidText(g: PublicState, you: SeatState | null): string[] {
   const raid = g.raid!;
   const out: string[] = [];
   if (raid.step === 'vote') {
     out.push('Raid: vote for a target. Candidates:');
-    raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(g, t)}`));
-    out.push(`  Voted: ${raid.votes.map((v, q) => `${pname(q)} ${v === null ? 'not yet' : 'yes'}`).join(', ')}`);
+    raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(t)}`));
+    out.push(`  Voted: ${raid.voted.map((v, q) => `${P(q)} ${v ? 'yes' : 'not yet'}`).join(', ')}`);
     return out;
   }
-  out.push(`Raid target: ${targetText(g, raid.target!)}`);
+  out.push(`Raid target: ${targetText(raid.target!)}`);
   if (raid.step === 'commit') {
     out.push(`Commitments (public, not locked until everyone is ready):`);
-    for (let q = 0; q < g.players.length; q++) out.push(`  ${pname(q)}: ${raid.commits[q].length ? `${raid.commits[q].join(' ')} (power ${commitPower(g, raid.commits[q])})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`);
+    raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`));
   } else {
-    out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${pname(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-  }
-  if (raid.step === 'bail') {
-    out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${pname(q)} ${raid.choices[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
-    if (raid.choices[p]) out.push(`  You chose to ${raid.choices[p]}.`);
+    out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
+    out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
+    if (you?.myChoice) out.push(`  You chose to ${you.myChoice}.`);
   }
   return out;
 }
 
-function commitPower(g: Game, ids: string[]): number {
-  return ids.reduce((s, id) => s + dragonPower(g.dragons.find((d) => d.id === id)!), 0);
-}
-
-export function targetText(g: Game, t: string): string {
-  const def = TARGETS[t];
-  const units = def.units.map((u) => {
-    const x = UNITS[u];
-    return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
-  });
-  return `${def.name} — combat power ${targetPower(t)}; defenders: ${units.join(', ')}; loot ${bundleText(lootOf(g, t))} (split by the combat power each player still has fighting at the end)`;
-}
-
-export function faunaText(k: string): string {
-  const x = faunaDef(k);
-  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; 1 try each round` : `loot ${bundleText(x.loot)}`;
-  return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
-}
-
-// Command hints for this player right now. Empty if they have nothing to decide.
-export function commandHints(g: Game, p: number): string[] {
-  if (!waitingOn(g).includes(p)) return [];
-  const pl = g.players[p];
+// Command hints for this seat right now. Empty if they have nothing to decide.
+export function commandHints(g: PublicState, you: SeatState): string[] {
+  if (!you.deciding) return [];
   const out: string[] = [];
+  const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
   if (g.phase === 'action') {
-    for (const o of g.offers.filter((x) => x.to === p)) {
-      const why = acceptProblem(g, o);
-      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${pname(o.from)} gives ${tradeText(g, o.give)} for ${tradeText(g, o.get)})${why ? ` ${why}` : ''}`);
+    for (const o of g.offers.filter((x) => x.to === you.seat)) {
+      const why = you.cantAccept[o.id];
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})${why ? ` ${why}` : ''}`);
     }
-    if (p !== g.turn) {
-      out.push(`offer ${pname(g.turn)} give <items> get <items>   (out of turn you may only trade with ${pname(g.turn)})`);
+    if (!you.myTurn) {
+      out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn you may only trade with ${P(g.turn)})`);
       return out;
     }
-    for (const c of pl.hand) {
-      const kind = cardKind(c);
-      const afford = canAfford(pl, cardCost(c)) ? '' : ' (cannot afford yet)';
-      if (kind === 'building') {
-        const def = BUILDINGS[c.key];
+    for (const c of you.hand) {
+      if (c.kind === 'building') {
         // For a building that counts its neighbours, each hex shows its count, like 2,-1(x3).
-        const hexes = buildableHexes(g, p, c.key).map((k) => (def.per ? `${k}(x${neighbourCount(g, k, def.per)})` : k));
-        if (def.onTower) out.push(`build ${c.id}   (${cardName(c)})${afford}`);
-        else out.push(`build ${c.id} <hex>   (${cardName(c)}; open hexes: ${hexes.join(' ') || 'none'})${afford}`);
-      } else if (kind === 'upgrade') {
-        out.push(`upgrade ${c.id} <hex>   (${cardName(c)}; on: ${upgradeTargets(g, p, c.key).join(' ') || 'none'})${afford}`);
-      } else if (kind === 'dragon') {
-        const full = g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p) ? ' (no room: build a roost first)' : '';
-        out.push(`play ${c.id}   (hatch ${cardName(c)})${afford}${full}`);
-      } else {
-        const a = ACTIONS[c.key];
-        const arg = { gain_resource: ' <stone|timber|crystal|livestock>', grow_dragon: ' <dragon id>', heal_dragon: ' <dragon id>', gain_gold: '', extra_raid: '', hidden_point: null, send_fauna: ' <hex>' }[a.effect];
-        if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name}${a.effect === 'send_fauna' ? `: any land hex without fauna or a tower; ${faunaText(a.fauna!)}` : ''})${afford}`);
+        const hexes = c.hexes.map((k) => (c.counts ? `${k}(x${c.counts[k]})` : k));
+        if (c.needs === 'none') out.push(`build ${c.id}   (${c.name})${afford(c)}`);
+        else out.push(`build ${c.id} <hex>   (${c.name}; open hexes: ${hexes.join(' ') || 'none'})${afford(c)}`);
+      } else if (c.kind === 'upgrade') {
+        out.push(`upgrade ${c.id} <hex>   (${c.name}; on: ${c.hexes.join(' ') || 'none'})${afford(c)}`);
+      } else if (c.kind === 'dragon') {
+        out.push(`play ${c.id}   (hatch ${c.name})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
+      } else if (c.needs !== 'unplayable') {
+        const arg = { resource: ' <stone|timber|crystal|livestock>', dragon: ' <dragon id>', hex: ' <hex>', none: '' }[c.needs];
+        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: any land hex without fauna or a tower; ${faunaText(c.fauna)}` : ''})${afford(c)}`);
       }
     }
-    for (const b of BASIC_BUILDINGS) {
-      const def = BUILDINGS[b];
-      const hexes = buildableHexes(g, p, b);
-      if (hexes.length) out.push(`build ${b}${def.onTower ? '' : ' <hex>'}   (basic, no card: ${def.text} Costs ${bundleText(def.cost)}${def.onTower ? '' : `; open hexes: ${hexes.join(' ')}`})${canAfford(pl, def.cost) ? '' : ' (cannot afford yet)'}`);
+    for (const b of you.basics) {
+      if (b.hexes.length) out.push(`build ${b.key}${b.onTower ? '' : ' <hex>'}   (basic, no card: ${b.text} Costs ${resText(b.cost)}${b.onTower ? '' : `; open hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
     }
-    const fighters = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
-    const fauna = huntable(g, p);
-    if (fauna.length && fighters.length) out.push(`clear <hex> <dragon ids...>   (fight the beast there to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${fighters.join(' ')}; you can fight: ${fauna.map((k) => `${k} ${faunaDef(g.map[k].fauna!).name}`).join(', ')})`);
-    out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
-    out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
+    if (you.huntable.length && you.raidReady.length) {
+      const beasts = you.huntable.map((k) => `${k} ${g.map.find((h) => h.k === k)?.fauna?.name ?? 'beast'}`);
+      out.push(`clear <hex> <dragon ids...>   (fight the beast there to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${beasts.join(', ')})`);
+    }
+    out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
+    out.push(`bank <give resource> <get resource> [times]   (your rate: ${you.bankRate}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
-    for (const o of g.offers.filter((x) => x.from === p)) out.push(`cancel ${o.id}`);
-    out.push(g.offers.some((o) => o.to === p) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
+    for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);
+    out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
     return out;
   }
   if (g.phase === 'cards') {
-    out.push(`keep <${pl.choice.map((c) => c.id).join('|')}>   (keep one of the building cards you drew; the other is discarded)`);
-    for (const c of pl.choice) out.push(`  ${cardText(c)}`);
+    out.push(`keep <${you.choice.map((c) => c.id).join('|')}>   (keep one of the building cards you drew; the other is discarded)`);
+    for (const c of you.choice) out.push(`  ${cardText(c)}`);
     return out;
   }
   if (g.phase === 'discard') {
-    out.push(`discard <${pl.hand.length - TUNING.handCap} card ids>   (hand cap is ${TUNING.handCap})`);
+    out.push(`discard <${you.hand.length - you.handCap} card ids>   (hand cap is ${you.handCap})`);
     return out;
   }
-  const raid = g.raid!;
-  if (raid.step === 'vote') out.push(`vote <1-${raid.candidates.length}>`);
-  if (raid.step === 'commit') {
-    const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
-    out.push(`commit <dragon ids...>   (your raid-ready dragons: ${ids.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
+  const raid = g.raid;
+  if (raid?.step === 'vote') out.push(`vote <1-${raid.candidates.length}>`);
+  if (raid?.step === 'commit') {
+    out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
     out.push('ready   (lock in your commitment)');
   }
-  if (raid.step === 'bail') out.push('fight  |  bail   (secret)');
+  if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
   return out;
 }
 
-function phaseText(g: Game): string {
-  if (g.phase === 'over') return `Game over. ${pname(g.winner!)} won.`;
+function phaseText(g: PublicState): string {
+  if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
   if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps one of the two building cards they drew.`;
-  if (g.phase === 'action') return `Round ${g.round}, action phase, ${pname(g.turn)}'s turn.`;
-  if (g.phase === 'discard') return `Round ${g.round}, end of round: discarding down to ${TUNING.handCap} cards.`;
-  return `Round ${g.round}, raid phase (${g.raid!.step}), ${g.raidsLeft} raid${g.raidsLeft === 1 ? '' : 's'} left this round.`;
+  if (g.phase === 'action') return `Round ${g.round}, action phase, ${P(g.turn)}'s turn.`;
+  if (g.phase === 'discard') return `Round ${g.round}, end of round: discarding down to the hand cap.`;
+  return `Round ${g.round}, raid phase (${g.raid!.step}), ${plural(g.raidsLeft, 'raid')} left this round.`;
 }
 
-function costLine(b: Bundle): string {
-  return bundleText(b);
+const waitingText = (g: PublicState) => g.waitingOn.map(P).join(', ') || 'no one';
+
+/** Every event in the snapshot, in order: the public log and talk, and the viewer's own private events and messages. */
+export function snapshotEvents(s: Snapshot): EventView[] {
+  const all = [...(s.game?.log ?? []), ...(s.you ? [...s.you.log, ...s.you.talk] : (s.game?.talk ?? []))];
+  const byIndex = new Map(all.map((e) => [e.i, e]));
+  return [...byIndex.values()].sort((a, b) => a.i - b.i);
 }
 
-export function publicStatus(g: Game): string {
-  const out: string[] = [];
-  out.push(phaseText(g));
-  const w = waitingOn(g);
-  if (w.length) out.push(`Waiting on: ${w.map(pname).join(', ')}`);
-  for (let q = 0; q < g.players.length; q++) {
-    out.push(`${pname(q)}: ${score(g, q).public} public points, ${g.players[q].hand.length} cards in hand`);
-  }
+export const eventLine = (e: EventView) => `[r${e.round}] ${e.text}`;
+
+// Who sits where: the engine calls players P1, P2...; people know each other by name.
+function tableText(s: Snapshot, you = -1): string {
+  return s.lobby.seats.map((t, i) => `${P(i)} ${t.name}${i === you ? ' (you)' : t.kind === 'bot' ? ' (bot)' : t.kind === 'open' ? ' (open seat)' : ''}`).join(', ');
+}
+
+/** The public summary: the table, the phase, who the game waits on, the public scores. */
+export function statusText(s: Snapshot): string {
+  const names = tableText(s);
+  const g = s.game;
+  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'nobody yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
+  const out = [`Room ${s.lobby.code}: ${names}.`, phaseText(g)];
+  if (g.waitingOn.length) out.push(`Waiting on: ${waitingText(g)}`);
+  g.players.forEach((pl, q) => out.push(`${P(q)}: ${pl.publicPoints} public points, ${pl.handSize} cards in hand`));
   return out.join('\n');
 }
 
-export function playerView(g: Game, p: number, logLines = 25): string {
-  const pl = g.players[p];
+/** Everything one seat sees, and its options: what its phone shows, as text. */
+export function seatView(s: Snapshot, logLines = 25): string {
+  const g = s.game;
+  const you = s.you;
+  if (!you) return statusText(s);
+  const p = you.seat;
+  if (!g) return `You are seat ${p + 1} (${you.name}) in room ${s.lobby.code}. The game hasn't started.\n${statusText(s)}`;
   const out: string[] = [];
-  out.push(`You are ${pname(p)}. ${phaseText(g)}`);
-  const hints = commandHints(g, p);
-  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingOn(g).map(pname).join(', ') || 'no one'}.`);
+  out.push(`Table: ${tableText(s, p)}.`);
+  out.push(`You are ${P(p)}. ${phaseText(g)}`);
+  const hints = commandHints(g, you);
+  out.push(hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingText(g)}.`);
   out.push('');
-  out.push(`== Scores (first to ${TUNING.pointsToWin}; hidden points count at the end) ==`);
-  for (let q = 0; q < g.players.length; q++) {
-    const s = score(g, q);
-    const extra = q === p ? ` + ${s.hidden} hidden = ${s.total}` : '';
-    out.push(`${pname(q)}${q === p ? ' (you)' : ''}: ${s.public} public (dragons ${s.dragons}, buildings ${s.buildings}, titles ${s.titles}${s.beasts ? `, great beasts ${s.beasts}` : ''})${extra}; ${g.players[q].hand.length} cards in hand; produces ${productionText(g, q)}`);
-  }
-  out.push(`Titles (${TUNING.titlePoints} points each): ${(Object.keys(TITLE_NAMES) as Title[]).map((t) => `${TITLE_NAMES[t]}: ${g.titles[t] === null ? 'no one' : pname(g.titles[t]!)} [${titleValues(g, t).join('/')}; needs ${TUNING.titleMinimum[t]}]`).join('; ')}`);
+  out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
+  g.players.forEach((pl, q) => {
+    const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (dragons ${pl.dragons}, buildings ${pl.buildings}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
+  });
+  out.push(`Titles (${g.titlePoints} points each): ${g.titles.map((t) => `${t.name}: ${t.holder === null ? 'no one' : P(t.holder)} [${t.values.join('/')}; needs ${t.min}]`).join('; ')}`);
   out.push('');
   out.push('== You (hidden from others) ==');
-  out.push(`Resources: ${RESOURCES.map((r) => `${pl.resources[r]} ${r}`).join(', ')}`);
-  out.push(`Bank rate ${bankRate(g, p)}:1. Dragons ${g.dragons.filter((d) => d.owner === p).length}/${dragonCapacity(g, p)} housed. Each dragon eats ${TUNING.livestockPerDragon} livestock per round.`);
-  out.push(`Hand (${pl.hand.length}/${TUNING.handCap}):`);
-  for (const c of pl.hand) out.push(`  ${cardText(c)}`);
-  if (pl.choice.length) out.push(`Drawn, keep one: ${pl.choice.map((c) => cardText(c)).join(' | ')}`);
+  out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
+  out.push(`Each round you gain (production minus what your dragons eat): ${amounts(you.income)}.`);
+  out.push(`Bank rate ${you.bankRate}:1. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
+  out.push(`Hand (${you.hand.length}/${you.handCap}):`);
+  for (const c of you.hand) out.push(`  ${cardText(c)}`);
+  if (you.choice.length) out.push(`Drawn, keep one: ${you.choice.map(cardText).join(' | ')}`);
   out.push('');
   out.push('== Dragons (public) ==');
-  for (const d of g.dragons) out.push(`  ${dragonLine(g, d)}`);
+  for (const d of g.dragons) out.push(`  ${dragonLine(d)}`);
   out.push('');
   out.push('== Buildings (public) ==');
-  for (let q = 0; q < g.players.length; q++) {
-    const list = Object.entries(g.buildings)
-      .filter(([, b]) => b.owner === q)
-      .map(([k, b]) => `${b.type === 'tower' ? `Tower(${b.floors} floors)` : BUILDINGS[b.type].name}${b.upgrade ? `+${UPGRADES[b.upgrade].name}` : ''}@${k}`);
-    out.push(`  ${pname(q)}: ${list.join(', ')}`);
-  }
+  g.players.forEach((_, q) => {
+    const list = g.map.filter((h) => h.building?.owner === q).map((h) => {
+      const b = h.building!;
+      return `${b.type === 'tower' ? `Tower(${b.floors} floors)` : b.name}${b.upgradeName ? `+${b.upgradeName}` : ''}@${h.k}`;
+    });
+    out.push(`  ${P(q)}: ${list.join(', ')}`);
+  });
   out.push(...mapText(g));
-  const fauna = faunaOnMap(g);
-  out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
-  const slain = Object.entries(g.slain).map(([k, q]) => `${BEASTS[k].name} by ${pname(q)}`);
-  out.push(`Great beasts: a Thunderbird on the peak (${PEAK}) and a Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
-  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${Object.keys(TARGETS).map((t) => `${TARGETS[t].name} (power ${targetPower(t)}) ${bundleText(lootOf(g, t))}`).join('; ')}.`);
-  if (g.phase === 'raid') {
+  const fauna = g.map.filter((h) => h.fauna).sort((a, b) => (a.k < b.k ? -1 : 1));
+  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast.`);
+  const peak = g.map.find((h) => h.peak)?.k;
+  const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
+  out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
+  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (power ${t.power}) ${resText(t.loot)}`).join('; ')}.`);
+  if (g.raid) {
     out.push('');
-    out.push(...raidText(g, p));
+    out.push(...raidText(g, you));
   }
   if (g.offers.length) {
     out.push('');
     out.push('== Open offers ==');
-    for (const o of g.offers) out.push(`  ${o.id}: ${pname(o.from)} offers ${pname(o.to)} ${tradeText(g, o.give)} for ${tradeText(g, o.get)}`);
+    for (const o of g.offers) out.push(`  ${o.id}: ${P(o.from)} offers ${P(o.to)} ${o.give} for ${o.get}`);
   }
   out.push('');
   out.push(`== Recent events ==`);
-  const visible = g.log.filter((e) => !e.to || e.to.includes(p));
-  for (const e of visible.slice(-logLines)) out.push(`  [r${e.round}] ${e.text}`);
+  for (const e of snapshotEvents(s).slice(-logLines)) out.push(`  ${eventLine(e)}`);
   if (hints.length) {
     out.push('');
     out.push('== Your options ==');
@@ -278,25 +265,24 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   return out.join('\n');
 }
 
-// After a seat's move: the events it can see since `before` (a count of its
-// visible log), then its options or who the game is waiting on.
-export function visibleLog(g: Game, p: number) {
-  return g.log.filter((e) => !e.to || e.to.includes(p));
-}
-
-// One line for a seat: its options when it's its decision, else who the game waits on.
-export function seatStatus(g: Game, p: number): string {
-  if (g.phase === 'over') return `The game is over.${g.winner !== null ? ` ${pname(g.winner)} won.` : ''}`;
-  const hints = commandHints(g, p);
+/** One line for a seat: its options when it's its decision, else who the game waits on. */
+export function seatStatus(s: Snapshot): string {
+  const g = s.game;
+  if (!g) return 'The game has not started yet.';
+  if (g.phase === 'over') return `The game is over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
+  const hints = s.you ? commandHints(g, s.you) : [];
   if (hints.length) return `It's your decision. Your options:\n${hints.map((h) => `  ${h}`).join('\n')}`;
-  return `Not your decision. Waiting on: ${waitingOn(g).map(pname).join(', ')}.`;
+  return `Not your decision. Waiting on: ${waitingText(g)}.`;
 }
 
-export function afterMove(g: Game, p: number, before: number): string {
-  const lines = visibleLog(g, p).slice(before).map((e) => `  [r${e.round}] ${e.text}`);
-  const hints = commandHints(g, p);
-  const tail = g.phase === 'over' ? 'The game is over.' : hints.length ? `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}` : `Waiting on: ${waitingOn(g).map(pname).join(', ')}.`;
-  return `${lines.join('\n')}\n${tail}`;
+/** After a move: the events this seat sees from log index `since` on, then its options or who the game waits on. */
+export function afterMove(s: Snapshot, since: number): string {
+  const lines = snapshotEvents(s).filter((e) => e.i >= since).map((e) => `  ${eventLine(e)}`);
+  const g = s.game;
+  const hints = g && s.you ? commandHints(g, s.you) : [];
+  const tail = !g ? 'The game has not started yet.' : g.phase === 'over' ? 'The game is over.' : hints.length ? `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}` : `Waiting on: ${waitingText(g)}.`;
+  return [...lines, tail].join('\n');
 }
 
-export { costLine };
+/** The log index just past the last event in a snapshot: where the next move's events start. */
+export const nextIndex = (s: Snapshot) => Math.max(-1, ...snapshotEvents(s).map((e) => e.i)) + 1;
