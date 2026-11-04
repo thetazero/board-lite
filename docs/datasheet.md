@@ -156,16 +156,16 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power, so the last column, loot value per point of power sent, rises with difficulty:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power; the last column is loot value per point of power sent:
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Loot value | Value per power |
 |---|---|---|---|---|---|---|---|
 | Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold | 6 | 0.8 |
-| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 3 gold | 16 | 0.8 |
-| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 5 gold | 24 | 1 |
-| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 8 gold | 36 | 1.3 |
-| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 15 gold | 60 | 1.7 |
-| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 25 gold | 104 | 2.3 |
+| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 2 gold | 12 | 0.6 |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 3 gold | 16 | 0.7 |
+| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 5 gold | 24 | 0.9 |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 9 gold | 36 | 1 |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 15 gold | 64 | 1.4 |
 
 Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
 
@@ -190,20 +190,20 @@ Gold a lone base dragon expects from one raid on the kingdom that pays it best (
 
 | Hoarded | Hatchling | Young | Adult |
 |---|---|---|---|
-| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 2.8 (Archer's Hold) |
-| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 5.6 (Archer's Hold) |
-| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 8.4 (Archer's Hold) |
+| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 1.9 (Archer's Hold) |
+| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 4.6 (Archer's Hold) |
+| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 7.4 (Archer's Hold) |
 
 Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
 
 | Kingdom | Loot value | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
 |---|---|---|---|---|---|---|---|
 | Hamlet of Brindle (8) | 6 | 100% → 100% | 6 | 6 | 0 | about 0 | 0 |
-| Stormspire (35) | 60 | 67% → 82% | 40.2 | 47.4 | 1.6 | about 4 | 0.8 |
+| Stormspire (35) | 36 | 67% → 82% | 24.1 | 27.9 | 1.6 | about 4 | 0.8 |
 
 Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
 
-Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 16.1 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 5.2, and misses 2.9 raid rounds.
+Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 12.3 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 3.5, and misses 2.9 raid rounds.
 
 ## Fauna
 
@@ -324,6 +324,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 13 | 19 | 27 | 0 | 73% | 40% | 83% | 10%, median round 21 | 7%, median round 19 |
-| 3 | 13 | 20 | 25 | 0 | 73% | 67% | 87% | 30%, median round 21 | 27%, median round 17 |
-| 4 | 14 | 17 | 25 | 0 | 67% | 70% | 87% | 23%, median round 16 | 23%, median round 17 |
+| 2 | 13 | 19 | 34 | 0 | 77% | 37% | 87% | 17%, median round 18 | 20%, median round 17 |
+| 3 | 14 | 19 | 23 | 0 | 63% | 57% | 93% | 20%, median round 19 | 27%, median round 19 |
+| 4 | 13 | 19 | 22 | 0 | 60% | 67% | 90% | 30%, median round 18 | 17%, median round 13 |

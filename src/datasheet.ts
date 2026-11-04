@@ -460,7 +460,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], uni
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power, so the last column, loot value per point of power sent, rises with difficulty:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power; the last column is loot value per point of power sent:
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot', 'Loot value', 'Value per power'], targetRows)}
 
