@@ -28,7 +28,7 @@ board-lite is running on port 8080.
 
 If phones can't connect: they must be on the same Wi-Fi as the server machine, or on the same tailnet using its Tailscale address, and its firewall must allow the port (on Linux with ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0` for the tailnet). Some guest Wi-Fi networks block devices from reaching each other.
 
-A phone that reloads, closes its tab, sleeps or drops off the Wi-Fi gets its seat back on its own when the page is open again (the seat is remembered in that browser; coming back into view or back online reconnects at once). On another phone, or a browser that forgot it, the room's address mid-game lists the seats nobody is at: tap your name to take yours back.
+A phone that reloads, closes its tab, sleeps or drops off the Wi-Fi gets its seat back on its own when the page is open again (the seat is remembered in that browser; coming back into view or back online reconnects at once). On another phone, or a browser that forgot it, the room's address mid-game lists the seats nobody is at: tap your name to take yours back. The TV shows the address only in the lobby, since nobody new joins a game that has started; the phones' address is still printed in the server's terminal.
 
 Nobody stalls the table:
 
