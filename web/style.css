@@ -418,6 +418,10 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 /* Offering cards in a trade: tapped cards rise out of the fan, outlined like any other choice. */
 .handfan .card.offered { transform: translateY(calc(var(--y) - 1.6em)) rotate(calc(var(--r) / var(--hs, 1))); box-shadow: 0 0 0 3px var(--accent), 0 8px 16px #000a; }
 body.phone.has-hand { padding-bottom: calc(5.1em + 9.4em * var(--hs, 1)); } /* the fan sits over the talk bar: room for both; --hs is how far the hand has grown into free space (phone.ts fitHand) */
+/* A page too long for the hand to fit below it: the hand sits after the page, not over it (phone.ts fitHand). */
+body.phone.hand-below .handfan { position: relative; left: auto; bottom: auto; transform: none; margin: .4em auto 0; }
+body.phone.hand-below .handfan::before { display: none; }
+body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .card { --paper: #f4ecd8; --ink: #2b2228; position: relative; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); border-radius: 7px; padding: 5px 5px 6px; cursor: pointer; box-shadow: 0 1px 0 #fff8 inset, 0 2px 0 #0003, 0 6px 14px #0007; -webkit-tap-highlight-color: transparent; }
 .card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .35 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -546,7 +550,7 @@ button.on { background: var(--grain), linear-gradient(172deg, #ffdc6e 0 48%, #f0
 .who button.on { background: var(--grain), linear-gradient(172deg, color-mix(in srgb, var(--pc) 80%, #fff) 0 48%, var(--pc) 48%); box-shadow: 0 .16em 0 color-mix(in srgb, var(--pc) 60%, #000), 0 .3em .5em #0b081a66; }
 .who button.on .ptag, .who button.on { color: var(--ink); }
 button.on:disabled { opacity: 1; }
-.row.big2 > button { display: flex; flex-direction: column; align-items: center; gap: .15em; }
+.row.big2 > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15em; }
 .row.big2 > button small { font-size: .7em; font-weight: 600; }
 .row.big2 > button small .chip { margin: 0 .15em; }
 .sent { display: flex; flex-wrap: wrap; gap: .4em; margin-bottom: .6em; }

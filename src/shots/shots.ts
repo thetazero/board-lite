@@ -37,6 +37,25 @@ const SIZES: Record<'tv' | 'phone', [string, Device][]> = {
   ],
 };
 const MAX_SCREENS = 4; // a long phone page is shot one screen at a time, scrolling down: at most this many
+// On a phone screen, the page's text and buttons the hand of cards sits over:
+// the hand is fixed to the bottom edge, so it must never sit over anything
+// (a card held open or the talk sheet open covers everything anyway).
+const COVERED = `(() => {
+  const cards = [...document.querySelectorAll('.handfan .card')].map((c) => c.getBoundingClientRect()).filter((r) => r.height);
+  if (!cards.length || document.querySelector('.zoom, .talkbar.open')) return [];
+  const hits = new Set();
+  for (const el of document.querySelectorAll('#app *')) {
+    if (el.closest('.handfan, .talkbar, .toast')) continue;
+    if (el.children.length && !el.matches('button, input, select')) continue; // the things you read and tap, not their boxes
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.bottom <= 0 || r.top >= innerHeight) continue;
+    if (cards.some((c) => Math.min(r.right, c.right) - Math.max(r.left, c.left) > 2 && Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top) > 2)) {
+      const b = el.closest('button') ?? el;
+      hits.add((b.id ? '#' + b.id : b.tagName.toLowerCase() + (b.className && typeof b.className === 'string' ? '.' + b.className.split(' ')[0] : '')) + (b.textContent.trim() ? ' "' + b.textContent.trim().replace(/\\s+/g, ' ').slice(0, 30) + '"' : ''));
+    }
+  }
+  return [...hits];
+})()`;
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const LAN = { lan: ['192.168.1.20'], tailscale: [] as string[], port: 8080 }; // the address the TV shows
 const TAILSCALE = ['100.86.12.40']; // and its Tailscale address, for shots with `tailscale`
@@ -257,13 +276,17 @@ class Tab {
   // hand, the talk bar, a card held open) sit where they sit on a real phone.
   // (Shooting the whole page at once stretches the screen to the page's
   // height, and everything sized against the screen grows with it.)
-  async pngs(device: Device): Promise<Buffer[]> {
-    const shoot = async () => Buffer.from((await this.send('Page.captureScreenshot', { format: 'png' })).data, 'base64');
+  // Each screen comes with what the phone's hand of cards sits over, if anything (COVERED).
+  async pngs(device: Device): Promise<{ png: Buffer; covered: string[] }[]> {
+    const shoot = async () => ({
+      png: Buffer.from((await this.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'),
+      covered: device.mobile ? await this.eval<string[]>(COVERED) : [],
+    });
     if (!device.mobile) return [await shoot()];
     const [page, screen] = await this.eval<[number, number]>('[document.documentElement.scrollHeight, innerHeight]');
     // A page that scrolls only a sliver (under 24px: padding, nothing more to see) is one screen.
     const n = page - screen < 24 ? 1 : Math.min(MAX_SCREENS, Math.ceil(page / screen));
-    const out: Buffer[] = [];
+    const out: { png: Buffer; covered: string[] }[] = [];
     for (let i = 0; i < n; i++) {
       await this.eval(`scrollTo(0, ${n > 1 ? Math.round(((page - screen) * i) / (n - 1)) : 0})`);
       await this.settle();
@@ -341,6 +364,7 @@ async function main() {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const chrome = await launchChrome();
   const done: Done[] = [];
+  const covered: string[] = []; // phone screens where the hand sits over the page
   let failures = 0;
   try {
     const cdp = await Cdp.connect(chrome.url);
@@ -402,7 +426,8 @@ async function main() {
               if (!shot.loading) await tab.settle();
               const pngs = await tab.pngs(device);
               let changed: boolean | null = null;
-              pngs.forEach((png, i) => {
+              pngs.forEach(({ png, covered: c }, i) => {
+                if (c.length) covered.push(`${pngName(name, i)}: ${c.join(', ')}`);
                 writeFileSync(join(out, pngName(name, i)), png);
                 const before = join(prev, pngName(name, i));
                 const differs = existsSync(before) ? !readFileSync(before).equals(png) : existsSync(prev) ? true : null;
@@ -436,6 +461,7 @@ async function main() {
   console.log(`\n${done.length} screenshots in ${secs}s (staging ${tStaged - t0} ms) -> ${out}/`);
   console.log(`Contact sheet: file://${join(out, 'index.html')}`);
   if (done.some((d) => d.changed !== null)) console.log(changed.length ? `Changed since the previous run (*): ${changed.length}` : 'Nothing changed since the previous run.');
+  if (covered.length) console.log(`\nThe hand of cards sits over the page on ${covered.length} phone screen(s):\n${covered.map((c) => `  ${c}`).join('\n')}`);
   if (failures) {
     console.error(`${failures} screenshot(s) failed.`);
     process.exitCode = 1;
