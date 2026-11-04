@@ -109,6 +109,12 @@ small { color: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: 1.5em; transform: translateX(-50%) rotate(-.6deg); background: var(--sheet); border-left: .4em solid var(--bad); box-shadow: var(--lift); font-weight: 600; padding: .7em 1em; border-radius: 2px; z-index: 50; max-width: 90vw; }
 .offline-note { display: none; position: fixed; top: 0; left: 0; right: 0; background: var(--grain), #c0392b; color: #fff; font-weight: 700; text-align: center; padding: .3em; z-index: 60; box-shadow: 0 .2em .4em #0006; }
 body.offline .offline-note { display: block; }
+/* Offline, the phone's page greys out and can't be tapped (phone.ts makes it
+   inert), and the banner sits above your header instead of over it. */
+body.phone.offline { padding-top: 2em; }
+body.phone .offline-note { line-height: 1.4em; }
+body.phone.offline .mehead { top: 2em; }
+body.offline #app { filter: grayscale(.8); opacity: .55; }
 
 /* map */
 svg.map { width: 100%; height: 100%; display: block; }
@@ -563,7 +569,12 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .dragon .tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
 .dragon.on .tick { border-color: var(--ink); background: var(--ink); }
 .dragon.on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
-.sendask { margin: .3em 0 0; font-size: 1.05em; color: var(--paper); }
+/* A choice's prompt ("Choose a resource to gain"), then its options (phone.ts, choose) */
+.ask { margin: .3em 0 0; font-size: 1.05em; }
+.pbody > .ask, .zoomacts .ask { color: var(--paper); }
+.choose { display: flex; flex-direction: column; gap: .3em; }
+.choose .row { justify-content: center; }
+.choose .dragon { flex: 1 1 100%; }
 
 .dragon em { font-style: normal; color: var(--warn); font-weight: 800; }
 .big-note { font-size: 1.2em; text-align: center; padding: 1.2em .5em; margin: 0; }

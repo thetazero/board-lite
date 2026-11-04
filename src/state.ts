@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -135,6 +135,11 @@ export interface CardView {
   counts?: Record<string, number>;
   dragons: string[];
   blocked: string | null; // why it can't be played right now, if known
+  verb: string; // its button: Build, Upgrade, Hatch, Play or Place
+  // Why you can't play it now, said as the phone says it under the greyed button
+  // (docs/wording.md, "Why you can't"): what blocks it, what you can't afford,
+  // or that it isn't your turn. Null when you can.
+  why: string | null;
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
   fauna?: FaunaView; // fauna cards: the beast it sends
@@ -158,8 +163,8 @@ export interface SeatState {
   handCap: number;
   myTurn: boolean;
   deciding: boolean;
-  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean }[]; // built without a card
-  eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean };
+  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean; why: string | null }[]; // built without a card
+  eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean; why: string | null };
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   huntable: string[]; // hexes of the beasts I may fight now (one try at a great beast a round)
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
@@ -288,7 +293,16 @@ export function publicState(g: Game, logLines = 60): PublicState {
   };
 }
 
+// A card as a seat sees it, with what playing it now needs and, if it can't
+// be played now, why.
 function cardView(g: Game, p: number, c: Card): CardView {
+  const v = cardOptions(g, p, c);
+  const verb = v.kind === 'dragon' ? 'Hatch' : v.kind === 'upgrade' ? 'Upgrade' : v.kind === 'building' ? 'Build' : v.fauna ? 'Place' : 'Play';
+  const why = v.blocked ?? afford(g.players[p], cardCost(c)) ?? (g.phase === 'action' && g.turn === p ? null : `${verb} it on your turn.`);
+  return { ...v, verb, why };
+}
+
+function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'> {
   const kind = cardKind(c);
   const pl = g.players[p];
   const mine = g.dragons.filter((d) => d.owner === p);
@@ -298,7 +312,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const hexes = b.onTower ? [] : buildableHexes(g, p, c.key);
     const text = `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}`;
     const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, neighbourCount(g, k, b.per!)])) : undefined;
-    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings.` : null };
+    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? noHex(b.terrain) : null };
   }
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
@@ -311,7 +325,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) };
-    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room for another dragon: build a roost first.' : null };
+    return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? NO_ROOM : null };
   }
   const a = ACTIONS[c.key];
   if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep this card in your hand to score its point.' };
@@ -327,6 +341,9 @@ function cardView(g: Game, p: number, c: Card): CardView {
   }
   return { ...base, text: a.text, needs: 'none' };
 }
+
+const NO_ROOM = 'No room for another dragon: build a roost first.';
+const noHex = (terrain?: string) => `No empty ${terrain ? TERRAIN_NOUN[terrain as keyof typeof TERRAIN_NOUN] : 'land hex'} is adjacent to your buildings.`;
 
 export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const pl = g.players[p];
@@ -352,9 +369,11 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     deciding: waitingOn(g).includes(p),
     basics: BASIC_BUILDINGS.map((k) => {
       const b = BUILDINGS[k];
-      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes: buildableHexes(g, p, k), onTower: !!b.onTower };
+      const hexes = buildableHexes(g, p, k);
+      const why = (!b.onTower && !hexes.length ? noHex(b.terrain) : null) ?? afford(pl, b.cost);
+      return { key: k, cls: b.class, name: b.name, text: `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}`, cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, onTower: !!b.onTower, why };
     }),
-    eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p) },
+    eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
     cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),

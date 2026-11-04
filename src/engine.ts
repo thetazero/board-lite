@@ -193,8 +193,15 @@ export function canAfford(pl: Player, cost: Bundle): boolean {
   return RESOURCES.every((r) => pl.resources[r] >= (cost[r] ?? 0));
 }
 
+// Why a player can't pay a cost, or null if they can: the same words as the
+// error, so the phone's greyed button and a refused command say one thing.
+export function afford(pl: Player, cost: Bundle): string | null {
+  return canAfford(pl, cost) ? null : `You can't afford ${bundleText(cost)}.`;
+}
+
 function pay(pl: Player, cost: Bundle) {
-  if (!canAfford(pl, cost)) fail(`You can't afford ${bundleText(cost)}.`);
+  const why = afford(pl, cost);
+  if (why) fail(why);
   for (const r of RESOURCES) pl.resources[r] -= cost[r] ?? 0;
 }
 
