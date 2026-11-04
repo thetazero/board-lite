@@ -14,21 +14,27 @@ export type Scene =
   | { kind: 'hunt'; at: number; combat: number[]; end: number | null; ms: number } // a fight against fauna; end: its cleared
   | { kind: 'noRaid'; at: number; ms: number };
 
-// Each player's dice tumble a moment after the last's, all landing within
-// about a second; then the table reads them.
-export const ROLL_STAGGER_MS = 250;
-export const ROLL_SPIN_MS = 800;
-const rollMs = (n: number) => (n ? 300 + (n - 1) * ROLL_STAGGER_MS + ROLL_SPIN_MS + 1400 : 1200);
+// Every length here allows for a table whose eyes are on their phones: the
+// phone says "Watch the TV" when a scene starts, and it takes a moment to
+// look up. So nothing important happens in a scene's first beat, and its
+// result stays up long enough to read after looking up late.
 
-// A fight: a beat to see who's there, the hits (at most 4.5 s of them), then
-// the outcome long enough to read.
-export const FIGHT_LEAD_MS = 800;
-export const HIT_MS = 300;
-export const OUTCOME_MS = 3200;
-export const hitStep = (hits: number) => Math.min(HIT_MS, 4500 / Math.max(1, hits));
+// A beat to look up, then each player's dice tumble a moment after the last's
+// and land; then the table reads them.
+export const ROLL_LEAD_MS = 900;
+export const ROLL_STAGGER_MS = 400;
+export const ROLL_SPIN_MS = 1200;
+const rollMs = (n: number) => (n ? ROLL_LEAD_MS + (n - 1) * ROLL_STAGGER_MS + ROLL_SPIN_MS + 3000 : 2200);
+
+// A fight: a beat to look up and see who's there, the hits (at most 6 s of
+// them), then the outcome long enough to read.
+export const FIGHT_LEAD_MS = 1600;
+export const HIT_MS = 400;
+export const OUTCOME_MS = 4500;
+export const hitStep = (hits: number) => Math.min(HIT_MS, 6000 / Math.max(1, hits));
 const fightMs = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400 + OUTCOME_MS;
 
-export const NO_RAID_MS = 2500;
+export const NO_RAID_MS = 4000;
 
 // The scenes in a run of new events, in order.
 export function scenesOf(events: SceneEvent[]): Scene[] {

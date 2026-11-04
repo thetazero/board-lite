@@ -160,6 +160,10 @@ svg.token { flex: none; }
 /* what's happening, on a gold ribbon */
 .topbar .phase { font-size: 1.7em; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); padding: .05em .9em .1em; filter: drop-shadow(0 .12em .15em #0008); }
 .topbar .phase .ptag { color: color-mix(in oklab, var(--pc) 62%, #1a1218); }
+/* the round's phases in order, the current one on the ribbon, the rest faint beside it */
+.topbar .phases { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: .9em; }
+.topbar .phases li:not(.phase) { font-size: 1.15em; font-weight: 600; color: var(--muted); opacity: .75; white-space: nowrap; }
+.topbar .phases li.phase { white-space: nowrap; }
 .topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
 .mapwrap { position: absolute; inset: 0 calc(var(--colw) - 6vw) 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
@@ -216,7 +220,10 @@ svg.token { flex: none; }
 /* The bottom corners: what happened and what was said, and the titles. */
 .side .corner { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .3em .7em; font-size: clamp(15px, 1.15vw, 28px); flex: none; }
 .feedbox ul.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; max-height: 7.2em; overflow: hidden; }
-.feedbox li { padding: .05em 0; color: var(--muted); display: flex; align-items: center; gap: .35em; flex-wrap: wrap; }
+.feedbox li { padding: .05em 0; color: var(--muted); line-height: 1.45; }
+/* a line reads as a sentence: the icons sit in the words, not spaced out as cells */
+.feedbox li :is(svg, .ricon, .chip) { vertical-align: middle; }
+.feedbox li .evround { display: block; }
 .feedbox li .chip { margin-right: .15em; }
 .feedbox .feed li:last-child { color: var(--text); font-weight: 600; }
 .feedbox .said { color: var(--text); display: block; }
@@ -696,6 +703,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .topbar { position: static; order: 0; flex-wrap: wrap; gap: .3em .6em; padding: .1em 0; }
 .remote .topbar .round { font-size: 1.15em; }
 .remote .topbar .phase { font-size: 1.2em; }
+.remote .topbar .phases li:not(.phase) { display: none; }
 .remote .topbar .goal { font-size: 1em; }
 .remote .mapwrap { position: static; order: 1; }
 .remote .mapwrap svg.map { flex: none; height: auto; max-height: 70vh; }
