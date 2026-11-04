@@ -4,9 +4,12 @@
 // engine's commands through the room; every change is pushed to whoever is
 // watching. The game is saved to a file after each change (the same format
 // the CLI's file mode uses), so a server restart or a CLI look loses nothing.
+// Who sits where is saved beside it (<game>.seats.json: the code, the TV's and
+// each seat's token), so after a restart the room comes back under its own
+// code and every phone, the TV and each CLI player reconnect to their own seat.
 
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
@@ -18,6 +21,7 @@ import { scenesMs, scenesOf } from '../../web/scenes.ts';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
+export const AWAY_MS = 60000; // a seat with no phone or CLI request for this long is away
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
 
 export interface Seat {
@@ -44,20 +48,43 @@ export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
+  awayMs?: number; // defaults to AWAY_MS (tests shorten it)
   remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
+}
+
+// What the seats file keeps: enough for every client to reconnect as before.
+interface SavedRoom {
+  code: string;
+  hostToken: string;
+  remote: boolean;
+  seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
+}
+
+/** Where a game file's seats are saved. */
+export const seatsFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.seats.json`;
+
+function readSaved(file: string): SavedRoom | null {
+  try {
+    const v = JSON.parse(readFileSync(file, 'utf8'));
+    return typeof v?.code === 'string' && typeof v?.hostToken === 'string' && Array.isArray(v?.seats) ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 export class Room {
   readonly code: string;
   readonly file: string;
-  readonly hostToken = token();
+  readonly hostToken: string;
   readonly opts: RoomOptions;
   seats: Seat[] = [];
   lastActive = Date.now();
   private cached: Game | null = null;
   private botTimer: NodeJS.Timeout | null = null;
+  private awayTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private botRng = { state: Date.now() | 0 };
+  private savedSeats = '';
   // While a TV is watching, a change that gives it a scene to play (a fight,
   // a round's production roll) holds everyone's next decision until the scene
   // is over: phones show "Look at the TV", bots and CLI players wait. Without
@@ -68,21 +95,59 @@ export class Room {
 
   constructor(code: string, opts: RoomOptions = {}) {
     this.code = code;
-    this.opts = opts;
     this.file = opts.file ?? join(opts.dir ?? ROOMS_DIR, `${code}.json`);
     mkdirSync(dirname(this.file), { recursive: true });
-    // Hosting a saved game (from the CLI's file mode, or before a restart):
-    // every seat starts open, and players claim them by joining.
+    // Hosted again after a restart: the same TV, the same players in the same seats.
+    const saved = readSaved(seatsFile(this.file));
+    this.hostToken = saved?.hostToken ?? token();
+    this.opts = saved ? { ...opts, remote: saved.remote } : opts;
+    if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
     if (existsSync(this.file)) {
       this.cached = load(this.file);
-      this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
+      // A saved game with no seats file (from the CLI's file mode): every seat
+      // starts open, and players claim them by joining.
+      if (this.seats.length !== this.cached.players.length) {
+        this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
+      }
     }
+    this.saveSeats();
+  }
+
+  /** The code a game file was hosted under before, if its seats were saved. */
+  static savedCode(gameFile: string): string | null {
+    return readSaved(seatsFile(gameFile))?.code ?? null;
+  }
+
+  /** Rooms saved in `dir` and active in the last `withinMs`: their codes and game files, to host again after a restart. */
+  static saved(dir = ROOMS_DIR, withinMs = Infinity): { code: string; file: string }[] {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return [];
+    }
+    return names.filter((n) => n.endsWith('.seats.json')).flatMap((n) => {
+      const path = join(dir, n);
+      const file = join(dir, `${n.slice(0, -'.seats.json'.length)}.json`);
+      const saved = readSaved(path);
+      const touched = Math.max(statSync(path).mtimeMs, existsSync(file) ? statSync(file).mtimeMs : 0);
+      if (!saved || Date.now() - touched > withinMs) return [];
+      return [{ code: saved.code, file }];
+    });
+  }
+
+  private saveSeats() {
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !!this.opts.remote, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const text = JSON.stringify(saved);
+    if (text === this.savedSeats) return;
+    this.savedSeats = text;
+    save(seatsFile(this.file), saved);
   }
 
   static newCode(taken: (c: string) => boolean, dir = ROOMS_DIR): string {
     for (;;) {
       const c = Array.from(randomBytes(4), (b) => LETTERS[b % LETTERS.length]).join('');
-      if (!taken(c) && !existsSync(join(dir, `${c}.json`))) return c;
+      if (!taken(c) && !existsSync(join(dir, `${c}.json`)) && !existsSync(join(dir, `${c}.seats.json`))) return c;
     }
   }
 
@@ -129,7 +194,18 @@ export class Room {
   // Someone is at this seat: a bot, a phone holding its stream open, or a CLI
   // or Claude player that asked something in the last minute.
   here(s: Seat): boolean {
-    return s.kind === 'bot' || (!s.left && (s.connected > 0 || Date.now() - s.seen < 60000));
+    return s.kind === 'bot' || (!s.left && (s.connected > 0 || Date.now() - s.seen < this.awayMs));
+  }
+
+  // Every player has quit: only bots are left, so the game stops (no one would
+  // ever score) and the server forgets the room once no one has come back.
+  private get awayMs(): number {
+    return this.opts.awayMs ?? AWAY_MS;
+  }
+
+  get abandoned(): boolean {
+    const people = this.seats.filter((s) => s.kind === 'player');
+    return !!this.game && people.length > 0 && people.every((s) => s.left);
   }
 
   // Before the game, joining adds a seat. Once it's running, joining with the
@@ -247,6 +323,7 @@ export class Room {
     return () => {
       s.connected--;
       s.seen = Date.now();
+      this.watchAway();
     };
   }
 
@@ -352,16 +429,33 @@ export class Room {
   // Called after every change: keep the bots going.
   private tick() {
     this.scheduleBot();
+    this.watchAway();
+  }
+
+  // A seat whose phone closed counts as here for a minute; when that runs out
+  // nothing else may change (the table is waiting on them), so tell everyone
+  // then, and the others' phones offer a bot for them.
+  private watchAway() {
+    if (this.awayTimer) clearTimeout(this.awayTimer);
+    this.awayTimer = null;
+    const ends = this.seats.filter((s) => s.kind === 'player' && !s.left && s.connected === 0 && this.here(s)).map((s) => s.seen + this.awayMs);
+    if (!ends.length) return;
+    this.awayTimer = setTimeout(() => {
+      this.awayTimer = null;
+      this.changed();
+    }, Math.max(0, Math.min(...ends) - Date.now()) + 10);
+    this.awayTimer.unref();
   }
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.sceneLeft()) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.sceneLeft()) return;
     const botPlays = (p: number) => this.seats[p]?.kind === 'bot' || !!this.seats[p]?.standIn;
     if (!waitingOn(g).some(botPlays)) return;
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
+        if (this.abandoned) return;
         this.mutate((g2) => {
           const p = waitingOn(g2).find(botPlays);
           if (p === undefined) return;
@@ -424,6 +518,7 @@ export class Room {
 
   changed() {
     this.lastActive = Date.now();
+    this.saveSeats();
     this.tick();
     for (const fn of this.listeners) fn();
   }
@@ -431,7 +526,8 @@ export class Room {
   close() {
     if (this.botTimer) clearTimeout(this.botTimer);
     if (this.sceneTimer) clearTimeout(this.sceneTimer);
-    this.botTimer = this.sceneTimer = null;
+    if (this.awayTimer) clearTimeout(this.awayTimer);
+    this.botTimer = this.sceneTimer = this.awayTimer = null;
     this.listeners.clear();
   }
 }

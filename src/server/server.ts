@@ -21,6 +21,7 @@ const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const THREE_BUILD = fileURLToPath(new URL('../../node_modules/three/build/', import.meta.url));
 const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three.module.js', '/vendor/three/three.core.js': 'three.core.js' };
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
+const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
 const MAX_BODY = 4096;
 
 const TYPES: Record<string, string> = {
@@ -33,23 +34,39 @@ const TYPES: Record<string, string> = {
 
 const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html' };
 
-export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = [], host = '0.0.0.0'): { server: Server; rooms: Map<string, Room> } {
+// `resume`: host again every room saved in the last few hours (a restart), each
+// under its own code, so the TV and phones reconnect to the same seats.
+export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = [], host = '0.0.0.0', resume = false): { server: Server; rooms: Map<string, Room> } {
   const rooms = new Map<string, Room>();
-  // Saved games to host (e.g. one started in the CLI's file mode): every seat starts open.
+  if (resume) {
+    for (const { code, file } of Room.saved(opts.dir, ROOM_IDLE_MS)) {
+      if (hostFiles.includes(file)) continue;
+      try {
+        rooms.set(code, new Room(code, { ...opts, file }));
+      } catch (e) {
+        console.error(`Could not host room ${code} again (${file}):`, e);
+      }
+    }
+  }
+  // Saved games to host (e.g. one started in the CLI's file mode): hosted
+  // before, it keeps its code and seats; otherwise every seat starts open.
   for (const file of hostFiles) {
-    const room = new Room(Room.newCode((c) => rooms.has(c)), { ...opts, file });
+    const was = Room.savedCode(file);
+    const code = was && !rooms.has(was) ? was : Room.newCode((c) => rooms.has(c), opts.dir);
+    const room = new Room(code, { ...opts, file });
     rooms.set(room.code, room);
   }
   const stripped = new Map<string, { src: string; js: string }>();
 
   setInterval(() => {
     for (const [code, room] of rooms) {
-      if (Date.now() - room.lastActive > ROOM_IDLE_MS && !hostFiles.includes(room.file)) {
+      const idle = Date.now() - room.lastActive;
+      if ((idle > ROOM_IDLE_MS || (room.abandoned && idle > ABANDONED_MS)) && !hostFiles.includes(room.file)) {
         room.close();
         rooms.delete(code);
       }
     }
-  }, 10 * 60 * 1000).unref();
+  }, 60 * 1000).unref();
 
   function getRoom(code: string): Room {
     const room = rooms.get(code.toUpperCase());
@@ -244,12 +261,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   };
   const port = Number(flag('--port') ?? process.env.PORT ?? 8080);
   const game = flag('--game');
-  const { server, rooms } = startServer(port, {}, game ? [resolve(game)] : []);
+  const { server, rooms } = startServer(port, {}, game ? [resolve(game)] : [], '0.0.0.0', true);
   server.on('listening', () => {
     const hosts = lanAddresses();
     const tail = tailscaleAddresses();
     console.log(`board-lite is running on port ${port}.`);
-    for (const r of rooms.values()) console.log(`  Hosting ${r.file} as room ${r.code}: TV http://localhost:${port}/tv?room=${r.code}`);
+    for (const r of rooms.values()) if (r.game || r.seats.length) console.log(`  Hosting ${r.file} as room ${r.code}: TV http://localhost:${port}/tv?room=${r.code}`);
     console.log(`  TV:     http://localhost:${port}/tv${hosts.length ? `   (or http://${hosts[0]}:${port}/tv)` : ''}`);
     for (const h of hosts) console.log(`  Phones: http://${h}:${port}/`);
     for (const h of tail) console.log(`  Phones over Tailscale: http://${h}:${port}/`);

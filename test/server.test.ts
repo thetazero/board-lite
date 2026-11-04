@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -205,12 +205,60 @@ test('the stand-in keeps the game moving to the end without spending anything', 
   room.start(seats[0].token, 5);
   const g = room.game!;
   const dragons = g.dragons.length; // each player starts with one
-  for (const s of seats) room.quit(s.token);
+  room.quit(seats[0].token);
+  room.seats[1].standIn = true; // away, with a bot playing for them (quitting too would end the game)
+  room.changed();
   for (let i = 0; i < 2000 && g.round < 6; i++) await sleep(1);
   room.close();
   assert.ok(g.round >= 6, `stuck in round ${g.round}, phase ${g.phase} ${g.raid?.step ?? ''}`);
   assert.equal(Object.keys(g.buildings).length, 2, 'only the towers');
   assert.equal(g.dragons.length, dragons, 'no eggs hatched');
+});
+
+test("a phone that closes on its turn: once it counts as away, the others hear so and can let a bot play", async () => {
+  const room = new Room('SHUT', { dir, botDelayMs: 0, awayMs: 50 });
+  const [ada, bram] = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.start(ada.token, 3);
+  const g = room.game!;
+  const turn = room.seats[g.turn ?? 0] === ada ? ada : bram;
+  const other = turn === ada ? bram : ada;
+  const close = room.connect(turn.token);
+  room.connect(other.token);
+  let updates = 0;
+  room.subscribe(() => updates++);
+  close(); // the acting player's tab closes; nothing else happens at the table
+  assert.ok(room.lobby().seats[room.seats.indexOf(turn)].connected, 'here for a moment, in case the phone is back');
+  const before = updates;
+  for (let i = 0; i < 200 && room.here(turn); i++) await sleep(5);
+  await sleep(30);
+  assert.ok(updates > before, 'the table hears when they count as away');
+  assert.equal(room.lobby().seats[room.seats.indexOf(turn)].connected, false);
+  room.standInFor(other.token, room.seats.indexOf(turn));
+  room.close();
+});
+
+test('a game every player quits ends: the bots stop, nothing is saved again, and the server forgets the room', async () => {
+  const room = new Room('GONE', { dir, botDelayMs: 0 });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.addBot();
+  room.start(seats[0].token, 5);
+  const g = room.game!;
+  room.quit(seats[0].token);
+  assert.ok(!room.abandoned, 'Bram is still playing');
+  room.quit(seats[1].token);
+  assert.ok(room.abandoned);
+  const active = room.lastActive;
+  const mtime = statSync(room.file).mtimeMs;
+  const log = g.log.length;
+  await sleep(50);
+  assert.equal(g.log.length, log, 'no bot moves');
+  assert.equal(statSync(room.file).mtimeMs, mtime, 'no saves');
+  assert.equal(room.lastActive, active, 'idle, so the server forgets it');
+  room.join('Ada'); // until then, a player can come back
+  assert.ok(!room.abandoned);
+  for (let i = 0; i < 200 && g.log.length === log; i++) await sleep(1);
+  assert.ok(g.log.length > log, 'the bots play again');
+  room.close();
 });
 
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
@@ -338,6 +386,54 @@ test("a game from the CLI's file mode can be hosted; players claim its open seat
   room.join('Bram');
   assert.throws(() => room.join('Cora'), /every seat is taken/);
   room.close();
+});
+
+test('a server restart: the room comes back under its own code, and every client to its own seat', async () => {
+  const roomsDir = mkdtempSync(join(dir, 'restart-'));
+  const serve = async (hostFiles: string[] = []) => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000 }, hostFiles, '127.0.0.1', true);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    const post = async (path: string, body: object) => (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json() as Promise<Record<string, string>>;
+    return { ...s, base, stop, post };
+  };
+  const first = await serve();
+  const made = await first.post('/api/rooms', {});
+  const ada = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Ada' })).token;
+  const bram = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Bram' })).token;
+  await first.post(`/api/rooms/${made.code}/bot`, { token: made.hostToken });
+  await first.post(`/api/rooms/${made.code}/start`, { token: ada });
+  const file = first.rooms.get(made.code)!.file;
+  first.stop();
+
+  for (const again of [await serve(), await serve([file])]) {
+    try {
+      assert.deepEqual([...again.rooms.keys()], [made.code], 'the same code, whether resumed or hosted with --game');
+      const room = again.rooms.get(made.code)!;
+      assert.deepEqual(room.seats.map((s) => [s.name, s.kind]), [['Ada', 'player'], ['Bram', 'player'], ['Tick', 'bot']]);
+      // Bram's phone reconnects first and still gets his own seat; the TV is still the TV.
+      const asBram = (await (await fetch(`${again.base}/api/rooms/${made.code}?token=${bram}`)).json()) as { seated: boolean };
+      assert.ok(asBram.seated);
+      assert.equal(room.snapshot(bram).seat, 1);
+      assert.equal(room.snapshot(ada).seat, 0);
+      assert.ok(room.canStart(made.hostToken));
+      assert.equal(room.game!.round, 1);
+    } finally {
+      again.stop();
+    }
+  }
+  // A room the server doesn't have: the clients stop retrying on a 400.
+  const third = await serve();
+  try {
+    assert.equal((await fetch(`${third.base}/api/rooms/ZZZZ`)).status, 400);
+  } finally {
+    third.stop();
+  }
 });
 
 test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {

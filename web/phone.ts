@@ -165,7 +165,11 @@ function enter(c: string, t: string) {
   code = c;
   token = t;
   stop?.();
-  stop = watch(code, token, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
+  stop = watch(code, token, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => {
+    const gone = code;
+    code = '';
+    leaveToJoin(`Room ${gone} is no longer on the server.`);
+  });
 }
 
 function onSnapshot(s: Snapshot) {
