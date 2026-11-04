@@ -33,6 +33,7 @@ export interface Shot {
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
   waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
+  hold?: boolean; // the moment `waitFor` matches, the page's timers stop: a timed banner stays up for the shot, however slow the machine
   live?: boolean; // load the page, then let the scene's `live` moves happen, then shoot
   screen?: boolean; // phone: a TV is watching the room too, so its scenes hold the phones
   sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
@@ -150,6 +151,28 @@ function arm(g: Game, p: number, stages: number[]) {
   const keys = Object.keys(DRAGONS);
   stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0, resting: '' }));
 }
+
+// Seat p gets n buildings that roll a die each round (quarries, lumber camps
+// and the like), each on the first hex beside their land of its terrain: a
+// bot game rarely has them built by the rounds the scenes stage, and with
+// none the round's production roll has no dice to show.
+function producers(g: Game, p: number, n: number) {
+  const keys = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].produces).sort();
+  for (let placed = 0, i = 0; placed < n; i++) {
+    if (i >= keys.length * n) throw new Error(`producers: no room for P${p + 1}'s`);
+    const k = buildableHexes(g, p, keys[i % keys.length])[0];
+    if (!k) continue;
+    g.buildings[k] = { type: keys[i % keys.length], owner: p, upgrade: null, floors: 0 };
+    placed++;
+  }
+}
+// Everyone rolls dice: seat p gets 1 or 2 dice buildings, by seat.
+const everyoneRolls = (g: Game) => g.players.forEach((_, p) => producers(g, p, 1 + (p % 2)));
+// The round the live moves opened rolled dice for every seat.
+const allRolled = (g: Game) => {
+  const at = g.log.findLastIndex((e) => e.ev?.k === 'round');
+  return g.log.slice(at).filter((e) => e.ev?.k === 'produce' && e.dice?.length).length === g.players.length;
+};
 
 // Seat p's hand gets `extra` more cards than the hand limit allows.
 function overHand(g: Game, p: number, extra: number) {
@@ -608,18 +631,26 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     until: (g) => g.round === 2 && g.phase === 'action',
-    setup: (g) => toDiscard(g, [0]),
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+    },
     live: bots((g) => g.phase === 'action'),
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 1700 }],
+    liveEnd: allRolled,
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitFor: '#overlay .production li.up:nth-child(3)', hold: true }],
   },
   {
     name: 'production-done-6p',
     players: 6,
     seed: 1,
     until: (g) => g.round === 4 && g.phase === 'action',
-    setup: (g) => toDiscard(g, [0]),
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+    },
     live: bots((g) => g.phase === 'action'),
-    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
+    liveEnd: allRolled,
+    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
   },
   {
     name: 'late-6p',
@@ -1229,8 +1260,12 @@ export const SCENES: Scene[] = [
     seed: 1,
     remote: true,
     until: (g) => g.round === 2 && g.phase === 'action',
-    setup: (g) => toDiscard(g, [0]),
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+    },
     live: bots((g) => g.phase === 'action'),
+    liveEnd: allRolled,
     shots: (g) => [{ file: 'phone-remote-production-4p', caption: "No TV: the round's production rolls cut in on the phone", client: 'phone', seat: 0, live: true, waitFor: '.table-on', waitMs: 1800 }],
   },
   {
@@ -1239,9 +1274,13 @@ export const SCENES: Scene[] = [
     seed: 1,
     remote: true,
     until: (g) => g.round === 4 && g.phase === 'action',
-    setup: (g) => toDiscard(g, [0]),
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+    },
     live: bots((g) => g.phase === 'action'),
-    shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
+    liveEnd: allRolled,
+    shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
   },
   {
     name: 'remote-fight-3p',
