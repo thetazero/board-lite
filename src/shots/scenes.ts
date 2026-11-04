@@ -31,6 +31,7 @@ export interface Shot {
   then?: (room: Room) => void; // something that happens at the table after the page is up (before the clicks)
   offline?: boolean; // the connection to the server drops after the page is up
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
+  press?: { on: string; dx?: number; dy?: number }; // phone: a finger put down on this (after the clicks) and slid by dx, dy pixels, still held for the shot
   waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
   hold?: boolean; // the moment `waitFor` matches, the page's timers stop: a timed banner stays up for the shot, however slow the machine
@@ -622,7 +623,7 @@ export const SCENES: Scene[] = [
     setup: (g) => toDiscard(g, [g.turn]),
     shots: (g) => [
       { file: 'tv-discard-4p', caption: 'TV, end of round: someone is discarding', client: 'tv' },
-      { file: 'phone-discard-4p', caption: 'Phone: over the hand limit, one card picked', client: 'phone', seat: waitingOn(g!)[0], clicks: ['[data-card]'], sizes: true },
+      { file: 'phone-discard-4p', caption: 'Phone: over the hand limit, one card picked', client: 'phone', seat: waitingOn(g!)[0], clicks: ['.handfan [data-card]'], sizes: true },
       { file: 'phone-discard-waiting-4p', caption: 'Phone: under the limit, waiting for the others to discard', client: 'phone', seat: seatWhere(g!, (p) => !waitingOn(g!).includes(p)) },
     ],
   },
@@ -810,6 +811,8 @@ export const SCENES: Scene[] = [
       const me = { client: 'phone' as const, seat: g!.turn };
       return [
         { ...me, file: 'phone-hand-3p', caption: 'Phone: a hand of playable cards (staged)' },
+        { ...me, file: 'phone-hand-slide', caption: 'Phone: a thumb on the hand, the card under it raised to read', press: { on: card(id('healing_potion')), dx: 15 } },
+        { ...me, file: 'phone-hand-pull', caption: 'Phone: a card dragged up out of the hand: letting go plays it', press: { on: card(id('monument')), dy: -160 } },
         { ...me, file: 'phone-zoom-hoard', caption: 'Phone: Secret Hoard tapped open (kept, not played)', clicks: [card(id('secret_hoard'))] },
         { ...me, file: 'phone-zoom-elixir', caption: 'Phone: Growth Elixir, choosing the dragon', clicks: [card(id('growth_elixir'))] },
         { ...me, file: 'phone-zoom-potion', caption: 'Phone: Healing Potion, choosing the hurt dragon', clicks: [card(id('healing_potion'))] },
@@ -870,7 +873,8 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 2 && g.phase === 'action',
     setup: (g) => toDiscard(g, [g.turn], 3),
     shots: (g) => [
-      { file: 'phone-discard-many', caption: 'Phone: discarding several cards, two picked', client: 'phone', seat: seatWhere(g!, (p) => g!.players[p].hand.length - seatState(g!, p).handCap >= 2), clicks: ['[data-card]', '[data-card]:not(.picked)'] },
+      { file: 'phone-discard-many', caption: 'Phone: discarding several cards, two picked', client: 'phone', seat: seatWhere(g!, (p) => g!.players[p].hand.length - seatState(g!, p).handCap >= 2), clicks: ['.handfan [data-card]', '.handfan [data-card]:not(.picked)'] },
+      { file: 'phone-discard-slide', caption: 'Phone: discarding, a thumb sliding along the hand raises the card under it to read', client: 'phone', seat: seatWhere(g!, (p) => g!.players[p].hand.length - seatState(g!, p).handCap >= 2), clicks: ['.handfan [data-card]'], press: { on: '.handfan [data-card]:nth-child(4)', dx: 40 }, sizes: true },
     ],
   },
 
