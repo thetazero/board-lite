@@ -2,7 +2,12 @@
 // tuning how the game looks. One command, one headless Chrome, the real
 // server and clients:
 //
-//   npm run shots [-- --only raid] [--every-size] [--out NAME]
+//   npm run shots -- --only NAME[,NAME...] [--every-size] [--out NAME]
+//   npm run shots -- --list [--only NAME]   (what there is to shoot; no Chrome)
+//   npm run shots -- --all [--every-size]   (everything: hundreds of images)
+//
+// A run takes the shots it's asked for: --only picks shots by their file or
+// scene name, so checking a change shoots the screens it touched.
 //
 // Each scene in scenes.ts becomes a room on a private server (every seat a
 // player nobody drives, so nothing moves on its own). Chrome is driven over
@@ -24,7 +29,7 @@ import type { Readable, Writable } from 'node:stream';
 import { Room, seatsFile } from '../server/room.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
-import { NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
+import { NAMES, picked, SCENES, stage, type Shot, type Staged } from './scenes.ts';
 import { checkName, claim, defaultName, KEEP_DAYS, tidy } from './tidy.ts';
 import { takeTurn } from './turn.ts';
 
@@ -421,7 +426,28 @@ interface Done extends Shot {
 
 const imageName = (file: string, i: number) => `${file}${i ? `.${i + 1}` : ''}.webp`;
 
+const USAGE = `Name what to shoot:
+  npm run shots -- --only phone-hand            shots whose file or scene name contains "phone-hand"
+  npm run shots -- --only raid-fight,tv-vote    several, separated by commas
+  npm run shots -- --list [--only raid]         the shots there are, without taking any
+  npm run shots -- --all                        every shot: hundreds of images (about 980 with --every-size)`;
+
+// The other sizes a shot is taken at, on top of its own.
+function otherSizes(shot: Shot, everySize: boolean): [string, Device][] {
+  // A shot that changes the room itself (a `then`, a live move, typing) is taken at one size only.
+  return (shot.sizes || everySize) && !shot.then && !shot.live && !shot.fill ? SIZES[shot.table ? 'phone' : shot.client] : [];
+}
+
 async function main() {
+  const only = flag('only')?.split(',').map((p) => p.trim()).filter(Boolean) ?? null;
+  const all = process.argv.includes('--all');
+  const everySize = process.argv.includes('--every-size');
+  if (process.argv.includes('--list')) return list(only, everySize);
+  if (!only?.length && !all) {
+    console.error(USAGE);
+    process.exitCode = 2;
+    return;
+  }
   // One run at a time on this machine, whichever tab or worktree it's from: each holds a gigabyte or two.
   mkdirSync(CACHE, { recursive: true });
   await takeTurn(join(CACHE, 'run.lock'), (h) => {
@@ -430,8 +456,6 @@ async function main() {
       + ` Only one runs at a time, so they don't run the machine out of memory.`);
   });
   const t0 = Date.now();
-  const only = flag('only');
-  const everySize = process.argv.includes('--every-size');
   const out = join(CACHE, flag('out') ? checkName(flag('out')!) : defaultName(CHECKOUT));
   const prev = `${out}.previous`;
   const cleared = tidy(CACHE, [out, prev]);
@@ -441,8 +465,13 @@ async function main() {
   mkdirSync(out, { recursive: true });
   claim(out, CHECKOUT);
 
-  const staged = SCENES.filter((s) => !only || s.name.includes(only)).map((s) => stage(s));
+  const staged = picked(SCENES.map((s) => stage(s)), all ? null : only);
   const tStaged = Date.now();
+  if (!staged.length) {
+    console.error(`No shot's file or scene name contains ${only!.map((p) => `"${p}"`).join(' or ')}. See them all: npm run shots -- --list`);
+    process.exitCode = 1;
+    return;
+  }
 
   const { server, rooms } = startServer(0);
   await new Promise<void>((ok) => (server.listening ? ok() : server.on('listening', () => ok())));
@@ -464,14 +493,13 @@ async function main() {
     const cdp = chrome.cdp;
     const tab = await Tab.open(cdp);
     let n = 0;
-    for (const st of staged) {
+    for (const { st, shots } of staged) {
       const code = roomCode(SCENES.indexOf(st.scene));
       const room = makeRoom(st, code);
       rooms.set(code, room);
-      for (const shot of st.scene.shots(st.game)) {
+      for (const shot of shots) {
         const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? TV : PHONE];
-        // A shot that changes the room itself (a `then`, a live move, typing) is taken at one size only.
-        const sizes = (shot.sizes || everySize) && !shot.then && !shot.live && !shot.fill ? [own, ...SIZES[shot.table ? 'phone' : shot.client]] : [own];
+        const sizes = [own, ...otherSizes(shot, everySize)];
         // Its taps can still change the room (Leave takes the seat away): each size starts from the room as it was.
         const before = sizes.length > 1 ? keep(room) : null;
         for (const [size, device] of sizes) {
@@ -572,6 +600,22 @@ async function main() {
     console.error(`${failures} screenshot(s) failed.`);
     process.exitCode = 1;
   }
+}
+
+// The shots there are (or those --only picks), and the sizes each is taken at: nothing is shot.
+function list(only: string[] | null, everySize: boolean) {
+  let images = 0;
+  const picks = picked(SCENES.map((s) => stage(s)), only);
+  for (const { st, shots } of picks) {
+    console.log(`${st.scene.name}:`);
+    for (const shot of shots) {
+      const sizes = otherSizes(shot, everySize).map(([s]) => s);
+      const frames = shot.frames?.length ?? 1;
+      images += frames * (1 + sizes.length);
+      console.log(`  ${shot.file}${sizes.length ? ` (also @${sizes.join(', @')})` : ''}${frames > 1 ? ` (${frames} frames)` : ''}  ${shot.caption}`);
+    }
+  }
+  console.log(`\n${picks.reduce((n, p) => n + p.shots.length, 0)} shots, ${images} images or more (a long phone page is several)${everySize ? '' : '; --every-size takes more'}.`);
 }
 
 function contactSheet(done: Done[], prev: string | null): string {
