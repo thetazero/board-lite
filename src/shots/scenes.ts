@@ -822,6 +822,26 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
   },
   {
+    // Clearing ordinary fauna (#96): a Cave Bear beside the acting player's
+    // tower and two hatchlings sent against it, lightning (its weakness)
+    // and fire. The TV replays the fight as it does a great beast's.
+    name: 'fauna-fight-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => bearHunters(g),
+    shots: () => [{ file: 'tv-fauna-fight-3p', caption: 'TV: two hatchlings against a Cave Bear, mid-replay', client: 'tv', waitMs: 1400, then: (room) => room.mutate((g2) => huntBear(g2)) }],
+  },
+  {
+    // The same fight, at its end: what the player got for it.
+    name: 'fauna-cleared-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => bearHunters(g),
+    shots: () => [{ file: 'tv-fauna-cleared-3p', caption: 'TV: the Cave Bear falls: +4 livestock', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntBear(g2)) }],
+  },
+  {
     // Fauna on every terrain and on buildings (#72): a wolf pack, a cave bear
     // and a basilisk on open hexes of each land terrain, and one of each on a
     // building it shuts down. The acting player has dragons to send.
@@ -888,4 +908,21 @@ function beastHunters(g: Game) {
 function huntPeak(g: Game) {
   const ids = g.dragons.filter((d) => d.owner === g.turn && d.stage > 0 && !d.resting && !d.damage).map((d) => d.id);
   apply(g, g.turn, `clear ${PEAK} ${ids.join(' ')}`);
+}
+
+// A Cave Bear on an open hex beside the acting player's tower, and two
+// dragons of theirs (hatchlings), lightning and fire, ready to send.
+function bearHunters(g: Game) {
+  const p = g.turn;
+  const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k] && !g.map[k].fauna)!;
+  g.map[open].fauna = 'cave_bear';
+  g.dragons = g.dragons.filter((d) => d.owner !== p);
+  for (const key of ['storm_wyrm', 'cinder_drake']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 1, growth: 0, damage: 0, resting: '' });
+}
+
+// The acting player sends every ready dragon against the Cave Bear.
+function huntBear(g: Game) {
+  const k = Object.keys(g.map).find((x) => g.map[x].fauna === 'cave_bear' && neighbors(g.towers[g.turn]).includes(x))!;
+  const ids = g.dragons.filter((d) => d.owner === g.turn && d.stage > 0 && !d.resting && !d.damage).map((d) => d.id);
+  apply(g, g.turn, `clear ${k} ${ids.join(' ')}`);
 }

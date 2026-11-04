@@ -349,7 +349,7 @@ function queueBanners(g: PublicState, fresh: EventView[]) {
   for (const e of fresh) {
     const ev = e.ev;
     if (ev?.k === 'fight') banners.push(fightBanner(g, e, fresh));
-    if (ev?.k === 'hunt' && g.beasts.some((b) => b.key === ev.fauna)) banners.push(huntBanner(g, e, fresh));
+    if (ev?.k === 'hunt') banners.push(huntBanner(g, e, fresh));
     if (ev?.k === 'noRaid') banners.push({ html: `<div class="result"><h1>${eventHtml(e, g, names)}</h1></div>`, ms: 4000, raid: true });
     if (ev?.k === 'round') {
       const rolls = fresh.filter((x) => x.i > e.i && x.round === e.round && x.ev?.k === 'produce' && x.dice?.length);
@@ -417,8 +417,9 @@ function fightBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
   return battle(g, head, dragons, fled, ev.units, rounds, outcome, true);
 }
 
-// A great beast's fight: one player's dragons against it, to the end, played
-// out like a raid's. The table watches the race.
+// A fight against fauna, a great beast or not: one player's dragons against
+// it, to the end, played out like a raid's, then what they got for it. Every
+// fight in the game gets this replay, so the table sees it happen.
 function huntBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
   const ev = e.ev as Extract<EventView['ev'], { k: 'hunt' }>;
   const later = fresh.filter((x) => x.i > e.i);
@@ -426,12 +427,12 @@ function huntBanner(g: PublicState, e: EventView, fresh: EventView[]): Banner {
   const rounds = (endAt < 0 ? later : later.slice(0, endAt)).flatMap((x) => (x.ev?.k === 'combat' ? [x.ev] : []));
   const end = endAt < 0 ? null : (later[endAt].ev as Extract<EventView['ev'], { k: 'cleared' }>);
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
-  const beast = g.beasts.find((b) => b.key === ev.fauna)!;
-  const outcome = !end ? '' : end.won
-    ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? beast.points} ${icon('points', 1.6)}</span></div>`
-    : `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`;
+  const great = g.beasts.some((b) => b.key === ev.fauna);
+  const outcome = !end ? '' : !end.won ? `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`
+    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
+    : `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${icon(ev.fauna, 1.4)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, '', [{ name: ev.name, hp: beast.hp }], rounds, outcome, false);
+  return battle(g, head, dragons, '', [{ name: ev.name, hp: ev.hp }], rounds, outcome, false);
 }
 
 function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number }[], rounds: Extract<EventView['ev'], { k: 'combat' }>[], outcome: string, raid: boolean): Banner {
