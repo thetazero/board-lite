@@ -28,7 +28,7 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Woodcutter's Hut | building card | 2 | 6 stone, 6 crystal, 4 livestock | Makes 1 timber each round for each adjacent forest hex. | — |
 | Sawmill | building card | 2 | 6 stone, 6 crystal, 4 livestock | Makes 1 timber each round for each adjacent timber building. | — |
 | Driftwood Yard | building card | 1 | 8 stone, 6 crystal, 6 livestock | Makes 1 timber each round for each adjacent ocean hex. | — |
-| Ley Spire | building card | 2 | 6 stone, 6 timber, 4 livestock | Makes 1 crystal each round for each adjacent ley line. | — |
+| Crystal Spire | building card | 2 | 6 stone, 6 timber, 4 livestock | Makes 1 crystal each round for each adjacent crystal field hex. | — |
 | Gem Cutter | building card | 2 | 6 stone, 6 timber, 4 livestock | Makes 1 crystal each round for each adjacent crystal building. | — |
 | Smelter | building card | 1 | 4 stone, 6 timber, 6 livestock | Makes 1 crystal each round for each adjacent stone building. | — |
 | Shepherd's Fold | building card | 2 | 6 stone, 6 timber, 4 crystal | Makes 1 livestock each round for each adjacent meadow hex. | — |
@@ -38,7 +38,7 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Port | building card | 3 | 2 stone, 6 timber, 2 livestock | You trade with the bank at 3:1. | — |
 | Market | building card | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
 | Monument | building card | 2 | 8 stone, 6 timber, 20 gold | Worth 1 point for each adjacent monument. | 1 each |
-| Standing Stones | building card | 2 | 6 stone, 6 crystal, 20 gold | Worth 1 point for each adjacent ley line. | 1 each |
+| Standing Stones | building card | 2 | 6 stone, 6 crystal, 20 gold | Worth 1 point for each adjacent crystal field hex. | 1 each |
 | Lighthouse | building card | 2 | 10 stone, 6 timber, 20 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
 | Guildhall | building card | 1 | 6 stone, 6 timber, 20 gold | Worth 1 point for each adjacent trade building. | 1 each |
 | Workshop | upgrade | 4 | 8 stone, 8 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more. | — |
@@ -105,7 +105,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Woodcutter's Hut | timber building | forest hexes | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
 | Sawmill | timber building | timber buildings (anyone's) | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
 | Driftwood Yard | timber building | ocean hexes | 8 stone, 6 crystal, 6 livestock | 1 timber a round |
-| Ley Spire | crystal building | ley hexes | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
+| Crystal Spire | crystal building | ley hexes | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
 | Gem Cutter | crystal building | crystal buildings (anyone's) | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
 | Smelter | crystal building | stone buildings (anyone's) | 4 stone, 6 timber, 6 livestock | 1 crystal a round |
 | Shepherd's Fold | livestock building | meadow hexes | 6 stone, 6 timber, 4 crystal | 1 livestock a round |
@@ -229,7 +229,7 @@ How much of each resource every card in both decks costs in total (each card cou
 |---|---|---|---|
 | stone | 226 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
 | timber | 196 | 20% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 243 | 25% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| crystal | 243 | 25% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
 | livestock | 126 | 13% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
 | gold | 194 | 20% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
@@ -244,7 +244,7 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 44.
 | Woodcutter's Hut | building | 2 | 5% |
 | Sawmill | building | 2 | 5% |
 | Driftwood Yard | building | 1 | 2% |
-| Ley Spire | building | 2 | 5% |
+| Crystal Spire | building | 2 | 5% |
 | Gem Cutter | building | 2 | 5% |
 | Smelter | building | 1 | 2% |
 | Shepherd's Fold | building | 2 | 5% |

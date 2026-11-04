@@ -16,7 +16,7 @@ export const POINTS_TO_WIN = 20;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
-export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Ley line', meadow: 'Meadow', plains: 'Plains', harbor: 'Harbor (ports)', ocean: 'Ocean' };
+export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Crystal field', meadow: 'Meadow', plains: 'Plains', harbor: 'Harbor (ports)', ocean: 'Ocean' };
 export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#9fe3c4', water: '#2f8fff' };
 
 // ---------- server ----------
@@ -199,51 +199,68 @@ export function buildingChip(type: string, owner: number, upgrade: string | null
 
 export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower', hoard: 'hoard' };
 
-// What just happened, drawn rather than told: who did it (their name in their
-// colour), then the thing itself as the board and the cards show it. Returns ''
-// for events the screen already shows elsewhere (a turn starting is the top
-// bar, an open offer is the offers panel, the raid's steps are its overlay).
+// What just happened, as a short line the table can read from the couch: who
+// did it (their name in their colour), the log's own verb, and the thing
+// itself as the board and the cards show it. Returns '' for events the screen
+// already shows elsewhere: a turn starting is the player panels, an open offer
+// is the offers panel, the raid's steps are its overlay, a dragon sitting out
+// is its tag on its owner's panel, and a beast wandering is the board (the
+// feed has no hexes to name; one moving onto a building is said).
 // Old saves without event data fall back to the text.
 export function eventHtml(e: EventView, g: PublicState, names: string[]): string {
   const ev = e.ev;
   if (!ev) return named(e.text, names, g.dragons);
   const who = (p: number) => playerTag(p, names);
+  const whose = (p: number) => `<span class="ptag" style="--pc:${PLAYER_COLORS[p]}">${esc(names[p] ?? `P${p + 1}`)}'s</span>`;
   const dragon = (id: string, stage?: number, size = 28) => {
     const d = g.dragons.find((x) => x.id === id);
     return d ? dragonBadge(stage === undefined ? d : { ...d, stage }, size) : '';
   };
-  const owner = (id: string) => g.dragons.find((x) => x.id === id)?.owner ?? 0;
-  const dname = (id: string) => { const d = g.dragons.find((x) => x.id === id); return d ? esc(dragonLabel(d, g.dragons)) : ''; };
+  const dname = (id: string) => { const d = g.dragons.find((x) => x.id === id); return d ? `<b>${esc(dragonLabel(d, g.dragons))}</b>` : ''; };
   const res = (b: Res) => resChips(b, 1.2);
+  const a = (name: string) => (/^[AEIOU]/i.test(name) ? 'an' : 'a');
+  const beast = (fauna: string, name: string) => `the ${icon(fauna, 1.5)} <b>${esc(name)}</b>`;
   switch (ev.k) {
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
-    case 'grow': return `${who(owner(ev.d))} ${dragon(ev.d, ev.stage - 1, 22)}<span class="arrow">➜</span>${dragon(ev.d)} <small>${STAGE_LABEL[ev.stage]}</small>`;
-    // Said as what happens, the log's own verbs; a dragon no longer in the game has nothing to show.
-    case 'rest': return g.dragons.some((x) => x.id === ev.d) ? `${who(owner(ev.d))} ${dragon(ev.d)} ${ev.why === 'hurt' ? '<em class="st-healing">sits out to heal</em>' : '<em class="st-hungry">goes hungry</em>'}` : '';
-    case 'build': return `${who(ev.p)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
-    case 'floor': return `${who(ev.p)} ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
-    case 'upgrade': return `${who(ev.p)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
-    case 'hatch': return `${who(ev.p)} ${dragon(ev.d, 0)} ${dname(ev.d)}`;
+    case 'grow': {
+      const d = g.dragons.find((x) => x.id === ev.d);
+      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][ev.stage]}` : '';
+    }
+    case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'floor': return `${who(ev.p)} adds a tower floor ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
+    case 'upgrade': return `${who(ev.p)} adds ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
     case 'play': {
       const on = ev.hex ? g.map.find((h) => h.k === ev.hex)?.building : null;
       const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : ev.fauna ? `${icon(ev.fauna, 1.5)}${on ? `<span class="arrow">➜</span>${buildingChip(on.type, on.owner, null, 26, on.cls)}` : ''}` : '';
-      return `${who(ev.p)} <span class="evcard">${esc(ev.name)}</span> ${what}`;
+      return `${who(ev.p)} plays <span class="evcard">${esc(ev.name)}</span> ${what}`;
     }
-    case 'bank': return `${who(ev.p)} ${res(ev.give)}<span class="arrow">➜</span>${res(ev.get)}`;
-    case 'trade': return `${who(ev.from)} <b>${iconText(esc(ev.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(ev.get))}</b> ${who(ev.to)}`;
-    case 'decline': return `${who(ev.p)} <span class="no">✗</span> ${who(ev.from)}`;
-    case 'title': return `<span class="title-badge">${icon(TITLE_ICON[ev.t], 1.1)}${esc(g.titles.find((t) => t.key === ev.t)?.name ?? '')}</span><span class="arrow">➜</span>${ev.p === null ? '<span class="none">—</span>' : who(ev.p)}`;
-    case 'discard': return `${who(ev.p)} −${ev.n}${icon('cards', 1.2)}`;
-    case 'target': return `${icon('raid', 1.3)} <b>${esc(ev.name)}</b>${ev.coin ? ' <small>by coin flip</small>' : ''}`;
+    case 'bank': return `${who(ev.p)} trades ${res(ev.give)} to the bank for ${res(ev.get)}`;
+    case 'trade': return `${who(ev.from)} gives <b>${iconText(esc(ev.give))}</b> to ${who(ev.to)} for <b>${iconText(esc(ev.get))}</b>`;
+    case 'decline': return `${who(ev.p)} <span class="no">declines</span> ${whose(ev.from)} offer`;
+    case 'title': {
+      const t = `<span class="title-badge">${icon(TITLE_ICON[ev.t], 1.1)}</span><b>${esc(g.titles.find((x) => x.key === ev.t)?.name ?? '')}</b>`;
+      return ev.p === null ? `No one holds ${t}` : `${who(ev.p)} takes ${t}`;
+    }
+    case 'discard': return `${who(ev.p)} discards ${ev.n} ${icon('cards', 1.2)}`;
+    case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
     case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
     case 'raidEnd': return ev.won
-      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(' ')}`
+      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}</span>`;
-    case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
-    // The beast is the subject ("Wolf Pack falls"), so it can't read as the player falling.
-    case 'cleared': return `${who(ev.p)} ${icon('raid', 1.3)} ${icon(ev.fauna, 1.5)} <b>${esc(ev.name)}</b> ${ev.won ? ev.points ? `<span class="ok">slain</span> +${ev.points}${icon('points', 1.2)}` : `<span class="ok">falls</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
-    case 'wander': return `${icon(ev.fauna, 1.5)} <b>${esc(ev.name)}</b> ${esc(ev.from)}<span class="arrow">➜</span>${esc(ev.to)}`;
+    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
+    case 'again': return `${icon('raid', 1.3)} Another raid follows`;
+    // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
+    case 'cleared': {
+      const it = beast(ev.fauna, ev.name);
+      const The = it.replace(/^the/, 'The');
+      if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
+      return ev.points ? `${The} <span class="ok">is slain</span>: ${who(ev.p)} +${ev.points} ${icon('points', 1.2)}` : `${The} <span class="ok">falls</span>: ${who(ev.p)} ${gainChips(ev.gain, 1.2)}`;
+    }
+    case 'wander': {
+      const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;
+      return b && b.type !== 'tower' ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}` : '';
+    }
     default: return '';
   }
 }

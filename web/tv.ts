@@ -12,7 +12,7 @@ import {
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
-import { FIGHT_LEAD_MS, ROLL_SPIN_MS, ROLL_STAGGER_MS, hitStep, scenesOf, type Scene } from './scenes.ts';
+import { FIGHT_LEAD_MS, ROLL_LEAD_MS, ROLL_SPIN_MS, ROLL_STAGGER_MS, hitStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -155,19 +155,26 @@ function renderLobby() {
 
 // ---------- the board ----------
 
-// "Ada", "Ada and Dax", "Ada, Dax and Eve".
-function nameList(ps: number[]): string {
-  const tags = ps.map((p) => playerTag(p, names));
-  return tags.length <= 1 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags.at(-1)}`;
-}
+// The round's phases, as the rules name them, and which one the game is in.
+// The top bar shows them as a track with the current one lit: the players'
+// panels say who the table is waiting on, so the bar only says where in the
+// round it is.
+const PHASES = ['Production', 'Cards', 'Actions', 'Raid', 'End of round'] as const;
+type Phase = (typeof PHASES)[number] | 'Game over';
 
-function phaseLabel(g: PublicState): string {
+function phaseNow(g: PublicState): Phase {
   if (bannerTop) return bannerTop.phase;
   if (g.phase === 'over') return 'Game over';
-  if (g.phase === 'action') return `${playerTag(g.turn, names)}'s turn`;
-  if (g.phase === 'discard') return `End of round: ${g.waitingOn.length ? `${nameList(g.waitingOn)} discard${g.waitingOn.length === 1 ? 's' : ''} down to the hand limit` : 'discarding'}`;
-  if (g.phase === 'cards') return 'Everyone keeps a building card';
-  return `Raid${g.raidsLeft > 1 ? ` (${g.raidsLeft} this round)` : ''}`;
+  if (g.phase === 'action') return 'Actions';
+  if (g.phase === 'discard') return 'End of round';
+  if (g.phase === 'cards') return 'Cards';
+  return 'Raid';
+}
+
+function phaseTrack(g: PublicState): string {
+  const now = phaseNow(g);
+  if (now === 'Game over') return '<span class="phase">Game over</span>';
+  return `<ol class="phases">${PHASES.map((p) => `<li${p === now ? ' class="phase"' : ''}>${p}</li>`).join('')}</ol>`;
 }
 
 // What one player is doing right now, if the table is waiting on them.
@@ -265,9 +272,8 @@ function renderGame(g: PublicState) {
       ${offers ? `<div class="panel offers"><h3>Trade offers</h3><ul>${offers}</ul></div>` : ''}
       <header class="topbar">
         <span class="round">Round ${bannerTop?.round ?? g.round}</span>
-        <span class="phase">${phaseLabel(g)}</span>
+        ${phaseTrack(g)}
         <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
-        ${remote ? '' : `<span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>`}
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul>
@@ -374,7 +380,7 @@ function renderRaid(g: PublicState) {
 // and the final scores show whenever no banner is up.
 // top: what the top bar says while it's up (the board under it is held as it
 // was, so its own round and phase may have moved on).
-interface Banner { html: string; ms: number; top?: { round: number; phase: string }; play?: (el: HTMLElement) => void }
+interface Banner { html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
 let bannerTop: Banner['top'] | null = null;
 const banners: Banner[] = [];
 let bannerUp = false;
@@ -413,7 +419,7 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
           d.classList.remove('rolling');
         });
       }, ROLL_SPIN_MS);
-    }, 300 + k * ROLL_STAGGER_MS));
+    }, ROLL_LEAD_MS + k * ROLL_STAGGER_MS));
   };
   return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<ul>${rows}</ul>` : ''}</div>`, ms, play, top: { round, phase: 'Production' } };
 }

@@ -2,9 +2,9 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -48,7 +48,11 @@ export interface DragonView {
   status: string;
   targeting: string;
   attack: string;
+  key: string; // its card, for the card's art
+  stages: DragonStageView[]; // hatchling, young, adult: as on its card
 }
+
+export interface DragonStageView { hp: number; attack: string; power: number }
 
 export interface UnitView {
   name: string;
@@ -98,7 +102,7 @@ export interface PublicState {
   titlePoints: number; // what each title is worth
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   waitingOn: number[];
-  players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
+  players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -134,7 +138,7 @@ export interface CardView {
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
   fauna?: FaunaView; // fauna cards: the beast it sends
-  dragon?: { growth: number; targeting: string; stages: { hp: number; attack: string; power: number }[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
+  dragon?: { growth: number; targeting: string; stages: DragonStageView[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
 export interface SeatState {
@@ -158,6 +162,7 @@ export interface SeatState {
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean };
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   huntable: string[]; // hexes of the beasts I may fight now (one try at a great beast a round)
+  cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   myChoice: 'fight' | 'bail' | null;
   log: EventView[]; // private events for me
@@ -170,6 +175,8 @@ function attackText(a: { targets: number; dice: number; sides: number }) {
   return `${a.targets > 1 ? `${a.targets}× ` : ''}${a.dice}d${a.sides}`;
 }
 
+const stageViews = (def: DragonDef): DragonStageView[] => def.stages.map((st) => ({ hp: st.hp, attack: attackText(st), power: combatPower(st) }));
+
 function dragonView(g: Game, d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
@@ -178,6 +185,7 @@ function dragonView(g: Game, d: Dragon): DragonView {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
     canRaid: canRaid(d), backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    key: d.key, stages: stageViews(def),
   };
 }
 
@@ -239,7 +247,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, production: production(g, p), bankRate: bankRate(g, p) };
+      return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
@@ -302,7 +310,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
     const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
-    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: d.stages.map((st) => ({ hp: st.hp, attack: attackText(st), power: combatPower(st) })) };
+    const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) };
     return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? 'No room for another dragon: build a roost first.' : null };
   }
   const a = ACTIONS[c.key];
@@ -349,6 +357,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
+    cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     myChoice: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),

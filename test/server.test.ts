@@ -98,14 +98,30 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   room.close();
 });
 
-test('a room of bots plays itself to the end', async () => {
+// No clock here: the test follows the room move by move, so a slow machine only
+// makes it slower. It fails when a bot throws, or when the bots keep moving
+// without the game ever ending. The timeout only catches a room that goes
+// silent, which would otherwise hang the run.
+test('a room of bots plays itself to the end', { timeout: 120_000 }, async (t) => {
   const room = new Room('BOTS', { botDelayMs: 0, dir });
   room.addBot();
   room.addBot();
+  const maxMoves = 20_000; // a 3-bot game takes well under this
+  let moves = 0;
+  const ended = new Promise<void>((resolve, reject) => {
+    t.mock.method(console, 'error', (...args: unknown[]) => reject(new Error(args.map(String).join(' '))));
+    room.subscribe(() => {
+      if (room.game?.phase === 'over') resolve();
+      else if (++moves > maxMoves) reject(new Error(`the game was not over after ${maxMoves} moves`));
+    });
+  });
   room.start(room.hostToken, 3);
-  for (let i = 0; i < 400 && room.game!.phase !== 'over'; i++) await sleep(10);
+  try {
+    await ended;
+  } finally {
+    room.close();
+  }
   assert.equal(room.game!.phase, 'over');
-  room.close();
 });
 
 test("the lobby and the join form name the game's real goal", () => {

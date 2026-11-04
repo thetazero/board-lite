@@ -10,7 +10,8 @@
 // clock is frozen and CSS animations are off, so a scene renders the same
 // on every run. The run goes to ~/.cache/board-lite/staged-shots/latest (the last
 // run moves to latest.previous) with an index.html contact sheet that marks
-// what changed since the previous run.
+// what changed since the previous run. Only one run goes at a time on the
+// machine (turn.ts): one started meanwhile waits for it, and says so.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,10 +19,11 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Readable, Writable } from 'node:stream';
-import { Room } from '../server/room.ts';
+import { Room, seatsFile } from '../server/room.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
-import { drive, NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
+import { NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
+import { takeTurn } from './turn.ts';
 
 const CACHE = join(homedir(), '.cache', 'board-lite', 'staged-shots'); // on disk: /tmp is RAM on the dev machine
 interface Device { width: number; height: number; deviceScaleFactor: number; mobile: boolean }
@@ -342,7 +344,8 @@ const NEVER = 2 ** 31 - 1;
 
 function makeRoom(staged: Staged, code: string): Room {
   const file = join(CACHE, 'rooms', `${code}.json`);
-  rmSync(file, { force: true });
+  // A fresh room: not the game or the seats an earlier run left under this code.
+  for (const f of [file, seatsFile(file)]) rmSync(f, { force: true });
   const { scene } = staged;
   const names = scene.names ?? NAMES;
   let room: Room;
@@ -394,6 +397,13 @@ interface Done extends Shot {
 const pngName = (file: string, i: number) => `${file}${i ? `.${i + 1}` : ''}.png`;
 
 async function main() {
+  // One run at a time on this machine, whichever tab or worktree it's from: each holds a gigabyte or two.
+  mkdirSync(CACHE, { recursive: true });
+  await takeTurn(join(CACHE, 'run.lock'), (h) => {
+    const mins = Math.round((Date.now() - h.since) / 60000);
+    console.log(`Waiting for another screenshot run to finish: process ${h.pid} in ${h.cwd}${h.args ? ` (${h.args})` : ''}, started ${mins ? `${mins} min ago` : 'just now'}.`
+      + ` Only one runs at a time, so they don't run the machine out of memory.`);
+  });
   const t0 = Date.now();
   const only = flag('only');
   const everySize = process.argv.includes('--every-size');
@@ -460,7 +470,7 @@ async function main() {
             // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
             if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
             if (shot.live) {
-              room.mutate((g) => drive(g, st.rng, st.scene.live!));
+              room.mutate((g) => st.scene.live!(g, st.rng));
               await sleep(100);
             }
             if (shot.then) {

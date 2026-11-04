@@ -160,9 +160,11 @@ svg.token { flex: none; }
 /* what's happening, on a gold ribbon */
 .topbar .phase { font-size: 1.7em; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); padding: .05em .9em .1em; filter: drop-shadow(0 .12em .15em #0008); }
 .topbar .phase .ptag { color: color-mix(in oklab, var(--pc) 62%, #1a1218); }
+/* the round's phases in order, the current one on the ribbon, the rest faint beside it */
+.topbar .phases { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: .9em; }
+.topbar .phases li:not(.phase) { font-size: 1.15em; font-weight: 600; color: var(--muted); opacity: .75; white-space: nowrap; }
+.topbar .phases li.phase { white-space: nowrap; }
 .topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
-.topbar .roomcode { color: var(--muted); font-size: 1.1em; }
-.topbar .roomcode b { color: var(--text); letter-spacing: .1em; }
 .mapwrap { position: absolute; inset: 0 calc(var(--colw) - 6vw) 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
 .board3d { flex: 1; min-height: 0; position: relative; }
@@ -218,7 +220,10 @@ svg.token { flex: none; }
 /* The bottom corners: what happened and what was said, and the titles. */
 .side .corner { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .3em .7em; font-size: clamp(15px, 1.15vw, 28px); flex: none; }
 .feedbox ul.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; max-height: 7.2em; overflow: hidden; }
-.feedbox li { padding: .05em 0; color: var(--muted); display: flex; align-items: center; gap: .35em; flex-wrap: wrap; }
+.feedbox li { padding: .05em 0; color: var(--muted); line-height: 1.45; }
+/* a line reads as a sentence: the icons sit in the words, not spaced out as cells */
+.feedbox li :is(svg, .ricon, .chip) { vertical-align: middle; }
+.feedbox li .evround { display: block; }
 .feedbox li .chip { margin-right: .15em; }
 .feedbox .feed li:last-child { color: var(--text); font-weight: 600; }
 .feedbox .said { color: var(--text); display: block; }
@@ -649,6 +654,10 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .awayline { margin: .35em .7em 0; padding: .3em 1em; display: flex; align-items: center; gap: .5em; flex-wrap: wrap; font-weight: 600; color: var(--text); }
 .awayline button { margin-left: auto; }
 .toast.news { border-left-color: var(--accent); }
+/* The answers to your trade offers: they stay at the top until tapped. */
+.notices { position: fixed; top: .5em; left: 50%; transform: translateX(-50%); z-index: 55; display: flex; flex-direction: column; gap: .4em; width: max-content; max-width: 92vw; }
+.notices .toast { position: static; transform: rotate(-.6deg); max-width: none; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; }
+.notices .toast small { display: block; font-weight: 400; opacity: .7; }
 .pcard .seatnote { display: block; color: var(--warn); font-weight: 700; font-size: .9em; }
 .join-box:has(.qr) .alt { font-size: .8em; margin: -.2em 0 .4em; }
 /* What just happened to this phone: news, not an error. */
@@ -694,6 +703,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .topbar { position: static; order: 0; flex-wrap: wrap; gap: .3em .6em; padding: .1em 0; }
 .remote .topbar .round { font-size: 1.15em; }
 .remote .topbar .phase { font-size: 1.2em; }
+.remote .topbar .phases li:not(.phase) { display: none; }
 .remote .topbar .goal { font-size: 1em; }
 .remote .mapwrap { position: static; order: 1; }
 .remote .mapwrap svg.map { flex: none; height: auto; max-height: 70vh; }
@@ -735,3 +745,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .bvs b { font-size: 1.6em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
+/* A dragon in the roost is a button: tap it for its card. */
+.dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
+.dtap:active:not(:disabled) { transform: translateY(.08em); box-shadow: none; }
+/* A hatched dragon's card: where it is now, and its stage's row marked. */
+.card .dnow { display: inline-flex; align-items: center; gap: .3em; font-weight: 700; }
+.card .dnow .grow { color: #6a5d52; letter-spacing: -.05em; }
+.drow.now { background: color-mix(in oklab, var(--kc) 22%, transparent); border-radius: 2px; box-shadow: inset .2em 0 0 var(--kc); }

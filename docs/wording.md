@@ -19,9 +19,9 @@ The game should read like a well-edited board game: the box's rulebook, the card
 | **Card text** | One or two sentences, capitalized and full-stopped. An effect you carry out is an imperative ("Gain 3 of one resource other than gold."); a lasting effect is a present-tense statement ("Makes 1 timber each round for each adjacent forest hex.", "Worth 1 point while in your hand."). | Windfall, Lumber Camp, Secret Hoard |
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear" |
-| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Vote", "Commit", "Fight or bail", "End of round" |
-| **Status** (what someone is doing, on a TV panel or the top bar) | Sentence case, present tense, short: a present participle for what a player is doing, a statement for the table. | "Taking a turn", "Voting", "Choosing a card", "Everyone keeps a building card" |
-| **State tag** (a dragon or building, at a glance) | Sentence case, one or two words: why it's out of play. A number in a tag says what it counts. | "Hungry", "Healing: raids in 2 rounds", "Fought" (cleared fauna this round) |
+| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or bail", "End of round" |
+| **Status** (what someone is doing, on a TV panel or the phone's top bar) | Sentence case, present tense, short: a present participle for what a player is doing. The TV's top bar names the phase (a heading), never a sentence. | "Taking a turn", "Voting", "Keeping a card" |
+| **State tag** (a dragon or building, at a glance) | Sentence case, one to four words: why it's out of play. A number in a tag says what it counts, and the tag claims only what the rules make sure of. | "Hungry", "Healed in 2 rounds", "Fought" (cleared fauna this round) |
 | **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax bails", "No one raids" |
 | **Why you can't** (a greyed card, an error) | A statement of the reason, then, if there's a fix, a colon and an imperative. Full stop. | "No room for another dragon: build a roost first.", "You can't afford 2 stone." |
 | **Rules** (`docs/rules.md`) | Second person, present tense, as above; "may" for a choice, no "should", and "must" only where breaking it is possible and matters. | "On your turn, you may play an action card." |
@@ -49,8 +49,8 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **no one** | nobody | No player |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
-| **ley line** | ley | The terrain, every time |
-| **<terrain> hex** ("meadow hex", "forest hex") | a bare "meadow", "forest" | A hex of a terrain, built on or not, when a card counts it or a building must go on it. "ley line" is already a terrain's name and needs no "hex" |
+| **crystal field** | ley line, ley | The purple terrain crystal comes from, every time. One hex of it is a "crystal field hex" |
+| **<terrain> hex** ("meadow hex", "forest hex") | a bare "meadow", "forest" | A hex of a terrain, built on or not, when a card counts it or a building must go on it. |
 | **<resource> building** ("livestock building", "stone building") | pasture, quarry, lumber camp, mine (for a class) | Every building of a class: the basic building and the cards that make the same resource. A card that counts buildings says "building"; one that counts terrain says "hex", so the two never read alike (a Pasture stands on a meadow hex; "adjacent pasture" and "adjacent meadow" read the same) |
 
 Spelling is American ("harbor", "color"), to match the terrain and code names the CLI shows.

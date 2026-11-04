@@ -21,6 +21,7 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
 | `--serve PORT` | off | also open the game's TV and phone pages to the network on PORT, to watch a playtest on a TV (the runner prints the TV link) |
 | `--room URL` | none | don't host: join the Claude seats to a room someone else hosts; see [`play-vs-claude.md`](play-vs-claude.md) |
+| `--resume DIR` | none | bring back the Claude seats of a runner that stopped before the game ended; see [Resuming a game](#resuming-a-game) |
 
 It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.
 
@@ -30,7 +31,7 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 
 - **At most 6 Claude seats run at once on the machine**, across every playtest from every tab: two 3-seat games, three 2-seat games, or one 6-seat game. `bot` seats don't count.
 - A game takes one slot per Claude seat before it starts any of them. If the slots aren't free, or free memory (`MemAvailable`) would drop under 2 GB once its seats start (counting 450 MB a seat), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once the slots free up. `--max-minutes` counts from the start, not from the wait.
-- A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Rerun it later.
+- A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Resume it later with `--resume` (below), or rerun it.
 - So start a whole batch at once (`batch.ts`, below, or all games in the background): the pool runs them a few at a time. Expect a batch to take about (games × seats ÷ 6) game-lengths.
 - Slots live in `~/.cache/board-lite/seat-slots/`, one file per running game naming its `--out`, so `ls` there shows who holds them. A game that dies without cleaning up frees its slots automatically (its process is gone).
 - `BOARD_LITE_MAX_SEATS=N` changes the limit, and every playtest on the machine must use the same N for it to hold; leave it alone unless the owner says so. A game with more Claude seats than the limit is refused.
@@ -44,6 +45,7 @@ In the `--out` directory:
 - `talk.txt`: just the talk.
 - `seat-N.moves.txt`: why seat N made each move. Every `act` (and `say`) carries a private `why` that no other player sees, and this file pairs each one with what really happened (`-> done` or `-> not allowed: can't afford ...`). It's the record of reasoning to audit: read it, not the narration.
 - `seat-N.jsonl`: seat N's full Claude transcript (stream-json): every tool call and result and the text between them. Its thinking blocks are empty: `claude -p` drops thinking from its output (there is no flag to keep it), which is why `why` exists. The text between moves is narration, sometimes of a move that then failed; check it against the tool results or `seat-N.moves.txt`.
+- `runner.json`: what `--resume` needs to bring the Claude seats back: the room, and each seat's model, token and Claude session.
 - `runner.log`, `seat-N.stderr.log`, `game.json` (the game, saved after every change; with `--room` the host keeps it instead).
 
 Claude seats are named Rowan, Quinn, Ellis, ... in seat order, never after their model, so no player knows which opponent is the stronger one. Which model plays which name is only in `runner.log` and `results.json`.
@@ -102,3 +104,18 @@ Each player process is started with:
 - cwd `seat-N/` and `TMPDIR` inside `--out`, so nothing lands in `/tmp`.
 
 A player whose process ends before the game does (it stopped calling tools) is resumed in the same session and told to keep playing.
+
+## Resuming a game
+
+If the runner itself stops before the game ends (low memory, Ctrl-C, a crash, the machine restarting), the game is still there and its Claude seats are still held for them. Bring the same Claude players back into their own seats, each in its own Claude session so it remembers the game so far:
+
+```
+node src/playtest/run.ts --resume ~/.cache/board-lite/playtests/<time>-<models>
+```
+
+`DIR` is the stopped runner's `--out`; the runner prints this command when it stops early. It reads `runner.json` there (or, for a runner from before that file existed, the seat tokens in `seat-N/mcp.json`, the sessions in `seat-N.jsonl` and the models in `results.json`), takes the seats back, and carries on from where the game is now, appending to the same logs and transcripts. Each player is told it was away and to look at the table before it acts.
+
+- A playtest the runner hosted comes back from its `game.json` under the same room code (`--serve PORT` to watch it on a TV again).
+- A `--room` game must still be hosted (`npm run serve` restores its rooms after a restart). Give `--room URL` too if the room's address changed, such as a new port. If someone took over the seat or a stand-in bot is playing it, the Claude player takes it back, as a phone would by joining with the seat's name.
+- `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--effort` and `--serve` can be given again; the budget counts what each seat has already spent. A Claude player whose process was killed mid-turn never reported that turn's cost, so it isn't counted.
+- It refuses while the runner for that directory is still running, and if the game is over.
