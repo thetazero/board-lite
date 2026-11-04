@@ -21,6 +21,7 @@ import { scenesMs, scenesOf } from '../../web/scenes.ts';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
+export const AWAY_MS = 60000; // a seat with no phone or CLI request for this long is away
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
 
 export interface Seat {
@@ -47,6 +48,7 @@ export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
+  awayMs?: number; // defaults to AWAY_MS (tests shorten it)
   remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
 }
 
@@ -79,6 +81,7 @@ export class Room {
   lastActive = Date.now();
   private cached: Game | null = null;
   private botTimer: NodeJS.Timeout | null = null;
+  private awayTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private botRng = { state: Date.now() | 0 };
   private savedSeats = '';
@@ -191,7 +194,18 @@ export class Room {
   // Someone is at this seat: a bot, a phone holding its stream open, or a CLI
   // or Claude player that asked something in the last minute.
   here(s: Seat): boolean {
-    return s.kind === 'bot' || (!s.left && (s.connected > 0 || Date.now() - s.seen < 60000));
+    return s.kind === 'bot' || (!s.left && (s.connected > 0 || Date.now() - s.seen < this.awayMs));
+  }
+
+  // Every player has quit: only bots are left, so the game stops (no one would
+  // ever score) and the server forgets the room once no one has come back.
+  private get awayMs(): number {
+    return this.opts.awayMs ?? AWAY_MS;
+  }
+
+  get abandoned(): boolean {
+    const people = this.seats.filter((s) => s.kind === 'player');
+    return !!this.game && people.length > 0 && people.every((s) => s.left);
   }
 
   // Before the game, joining adds a seat. Once it's running, joining with the
@@ -309,6 +323,7 @@ export class Room {
     return () => {
       s.connected--;
       s.seen = Date.now();
+      this.watchAway();
     };
   }
 
@@ -414,16 +429,33 @@ export class Room {
   // Called after every change: keep the bots going.
   private tick() {
     this.scheduleBot();
+    this.watchAway();
+  }
+
+  // A seat whose phone closed counts as here for a minute; when that runs out
+  // nothing else may change (the table is waiting on them), so tell everyone
+  // then, and the others' phones offer a bot for them.
+  private watchAway() {
+    if (this.awayTimer) clearTimeout(this.awayTimer);
+    this.awayTimer = null;
+    const ends = this.seats.filter((s) => s.kind === 'player' && !s.left && s.connected === 0 && this.here(s)).map((s) => s.seen + this.awayMs);
+    if (!ends.length) return;
+    this.awayTimer = setTimeout(() => {
+      this.awayTimer = null;
+      this.changed();
+    }, Math.max(0, Math.min(...ends) - Date.now()) + 10);
+    this.awayTimer.unref();
   }
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.sceneLeft()) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.sceneLeft()) return;
     const botPlays = (p: number) => this.seats[p]?.kind === 'bot' || !!this.seats[p]?.standIn;
     if (!waitingOn(g).some(botPlays)) return;
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
+        if (this.abandoned) return;
         this.mutate((g2) => {
           const p = waitingOn(g2).find(botPlays);
           if (p === undefined) return;
@@ -494,7 +526,8 @@ export class Room {
   close() {
     if (this.botTimer) clearTimeout(this.botTimer);
     if (this.sceneTimer) clearTimeout(this.sceneTimer);
-    this.botTimer = this.sceneTimer = null;
+    if (this.awayTimer) clearTimeout(this.awayTimer);
+    this.botTimer = this.sceneTimer = this.awayTimer = null;
     this.listeners.clear();
   }
 }

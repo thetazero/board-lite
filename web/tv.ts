@@ -87,6 +87,7 @@ function onSnapshot(s: Snapshot) {
 // Mid-game, the table hears when someone quits, when a bot starts playing for
 // someone who's away, and when a seat is taken back.
 function seatNews(before: Snapshot, now: Snapshot) {
+  if (everyoneQuit(now.lobby) && !everyoneQuit(before.lobby)) return note('Everyone quits. The game ends.');
   now.lobby.seats.forEach((s, i) => {
     const was = before.lobby.seats[i];
     if (!was || s.kind !== 'player') return;
@@ -193,10 +194,18 @@ function seatTag(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   return seat.connected ? '' : ' <small>(away)</small>';
 }
 
+// Every player has quit: the server stops the game (bots alone never score)
+// and soon forgets the room.
+function everyoneQuit(l: Snapshot['lobby']): boolean {
+  const people = l.seats.filter((s) => s.kind === 'player');
+  return people.length > 0 && people.every((s) => s.left);
+}
+
 // A bot playing for a player says so on its own line: the table should know
 // those moves aren't theirs.
 function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   if (!seat?.standIn) return '';
+  if (everyoneQuit(snap!.lobby)) return '<span class="seatnote">Quit</span>';
   return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: a bot plays for them</span>`;
 }
 
