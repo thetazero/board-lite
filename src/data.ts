@@ -35,7 +35,7 @@ export const TUNING = {
   titlePoints: 2,
   // A title needs at least this much: dragon points, tower floors, gold. The
   // hoard's is a Monument's gold: keep it for the title or spend it on one (#109).
-  titleMinimum: { army: 10, tower: 4, hoard: 10 },
+  titleMinimum: { army: 10, tower: 4, hoard: 20 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -166,7 +166,7 @@ export interface ActionDef {
 }
 
 export const ACTIONS: Record<string, ActionDef> = {
-  windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 5 },
+  windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 2 },
   treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 4 },
   growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 4 },
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons. It can raid this round.', copies: 3 },
@@ -248,7 +248,7 @@ export const DRAGONS: Record<string, DragonDef> = {
   },
   storm_wyrm: {
     name: 'Storm Wyrm', element: 'lightning', growthTime: 3, targeting: 'random', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,
-    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 20, targets: 4, dice: 1, sides: 8 }],
+    stages: [{ hp: 6, targets: 2, dice: 1, sides: 4 }, { hp: 12, targets: 3, dice: 1, sides: 6 }, { hp: 24, targets: 4, dice: 1, sides: 8 }],
   },
   bolt_drake: {
     name: 'Bolt Drake', element: 'lightning', growthTime: 2, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4 }, copies: 1,
@@ -260,7 +260,7 @@ export const DRAGONS: Record<string, DragonDef> = {
   },
   zephyr_drake: {
     name: 'Zephyr Drake', element: 'air', growthTime: 2, targeting: 'random', cost: { crystal: 8, livestock: 4 }, copies: 1,
-    stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 17, targets: 3, dice: 1, sides: 6 }],
+    stages: [{ hp: 5, targets: 1, dice: 1, sides: 6 }, { hp: 10, targets: 2, dice: 1, sides: 6 }, { hp: 20, targets: 3, dice: 1, sides: 8 }],
   },
   abyss_wyrm: {
     name: 'Abyss Wyrm', element: 'water', growthTime: 3, targeting: 'strongest_attacker', cost: { crystal: 8, livestock: 4, gold: 2 }, copies: 1,

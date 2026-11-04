@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { bundleText, specialProjectCost } from './engine.ts';
@@ -26,6 +26,8 @@ const avgAttack = avgDamage;
 const cost = (b: Bundle) => bundleText(b) || 'free';
 const n1 = (x: number) => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toString() : '∞');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+// A terrain as cards name it: "crystal field", not the code's "ley".
+const terrainName = (t: keyof typeof TERRAIN_NOUN) => TERRAIN_NOUN[t].replace(/ hex$/, '');
 
 function table(head: string[], rows: (string | number)[][]): string {
   return [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
@@ -68,7 +70,7 @@ function production(): string {
   const workshop = Object.values(UPGRADES).find((u) => u.baseBonus);
   const rows = Object.values(BUILDINGS).filter((b) => b.produces).map((b) => {
     const p = b.produces!;
-    return [b.name, b.terrain!, cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
+    return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
   const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.` : '';
   return `## Basic production buildings
@@ -83,7 +85,7 @@ function neighbourCards(): string {
   const cards = Object.values(BUILDINGS).filter((b) => b.per);
   const terrains = new Set<string>(TERRAINS);
   const rows = cards.map((b) => {
-    const counted = terrains.has(b.per!) ? `${b.per} hexes` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
+    const counted = terrains.has(b.per!) ? `${TERRAIN_NOUN[b.per as keyof typeof TERRAIN_NOUN]}es` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
     return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), b.makes ? `${cost(b.makes)} a round` : `${b.points} point`];
   });
   return `## Building cards that count their neighbours
@@ -96,7 +98,7 @@ ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
+  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
   const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 

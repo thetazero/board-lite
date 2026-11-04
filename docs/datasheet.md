@@ -44,7 +44,7 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Workshop | upgrade | 4 | 8 stone, 8 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more. | — |
 | Nesting Grounds | upgrade | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
 | Trade Charter | upgrade | 3 | 4 stone, 8 gold | This port or market makes 1 more gold each round. | — |
-| Windfall | action card | 5 | nothing | Gain 3 of one resource other than gold. | — |
+| Windfall | action card | 2 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | 4 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | 4 | 3 gold | Grow one of your dragons to its next life stage. | — |
 | Healing Potion | action card | 3 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
@@ -76,7 +76,7 @@ Anyone may build these, no card needed.
 |---|---|---|---|
 | Quarry | mountain | 8 timber, 8 crystal, 6 livestock | d4 stone (avg 2.5) |
 | Lumber Camp | forest | 8 stone, 8 crystal, 6 livestock | d4 timber (avg 2.5) |
-| Crystal Mine | ley | 8 stone, 8 timber, 6 livestock | d4 crystal (avg 2.5) |
+| Crystal Mine | crystal field | 8 stone, 8 timber, 6 livestock | d4 crystal (avg 2.5) |
 | Pasture | meadow | 6 stone, 8 timber, 8 crystal | d4 livestock (avg 2.5) |
 
 Workshop (8 stone, 8 timber, 2 crystal): makes 2 more a round.
@@ -89,7 +89,7 @@ The land is ringed by ocean, where nothing is built. Each of its six coasts has 
 |---|---|---|
 | mountain | Quarry | 20% |
 | forest | Lumber Camp | 20% |
-| ley | Crystal Mine | 20% |
+| crystal field | Crystal Mine | 20% |
 | meadow | Pasture | 20% |
 | plains | — | 20% |
 | harbor | Port | coast |
@@ -105,7 +105,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Woodcutter's Hut | timber building | forest hexes | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
 | Sawmill | timber building | timber buildings (anyone's) | 6 stone, 6 crystal, 4 livestock | 1 timber a round |
 | Driftwood Yard | timber building | ocean hexes | 8 stone, 6 crystal, 6 livestock | 1 timber a round |
-| Crystal Spire | crystal building | ley hexes | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
+| Crystal Spire | crystal building | crystal field hexes | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
 | Gem Cutter | crystal building | crystal buildings (anyone's) | 6 stone, 6 timber, 4 livestock | 1 crystal a round |
 | Smelter | crystal building | stone buildings (anyone's) | 4 stone, 6 timber, 6 livestock | 1 crystal a round |
 | Shepherd's Fold | livestock building | meadow hexes | 6 stone, 6 timber, 4 crystal | 1 livestock a round |
@@ -113,7 +113,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Fishery | livestock building | ocean hexes | 6 stone, 8 timber, 6 crystal | 1 livestock a round |
 | Market | trade building | trade buildings (anyone's) | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
 | Monument | monument | monuments (anyone's) | 8 stone, 6 timber, 20 gold | 1 point |
-| Standing Stones | monument | ley hexes | 6 stone, 6 crystal, 20 gold | 1 point |
+| Standing Stones | monument | crystal field hexes | 6 stone, 6 crystal, 20 gold | 1 point |
 | Lighthouse | monument | ocean hexes | 10 stone, 6 timber, 20 gold | 1 point |
 | Guildhall | monument | trade buildings (anyone's) | 6 stone, 6 timber, 20 gold | 1 point |
 
@@ -141,7 +141,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most gold (at least 10). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
+Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 
@@ -154,10 +154,10 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 | Cinder Drake | fire | 8 crystal, 4 livestock | 2 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **9**: 11hp 2×1d6 (7) | **16**: 18hp 3×1d8 (13.5) |
 | Frost Wyrm | ice | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 9hp 1×1d6 (3.5) | **11**: 17hp 1×2d6 (7) | **20**: 30hp 1×3d8 (13.5) |
 | Rime Drake | ice | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 6hp 1×1d6 (3.5) | **9**: 12hp 1×2d6 (7) | **19**: 20hp 2×2d8 (18) |
-| Storm Wyrm | lightning | 8 crystal, 4 livestock, 2 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **19**: 20hp 4×1d8 (18) |
+| Storm Wyrm | lightning | 8 crystal, 4 livestock, 2 gold | 3 | random | **5**: 6hp 2×1d4 (5) | **11**: 12hp 3×1d6 (10.5) | **21**: 24hp 4×1d8 (18) |
 | Bolt Drake | lightning | 8 crystal, 4 livestock | 2 | strongest_attacker | **5**: 5hp 1×1d8 (4.5) | **9**: 10hp 1×2d8 (9) | **19**: 20hp 1×4d8 (18) |
 | Sky Wyrm | air | 8 crystal, 4 livestock, 2 gold | 3 | lowest_health | **5**: 6hp 1×1d6 (3.5) | **11**: 13hp 2×1d8 (9) | **20**: 22hp 2×2d8 (18) |
-| Zephyr Drake | air | 8 crystal, 4 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **13**: 17hp 3×1d6 (10.5) |
+| Zephyr Drake | air | 8 crystal, 4 livestock | 2 | random | **4**: 5hp 1×1d6 (3.5) | **8**: 10hp 2×1d6 (7) | **16**: 20hp 3×1d8 (13.5) |
 | Abyss Wyrm | water | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
 | Reef Drake | water | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
 
@@ -235,7 +235,7 @@ How much of each resource every card in both decks costs in total (each card cou
 
 ## Decks
 
-Building deck 43 cards (18 buildings, 3 upgrades), action deck 44.
+Building deck 43 cards (18 buildings, 3 upgrades), action deck 41.
 
 | Card | Deck | Copies | Share of deck |
 |---|---|---|---|
@@ -260,13 +260,13 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 44.
 | Workshop | building deck (upgrade) | 4 | 9% |
 | Nesting Grounds | building deck (upgrade) | 3 | 7% |
 | Trade Charter | building deck (upgrade) | 3 | 7% |
-| Windfall | action | 5 | 11% |
-| Buried Treasure | action | 4 | 9% |
-| Growth Elixir | action | 4 | 9% |
+| Windfall | action | 2 | 5% |
+| Buried Treasure | action | 4 | 10% |
+| Growth Elixir | action | 4 | 10% |
 | Healing Potion | action | 3 | 7% |
 | War Horn | action | 3 | 7% |
-| Secret Hoard | action | 4 | 9% |
-| Wolf Call | action | 4 | 9% |
+| Secret Hoard | action | 4 | 10% |
+| Wolf Call | action | 4 | 10% |
 | Rouse the Bear | action | 2 | 5% |
 | Any upgrade (3 kinds) | building deck (upgrade) | 10 | 23% |
-| Any dragon (15 kinds) | action | 15 | 34% |
+| Any dragon (15 kinds) | action | 15 | 37% |
