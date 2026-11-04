@@ -81,7 +81,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 |---|---|---|
 | Stone | Quarries (mountains) | Tower floors, roosts, defenses |
 | Timber | Lumber camps (forests) | Buildings, raid gear |
-| Crystal | Crystal mines (ley lines, caves) | Hatching eggs, action cards |
+| Crystal | Crystal mines (crystal fields, caves) | Hatching eggs, action cards |
 | Livestock | Pastures | Feeding dragons, every round |
 | Gold | Raids only (not produced) | The strongest things: action cards, top tower floors, adult dragons |
 

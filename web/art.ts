@@ -404,7 +404,7 @@ const BUILDINGS: Record<string, () => string> = {
     + lift(f([[64, 64], [118, 60], [118, 64], [64, 68]], '#c48a4e', 0.1) + [72, 92, 112].map((x) => f([[x, 66], [x + 2, 66], [x + 2, 80], [x, 80]], '#7f4b23', 0)).join(''))
     + lift(f([[80, 56], [108, 56], [104, 62], [84, 62]], '#a0673a', -0.05) + f([[93, 56], [93, 20], [95, 20], [95, 56]], '#5e3c22', 0)
       + f([[95, 22], [95, 52], [112, 52]], '#f3ece0', 0.1) + f([[93, 24], [93, 52], [80, 52]], '#f3ece0', -0.15) + f([[95, 38], [95, 44], [105, 44], [102, 38]], TRADE_RED, 0), true),
-  // A ring of standing stones on the ley line, a trilithon carrying a gold sun.
+  // A ring of standing stones on a crystal field, a trilithon carrying a gold sun.
   standing_stones: () => sky('#3d3170', { x: 98, y: 14, r: 6, c: '#e8e0ff' })
     + star(20, 12, 2) + star(70, 8, 1.5) + star(46, 18, 1.2)
     + lift(ridges([[24, 20, 22], [104, 24, 22]], '#6f6a86'))
