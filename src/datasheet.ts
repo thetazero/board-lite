@@ -1,18 +1,17 @@
-// The tuning datasheet: every number in data.ts and what they add up to
-// (costs, outputs, points, raid odds), so bad tuning shows up without a
-// playtest. Everything here is computed from data.ts and the engine; nothing
-// is typed in by hand. `npm run datasheet` writes docs/datasheet.md, and a
+// The tuning datasheet: the raw game rules, every number in data.ts as the
+// game has it (costs, outputs, stats, points), so bad tuning shows up without
+// a playtest. Nothing here is simulated: no generated maps, fights or bot
+// games, only what data.ts says. `npm run datasheet` writes docs/datasheet.md, and a
 // test fails when that file is out of date.
 
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
-import { playOut } from './bot.ts';
 import {
   ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
-  type Attack, type BuildingClass, type Bundle, type Resource, type Terrain,
+  type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
-import { apply, bundleText, newGame, specialProjectCost, type Game } from './engine.ts';
-import { distance, generateMap, key, mapRadius, neighbors, parseKey, towerSpots } from './map.ts';
+import { bundleText, specialProjectCost } from './engine.ts';
+import { mapRadius } from './map.ts';
 
 
 // ---------- plain numbers ----------
@@ -23,8 +22,6 @@ const perPoint = (b: Bundle, pts: number): string => {
   const parts = RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `${n1(b[r]! / pts)} ${r}`);
   return parts.length ? parts.join(', ') : 'nothing';
 };
-// An average take over many raids, each resource apart.
-const avgText = (b: Record<string, number>) => RESOURCES.filter((r) => (b[r] ?? 0) >= 0.05).map((r) => `${n1(b[r])} ${r}`).join(', ') || 'nothing';
 const avgAttack = avgDamage;
 const cost = (b: Bundle) => bundleText(b) || 'free';
 const n1 = (x: number) => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toString() : '∞');
@@ -81,132 +78,31 @@ Anyone may build these, no card needed.
 ${table(['Building', 'Terrain', 'Cost', 'Makes each round'], rows)}${extra}`;
 }
 
-// Generated maps, one batch per player count, shared by the land sections.
-const MAP_SEEDS = 300;
-const PLAYER_COUNTS = [2, 3, 4];
-const hexDist = (a: { q: number; r: number }, b: { q: number; r: number }) => distance(a.q - b.q, a.r - b.r);
-function sampleMaps(players: number) {
-  return Array.from({ length: MAP_SEEDS }, (_, i) => generateMap({ state: (i + 1) * 7 + players }, players));
-}
-function towerHexes(players: number) {
-  return towerSpots(players).map((k) => { const [q, r] = parseKey(k)!; return { q, r }; });
-}
-const PRODUCERS = Object.values(BUILDINGS).filter((b) => b.produces);
-
-// Building cards whose effect counts their neighbours. For a terrain, the
-// map decides the count: measured as the best open hex touching a tower (the
-// first place one could go) and the share of all land hexes with 2 or more.
+// Building cards whose effect counts their neighbours.
 function neighbourCards(): string {
   const cards = Object.values(BUILDINGS).filter((b) => b.per);
   const terrains = new Set<string>(TERRAINS);
-  const players = 3;
-  const maps = sampleMaps(players);
-  const measured = (t: Terrain) => {
-    let best = 0, twoPlus = 0, landHexes = 0;
-    for (const map of maps) {
-      const count = (k: string) => neighbors(k).filter((n) => map[n]?.terrain === t).length;
-      for (const tw of towerHexes(players)) {
-        const spots = neighbors(key(tw.q, tw.r)).filter((n) => map[n] && map[n].terrain !== 'ocean' && map[n].terrain !== 'harbor');
-        best += Math.max(0, ...spots.map(count));
-      }
-      for (const [k, h] of Object.entries(map)) if (h.terrain !== 'ocean') { landHexes++; if (count(k) >= 2) twoPlus++; }
-    }
-    return `${n1(best / (maps.length * players))} / ${pct(twoPlus / landHexes)}`;
-  };
   const rows = cards.map((b) => {
     const counted = terrains.has(b.per!) ? `${b.per} hexes` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
-    return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), b.makes ? `${cost(b.makes)} a round` : `${b.points} point`, terrains.has(b.per!) ? measured(b.per as Terrain) : 'built'];
+    return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), b.makes ? `${cost(b.makes)} a round` : `${b.points} point`];
   });
   return `## Building cards that count their neighbours
 
-Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building). "Map" is for ${players} players: the best count on an open hex touching a tower / share of land hexes with 2 or more.
+Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building).
 
-${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds', 'Map'], rows)}`;
+${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 }
 
 function land(): string {
-  // Measured on generated maps: how often a tower has each terrain next to it,
-  // and how many hexes of it lie within 2 steps.
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => {
-    const cells: string[] = [];
-    for (const players of PLAYER_COUNTS) {
-      let adjacent = 0, near = 0, towers = 0;
-      for (const map of sampleMaps(players)) {
-        for (const tw of towerHexes(players)) {
-          towers++;
-          const hexes = Object.values(map).filter((h) => h.terrain === t);
-          if (hexes.some((h) => hexDist(h, tw) === 1)) adjacent++;
-          near += hexes.filter((h) => hexDist(h, tw) <= 2 && hexDist(h, tw) > 0).length;
-        }
-      }
-      cells.push(`${pct(adjacent / towers)} / ${n1(near / towers)}`);
-    }
-    const share = TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast';
-    return [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', share, ...cells];
-  });
-  const size = PLAYER_COUNTS.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
+  const rows = terrains.map((t) => [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
+  const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
 The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
 
-Measured on ${MAP_SEEDS} generated maps per player count. Each cell: share of towers with that terrain on a touching hex / average number of such hexes within 2 steps of the tower.
-
-${table(['Terrain', 'For', 'Share of land', ...PLAYER_COUNTS.map((p) => `${p} players`)], rows)}`;
-}
-
-function shortages(): string {
-  // Who is short of what, from the land alone: card costs ask for stone,
-  // timber and crystal about equally (see Resource demand), so a player is
-  // short of what their own land can't make. A player's "scarcest" resource is
-  // the one with the fewest hexes to make it within 2 steps of their tower
-  // (ties split evenly).
-  const rows = PLAYER_COUNTS.map((players) => {
-    let seats = 0, none = 0, sameScarcest = 0, pairs = 0;
-    const scarcest = Object.fromEntries(PRODUCERS.map((b) => [b.produces!.resource, 0])) as Record<string, number>;
-    for (const map of sampleMaps(players)) {
-      const shares = towerHexes(players).map((tw) => {
-        const counts = PRODUCERS.map((b) => Object.values(map).filter((h) => h.terrain === b.terrain && hexDist(h, tw) <= 2).length);
-        const min = Math.min(...counts);
-        const tied = counts.filter((c) => c === min).length;
-        if (min === 0) none++;
-        seats++;
-        return counts.map((c) => (c === min ? 1 / tied : 0));
-      });
-      for (const sh of shares) PRODUCERS.forEach((b, i) => (scarcest[b.produces!.resource] += sh[i]));
-      for (let a = 0; a < shares.length; a++) {
-        for (let b = a + 1; b < shares.length; b++) {
-          pairs++;
-          sameScarcest += shares[a].reduce((s, x, i) => s + x * shares[b][i], 0);
-        }
-      }
-    }
-    return [players, pct(none / seats), pct(sameScarcest / pairs), PRODUCERS.map((b) => `${b.produces!.resource} ${pct(scarcest[b.produces!.resource] / seats)}`).join(', ')];
-  });
-  const harbor = PLAYER_COUNTS.map((players) => {
-    let seats = 0, adjacent = 0, near = 0, steps = 0;
-    for (const map of sampleMaps(players)) {
-      const harbors = Object.values(map).filter((h) => h.terrain === 'harbor');
-      for (const tw of towerHexes(players)) {
-        seats++;
-        const d = Math.min(...harbors.map((h) => hexDist(h, tw)));
-        if (d === 1) adjacent++;
-        if (d <= 2) near++;
-        steps += d;
-      }
-    }
-    return [players, pct(adjacent / seats), pct(near / seats), n1(steps / seats)];
-  });
-  return `## Shortages
-
-What a player's own land can't make, they have to trade for. Measured on the same maps as Land, counting production terrain within 2 steps of each tower. If shortages were fully independent between players, two players would share their scarcest resource ${pct(1 / PRODUCERS.length)} of the time.
-
-${table(['Players', 'Players with no land for some resource', 'Two players share their scarcest resource', 'Scarcest resource, how often'], rows)}
-
-Harbors (for ports, the only way to beat the bank's ${TUNING.bankRate}:1):
-
-${table(['Players', 'Harbor touching the tower', 'Harbor within 2 steps', 'Average steps to the nearest harbor'], harbor)}`;
+${table(['Terrain', 'For', 'Share of land'], rows)}`;
 }
 
 function growth(gt: number, perRound: number, stage: number) {
@@ -273,109 +169,18 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 ${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}`;
 }
 
-// Run one raid through the real engine: each dragon fights to the end for its
-// owner (P1 unless given). Returns whether the kingdom fell, what each player
-// took, and each dragon's damage.
-// A small game to copy for each raid: no map, decks or log, so the engine's
-// per-command snapshot stays cheap.
-let template: Game | null = null;
-type Raider = { key: string; stage: number; owner?: number };
-function raidOnce(target: string, dragons: Raider[], seed: number): { won: boolean; got: Bundle[]; damage: number[] } {
-  if (!template) {
-    template = newGame(2, 1);
-    template.log = [];
-    template.decks = { building: [], action: [] };
-    template.map = {}; // raids never look at the map
-  }
-  const g = structuredClone(template);
-  g.rng = { state: seed };
-  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: d.owner ?? 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
-  // A hatchling P2 keeps at home, so the next raid has a raider and isn't
-  // skipped: the engine then stops at its vote, before the round ends.
-  const home = { id: 'home', owner: 1, key: dragons[0].key, stage: 1, growth: 0, damage: 0, resting: '' as const };
-  const raiders = [...g.dragons];
-  g.dragons.push(home);
-  const before = [0, 1].map((p) => ({ ...g.players[p].resources }));
-  g.phase = 'raid';
-  g.raidsLeft = 2; // so the engine stops at the next raid's vote, before healing
-  g.raid = {
-    step: 'vote', candidates: [target], votes: [null, null], target: null, commits: [[], []], ready: [false, false],
-    choices: [null, null], units: [], fighters: [],
-  };
-  apply(g, 0, 'vote 1');
-  apply(g, 1, 'vote 1');
-  const sent = [0, 1].filter((p) => raiders.some((d) => d.owner === p));
-  for (const p of sent) apply(g, p, `commit ${raiders.filter((d) => d.owner === p).map((d) => d.id).join(' ')}`);
-  for (const p of [0, 1]) if (sent.includes(p) || p === home.owner) apply(g, p, 'ready');
-  for (const p of sent) apply(g, p, 'fight');
-  const got = [0, 1].map((p) => Object.fromEntries(RESOURCES.map((r) => [r, (g.players[p].resources[r] ?? 0) - (before[p][r] ?? 0)])) as Bundle);
-  return { won: g.log.some((e) => e.ev?.k === 'raidEnd' && e.ev.won), got, damage: raiders.map((r) => g.dragons.find((d) => d.id === r.id)!.damage) };
-}
-const raid = (target: string, dragons: Raider[], seed: number) => raidOnce(target, dragons, seed).won;
-
-const RAIDS_PER_CELL = 100; // about ±5 points of precision at 50%
-function odds(target: string, dragons: Raider[], salt: number) {
-  let won = 0;
-  for (let i = 0; i < RAIDS_PER_CELL; i++) if (raid(target, dragons, salt * 1000 + i)) won++;
-  return won / RAIDS_PER_CELL;
-}
-
 // Rounds a dragon with this much damage sits out (it heals at each production).
 const roundsOut = (damage: number) => Math.ceil(damage / TUNING.healPerRound);
 
-// Averages over many raids: the chance it falls, what each player takes (gold
-// and other resources apart), and the raid rounds each dragon then misses.
-function outcome(target: string, dragons: Raider[], salt: number, n = 400) {
-  let won = 0;
-  const got = [0, 1].map(() => Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<string, number>);
-  const out = dragons.map(() => 0);
-  for (let i = 0; i < n; i++) {
-    // A '*' dragon is a base dragon, its element varying from raid to raid.
-    const bases = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
-    const r = raidOnce(target, dragons.map((d, j) => (d.key === '*' ? { ...d, key: bases[(i + j) % bases.length] } : d)), salt * 1000 + i);
-    if (r.won) won++;
-    r.got.forEach((x, p) => { for (const k of RESOURCES) got[p][k] += (x[k] ?? 0) / n; });
-    r.damage.forEach((x, d) => (out[d] += roundsOut(x) / n));
-  }
-  const took = got.map(avgText);
-  return { won: won / n, took, out };
-}
-
-// What a tag-along and the player carrying the raid each take: a base
-// hatchling joins two base adults, on the easiest kingdom and on a hard one.
-function shares(): string {
-  const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
-  const [hatch, adult] = [combatPower(DRAGONS[base].stages[0]), combatPower(DRAGONS[base].stages[2])];
-  const targets = Object.keys(TARGETS).sort((a, b) => targetPower(a) - targetPower(b));
-  const rows = [targets[0], targets[targets.length - 2]].map((t, i) => {
-    const solo = outcome(t, [{ key: '*', stage: 3 }, { key: '*', stage: 3 }], 7000 + i);
-    const tag = outcome(t, [{ key: '*', stage: 3 }, { key: '*', stage: 3 }, { key: '*', stage: 1, owner: 1 }], 7100 + i);
-    const share: Bundle = Object.fromEntries(RESOURCES.map((r) => [r, Math.floor((TARGETS[t].loot[r] ?? 0) * hatch / (2 * adult + hatch))]));
-    return [`${TARGETS[t].name} (${targetPower(t)})`, cost(TARGETS[t].loot), `${pct(solo.won)} → ${pct(tag.won)}`, solo.took[0], tag.took[0], tag.took[1], `about ${cost(share)}`, n1(tag.out[2])];
-  });
-  return `Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (${2 * adult} power), and a second tags along with a base hatchling (${hatch}). Base dragons' elements vary from raid to raid. Takes are averages, losses included, from 400 raids each.
-
-${table(['Kingdom', 'Loot', 'Falls: alone → with the tag-along', 'Carrier alone takes', 'Carrier takes, shared', 'Tag-along takes', 'Tag-along if it falls and the hatchling stands', 'Raid rounds the hatchling then misses'], rows)}`;
-}
-
-// How long a hurt dragon is out, and what being bailed on costs.
 function healing(): string {
   const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
   const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsOut(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
   const big = Object.values(DRAGONS).reduce((m, d) => (d.stages[2].hp > m.stages[2].hp ? d : m));
-  // Two players each send a base adult to a kingdom that needs both; one secretly bails.
-  const targets = Object.keys(TARGETS).sort((a, b) => targetPower(a) - targetPower(b));
-  const hard = targets[targets.length - 3];
-  const both = outcome(hard, [{ key: '*', stage: 3 }, { key: '*', stage: 3, owner: 1 }], 7200);
-  const left = outcome(hard, [{ key: '*', stage: 3 }], 7300);
-  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.
-
-Being bailed on, from 400 raids each (elements varying): two players each send a base adult to ${TARGETS[hard].name} (power ${targetPower(hard)}). If both fight, it falls ${pct(both.won)} of the time, each takes ${both.took[0]}, and each dragon misses ${n1(both.out[0])} raid rounds on average. If one secretly bails, the one left alone wins ${pct(left.won)} of the time, takes ${left.took[0]}, and misses ${n1(left.out[0])} raid rounds.`;
+  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
 }
 
 function raids(): string {
-  const targets = Object.keys(TARGETS);
-  const targetRows = targets.map((k) => {
+  const targetRows = Object.keys(TARGETS).map((k) => {
     const t = TARGETS[k];
     const units = t.units.map((u) => UNITS[u]);
     return [
@@ -384,80 +189,19 @@ function raids(): string {
     ];
   });
   const unitRows = Object.values(UNITS).map((u) => [u.name, combatPower(u), u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
-
-  // A lone dragon of every kind, at every stage, against every kingdom.
-  const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
-  const head = ['Raider', ...targets.map((k) => TARGETS[k].name)];
-  const rows: string[][] = [];
-  let salt = 1;
-  // Gold a lone base dragon expects from each kingdom, by stage.
-  const goldEach: number[][] = [];
-  const chance: number[][] = [];
-  for (const stage of [1, 2, 3]) {
-    const avg = targets.map((t) => {
-      const all = baseKeys.map((k) => odds(t, [{ key: k, stage }], salt++));
-      return { all, mean: all.reduce((s, o) => s + o, 0) / all.length };
-    });
-    goldEach.push(avg.map((a, i) => a.mean * (TARGETS[targets[i]].loot.gold ?? 0)));
-    chance.push(avg.map((a) => a.mean));
-    rows.push([`Base dragon, ${STAGE_NAMES[stage]} (${combatPower(DRAGONS[baseKeys[0]].stages[stage - 1])})`, ...avg.map(({ all, mean }) => `${pct(mean)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`)]);
-  }
-  // Raiding alone, the kingdom that pays it best, when every kingdom has
-  // hoarded the same extra gold (it adds 1 after each raid it doesn't fall in).
-  const mon = BUILDINGS.monument;
-  const best = (stage: number, extra: number) => {
-    const each = goldEach[stage].map((g, i) => g + chance[stage][i] * extra);
-    const i = each.indexOf(Math.max(...each));
-    return `${n1(each[i])} (${TARGETS[targets[i]].name})`;
-  };
-  const hoardRows = [0, 3, 6].map((x) => [x ? `${x} gold each` : 'none (printed loot)', best(0, x), best(1, x), best(2, x)]);
-  const goldLine = `Gold a lone base dragon expects from one raid on the kingdom that pays it best (if its vote wins), by how much extra gold the kingdoms have hoarded. A ${mon.name} takes ${mon.cost.gold} gold.
-
-${table(['Hoarded', 'Hatchling', 'Young', 'Adult'], hoardRows)}`;
-  const pairCells = targets.map((t) => {
-    const all = baseKeys.map((k) => odds(t, [{ key: k, stage: 2 }, { key: k, stage: 2 }], salt++));
-    return pct(all.reduce((s, o) => s + o, 0) / all.length);
-  });
-  rows.push([`Two young base dragons (${2 * combatPower(DRAGONS[baseKeys[0]].stages[1])})`, ...pairCells]);
-  for (const [k, d] of Object.entries(DRAGONS).filter(([, d]) => !d.base)) {
-    rows.push([`${d.name} (${d.element}), adult (${combatPower(d.stages[2])})`, ...targets.map((t) => pct(odds(t, [{ key: k, stage: 3 }], salt++)))]);
-  }
-
   return `## Raids
 
 Defenders:
 
 ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], unitRows)}
 
-Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
+Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power).
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot'], targetRows)}
 
-Chance the kingdom falls to one player's raiders fighting to the end, from ${RAIDS_PER_CELL} raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
-
-${table(head, rows)}
-
-${goldLine}
-
-${shares()}
-
 ${healing()}`;
-}
-
-// Clear one beast through the real engine: P1 sends these dragons on their
-// turn. Returns whether it fell.
-function hunt(fauna: string, dragons: { key: string; stage: number }[], seed: number): boolean {
-  if (!template) raid('brindle', [], 0); // builds the template
-  const g = structuredClone(template!);
-  g.rng = { state: seed };
-  g.map = { '0,0': { q: 0, r: 0, terrain: 'plains', fauna } };
-  g.dragons = dragons.map((d, i) => ({ id: `d${i + 1}`, owner: 0, key: d.key, stage: d.stage, growth: 0, damage: 0, resting: '' }));
-  g.phase = 'action';
-  g.turn = 0;
-  apply(g, 0, `clear 0,0 ${g.dragons.map((d) => d.id).join(' ')}`);
-  return !g.map['0,0'].fauna;
 }
 
 function fauna(): string {
@@ -466,26 +210,6 @@ function fauna(): string {
     const where = at < 0 ? 'cards only' : `${at + 2}${at === FAUNA_BY_DISTANCE.length - 1 ? '+' : ''} steps from the nearest tower`;
     return [f.name, f.hp, `${f.targets}×${f.dice}d${f.sides} (${n1(avgAttack(f))})`, f.strong.join(', ') || '—', f.weak.join(', ') || '—', cost(f.loot), where];
   });
-  // Clear odds, averaged over the five base dragons' elements (worst–best in brackets).
-  const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
-  const parties: [string, number[]][] = [['One hatchling', [1]], ['One young', [2]], ['One adult', [3]], ['Two young', [2, 2]], ['Two adults', [3, 3]]];
-  let salt = 500;
-  const oddsRows = parties.map(([label, stages]) => [label, ...Object.keys(FAUNA).map((f) => {
-    const all = baseKeys.map((k) => {
-      const s0 = salt++;
-      let won = 0;
-      for (let i = 0; i < RAIDS_PER_CELL; i++) if (hunt(f, stages.map((stage) => ({ key: k, stage })), s0 * 1000 + i)) won++;
-      return won / RAIDS_PER_CELL;
-    });
-    return `${pct(all.reduce((s, o) => s + o, 0) / all.length)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`;
-  })]);
-  // The starting map: how many of each beast, by player count.
-  const mapRows = PLAYER_COUNTS.map((players) => {
-    const maps = sampleMaps(players);
-    const per = (k: string) => maps.reduce((s, m) => s + Object.values(m).filter((h) => h.fauna === k).length, 0) / maps.length;
-    const land = Object.values(maps[0]).filter((h) => h.terrain !== 'ocean').length;
-    return [players, land, ...Object.keys(FAUNA).map((k) => n1(per(k)))];
-  });
   const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), a.copies]);
   return `## Fauna
 
@@ -493,50 +217,19 @@ Beasts on the map. Nothing is built on a hex with fauna, and a building under fa
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Loot', 'Starts'], unitRows)}
 
-Chance the beast falls, from ${RAIDS_PER_CELL} fights through the engine per cell, averaged over the five base dragons' elements (worst–best element in brackets):
-
-${table(['Dragons sent', ...Object.values(FAUNA).map((f) => f.name)], oddsRows)}
-
-On the starting map (one beast per ${TUNING.landHexesPerFauna} land hexes, none within 1 step of a tower), on average:
-
-${table(['Players', 'Land hexes', ...Object.values(FAUNA).map((f) => f.name)], mapRows)}
+On the starting map: one beast per ${TUNING.landHexesPerFauna} land hexes, none within 1 step of a tower.
 
 Cards that send fauna (action cards; see Decks for how often they come):
 
 ${table(['Card', 'Sends', 'Cost', 'Copies'], cardRows)}`;
 }
 
-// The great beasts: what force kills each, how often, and when it exists.
+// The great beasts: their stats, and when a grown dragon can exist.
 function beasts(): string {
   const unitRows = Object.entries(BEASTS).map(([k, b]) => [
     b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.strong.join(', '), b.weak.join(', '), b.points,
     k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean beside one harbor',
   ]);
-  const baseKeys = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
-  const weakKey = (b: string) => baseKeys.find((k) => BEASTS[b].weak.includes(DRAGONS[k].element))!;
-  const others = (b: string) => baseKeys.filter((k) => !BEASTS[b].weak.includes(DRAGONS[k].element));
-  const N = 2 * RAIDS_PER_CELL;
-  let salt = 900;
-  const rate = (b: string, party: { key: string; stage: number }[]) => {
-    const s0 = salt++;
-    let won = 0;
-    for (let i = 0; i < N; i++) if (hunt(b, party, s0 * 1000 + i)) won++;
-    return won / N;
-  };
-  const same = (k: string, stages: number[]) => stages.map((stage) => ({ key: k, stage }));
-  const parties: [string, number[]][] = [['Two young', [2, 2]], ['One adult', [3]], ['Two adults', [3, 3]], ['Three adults', [3, 3, 3]], ['Four adults', [3, 3, 3, 3]]];
-  const rows: string[][] = [];
-  for (const [label, stages] of parties) {
-    rows.push([label, ...Object.keys(BEASTS).flatMap((b) => {
-      const weak = pct(rate(b, same(weakKey(b), stages)));
-      const all = others(b).map((k) => rate(b, same(k, stages)));
-      return [weak, `${pct(all.reduce((x, y) => x + y, 0) / all.length)} (${pct(Math.min(...all))}–${pct(Math.max(...all))})`];
-    })]);
-  }
-  const specials = Object.keys(BEASTS).map((b) => {
-    const best = Object.keys(DRAGONS).filter((k) => !DRAGONS[k].base && BEASTS[b].weak.includes(DRAGONS[k].element));
-    return best.map((k) => `${DRAGONS[k].name} adult with a base adult of its element: ${pct(rate(b, [{ key: k, stage: 3 }, { key: weakKey(b), stage: 3 }]))} against the ${BEASTS[b].name}`).join('; ');
-  });
   const base = Object.values(DRAGONS).find((d) => d.base)!;
   const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus)!;
   const adult = growth(base.growthTime, 1, 3);
@@ -547,13 +240,9 @@ Two on every map, the top tier of the fauna: fought like fauna (on your turn, yo
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Points', 'Lives in'], unitRows)}
 
-Chance it falls, from ${N} fights through the engine per cell. "Weakness" is base dragons of the element it is weak to; "other" averages the other four elements (worst–best in brackets). A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
+A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 
-${table(['Dragons sent', ...Object.values(BEASTS).flatMap((b) => [`${b.name}, weakness`, `${b.name}, other`])], rows)}
-
-${specials.join('. ')}.
-
-When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult ${adult} rounds after it is hatched, ${fast} with a ${hatchery.name}. Two adults of a beast's weakness, hatched in rounds 2–4, are ready in rounds ${2 + adult}–${4 + adult}; the bot games under Game length show when beasts fall with random play.`;
+When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult ${adult} rounds after it is hatched, ${fast} with a ${hatchery.name}. `;
 }
 
 function deck(): string {
@@ -561,30 +250,20 @@ function deck(): string {
   const act = [...Object.values(ACTIONS), ...Object.values(DRAGONS)];
   const nb = build.reduce((s, c) => s + (c.copies ?? 0), 0);
   const na = act.reduce((s, c) => s + c.copies, 0);
-  // Chance one player is dealt at least one copy within 5 rounds, ignoring
-  // what other players draw (a fair approximation while the deck is large).
-  const within = (copies: number, deckSize: number, draws: number) => {
-    let miss = 1;
-    for (let i = 0; i < draws; i++) miss *= (deckSize - copies - i) / (deckSize - i);
-    return 1 - Math.max(0, miss);
-  };
-  const R = 5;
-  const seen = R * TUNING.buildingCardsDrawn;
   const rows = [
-    ...Object.values(BUILDINGS).filter((c) => c.copies).map((c) => [c.name, 'building', c.copies!, pct(c.copies! / nb), pct(within(c.copies!, nb, seen))]),
-    ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb), pct(within(c.copies, nb, seen))]),
-    ...Object.values(ACTIONS).map((c) => [c.name, 'action', c.copies, pct(c.copies / na), pct(within(c.copies, na, R * TUNING.actionCardsPerRound))]),
+    ...Object.values(BUILDINGS).filter((c) => c.copies).map((c) => [c.name, 'building', c.copies!, pct(c.copies! / nb)]),
+    ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb)]),
+    ...Object.values(ACTIONS).map((c) => [c.name, 'action', c.copies, pct(c.copies / na)]),
   ];
   const upgradeCopies = Object.values(UPGRADES).reduce((s, u) => s + u.copies, 0);
-  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb), pct(within(upgradeCopies, nb, seen))]);
-  const firstTwo = within(upgradeCopies, nb, 2 * TUNING.buildingCardsDrawn);
+  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb)]);
   const dragonCopies = Object.values(DRAGONS).reduce((s, d) => s + d.copies, 0);
-  rows.push([`Any dragon (${Object.keys(DRAGONS).length} kinds)`, 'action', dragonCopies, pct(dragonCopies / na), pct(within(dragonCopies, na, R * TUNING.actionCardsPerRound))]);
+  rows.push([`Any dragon (${Object.keys(DRAGONS).length} kinds)`, 'action', dragonCopies, pct(dragonCopies / na)]);
   return `## Decks
 
-Building deck ${nb} cards (${Object.values(BUILDINGS).filter((c) => c.copies).length} buildings, ${Object.keys(UPGRADES).length} upgrades), action deck ${na}. Last column: chance a player draws at least one (to keep or pass over) within ${R} rounds. A player draws at least one upgrade in their first 2 rounds ${pct(firstTwo)} of the time.
+Building deck ${nb} cards (${Object.values(BUILDINGS).filter((c) => c.copies).length} buildings, ${Object.keys(UPGRADES).length} upgrades), action deck ${na}.
 
-${table(['Card', 'Deck', 'Copies', 'Share of deck', `By round ${R}`], rows)}`;
+${table(['Card', 'Deck', 'Copies', 'Share of deck'], rows)}`;
 }
 
 function demand(): string {
@@ -612,56 +291,12 @@ How much of each resource every card in both decks costs in total (each card cou
 ${table(['Resource', 'In all card costs', 'Share', 'Comes from'], rows)}`;
 }
 
-// The random-bot games, played once for Game length.
-const BOT_GAMES = 30;
-let botGamesCache: { players: number; games: Game[] }[] | undefined;
-function botGames() {
-  return (botGamesCache ??= [2, 3, 4].map((players) => ({
-    players,
-    games: Array.from({ length: BOT_GAMES }, (_, i) => {
-      const g = newGame(players, 1 + i);
-      playOut(g, { state: 7919 + i });
-      return g;
-    }),
-  })));
-}
-function length(): string {
-  const GAMES = BOT_GAMES;
-  const rows = botGames().map(({ players, games }) => {
-    const rounds: number[] = [];
-    let stalled = 0;
-    const held = { army: 0, tower: 0, hoard: 0 };
-    const slain: Record<string, number[]> = Object.fromEntries(Object.keys(BEASTS).map((k) => [k, []]));
-    for (const g of games) {
-      if (g.phase === 'over') rounds.push(g.round);
-      else stalled++;
-      for (const t of Object.keys(held) as (keyof typeof held)[]) if (g.titles[t] !== null) held[t]++;
-      for (const k of Object.keys(slain)) {
-        const at = g.log.find((e) => e.ev?.k === 'cleared' && e.ev.fauna === k && e.ev.won);
-        if (at) slain[k].push(at.round);
-      }
-    }
-    const fell = (rs: number[]) => (rs.length ? `${pct(rs.length / GAMES)}, median round ${rs.sort((a, b) => a - b)[Math.floor(rs.length / 2)]}` : 'never');
-    rounds.sort((a, b) => a - b);
-    return [players, rounds[0] ?? '—', rounds[Math.floor(rounds.length / 2)] ?? '—', rounds[rounds.length - 1] ?? '—', stalled, ...Object.values(held).map((n) => pct(n / GAMES)), ...Object.values(slain).map(fell)];
-  });
-  return `## Game length (random bots)
-
-${GAMES} games per player count between the random bot (\`src/bot.ts\`). Random bots play badly, so this is a sanity check on pace, not a prediction.
-
-Army held, Tower held and Hoard held: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points, ${TUNING.titleMinimum.tower} tower floors or ${TUNING.titleMinimum.hoard} gold).
-
-The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
-
-${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Hoard held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
-}
-
 export function datasheet(): string {
   return `# Tuning datasheet
 
-Generated from \`src/data.ts\` and the engine by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff: it shows what the change does to costs, points and raid odds.
+Generated from \`src/data.ts\` by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff. It holds the raw rules only: every number as \`src/data.ts\` has it, with nothing simulated.
 
-${[economy(), costs(), production(), land(), shortages(), neighbourCards(), points(), dragons(), raids(), fauna(), beasts(), demand(), deck(), length()].join('\n\n')}
+${[economy(), costs(), production(), land(), neighbourCards(), points(), dragons(), raids(), fauna(), beasts(), demand(), deck()].join('\n\n')}
 `;
 }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -205,12 +205,60 @@ test('the stand-in keeps the game moving to the end without spending anything', 
   room.start(seats[0].token, 5);
   const g = room.game!;
   const dragons = g.dragons.length; // each player starts with one
-  for (const s of seats) room.quit(s.token);
+  room.quit(seats[0].token);
+  room.seats[1].standIn = true; // away, with a bot playing for them (quitting too would end the game)
+  room.changed();
   for (let i = 0; i < 2000 && g.round < 6; i++) await sleep(1);
   room.close();
   assert.ok(g.round >= 6, `stuck in round ${g.round}, phase ${g.phase} ${g.raid?.step ?? ''}`);
   assert.equal(Object.keys(g.buildings).length, 2, 'only the towers');
   assert.equal(g.dragons.length, dragons, 'no eggs hatched');
+});
+
+test("a phone that closes on its turn: once it counts as away, the others hear so and can let a bot play", async () => {
+  const room = new Room('SHUT', { dir, botDelayMs: 0, awayMs: 50 });
+  const [ada, bram] = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.start(ada.token, 3);
+  const g = room.game!;
+  const turn = room.seats[g.turn ?? 0] === ada ? ada : bram;
+  const other = turn === ada ? bram : ada;
+  const close = room.connect(turn.token);
+  room.connect(other.token);
+  let updates = 0;
+  room.subscribe(() => updates++);
+  close(); // the acting player's tab closes; nothing else happens at the table
+  assert.ok(room.lobby().seats[room.seats.indexOf(turn)].connected, 'here for a moment, in case the phone is back');
+  const before = updates;
+  for (let i = 0; i < 200 && room.here(turn); i++) await sleep(5);
+  await sleep(30);
+  assert.ok(updates > before, 'the table hears when they count as away');
+  assert.equal(room.lobby().seats[room.seats.indexOf(turn)].connected, false);
+  room.standInFor(other.token, room.seats.indexOf(turn));
+  room.close();
+});
+
+test('a game every player quits ends: the bots stop, nothing is saved again, and the server forgets the room', async () => {
+  const room = new Room('GONE', { dir, botDelayMs: 0 });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.addBot();
+  room.start(seats[0].token, 5);
+  const g = room.game!;
+  room.quit(seats[0].token);
+  assert.ok(!room.abandoned, 'Bram is still playing');
+  room.quit(seats[1].token);
+  assert.ok(room.abandoned);
+  const active = room.lastActive;
+  const mtime = statSync(room.file).mtimeMs;
+  const log = g.log.length;
+  await sleep(50);
+  assert.equal(g.log.length, log, 'no bot moves');
+  assert.equal(statSync(room.file).mtimeMs, mtime, 'no saves');
+  assert.equal(room.lastActive, active, 'idle, so the server forgets it');
+  room.join('Ada'); // until then, a player can come back
+  assert.ok(!room.abandoned);
+  for (let i = 0; i < 200 && g.log.length === log; i++) await sleep(1);
+  assert.ok(g.log.length > log, 'the bots play again');
+  room.close();
 });
 
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
