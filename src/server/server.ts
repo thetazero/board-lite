@@ -139,6 +139,12 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         room.leave(i);
         return json(res, 200, {});
       }
+      case 'quit': // mid-game: a bot plays the seat from now on
+        room.quit(tok);
+        return json(res, 200, {});
+      case 'standin': // a player who's away: a bot plays for them until they're back
+        room.standInFor(tok, Number(b.seat));
+        return json(res, 200, {});
       case 'start':
         room.start(tok);
         return json(res, 200, {});
