@@ -92,7 +92,7 @@ small { color: var(--muted); }
 .chip.free { color: var(--muted); font-weight: 500; }
 .ricon { vertical-align: middle; }
 .hpbar { display: inline-block; width: 4em; height: .5em; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 2px; overflow: hidden; vertical-align: middle; }
-.hpbar span { display: block; height: 100%; transition: width .6s; }
+.hpbar span { display: block; height: 100%; transition: width .6s ease-out, background-color .6s; }
 .ok { color: var(--good); font-weight: 800; }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
@@ -107,6 +107,10 @@ small { color: var(--muted); }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
 .toast { position: fixed; left: 50%; bottom: 1.5em; transform: translateX(-50%) rotate(-.6deg); background: var(--sheet); border-left: .4em solid var(--bad); box-shadow: var(--lift); font-weight: 600; padding: .7em 1em; border-radius: 2px; z-index: 50; max-width: 90vw; }
+/* Toasts and notes slide up as they come and fade as they go (tv.ts). */
+.toast { animation: toastin .3s ease-out; transition: opacity .4s ease-in, translate .4s ease-in; }
+.toast.gone { opacity: 0; translate: 0 .8em; }
+@keyframes toastin { from { opacity: 0; translate: 0 .8em; } }
 .offline-note { display: none; position: fixed; top: 0; left: 0; right: 0; background: var(--grain), #c0392b; color: #fff; font-weight: 700; text-align: center; padding: .3em; z-index: 60; box-shadow: 0 .2em .4em #0006; }
 body.offline .offline-note { display: block; }
 /* Offline, the phone's page greys out and can't be tapped (phone.ts makes it
@@ -257,10 +261,21 @@ q::before { content: open-quote; }
 q::after { content: close-quote; }
 
 /* TV overlays */
-.overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #140f2ae8; }
-.overlay.raid { background: var(--table-mottle), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); }
-.overlay.banner { background: #140f2ad0; animation: fadein .3s; }
+/* Nothing on the TV cuts: an overlay fades in over the board and out again,
+   and a new screen in it (the next scene, the raid's next step) rises in while
+   the last one fades away above it (tv.ts, .overlay-ghost). The raid's mottled
+   table is a layer that fades in and out under the boxes. */
+.overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #140f2ae8; transition: opacity .4s ease-in, background-color .4s; }
+.overlay::before { content: ''; position: fixed; inset: 0; z-index: -1; background: var(--table-mottle), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); opacity: 0; transition: opacity .4s; pointer-events: none; }
+.overlay.raid::before { opacity: 1; }
+.overlay.banner { background-color: #140f2ad0; }
+.overlay.in { animation: fadein .4s ease-out; }
+.overlay.out { opacity: 0; pointer-events: none; }
+.overlay > .enter { animation: enter .4s ease-out; }
+.overlay-ghost { position: fixed; z-index: 21; margin: 0 !important; pointer-events: none; animation: leave .4s ease-in forwards; }
 @keyframes fadein { from { opacity: 0; } }
+@keyframes enter { from { opacity: 0; translate: 0 1.5rem; } }
+@keyframes leave { to { opacity: 0; translate: 0 -1.5rem; } }
 /* the TV's big moments: a large sheet laid on the table, its top-right corner folded down */
 .production, .result, .endbox { position: relative; background: var(--sheet); border-radius: 2px; padding: 1.2em 2.5em; min-width: 40em; text-align: center; box-shadow: 0 .18em 0 var(--paper-edge), 0 1.2em 2.4em #05030fcc;
   clip-path: polygon(0 0, calc(100% - 2.2em) 0, 100% 2.2em, 100% 100%, 0 100%); }
@@ -272,8 +287,8 @@ q::after { content: close-quote; }
 .production { max-width: 92vw; }
 .production .dice { display: flex; flex-wrap: wrap; gap: .1em 0; }
 /* Everyone rolls at once, each player's dice a moment after the last's, lit in their colour. */
-.production li { visibility: hidden; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
-.production li.up { visibility: visible; }
+.production li { opacity: 0; translate: -1.5em 0; transition: opacity .35s ease-out, translate .35s ease-out; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
+.production li.up { opacity: 1; translate: none; }
 .endbox { padding: 0 0 1.2em; overflow: hidden; min-width: 44em; }
 .endbox svg.scene { display: block; width: 100%; height: 13em; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }
@@ -334,7 +349,9 @@ q::after { content: close-quote; }
 .fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; opacity: .55; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
 .battle { position: relative; }
-.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; }
+.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; animation: beamin .12s ease-out; transition: opacity .25s; }
+.beam.gone { opacity: 0; }
+@keyframes beamin { from { scale: 0 1; opacity: .4; } }
 .battle .bvs { position: relative; z-index: 1; text-shadow: 0 0 .3em #000; }
 .fighter.unit .ricon { flex: none; }
 .fighter.unit b { font-size: .8em; }
@@ -351,9 +368,13 @@ q::after { content: close-quote; }
 .fighter.down { opacity: .3; }
 .fighter.strike { animation: strike .25s; }
 @keyframes strike { 50% { transform: scale(1.06) rotate(-1deg); background: var(--paper-hi); } }
-.fighter .dmg { position: absolute; top: -.2em; left: 50%; color: var(--hit); font-weight: 900; font-size: 1.3em; animation: dmg .9s forwards; pointer-events: none; }
+.fighter .dmg { position: absolute; top: -.2em; left: 50%; color: var(--hit); font-weight: 900; font-size: 1.3em; line-height: 1; animation: dmg 1.2s forwards; pointer-events: none; transform: translateY(calc(var(--slot, 0) * -.95em)) scale(calc(1 - var(--slot, 0) * .3)); transform-origin: 50% 100%; transition: transform .15s ease-out; }
+.fighter .dmg.gone { animation: dmg 1.2s forwards, out .45s forwards; }
+@keyframes out { to { opacity: 0; } }
 .fighter .dmg { left: auto; right: 3em; } .fighter.unit .dmg { left: 3em; right: auto; }
-@keyframes dmg { to { transform: translateY(-1.2em); opacity: 0; } }
+/* The number pops in, holds to be read, then drifts up and fades. It drifts on
+   translate and pops on scale, so the transform that stacks it stays free. */
+@keyframes dmg { from { scale: 1.5; } 15% { scale: 1; } 60% { translate: 0 0; opacity: 1; } to { translate: 0 -.8em; opacity: 0; } }
 .bvs { display: flex; flex-direction: column; align-items: center; color: var(--muted); min-width: 3em; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
 .bvs b { font-size: 2.4em; color: var(--text); }
@@ -439,11 +460,14 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
    cost on the stock below. A faint grain sits over all of it. */
 .handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.9em; z-index: 15; width: min(100vw, 34em); height: calc(9.4em * var(--hs, 1)); transform: translateX(-50%); pointer-events: none; }
 .handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: var(--table); background-color: var(--bg); background-attachment: fixed; -webkit-mask-image: linear-gradient(to top, #000 55%, transparent); mask-image: linear-gradient(to top, #000 55%, transparent); }
+/* The hand comes up from the bottom edge (it leaves the same way: .leave-down). */
+.handfan { animation: handin .3s ease-out; }
+@keyframes handin { from { translate: 0 3em; opacity: 0; } }
 .handfan.empty { height: auto; pointer-events: auto; text-align: center; }
 .handfan.empty .hint { position: relative; margin: 0 1em .8em; }
 /* Each card: placed by its share of the spread (--x), tilted (--r) and dropped along the arc (--y). */
 .handfan .card { position: absolute; left: calc(50% - var(--cw) / 2 + var(--x) * min(37% - var(--cw) / 2, (var(--n) - 1) * var(--cw) * .45)); top: .6em; width: var(--cw); font-size: calc(.78em * var(--hs, 1)); pointer-events: auto;
-  transform: translateY(var(--y)) rotate(calc(var(--r) / var(--hs, 1))); transform-origin: 50% 160%; transition: transform .15s; }
+  transform: translateY(var(--y)) rotate(calc(var(--r) / var(--hs, 1))); transform-origin: 50% 160%; transition: transform .15s, left .25s ease-out; }
 .handfan .card .cname { font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .handfan .card.longname .cname { font-size: .8em; letter-spacing: -.02em; padding-top: .42em; padding-bottom: .48em; }
 .handfan .card .ccost { flex-wrap: nowrap; white-space: nowrap; }
@@ -704,9 +728,9 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* ================= A game with no TV (remote mode) =================
    On the phone: the table view is the TV's page for the room in a frame over
    the phone's own page, shown by the You / Table switch by the talk bar. */
-.tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; background: #140f2a; }
+.tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; opacity: 0; background: #140f2a; transition: opacity .3s, visibility 0s .3s; }
 .tableview iframe { display: block; width: 100%; height: 100%; border: 0; }
-body.table-on .tableview { visibility: visible; }
+body.table-on .tableview { visibility: visible; opacity: 1; transition: opacity .3s; }
 body.table-on { overflow: hidden; }
 body.table-on .talkbar { z-index: 36; }
 body.remote .talkbar > .latest { padding-right: 9.5em; }
@@ -789,9 +813,22 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 /* Discarding: the cards picked to go, face up above the button, and a place for each still to pick. */
 .discardtray { display: flex; flex-wrap: wrap; justify-content: center; gap: .5em; }
 .discardtray .card, .discardtray .slot { width: 5.4em; font-size: .9em; }
+.discardtray .card { animation: zoomin .2s ease-out; } /* laid down as it's picked (only then: phone.ts updates in place) */
 .discardtray .card .cname { font-size: .72em; margin: -7px -6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .discardtray .card .ccost { display: none; }
 .discardtray .card .ckind { width: 16px; height: 16px; }
 .discardtray .card .ckind svg { width: 10px; height: 10px; }
 .discardtray .card.picked::before { width: 20px; height: 20px; top: -7px; right: -7px; font-size: .8em; }
 .discardtray .slot { aspect-ratio: 5 / 5.4; border: 2px dashed #fff5; border-radius: 4px; }
+
+/* Nothing on the phone cuts (phone.ts, morph.ts): the page updates in place,
+   a new screen rises in while the last one fades away above it, the hand slides
+   away down the bottom edge, and an open card fades as it closes. */
+.screen { animation: enter .3s ease-out; }
+.leaving { position: fixed !important; right: auto !important; bottom: auto !important; margin: 0 !important; transform: none !important; box-sizing: border-box; pointer-events: none; }
+.leaving.leave-up { z-index: 4; overflow: hidden; animation: leave .3s ease-in forwards; }
+.leaving.leave-down { z-index: 14; animation: handout .3s ease-in forwards; }
+.leaving.leave-fade { z-index: 30; animation: out .15s ease-in forwards; }
+@keyframes handout { to { translate: 0 3em; opacity: 0; } }
+/* The phone's open panels come in rather than appear. */
+.pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }

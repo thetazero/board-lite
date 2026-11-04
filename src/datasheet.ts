@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { bundleText, specialProjectCost } from './engine.ts';
@@ -26,6 +26,8 @@ const avgAttack = avgDamage;
 const cost = (b: Bundle) => bundleText(b) || 'free';
 const n1 = (x: number) => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toString() : '∞');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+// A terrain as the cards name it: "crystal field", not the code's "ley".
+const terrainName = (t: keyof typeof TERRAIN_NOUN) => TERRAIN_NOUN[t].replace(/ hex$/, '');
 
 function table(head: string[], rows: (string | number)[][]): string {
   return [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
@@ -37,7 +39,7 @@ function economy(): string {
   return `## Economy baseline
 
 - Start: ${cost(TUNING.startingResources)}. Tower income: ${cost(TUNING.towerProduction)} a round, no dice.
-- Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} action card; hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
+- Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} card from the action deck (action cards and dragons; see Decks); hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''}, clearing fauna, and the bank.
@@ -47,17 +49,18 @@ function economy(): string {
 // Every building, upgrade, action card and dragon: what it costs and does.
 function costs(): string {
   const pts = (n?: number) => (n ? String(n) : '—');
+  const row = (c: { name: string; copies?: number; cost: Bundle }, does: string, points: string) => [c.name, kindOf(c), deckOf(c), c.copies ?? '—', cost(c.cost), does, points];
   const rows: (string | number)[][] = [
-    ...Object.values(BUILDINGS).map((b) => [b.name, b.basic ? 'basic building' : 'building card', b.copies ?? '—', cost(b.cost), b.text, b.per && b.points ? `${b.points} each` : pts(b.points)]),
-    ...Object.values(UPGRADES).map((u) => [u.name, 'upgrade', u.copies, cost(u.cost), u.text, '—']),
-    ...Object.values(ACTIONS).map((a) => [a.name, 'action card', a.copies, cost(a.cost), a.text, a.effect === 'hidden_point' ? '1' : '—']),
-    ...Object.values(DRAGONS).map((d) => [d.name, d.base ? 'base dragon' : 'dragon card', d.copies, cost(d.cost), `${d.element}, grows a stage every ${d.growthTime} rounds`, TUNING.dragonPointsByStage.slice(1).join(' / ')]),
+    ...Object.values(BUILDINGS).map((b) => row(b, b.text, b.per && b.points ? `${b.points} each` : pts(b.points))),
+    ...Object.values(UPGRADES).map((u) => row(u, u.text, '—')),
+    ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? '1' : '—')),
+    ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, TUNING.dragonPointsByStage.slice(1).join(' / '))),
   ];
   return `## Costs
 
-Everything that can be bought, as the game has it. Basic buildings have no copies: anyone may build them, no card needed. Dragon points are hatchling / young / adult.
+Everything that can be bought, as the game has it. Deck is the deck its cards are in (see Decks); a kind isn't a deck, and dragons are in the action deck. Basic buildings have no copies and are in no deck: anyone may build them, no card needed. Dragon points are hatchling / young / adult.
 
-${table(['Name', 'Kind', 'Copies', 'Cost', 'Does', 'Points'], rows)}`;
+${table(['Name', 'Kind', 'Deck', 'Copies', 'Cost', 'Does', 'Points'], rows)}`;
 }
 
 function goldMakers(): string[] {
@@ -68,7 +71,7 @@ function production(): string {
   const workshop = Object.values(UPGRADES).find((u) => u.baseBonus);
   const rows = Object.values(BUILDINGS).filter((b) => b.produces).map((b) => {
     const p = b.produces!;
-    return [b.name, b.terrain!, cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
+    return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
   const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.` : '';
   return `## Basic production buildings
@@ -83,7 +86,7 @@ function neighbourCards(): string {
   const cards = Object.values(BUILDINGS).filter((b) => b.per);
   const terrains = new Set<string>(TERRAINS);
   const rows = cards.map((b) => {
-    const counted = terrains.has(b.per!) ? `${b.per} hexes` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
+    const counted = terrains.has(b.per!) ? `${TERRAIN_NOUN[b.per as keyof typeof TERRAIN_NOUN]}es` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
     return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), b.makes ? `${cost(b.makes)} a round` : `${b.points} point`];
   });
   return `## Building cards that count their neighbours
@@ -96,7 +99,7 @@ ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => [t, Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
+  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
   const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
@@ -245,25 +248,43 @@ A single beast takes one hit per dragon a combat round, so a dragon's extra targ
 When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult ${adult} rounds after it is hatched, ${fast} with a ${hatchery.name}. `;
 }
 
+// Every card in a deck, in deck order (as DECKS lists them), with its kind.
+type DeckName = keyof typeof DECKS;
+const DECK_TITLE: Record<DeckName, string> = { building: 'Building deck', action: 'Action deck' };
+function deckCards(d: DeckName): { name: string; kind: string; copies: number }[] {
+  return DECKS[d].flatMap((defs) => Object.values(defs as Record<string, { name: string; copies?: number }>))
+    .filter((c) => c.copies)
+    .map((c) => ({ name: c.name, kind: kindOf(c), copies: c.copies! }));
+}
+const deckOf = (c: object): string => (Object.keys(DECKS) as DeckName[]).find((d) => DECKS[d].some((defs) => Object.values(defs).includes(c as never) && (c as { copies?: number }).copies)) ?? 'none';
+function kindOf(c: object): string {
+  if (Object.values(BUILDINGS).includes(c as never)) return (c as { basic?: boolean }).basic ? 'basic building' : 'building card';
+  if (Object.values(UPGRADES).includes(c as never)) return 'upgrade';
+  if (Object.values(ACTIONS).includes(c as never)) return 'action card';
+  return (c as { base?: boolean }).base ? 'base dragon' : 'dragon card';
+}
+
 function deck(): string {
-  const build = [...Object.values(BUILDINGS), ...Object.values(UPGRADES)];
-  const act = [...Object.values(ACTIONS), ...Object.values(DRAGONS)];
-  const nb = build.reduce((s, c) => s + (c.copies ?? 0), 0);
-  const na = act.reduce((s, c) => s + c.copies, 0);
-  const rows = [
-    ...Object.values(BUILDINGS).filter((c) => c.copies).map((c) => [c.name, 'building', c.copies!, pct(c.copies! / nb)]),
-    ...Object.values(UPGRADES).map((c) => [c.name, 'building deck (upgrade)', c.copies, pct(c.copies / nb)]),
-    ...Object.values(ACTIONS).map((c) => [c.name, 'action', c.copies, pct(c.copies / na)]),
-  ];
-  const upgradeCopies = Object.values(UPGRADES).reduce((s, u) => s + u.copies, 0);
-  rows.push([`Any upgrade (${Object.keys(UPGRADES).length} kinds)`, 'building deck (upgrade)', upgradeCopies, pct(upgradeCopies / nb)]);
-  const dragonCopies = Object.values(DRAGONS).reduce((s, d) => s + d.copies, 0);
-  rows.push([`Any dragon (${Object.keys(DRAGONS).length} kinds)`, 'action', dragonCopies, pct(dragonCopies / na)]);
+  const decks = (Object.keys(DECKS) as DeckName[]).map((d) => {
+    const cards = deckCards(d);
+    const total = cards.reduce((s, c) => s + c.copies, 0);
+    const kinds = [...new Set(cards.map((c) => c.kind))].map((k) => {
+      const of = cards.filter((c) => c.kind === k);
+      return `${of.length} kinds of ${k} (${of.reduce((s, c) => s + c.copies, 0)} cards)`;
+    });
+    const rows: (string | number)[][] = cards.map((c) => [c.name, c.kind, c.copies, pct(c.copies / total)]);
+    rows.push(['**Total**', '', `**${total}**`, '**100%**']);
+    return `### ${DECK_TITLE[d]}: ${total} cards
+
+${kinds.join(' + ')} = ${total} cards.
+
+${table(['Card', 'Kind', 'Copies', 'Share of deck'], rows)}`;
+  });
   return `## Decks
 
-Building deck ${nb} cards (${Object.values(BUILDINGS).filter((c) => c.copies).length} buildings, ${Object.keys(UPGRADES).length} upgrades), action deck ${na}.
+There are ${Object.keys(DECKS).length} decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
 
-${table(['Card', 'Deck', 'Copies', 'Share of deck'], rows)}`;
+${decks.join('\n\n')}`;
 }
 
 function demand(): string {
@@ -296,7 +317,7 @@ export function datasheet(): string {
 
 Generated from \`src/data.ts\` by \`npm run datasheet\`; don't edit by hand. \`npm test\` fails when it is out of date, so after changing any number, rerun \`npm run datasheet\` and read the diff. It holds the raw rules only: every number as \`src/data.ts\` has it, with nothing simulated.
 
-${[economy(), costs(), production(), land(), neighbourCards(), points(), dragons(), raids(), fauna(), beasts(), demand(), deck()].join('\n\n')}
+${[economy(), deck(), costs(), production(), land(), neighbourCards(), points(), dragons(), raids(), fauna(), beasts(), demand()].join('\n\n')}
 `;
 }
 

@@ -325,9 +325,15 @@ export function healingText(n: number): string {
 }
 
 export function hpBar(hp: number, max: number): string {
+  const { width, color } = hpFill(hp, max);
+  return `<span class="hpbar"><span style="width:${width};background:${color}"></span></span>`;
+}
+
+// How full a health bar is and its colour, for setting a drawn bar's fill in
+// place so it drains rather than jumps.
+export function hpFill(hp: number, max: number): { width: string; color: string } {
   const pct = max ? Math.max(0, Math.min(100, (hp / max) * 100)) : 0;
-  const color = pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d';
-  return `<span class="hpbar"><span style="width:${pct}%;background:${color}"></span></span>`;
+  return { width: `${pct}%`, color: pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d' };
 }
 
 // ---------- the raid's defenders ----------
@@ -470,4 +476,14 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
 export function tiebreakNote(g: PublicState): string {
   const w = g.standings![0];
   return w.tiebreak === 'gold' ? `Wins the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+}
+
+// A toast or note fades as it goes (style.css, .toast.gone), then leaves; at
+// once if nothing animates (screenshots).
+export function fadeAway(t: HTMLElement) {
+  if (t.classList.contains('gone')) return;
+  t.classList.add('gone');
+  if (getComputedStyle(t).transitionDuration.split(',').every((d) => parseFloat(d) === 0)) return t.remove();
+  t.ontransitionend = (e) => e.target === t && t.remove();
+  setTimeout(() => t.remove(), 1000);
 }

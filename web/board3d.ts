@@ -328,12 +328,15 @@ function crystal(h: number, color = '#c3aefc'): THREE.Mesh {
   return part(new THREE.OctahedronGeometry(1, 0), color, { scale: [h * 0.32, h, h * 0.32], glow: 0.35 });
 }
 
+// Whether a hex's middle is taken, so what grows there keeps to the rim.
+// The Thunderbird perches on its peak rather than hiding it.
+const crowded = (h: HexView) => !!h.building || (!!h.fauna && !h.peak);
+
 // What grows on a hex. With a building on it, only a little at the rim.
 function decor(h: HexView, seaward: number): THREE.Group {
   const r = rng(h.k);
   const g = new THREE.Group();
-  // The Thunderbird perches on its peak rather than hiding it.
-  const built = !!h.building || (!!h.fauna && !h.peak);
+  const built = crowded(h);
   if (h.held) g.add(hexBorder(HOLD_COLORS[h.held] ?? '#555'));
   if (h.peakZone) g.add(hexBorder(GOLD));
   // Spots around the hex: the middle is kept for a building or a beast.
@@ -1545,7 +1548,55 @@ interface DragonEntry {
   face: number; // heading at rest
   home: THREE.Vector3; // what it circles when it flies
   seed: number;
+  // Easing between poses: `shown` is the pose drawn last frame; when what it's
+  // doing changes (`key`: taking off, landing, resting, a new perch, growing),
+  // it eases from where it was (`from`) to the new pose instead of jumping.
+  key?: string;
+  shown?: number[];
+  from?: { pose: number[]; at: number; dur: number; move: boolean; hop: number };
+  start?: THREE.Vector3; // where it first appears (a hatchling: its egg), before going to its perch
+  grow?: { from: number; at: number }; // growing to its stage's size since `at`
+  skip?: number; // a flight it sits out: it couldn't fly when the flight began
+  late?: boolean; // it arrived while the board was showing: it doesn't join a flight under way
 }
+
+// A dragon's pose as numbers, so two poses can be blended: where it is, its
+// heading, then its joints.
+function readPose(e: DragonEntry): number[] {
+  const p = [e.obj.position.x, e.obj.position.y, e.obj.position.z, e.obj.rotation.y];
+  const r = e.rig;
+  if (!r) return p;
+  p.push(r.body.rotation.x, r.body.rotation.z, r.body.position.y, r.legs.rotation.x, r.neck.rotation.x, r.neck.rotation.y);
+  for (const s of r.tail) p.push(s.rotation.x, s.rotation.y);
+  for (const w of r.wings) p.push(w.rotation.x, w.rotation.y, w.rotation.z, w.scale.x);
+  return p;
+}
+
+function writePose(e: DragonEntry, p: number[]) {
+  e.obj.position.set(p[0], p[1], p[2]);
+  e.obj.rotation.y = p[3];
+  const r = e.rig;
+  if (!r) return;
+  r.body.rotation.set(p[4], 0, p[5]);
+  r.body.position.y = p[6];
+  r.legs.rotation.x = p[7];
+  r.neck.rotation.set(p[8], p[9], 0);
+  r.tail.forEach((s, i) => s.rotation.set(p[10 + i * 2], p[11 + i * 2], 0));
+  r.wings.forEach((w, i) => {
+    const o = 10 + r.tail.length * 2 + i * 4;
+    w.rotation.set(p[o], p[o + 1], p[o + 2]);
+    w.scale.setScalar(p[o + 3]);
+  });
+}
+
+// Folds up from flat with a little overshoot: 0 at k = 0, 1 at k = 1.
+const popUp = (k: number) => 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2;
+
+// How long something takes to fold flat and go when it leaves the board (seconds).
+const LEAVE_S = 0.6;
+// How long the scenery on a hex takes to make room for a building or a beast,
+// or to grow back (seconds): the building's own fold-up takes 0.9.
+const DECOR_S = 1;
 
 // When a dragon flies: every `period` seconds from `offset`, for `dur` seconds.
 function schedule(d: DragonEntry): { offset: number; period: number; dur: number } {
@@ -1574,6 +1625,11 @@ const WALK_TURN = 0.7, WALK_GO = 3.4;
 const FRESH_S = 12;
 const MARK = '#ffe27a';
 
+// Several things new at once (the board catching up after a TV scene) fold
+// up one after another, this many seconds apart, not all in one frame, so
+// the eye can follow each. At most CASCADE_MAX of them wait their turn.
+const CASCADE_S = 0.3, CASCADE_MAX = 8;
+
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
@@ -1596,6 +1652,14 @@ export class Board3D {
   private fitPoints: THREE.Vector3[] = []; // what the camera must keep in view
   private firstUpdate = true;
   private marks = new Map<string, { mesh: THREE.Mesh; born: number }>(); // by hex
+  // What's leaving the board, folding flat (a building or beast) or shrinking
+  // away (a dragon or an egg) before it's gone.
+  private leaving: { obj: THREE.Object3D; at: number; how: 'fold' | 'shrink'; size: number; beast?: Built }[] = [];
+  // Hexes whose scenery is changing: the old folds flat while the new folds up.
+  // They're left out of the merged scenery until they're done.
+  private decorMoves = new Map<string, { old: THREE.Group; now: THREE.Group; at: number }>();
+  private map: HexView[] = [];
+  private lastT = -Infinity; // the clock at the last frame drawn
 
   constructor() {
     this.el = document.createElement('div');
@@ -1641,49 +1705,66 @@ export class Board3D {
     if (sig !== this.mapSig) this.buildMap(g.map, sig);
     const now = clock();
     const animate = !this.firstUpdate;
+    // Each hex with something new gets its turn in the cascade; its scenery
+    // makes room in step with it.
+    let n = 0;
+    const turns = new Map<string, number>();
+    const next = (k: string) => turns.get(k) ?? turns.set(k, now + Math.min(n++, CASCADE_MAX) * CASCADE_S).get(k)!;
+    this.map = g.map;
     let regrow = false;
     for (const h of g.map) {
       const t = this.tiles.get(h.k)!;
+      const was = t.hex;
       t.hex = h;
-      const decorSig = `${h.building ? `b${h.building.type}` : h.fauna ? 'f' : ''}${h.held ?? ''}${h.peakZone ? 'z' : ''}`;
-      if (decorSig !== t.decorSig) regrow = true;
+      const ground = h.building ? `b${h.building.type}` : h.fauna ? 'f' : '';
+      const decorSig = `${ground}${h.held ?? ''}${h.peakZone ? 'z' : ''}`;
+      if (decorSig === t.decorSig) continue;
+      regrow = true;
+      // A building or a beast arriving or leaving: the trees, grass and
+      // crystals fold down and fold up again round it, as it folds up or down.
+      if (animate && t.decorSig !== '-' && h.terrain !== 'ocean' && crowded(was) !== crowded(h)) {
+        const old = this.decorMoves.get(h.k);
+        if (old) this.endDecorMove(h.k);
+        const at = (hex: HexView) => {
+          const d = decor(hex, this.seaward(g.map, hex));
+          const [x, z] = hexXZ(hex.q, hex.r);
+          d.position.set(x, 0, z);
+          const baked = bake(group(d));
+          this.world.add(baked);
+          return baked;
+        };
+        this.decorMoves.set(h.k, { old: at(was), now: at(h), at: crowded(h) ? next(h.k) : now });
+      }
       t.decorSig = decorSig;
     }
-    if (regrow) {
-      this.world.remove(this.decor);
-      dispose(this.decor);
-      const all = new THREE.Group();
-      for (const h of g.map) {
-        const d = decor(h, this.seaward(g.map, h));
-        const [x, z] = hexXZ(h.q, h.r);
-        d.position.set(x, 0, z);
-        all.add(d);
-      }
-      this.decor = bake(all);
-      this.world.add(this.decor);
-    }
+    if (regrow) this.regrowDecor();
     for (const h of g.map) {
       const b = h.building;
       const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${h.fauna ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
-        this.world.remove(had.obj);
-        dispose(had.obj);
         this.built.delete(h.k);
+        // A building that's gone folds down; one that changed is replaced by the new one folding up.
+        if (!b && animate) this.leave(had.obj, now, 'fold');
+        else {
+          this.world.remove(had.obj);
+          dispose(had.obj);
+        }
       }
       if (!b) continue;
       const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
-      this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
-      if (fresh) this.mark(h, now);
+      const at = fresh ? next(h.k) : -1e9;
+      this.built.set(h.k, { sig: bsig, obj, born: at });
+      if (fresh) this.mark(h, at);
     }
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
     // arrives, unless it wandered in from the next hex: then it walks over.
-    const gone: { k: string; key: string; at: THREE.Vector3 }[] = [];
+    const gone: { k: string; key: string; at: THREE.Vector3; b: Built }[] = [];
     const fresh: HexView[] = [];
     for (const h of g.map) {
       const f = h.fauna;
@@ -1691,9 +1772,7 @@ export class Board3D {
       const had = this.beasts.get(h.k);
       if ((had?.sig ?? '') === fsig) continue;
       if (had) {
-        gone.push({ k: h.k, key: had.sig.split('|')[0], at: this.figureAt(had) });
-        this.world.remove(had.obj);
-        dispose(had.obj);
+        gone.push({ k: h.k, key: had.sig.split('|')[0], at: this.figureAt(had), b: had });
         this.beasts.delete(h.k);
       }
       if (f) fresh.push(h);
@@ -1701,17 +1780,29 @@ export class Board3D {
     for (const h of fresh) {
       const f = h.fauna!;
       const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
-      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: animate ? now : -1e9 };
+      const at = animate ? next(h.k) : -1e9;
+      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: at };
       const from = animate ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
       if (from >= 0) {
         entry.born = -1e9;
-        entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at: now };
+        entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at };
+        // It walks over from there: the one that stood there is this one.
+        this.world.remove(gone[from].b.obj);
+        dispose(gone[from].b.obj);
         gone.splice(from, 1);
       }
       this.beasts.set(h.k, entry);
-      if (animate) this.mark(h, now);
+      if (animate) this.mark(h, at);
     }
-    this.placeDragons(g);
+    // Cleared, slain or gone further than the next hex: it folds down where it stood.
+    for (const o of gone) {
+      if (animate) this.leave(o.b.obj, now, 'fold', o.b);
+      else {
+        this.world.remove(o.b.obj);
+        dispose(o.b.obj);
+      }
+    }
+    this.placeDragons(g, animate, now);
     this.firstUpdate = false;
   }
 
@@ -1734,6 +1825,37 @@ export class Board3D {
     m.mesh.geometry.dispose();
     (m.mesh.material as THREE.Material).dispose();
     this.marks.delete(k);
+  }
+
+  // Everything growing on the map, merged, but for the hexes whose scenery is moving.
+  private regrowDecor() {
+    this.world.remove(this.decor);
+    dispose(this.decor);
+    const all = new THREE.Group();
+    for (const h of this.map) {
+      if (this.decorMoves.has(h.k)) continue;
+      const d = decor(h, this.seaward(this.map, h));
+      const [x, z] = hexXZ(h.q, h.r);
+      d.position.set(x, 0, z);
+      all.add(d);
+    }
+    this.decor = bake(all);
+    this.world.add(this.decor);
+  }
+
+  private endDecorMove(k: string) {
+    const m = this.decorMoves.get(k);
+    if (!m) return;
+    for (const o of [m.old, m.now]) {
+      this.world.remove(o);
+      dispose(o);
+    }
+    this.decorMoves.delete(k);
+  }
+
+  // Takes something off the board slowly: see `leaving`.
+  private leave(obj: THREE.Object3D, now: number, how: 'fold' | 'shrink', beast?: Built) {
+    this.leaving.push({ obj, at: now, how, size: obj.scale.x, beast });
   }
 
   // ---------- building the scene ----------
@@ -1841,6 +1963,8 @@ export class Board3D {
     this.built.clear();
     this.beasts.clear();
     this.dragons.clear();
+    this.leaving = [];
+    this.decorMoves.clear();
     this.mapSig = sig;
     const geo = tileGeometry();
     const tiles = new THREE.Group();
@@ -1910,7 +2034,7 @@ export class Board3D {
     this.resize();
   }
 
-  private placeDragons(g: PublicState) {
+  private placeDragons(g: PublicState, animate: boolean, now: number) {
     // Perches: each owner's tower, roosts and hatcheries, in that order; eggs
     // go to a hatchery's nest first. Any extra dragons stand round the tower.
     const perches = new Map<number, { pos: THREE.Vector3; face: number; home: THREE.Vector3; egg: boolean }[]>();
@@ -1953,10 +2077,24 @@ export class Board3D {
       seen.add(d.id);
       const sig = `${d.element}|${d.stage}`;
       let e = this.dragons.get(d.id);
+      let start: THREE.Vector3 | undefined;
       if (e && e.sig !== sig) {
-        this.world.remove(e.obj);
-        dispose(e.obj);
-        e = undefined;
+        if (e.rig && d.stage > 0 && e.sig.split('|')[0] === d.element) {
+          // Grown a stage: the same dragon, growing to its new size.
+          if (animate) e.grow = { from: e.obj.scale.x, at: now };
+          else e.obj.scale.setScalar(STAGE_SCALE[d.stage]);
+          e.sig = sig;
+        } else {
+          // Hatched: the egg shrinks away and the hatchling grows where it lay.
+          if (animate) {
+            start = e.obj.position.clone();
+            this.leave(e.obj, now, 'shrink');
+          } else {
+            this.world.remove(e.obj);
+            dispose(e.obj);
+          }
+          e = undefined;
+        }
       }
       if (!e) {
         const rig = d.stage === 0 ? null : dragonRig(d.element);
@@ -1964,6 +2102,12 @@ export class Board3D {
         obj.scale.setScalar(STAGE_SCALE[d.stage]);
         this.world.add(obj);
         e = { sig, view: d, obj, rig, perch: w.pos, face: w.face, home: w.home, seed: hash(d.id) };
+        if (animate) {
+          e.late = true;
+          e.start = start ?? w.pos.clone();
+          e.grow = { from: 0, at: now + (start ? 0.3 : 0) };
+          obj.scale.setScalar(0.001);
+        }
         this.dragons.set(d.id, e);
       }
       e.view = d;
@@ -1973,8 +2117,11 @@ export class Board3D {
     }
     for (const [id, e] of this.dragons) {
       if (seen.has(id)) continue;
-      this.world.remove(e.obj);
-      dispose(e.obj);
+      if (animate) this.leave(e.obj, now, 'shrink');
+      else {
+        this.world.remove(e.obj);
+        dispose(e.obj);
+      }
       this.dragons.delete(id);
     }
   }
@@ -2033,9 +2180,9 @@ export class Board3D {
       const pop = b.obj.userData.pop as THREE.Group;
       const age = t - b.born;
       if (age < 1.2) {
-        // Folds up from flat on the page, overshoots a little, settles.
-        const k = Math.min(1, age / 0.9);
-        const back = 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2;
+        // Folds up from flat on the page, overshoots a little, settles
+        // (flat until its turn, when several fold up one after another).
+        const back = popUp(Math.max(0, Math.min(1, age / 0.9)));
         pop.rotation.x = (1 - back) * -Math.PI / 2;
         pop.scale.y = Math.max(0.02, Math.min(1.08, back));
       } else if (pop.rotation.x !== 0) {
@@ -2043,13 +2190,45 @@ export class Board3D {
         pop.scale.y = 1;
       }
     }
+    // Leaving: a building or beast folds back down flat, the way it came; a
+    // dragon or an egg shrinks away.
+    this.leaving = this.leaving.filter((l) => {
+      const k = smooth(0, LEAVE_S, t - l.at);
+      if (k >= 1) {
+        this.world.remove(l.obj);
+        dispose(l.obj);
+        return false;
+      }
+      if (l.how === 'fold') {
+        const pop = l.obj.userData.pop as THREE.Group;
+        pop.rotation.x = k * -Math.PI / 2;
+        pop.scale.y = Math.max(0.02, 1 - k);
+        if (l.beast) this.animateBeast(l.beast, t);
+      } else l.obj.scale.setScalar(Math.max(0.001, l.size * (1 - k)));
+      return true;
+    });
+    let regrow = false;
+    // Scenery making room: the old folds flat, then the new folds up, in step
+    // with the building's own fold-up.
+    for (const [k, m] of this.decorMoves) {
+      const age = t - m.at;
+      if (age > DECOR_S) {
+        this.endDecorMove(k);
+        regrow = true;
+        continue;
+      }
+      m.old.scale.y = Math.max(0.001, 1 - smooth(0, DECOR_S * 0.45, age));
+      m.old.visible = age < DECOR_S * 0.45;
+      m.now.scale.y = Math.max(0.001, popUp(Math.min(1, Math.max(0, (age - DECOR_S * 0.35) / (DECOR_S * 0.6)))));
+    }
+    if (regrow) this.regrowDecor();
     for (const [k, m] of this.marks) {
       const age = t - m.born;
       if (age > FRESH_S) {
         this.unmark(k);
         continue;
       }
-      const fade = Math.min(1, age / 0.4) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
+      const fade = Math.max(0, Math.min(1, age / 0.4)) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
       (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * (0.8 + 0.2 * Math.cos(age * 3.5));
     }
     // The acting player's plates glow gently.
@@ -2058,26 +2237,98 @@ export class Board3D {
       m.emissive.set(on ? PLAYER_COLORS[i] : '#000');
       m.emissiveIntensity = on ? 0.25 + 0.2 * Math.sin(t * 3) : 0;
     });
-    for (const c of (this.decor.userData.floaters ?? []) as THREE.Object3D[]) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
+    const floaters = [this.decor, ...[...this.decorMoves.values()].flatMap((m) => [m.old, m.now])].flatMap((d) => (d.userData.floaters ?? []) as THREE.Object3D[]);
+    for (const c of floaters) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
     for (const b of this.beasts.values()) this.animateBeast(b, t);
-    for (const e of this.dragons.values()) this.animateDragon(e, t);
+    const jumped = t < this.lastT || t - this.lastT > 0.5;
+    this.lastT = t;
+    for (const e of this.dragons.values()) this.animateDragon(e, t, jumped);
     this.renderer.render(this.scene, this.camera);
   }
 
-  private animateDragon(e: DragonEntry, t: number) {
+  // A dragon each frame: where it would be and how it would stand now (posed),
+  // eased from how it stood when that last changed, so it never jumps.
+  // `jumped`: the clock jumped (the TV was hidden, or a screenshot stepped
+  // it), so it's shown as it is now.
+  private animateDragon(e: DragonEntry, t: number, jumped: boolean) {
+    const key = this.posed(e, t);
+    if (jumped) delete e.from;
+    const target = readPose(e);
+    if (!e.shown && e.start) {
+      // Just arrived: from where it appears (a hatchling from its egg).
+      e.shown = [...target];
+      e.shown.splice(0, 3, e.start.x, e.start.y, e.start.z);
+      e.key = '';
+    }
+    delete e.start;
+    if (!jumped && e.shown && e.key !== undefined && e.key !== key) {
+      // Taking off, landing, coming down hurt or hungry, settling, or off to a
+      // new perch: from where it is now, the further the slower. Over level
+      // ground it hops, flapping; from the air it flaps down.
+      const a = e.shown;
+      const d = Math.hypot(target[0] - a[0], target[1] - a[1], target[2] - a[2]);
+      const move = d > 0.15;
+      e.from = { pose: a, at: t, dur: Math.min(2, 0.7 + d * 0.45), move, hop: move && Math.abs(target[1] - a[1]) < 0.3 ? Math.min(0.6, 0.15 + d * 0.3) : 0 };
+    }
+    e.key = key;
+    let p = target;
+    if (e.from) {
+      const u = smooth(0, e.from.dur, t - e.from.at);
+      if (u >= 1) delete e.from;
+      else {
+        const a = e.from.pose;
+        p = target.map((v, i) => (i === 3 ? a[3] + (turnTo(a[3], v) - a[3]) * u : a[i] + (v - a[i]) * u));
+        const air = e.from.move ? Math.sin(Math.PI * u) : 0;
+        p[1] += e.from.hop * air;
+        const r = e.rig;
+        if (r && air > 0) {
+          p[7] += (-0.9 - p[7]) * air; // legs tucked
+          const flap = Math.sin(t * (e.view.stage === 1 ? 16 : 9));
+          r.wings.forEach((_, i) => {
+            const o = 10 + r.tail.length * 2 + i * 4;
+            p[o + 1] += (0.15 - p[o + 1]) * air;
+            p[o + 2] += (flap * 0.75 + 0.1 - p[o + 2]) * air;
+            p[o + 3] += (1 - p[o + 3]) * air;
+          });
+        }
+        writePose(e, p);
+      }
+    }
+    e.shown = p;
+    // Growing a stage, or just arrived: from its old size to its new one.
+    if (e.grow) {
+      const to = STAGE_SCALE[e.view.stage];
+      const k = (t - e.grow.at) / 0.8;
+      if (k >= 1) {
+        e.obj.scale.setScalar(to);
+        delete e.grow;
+      } else e.obj.scale.setScalar(Math.max(0.001, e.grow.from + (to - e.grow.from) * popUp(Math.max(0, k))));
+    }
+  }
+
+  // Poses a dragon where it would be now, with nothing eased; says what it's
+  // doing, so a change can be eased.
+  private posed(e: DragonEntry, t: number): string {
     const ph = (e.seed % 628) / 100;
+    const at = `${e.perch.x.toFixed(3)},${e.perch.z.toFixed(3)}`;
     if (!e.rig) {
       // Eggs rock now and then.
       const shell = e.obj.userData.shell as THREE.Mesh;
       const w = Math.sin(t * 0.7 + ph);
       shell.rotation.z = w > 0.93 ? Math.sin(t * 18) * 0.12 : 0;
       e.obj.position.copy(e.perch);
-      return;
+      return `egg|${at}`;
     }
     const r = e.rig;
     const s = schedule(e);
     const since = t - s.offset;
-    const ft = canFly(e.view) && since > 0 ? since % s.period : Infinity;
+    // A flight it can't make from the start it sits out: one already under way
+    // when it gets well, or when it arrives, goes on without it.
+    const n = since > 0 ? Math.floor(since / s.period) : -1;
+    const due = since > 0 && since % s.period < s.dur;
+    if (due && (!canFly(e.view) || e.late)) e.skip = n;
+    e.late = false;
+    const ft = canFly(e.view) && due && e.skip !== n ? since % s.period : Infinity;
     const resting = e.view.status === 'hurt' || e.view.status === 'hungry';
     if (ft < s.dur) {
       // In the air: take off, circle home, land where it took off from.
@@ -2111,7 +2362,7 @@ export class Board3D {
       r.neck.rotation.set(0.95, 0, 0);
       r.tail.forEach((seg, i) => (seg.rotation.set(i === 0 ? 0.05 : -0.04, Math.sin(ft * 3 - i) * 0.12, 0)));
       r.body.position.y = 0.4;
-      return;
+      return `fly|${e.view.stage}|${at}`;
     }
     // At home: breathing, looking about, the tail swishing, wings folded.
     e.obj.position.copy(e.perch);
@@ -2130,5 +2381,6 @@ export class Board3D {
       w.rotation.set(0, (resting ? 1.3 : 0.75) - stretch * 0.6, up + Math.sin(t * 6) * 0.08 * stretch);
       w.scale.setScalar(resting ? 0.55 : 0.78 + 0.22 * stretch);
     }
+    return `home|${resting}|${e.view.stage}|${at}|${e.face.toFixed(3)}`;
   }
 }

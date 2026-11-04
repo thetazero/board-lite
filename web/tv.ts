@@ -6,8 +6,9 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, powerTag,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
+  fadeAway,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
@@ -64,7 +65,7 @@ function onSnapshot(s: Snapshot) {
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
   if (!s.game) {
-    $('overlay').className = 'overlay hidden';
+    clearOverlay();
     if (remote) return void (app.innerHTML = '');
     return renderLobby();
   }
@@ -349,9 +350,7 @@ const HOME = buildingIcon('roost', 40, '#9aa1ad'); // staying home: the roost
 
 function renderRaid(g: PublicState) {
   const raid = g.raid;
-  const el = $('overlay');
   if (!raid) return;
-  el.className = 'overlay raid';
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragonById(id).power, 0);
   const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
@@ -378,7 +377,8 @@ function renderRaid(g: PublicState) {
       : [])).join('');
     body = `<h1>${icon('raid', 1.1)} Fight or bail ${SECRET}${raidPips(g)}</h1>${arena(rows)}`;
   }
-  el.innerHTML = `<div class="raidbox">${body}</div>`;
+  // A new step (or the next raid) rises in; ticks within a step update in place.
+  showOverlay('raid', `raid ${g.round} ${g.raidsLeft} ${raid.step}`, `<div class="raidbox">${body}</div>`);
 }
 
 // Short banners for things that just happened, shown one after another: the
@@ -501,28 +501,46 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
         // The stroke: from the attacker's inner edge to the target's, in the
         // dragon's element colour, or the defenders' steel.
         const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : '#c9ced6';
-        battle.querySelector('.beam')?.remove();
+        // The last stroke fades out under the new one, never just blinks off.
+        battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
         battle.append(beam(battle, a, t, h.by === 'dragon', c));
       }
       if (t) {
-        t.querySelector('.hpbar')!.outerHTML = hpBar(now, max);
-        // Hits can land faster than a number fades: the new one replaces the
-        // last, so a −4 and a −8 never read as one −48.
-        t.querySelectorAll('.dmg').forEach((old) => old.remove());
+        // The bar drains to its new width (style.css eases it) rather than
+        // being redrawn at it.
+        const fill = t.querySelector<HTMLElement>('.hpbar > span')!;
+        const { width, color } = hpFill(now, max);
+        fill.style.width = width;
+        fill.style.background = color;
+        // Hits can land faster than a number reads. A new one doesn't cut the
+        // last: that one moves up a line, smaller, and fades, so a −4 sits
+        // over a −8 and never beside it as one −48. Only those two are up at
+        // once, so none rises into the fighter above.
+        t.querySelectorAll<HTMLElement>('.dmg').forEach((old) => {
+          if (old.classList.contains('gone')) return old.remove();
+          old.style.setProperty('--slot', '1');
+          fade(old, 450);
+        });
         const pop = document.createElement('span');
         pop.className = 'dmg';
         pop.textContent = `−${h.dmg}`;
         t.append(pop);
-        setTimeout(() => pop.remove(), 900);
+        pop.addEventListener('animationend', (e) => { if (e.target === pop && e.animationName === 'dmg') pop.remove(); });
         if (now <= 0) t.classList.add('down');
       }
     }, FIGHT_LEAD_MS + n * step));
     setTimeout(() => {
-      battle.querySelector('.beam')?.remove();
+      battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
       el.querySelector('.outcome')!.classList.add('show');
     }, FIGHT_LEAD_MS + hits.length * step + 400);
   };
   return { html, ms, play, top };
+}
+
+// Takes a stroke or a number away with a short fade instead of a cut.
+function fade(x: Element, ms = 250) {
+  x.classList.add('gone');
+  setTimeout(() => x.remove(), ms);
 }
 
 // A line from one fighter's facing edge to another's, drawn over the battle.
@@ -536,35 +554,48 @@ function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, rightward: bo
   return b;
 }
 
+// Whether the board itself comes next, with no overlay over it.
+const boardNext = (g: PublicState) => !banners.length && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
+
 function updateOverlay(g: PublicState) {
-  const el = $('overlay');
   if (bannerUp) return;
   const next = banners.shift();
   if (next) return showBanner(next);
   if (g.phase === 'over') {
     const w = g.standings![0].p;
-    el.className = 'overlay end';
-    el.innerHTML = `<div class="endbox" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
+    showOverlay('end', 'end', `<div class="endbox" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
       <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
       ${standingsHtml(g, names)}
-      ${remote ? '' : '<button class="primary" id="again">New game</button>'}</div>`;
+      ${remote ? '' : '<button class="primary" id="again">New game</button>'}</div>`);
     if (!remote) $('again').onclick = () => (location.href = '/tv');
     return;
   }
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
-  el.className = 'overlay hidden';
-  el.innerHTML = '';
+  hideOverlay();
 }
 
+let bannerN = 0;
+
 function showBanner(b: Banner) {
-  const el = $('overlay');
   bannerUp = true;
   bannerTop = b.top ?? null;
   cut(true);
-  el.className = 'overlay banner';
-  el.innerHTML = b.html;
-  b.play?.(el);
+  const key = `banner ${++bannerN}`;
+  const box = showOverlay('banner', key, b.html);
+  if (box) b.play?.(box);
   if (shown) renderGame(shown); // no one is being waited on while it plays
+  // The last scene's last moment: if the board comes next, it catches up
+  // under the scene, then the scene fades away, and what changed during the
+  // scene folds up as it clears (each thing a beat after the last, board3d.ts),
+  // rather than all of it landing in the frame the scene ends. The fade starts
+  // once the caught-up board is drawn: drawing it takes a while on a slow TV,
+  // and would eat the fade.
+  setTimeout(() => {
+    if (!bannerUp || !snap?.game || !boardNext(snap.game)) return;
+    bannerTop = null;
+    renderGame(snap.game);
+    requestAnimationFrame(() => requestAnimationFrame(() => overlayKey === key && hideOverlay()));
+  }, Math.max(0, b.ms - FADE_MS - CATCH_UP_MS));
   setTimeout(() => {
     bannerUp = false;
     bannerTop = null;
@@ -575,6 +606,65 @@ function showBanner(b: Banner) {
       cut(false);
     }
   }, b.ms);
+}
+
+// The overlay over the board: a banner, a raid step or the final scores.
+// Nothing in it cuts (style.css): it fades in over the board and out again,
+// and a new screen in it rises in while the one before fades away above it.
+// key names the screen: the same key again updates it in place.
+const FADE_MS = 400; // as style.css's .overlay transitions
+const CATCH_UP_MS = 200; // to draw the board's catch-up before a scene fades off it
+let overlayKey = ''; // '' while the overlay is hidden or fading out
+let hideTimer = 0;
+
+function showOverlay(kind: 'banner' | 'raid' | 'end', key: string, html: string): HTMLElement | null {
+  const el = $('overlay');
+  clearTimeout(hideTimer);
+  const was = overlayKey;
+  overlayKey = key;
+  const hidden = el.classList.contains('hidden');
+  el.className = `overlay ${kind}${hidden || el.classList.contains('in') ? ' in' : ''}`;
+  if (was === key) {
+    el.innerHTML = html;
+    return el.firstElementChild as HTMLElement | null;
+  }
+  // The screen it replaces fades away where it stood, above the new one.
+  const old = hidden ? null : (el.firstElementChild as HTMLElement | null);
+  if (old) {
+    const r = old.getBoundingClientRect();
+    old.classList.add('overlay-ghost');
+    old.style.cssText += `;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+    document.body.append(old);
+    old.onanimationend = () => old.remove();
+    setTimeout(() => old.remove(), FADE_MS * 2); // if nothing animates (screenshots)
+  }
+  el.innerHTML = html;
+  const box = el.firstElementChild as HTMLElement | null;
+  if (!hidden) box?.classList.add('enter');
+  return box;
+}
+
+function hideOverlay() {
+  const el = $('overlay');
+  if (!overlayKey) return;
+  overlayKey = '';
+  el.classList.add('out');
+  // Gone once it has faded, however slow the frames come; the timer is for
+  // when nothing animates (screenshots).
+  el.ontransitionend = (e) => {
+    if (e.target === el && !e.pseudoElement && e.propertyName === 'opacity' && el.classList.contains('out')) clearOverlay();
+  };
+  clearTimeout(hideTimer);
+  hideTimer = window.setTimeout(clearOverlay, FADE_MS * 2);
+}
+
+function clearOverlay() {
+  const el = $('overlay');
+  clearTimeout(hideTimer);
+  el.ontransitionend = null;
+  overlayKey = '';
+  el.className = 'overlay hidden';
+  el.innerHTML = '';
 }
 
 // In a phone (remote mode): a cutscene starts or ends.
@@ -588,15 +678,16 @@ function note(html: string) {
   t.className = 'toast news';
   t.innerHTML = html;
   document.body.append(t);
-  setTimeout(() => t.remove(), 8000);
+  setTimeout(() => fadeAway(t), 8000);
 }
+
 
 function toast(e: unknown) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = e instanceof Error ? e.message : String(e);
   document.body.append(t);
-  setTimeout(() => t.remove(), 3500);
+  setTimeout(() => fadeAway(t), 3500);
 }
 
 boot().catch(toast);

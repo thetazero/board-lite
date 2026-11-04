@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DECKS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -409,7 +409,7 @@ export function score(g: Game, p: number): Score {
 // ---------- setup ----------
 
 function buildDeck(g: Game, deck: 'building' | 'action'): Card[] {
-  const defs: Record<string, { copies?: number }>[] = deck === 'building' ? [BUILDINGS, UPGRADES] : [ACTIONS, DRAGONS];
+  const defs: readonly Record<string, { copies?: number }>[] = DECKS[deck];
   const cards: Card[] = [];
   for (const d of defs) for (const [k, def] of Object.entries(d)) for (let i = 0; i < (def.copies ?? 0); i++) cards.push({ id: '', deck, key: k });
   shuffle(g.rng, cards);
