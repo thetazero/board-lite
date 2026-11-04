@@ -8,6 +8,7 @@ export interface Hex {
   r: number;
   terrain: Terrain;
   fauna?: string; // a beast on this hex, a FAUNA or BEASTS key
+  sent?: true; // the beast here came from a card: it gives no loot
 }
 
 // The Thunderbird's peak: the mountain at the centre of the map.

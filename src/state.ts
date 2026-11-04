@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type Bundle, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, backInRound, bankRate, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -189,9 +189,10 @@ function targetView(g: Game, key: string, hp?: number[]): TargetView {
   };
 }
 
-export function faunaView(key: string): FaunaView {
+// A beast, with the loot it gives: a card-sent one gives none.
+export function faunaView(key: string, loot: Bundle = faunaDef(key).loot): FaunaView {
   const x = faunaDef(key);
-  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong, loot: res(x.loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
+  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong, loot: res(loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
 }
 
 function sideText(g: Game, s: TradeSide): string {
@@ -243,7 +244,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, floors: b.floors } : null,
-        fauna: h.fauna ? faunaView(h.fauna) : null,
+        fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
       };
     }),
     dragons: g.dragons.map((d) => dragonView(g, d)),
@@ -300,7 +301,7 @@ function cardView(g: Game, p: number, c: Card): CardView {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'All your dragons are adults.' };
   }
-  if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!), needs: 'hex', hexes: faunaHexes(g) };
+  if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!, {}), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
     const ids = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };

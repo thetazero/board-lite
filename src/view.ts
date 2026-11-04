@@ -4,7 +4,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
 import {
   PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, lootOf, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
+  dragonCapacity, dragonName, dragonPower, faunaLoot, faunaOnMap, huntable, lootOf, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
 import { PEAK, mapRadius, nearBeast } from './map.ts';
@@ -120,9 +120,10 @@ export function targetText(g: Game, t: string): string {
   return `${def.name} — combat power ${targetPower(t)}; defenders: ${units.join(', ')}; loot ${bundleText(lootOf(g, t))} (split by the combat power each player still has fighting at the end)`;
 }
 
-export function faunaText(k: string): string {
+// A beast, with the loot it gives (none if a card sent it).
+export function faunaText(k: string, loot: Bundle = faunaDef(k).loot): string {
   const x = faunaDef(k);
-  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; 1 try each round` : `loot ${bundleText(x.loot)}`;
+  const prize = BEASTS[k] ? `great beast: ${BEASTS[k].points} point for good to whoever slays it; 1 try each round` : Object.keys(loot).length ? `loot ${bundleText(loot)}` : 'no loot: a card sent it';
   return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''}; ${prize})`;
 }
 
@@ -154,7 +155,7 @@ export function commandHints(g: Game, p: number): string[] {
       } else {
         const a = ACTIONS[c.key];
         const arg = { gain_resource: ' <stone|timber|crystal|livestock>', grow_dragon: ' <dragon id>', heal_dragon: ' <dragon id>', gain_gold: '', extra_raid: '', hidden_point: null, send_fauna: ' <hex>' }[a.effect];
-        if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name}${a.effect === 'send_fauna' ? `: any land hex without fauna or a tower; ${faunaText(a.fauna!)}` : ''})${afford}`);
+        if (arg !== null) out.push(`play ${c.id}${arg}   (${a.name}${a.effect === 'send_fauna' ? `: any land hex without fauna or a tower; ${faunaText(a.fauna!, {})}` : ''})${afford}`);
       }
     }
     for (const b of BASIC_BUILDINGS) {
@@ -249,7 +250,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   }
   out.push(...mapText(g));
   const fauna = faunaOnMap(g);
-  out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
+  out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!, faunaLoot(g, k))}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them. In production, each beast (not a great beast) has a 1 in ${TUNING.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast.`);
   const slain = Object.entries(g.slain).map(([k, q]) => `${BEASTS[k].name} by ${pname(q)}`);
   out.push(`Great beasts: a Thunderbird on the peak (${PEAK}) and a Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
   out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${Object.keys(TARGETS).map((t) => `${TARGETS[t].name} (power ${targetPower(t)}) ${bundleText(lootOf(g, t))}`).join('; ')}.`);

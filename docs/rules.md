@@ -8,13 +8,13 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 ## A round: four phases
 
-1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry makes 1d4 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then every dragon eats 1 livestock, heals 7 health and grows 1 step (plus 1 per hatchery you own); a dragon that goes hungry doesn't grow. A dragon that goes hungry, or is still hurt when production begins, **sits out** this round's raids: a dragon sits out 1 round of raids for every 7 damage it took, rounded up. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
+1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry makes 1d4 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. Then every dragon eats 1 livestock, heals 7 health and grows 1 step (plus 1 per hatchery you own); a dragon that goes hungry doesn't grow. A dragon that goes hungry, or is still hurt when production begins, **sits out** this round's raids: a dragon sits out 1 round of raids for every 7 damage it took, rounded up. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
 2. **Cards** (all at once). Draw 1 action card and 2 building cards; keep 1 of the building cards and discard the other. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
    - **Build** on an empty land hex (no building, no beast) adjacent to one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on ley line, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor). Or add a **tower floor** on your tower, no card needed.
    - **Upgrade**: put an upgrade card on one of your buildings of its class. Each building takes 1 upgrade.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
-   - **Clear fauna**: send any of your raid-ready dragons against the beast on any hex. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is free and its livestock is yours; if not, it stays, at full health. A great beast takes one try per player a round.
+   - **Clear fauna**: send any of your raid-ready dragons against the beast on any hex. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is free and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A great beast takes one try per player a round.
    - **Special project** (no card): hatch a base egg of any element, for double the base dragon card's cost.
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
@@ -30,7 +30,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
-**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call, Rouse the Bear), which place a beast on any land hex with no tower or beast: next to someone, or on their building.
+**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
 **Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **2 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and shrugs off lightning, air and water; the Leviathan is weak to lightning and shrugs off water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
