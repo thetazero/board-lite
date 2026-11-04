@@ -48,8 +48,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       }
     }
   }
-  // Saved games to host (e.g. one started in the CLI's file mode): hosted
-  // before, it keeps its code and seats; otherwise every seat starts open.
+  // Saved games to host: hosted before, it keeps its code and seats; otherwise
+  // every seat starts open.
   for (const file of hostFiles) {
     const was = Room.savedCode(file);
     const code = was && !rooms.has(was) ? was : Room.newCode((c) => rooms.has(c), opts.dir);
@@ -124,9 +124,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     const room = getRoom(parts[1] ?? '');
     const action = parts[2];
     if (action === 'events' && req.method === 'GET') return events(req, res, room, query.get('token'));
-    // Plain text, for players at the command line (src/cli.ts with a room URL).
-    if (req.method === 'GET' && action === 'view') return text(res, room.viewText(query.get('token') ?? '', Number(query.get('log') ?? 25)));
-    if (req.method === 'GET' && action === 'status') return text(res, room.statusText());
+    // For clients that hold no stream open (the CLI, Claude seats): the same snapshot, on request.
+    if (req.method === 'GET' && action === 'state') return json(res, 200, room.state(query.get('token') ?? ''));
     if (req.method === 'GET' && action === 'wait') {
       const secs = Math.min(Number(query.get('timeout') ?? 60) || 60, 3600);
       const r = await room.wait(query.get('token') ?? '', secs * 1000);
@@ -169,14 +168,10 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         return json(res, 200, {});
       case 'do':
         if (host) throw new RoomError('The TV has no seat.');
-        return json(res, 200, { text: room.command(tok, str(b.command)) });
+        room.command(tok, str(b.command));
+        return json(res, 200, { state: room.snapshot(tok) });
     }
     return json(res, 404, { error: 'Not found.' });
-  }
-
-  function text(res: ServerResponse, body: string) {
-    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(body.endsWith('\n') ? body : `${body}\n`);
   }
 
   async function file(req: IncomingMessage, res: ServerResponse, path: string) {

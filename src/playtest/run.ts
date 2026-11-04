@@ -319,7 +319,7 @@ async function main() {
       const r = await call(`/listen?token=${watcher.token}&since=${since}&timeout=0`).catch(() => null);
       if (r) {
         if (r.next !== since) { since = r.next; lastChange = Date.now(); }
-        over = /^The game is over/.test(r.status);
+        over = r.state?.game?.phase === 'over';
       }
     } else over = hosted?.game?.phase === 'over';
     // Free memory under the floor for 10 s: stop this game before the machine OOMs.

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
 import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
-import { playerView } from '../src/view.ts';
+import { publicState, seatState } from '../src/state.ts';
+import { seatView } from '../src/view.ts';
 import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '../src/map.ts';
+
+// What seat p's CLI prints: its view, from the same JSON its phone would get.
+function playerView(g: Game, p: number, logLines = 25): string {
+  const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
+  const lobby = { code: 'TEST', started: true, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
+}
 
 // Each round starts with everyone keeping a building card: keep the first.
 function keepAll(g: Game) {
@@ -267,30 +271,6 @@ test('Largest Hoard goes to the most gold, from its minimum, and changes hands',
   apply(g, 0, 'bank stone timber');
   assert.equal(g.titles.hoard, 1);
   assert.equal(score(g, 1).titles, TUNING.titlePoints);
-});
-
-test('separate CLI processes can share one game', () => {
-  // On disk, not /tmp (which is RAM on the dev machine).
-  mkdirSync(join(homedir(), '.cache'), { recursive: true });
-  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
-  try {
-    const file = join(dir, 'g.json');
-    const cli = (...args: string[]) => execFileSync(process.execPath, ['src/cli.ts', ...args], { encoding: 'utf8' });
-    cli('new', file, '--players', '2', '--seed', '4');
-    assert.match(cli('view', file, '1'), /It's your decision/);
-    assert.match(cli('view', file, '1'), /keep <c\d+\|c\d+>/);
-    assert.match(cli('bot', file, '1'), /Bot plays/);
-    assert.match(cli('bot', file, '2'), /Bot plays/);
-    assert.match(cli('do', file, '1', 'end'), /P2's turn/);
-    assert.match(cli('wait', file, '2', '--timeout', '1'), /your decision/);
-    assert.throws(() => execFileSync(process.execPath, ['src/cli.ts', 'view', file, '1'], { env: { ...process.env, BOARD_LITE_SEAT: '2' }, stdio: 'pipe' }));
-    for (let i = 0; i < 15; i++) {
-      const seat = /Waiting on: P(\d)/.exec(cli('status', file))![1];
-      assert.match(cli('bot', file, seat), /Bot plays/);
-    }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 test('table talk is allowed any time, private talk reaches only the two players, and nothing else changes', () => {
