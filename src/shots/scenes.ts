@@ -1019,6 +1019,18 @@ export const SCENES: Scene[] = [
     },
     shots: (g) => [
       { file: 'tv-fauna-3p', caption: 'TV: fauna on the board: wolves by a tower, a bear on a building, beasts out in the wilds', client: 'tv', waitMs: 4800 },
+      {
+        // The wolf pack wanders to the next open hex: it turns, trots over, and turns back.
+        file: 'tv-fauna-wander-3p', caption: 'TV: the wolf pack wanders to the next hex, walking over', client: 'tv',
+        then: (room) => room.mutate((g2) => {
+          const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!;
+          const n = neighbors(k).find((x) => g2.map[x] && g2.map[x].terrain !== 'ocean' && !g2.map[x].fauna && !g2.buildings[x])!;
+          g2.map[n].fauna = 'wolf_pack';
+          delete g2.map[k].fauna;
+        }),
+        waitMs: 1500, // the board has the move before its clock starts
+        frames: [0, 0.4, 0.9, 1.5, 2.1, 2.9, 4],
+      },
       { file: 'phone-fauna-turn-3p', caption: 'Phone: your turn, with fauna to clear', client: 'phone', seat: g!.turn },
       { file: 'phone-fauna-pick-3p', caption: 'Phone: choosing which beast to clear', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
       { file: 'phone-fauna-send-3p', caption: 'Phone: choosing dragons to send against it', client: 'phone', seat: g!.turn, clicks: ['#hunt', '[data-hex]', '[data-hunter]'] },
