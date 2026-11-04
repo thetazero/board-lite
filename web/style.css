@@ -156,6 +156,8 @@ svg.token { flex: none; }
    stands in the columns either side of it and in its corners. */
 .board { position: relative; height: 100vh; overflow: hidden; --colw: 21vw; }
 .topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: .8em; padding: .35em 1em; pointer-events: none; }
+/* Over the sea, the round and the goal stand on a dark wash, to read. */
+.mapwrap:has(> .board3d) ~ .topbar { background: linear-gradient(#000a, #0006 70%, #0000); }
 .topbar .round { font-size: 1.5em; font-weight: 800; color: var(--accent); }
 /* what's happening, on a gold ribbon */
 .topbar .phase { font-size: 1.7em; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); padding: .05em .9em .1em; filter: drop-shadow(0 .12em .15em #0008); }
@@ -163,7 +165,11 @@ svg.token { flex: none; }
 .topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
 .mapwrap { position: absolute; inset: 0 calc(var(--colw) - 6vw) 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
-.board3d { flex: 1; min-height: 0; position: relative; }
+/* The 3D board's canvas spans the whole screen, the sea running off every
+   edge; the land is fitted to the middle (.mapwrap's box), between the
+   columns, so no hex hides under a player's card. */
+.mapwrap:has(> .board3d) { inset: 0 calc(var(--colw) + .5em); }
+.board3d { position: absolute; inset: 0 calc(-.5em - var(--colw)); }
 .board3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .legend { display: flex; gap: 1.1em; justify-content: center; color: var(--muted); font-size: .9em; flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: .3em; text-transform: capitalize; }
@@ -207,7 +213,7 @@ svg.token { flex: none; }
 .panel { padding: .4em .8em; }
 .panel h3 { margin: .1em 0 .3em; font-size: 1em; }
 .panel ul { margin: 0; padding-left: 1.1em; }
-/* Trade offers sit over the board's top edge, on its tray, while they're open. */
+/* Trade offers sit over the board's top edge while they're open. */
 .board > .offers { position: absolute; top: 3.2em; left: 50%; transform: translateX(-50%) rotate(-.4deg); z-index: 3; max-width: 46vw; font-size: 1.4em; border-top: .3em solid var(--accent); }
 .board > .offers h3 { display: none; }
 .offers ul { list-style: none; padding: 0; }
