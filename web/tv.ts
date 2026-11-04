@@ -264,7 +264,7 @@ function renderGame(g: PublicState) {
   // The board fills the screen, centred; the player cards stand in the
   // columns either side of it, the first half of the table on the left, and
   // the feed and the titles take the bottom corners. Open trade offers sit
-  // over the top of the board, on its tray, while they're open.
+  // over the top of the board while they're open.
   const half = Math.ceil(n / 2);
   app.innerHTML = `
     <div class="board">
