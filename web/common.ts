@@ -238,7 +238,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'raidEnd': return ev.won
       ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span> ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(' ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}</span>`;
+    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} <span class="none">${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}</span>`;
     case 'again': return `${icon('raid', 1.3)} <b>+1</b>`;
     // The beast is the subject ("Wolf Pack falls"), so it can't read as the player falling.
     case 'cleared': return `${who(ev.p)} ${icon('raid', 1.3)} ${icon(ev.fauna, 1.5)} <b>${esc(ev.name)}</b> ${ev.won ? ev.points ? `<span class="ok">slain</span> +${ev.points}${icon('points', 1.2)}` : `<span class="ok">falls</span> ${gainChips(ev.gain, 1.2)}` : '<span class="no">holds</span>'}`;
