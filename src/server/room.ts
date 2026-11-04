@@ -55,6 +55,7 @@ export class RoomError extends Error {}
 
 const LETTERS = 'BCDFGHJKLMNPQRSTVWXZ'; // no vowels: no accidental words
 const token = () => randomBytes(12).toString('hex');
+const MAX_TIMEOUT_MS = 2 ** 31 - 1; // the longest delay setTimeout keeps
 
 export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
@@ -433,7 +434,10 @@ export class Room {
     if (this.awayTimer) clearTimeout(this.awayTimer);
     this.awayTimer = null;
     const ends = this.seats.filter((s) => s.kind === 'player' && !s.left && s.connected === 0 && this.here(s)).map((s) => s.seen + this.awayMs);
-    if (!ends.length) return;
+    const wait = Math.max(0, Math.min(...ends) - Date.now()) + 10;
+    // setTimeout fires at once on anything past ~24.8 days, so a seat seen that
+    // far ahead (the screenshot rooms mark everyone here for good) needs no timer.
+    if (!ends.length || wait > MAX_TIMEOUT_MS) return;
     this.awayTimer = setTimeout(() => {
       this.awayTimer = null;
       this.changed();

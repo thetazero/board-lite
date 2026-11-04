@@ -1,5 +1,5 @@
 // The TV's board in 3D, in folded paper: each hex is a creased sheet of coloured
-// paper, set in an origami tray; buildings are folded paper models that pop up when
+// paper, laid on an open sea; buildings are folded paper models that pop up when
 // they're built; dragons are origami, live at home (their tower, a roost or a
 // hatchery) and now and then take off and circle it.
 //
@@ -202,31 +202,29 @@ function tileGeometry(): { top: THREE.BufferGeometry; sides: THREE.BufferGeometr
   return { top: build(top), sides: build(sides) };
 }
 
-// An origami tray the map sits in: a paper floor with its six walls folded up
-// and out, and a narrow rim folded flat along their tops.
-function trayGeometry(corners: THREE.Vector3[], wall: number, rim: number): { floor: THREE.BufferGeometry; walls: THREE.BufferGeometry } {
-  const quad = (out: number[], a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => {
-    for (const v of [a, b, c, a, c, d]) out.push(v.x, v.y, v.z);
-  };
-  const floor: number[] = [];
-  const walls: number[] = [];
-  const center = new THREE.Vector3();
-  const lift = (v: THREE.Vector3, by: number, outBy: number) => v.clone().add(v.clone().setY(0).normalize().multiplyScalar(outBy)).setY(by);
-  for (let i = 0; i < 6; i++) {
-    const a = corners[i], b = corners[(i + 1) % 6];
-    for (const v of [center, b, a]) floor.push(v.x, v.y, v.z);
-    const at = lift(a, wall, wall * 0.55), bt = lift(b, wall, wall * 0.55);
-    quad(walls, a, b, bt, at);
-    quad(walls, at, bt, lift(b, wall, wall * 0.55 + rim), lift(a, wall, wall * 0.55 + rim));
+// The open sea the map lies on: one flat sheet of paper far wider than the
+// camera ever sees, so the water runs off every edge of the screen.
+function seaGeometry(half: number): THREE.BufferGeometry {
+  const pos = [-half, 0, -half, -half, 0, half, half, 0, half, -half, 0, -half, half, 0, half, half, 0, -half];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(pos.flatMap((_, i) => (i % 3 === 1 ? [] : [pos[i] * 0.6])), 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+// Folded wave crests on a hex of sea, laid on the sea's paper.
+function waveCrests(r: () => number): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const crest = part(cyl(0.05, 0.05, 0.3 + r() * 0.15, 3), '#eaf4fb', { rot: [0, 0, Math.PI / 2], crease: false });
+    const a = r() * Math.PI * 2, d = 0.1 + r() * 0.5;
+    const holder = group(crest);
+    holder.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
+    holder.rotation.y = r() * 0.6 - 0.3;
+    g.add(holder);
   }
-  const geo = (pos: number[]) => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(pos.flatMap((_, i) => (i % 3 === 1 ? [] : [pos[i] * 0.6])), 2));
-    g.computeVertexNormals();
-    return g;
-  };
-  return { floor: geo(floor), walls: geo(walls) };
+  return g;
 }
 
 // Merges a model's pieces into one mesh per material and one set of crease
@@ -397,12 +395,7 @@ function decor(h: HexView, seaward: number): THREE.Group {
       }
       break;
     case 'ocean': {
-      // Folded wave crests on the sea.
-      for (let i = 0; i < 3; i++) {
-        const crest = part(cyl(0.05, 0.05, 0.3 + r() * 0.15, 3), '#eaf4fb', { rot: [0, 0, Math.PI / 2], crease: false });
-        crest.position.y = -TOP + 0.01; // on the sea, the tray's floor
-        place(group(crest), spot(0.1, 0.6), r() * 0.6 - 0.3);
-      }
+      g.add(waveCrests(r));
       break;
     }
     case 'harbor':
@@ -1854,7 +1847,7 @@ export class Board3D {
     for (const h of map) {
       if (h.terrain === 'ocean') {
         this.tiles.set(h.k, { hex: h, decorSig: '-' });
-        continue; // the sea is the tray's floor
+        continue; // the sea is the sheet under the map
       }
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
@@ -1864,41 +1857,46 @@ export class Board3D {
       this.tiles.set(h.k, { hex: h, decorSig: '-' });
     }
     this.world.add(bake(tiles));
-    // The map's extent, for the tray, the shadows and the camera.
+    // The map's extent, for the shadows and the camera.
     this.bounds.makeEmpty();
     for (const h of map) {
       const [x, z] = hexXZ(h.q, h.r);
       this.bounds.expandByPoint(new THREE.Vector3(x - 1, 0, z - 1)).expandByPoint(new THREE.Vector3(x + 1, 1.6, z + 1));
     }
-    // Every hex's outline, the tops of tall buildings, and the sky where dragons fly.
+    // The land's outline, the tops of tall buildings, and the sky where dragons
+    // fly: the camera fits these and lets the sea run off the screen's edges.
     this.fitPoints = map.flatMap((h) => {
+      if (h.terrain === 'ocean') return [];
       const [x, z] = hexXZ(h.q, h.r);
-      if (h.terrain === 'ocean') return [new THREE.Vector3(x, 0, z)]; // half the sea ring may go
       return [[0.95, 0, 0], [-0.95, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1.6, 0]].map(([dx, y, dz]) => new THREE.Vector3(x + dx, y, z + dz));
     });
+    if (!this.fitPoints.length) this.fitPoints = map.map((h) => new THREE.Vector3(...hexXZ(h.q, h.r)).setY(0));
     const size = this.bounds.getSize(new THREE.Vector3());
     const center = this.bounds.getCenter(new THREE.Vector3());
-    // The origami tray: a big hexagon round the map's six corner hexes.
-    const far = map.reduce((m, h) => Math.max(m, Math.hypot(...hexXZ(h.q, h.r))), 0);
-    const corners = Array.from({ length: 6 }, (_, i) => {
-      const a = (Math.PI / 3) * i;
-      return new THREE.Vector3(center.x + Math.cos(a) * (far + 1.35), 0, center.z + Math.sin(a) * (far + 1.35));
-    });
-    // The whole tray stays in view, so the board looks placed on the table, not cropped.
-    this.fitPoints.push(...corners);
-    const tray = trayGeometry(corners.map((c) => c.clone().sub(new THREE.Vector3(center.x, 0, center.z))), 0.45, 0.25);
-    // Its floor is the sea, the land pasted on it; a map without an ocean gets plain paper.
+    // The sea: a sheet far past the screen's edges, the land pasted on it; a
+    // map without an ocean gets plain paper. It catches the shadows too.
     const sea = map.some((h) => h.terrain === 'ocean');
-    const floor = part(tray.floor, sea ? mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2) : '#efe5cf', { at: [center.x, -0.01, center.z] });
+    const floor = part(seaGeometry(150), sea ? mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2) : '#efe5cf', { at: [center.x, -0.01, center.z], crease: false });
     floor.castShadow = false;
-    const walls = part(tray.walls, '#e9dec5', { at: [center.x, -0.01, center.z], two: true });
-    this.world.add(floor, walls);
-    // The table under it catches the tray's shadow; otherwise it's the page behind.
-    const table = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.35 }));
-    table.rotation.x = -Math.PI / 2;
-    table.position.set(center.x, -0.02, center.z);
-    table.receiveShadow = true;
-    this.world.add(table);
+    this.world.add(floor);
+    // Wave crests on the open sea round the map, out past any screen's corners.
+    if (sea) {
+      const dist = (q: number, r: number) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+      const reach = map.reduce((m, h) => Math.max(m, dist(h.q, h.r)), 0);
+      const onMap = new Set(map.map((h) => `${h.q},${h.r}`));
+      const open = new THREE.Group();
+      const out = reach * 2 + 6;
+      for (let q = -out; q <= out; q++) {
+        for (let r = -out; r <= out; r++) {
+          if (dist(q, r) > out || onMap.has(`${q},${r}`)) continue;
+          const crests = waveCrests(rng(`sea${q},${r}`));
+          const [x, z] = hexXZ(q, r);
+          crests.position.set(x, 0, z);
+          open.add(crests);
+        }
+      }
+      this.world.add(bake(open));
+    }
 
     const r = Math.max(size.x, size.z);
     this.sun.position.set(center.x - r * 0.45, r * 1.1, center.z + r * 0.55);
@@ -1988,9 +1986,14 @@ export class Board3D {
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    // Look down at the board from the room's side, as close as fits it all.
+    // Look down at the board from the room's side, as close as fits the land.
     const center = this.bounds.isEmpty() ? new THREE.Vector3() : this.bounds.getCenter(new THREE.Vector3());
     const dir = new THREE.Vector3(0, Math.sin(CAMERA_TILT), Math.cos(CAMERA_TILT));
+    // The canvas runs under the side columns so the sea reaches the screen's
+    // edges; the land fits the box it's set in (its parent), centred in it.
+    const box = this.el.parentElement;
+    const fx = box ? Math.min(1, box.clientWidth / w) : 1;
+    const fy = box ? Math.min(1, box.clientHeight / h) : 1;
     const corners = this.fitPoints;
     const fits = (dist: number) => {
       this.camera.position.copy(center).addScaledVector(dir, dist);
@@ -1999,7 +2002,7 @@ export class Board3D {
       this.camera.updateProjectionMatrix();
       return corners.every((c) => {
         const p = c.clone().project(this.camera);
-        return Math.abs(p.x) < 0.96 && Math.abs(p.y) < 0.93;
+        return Math.abs(p.x) < 0.96 * fx && Math.abs(p.y) < 0.93 * fy;
       });
     };
     let lo = 2, hi = 200;
