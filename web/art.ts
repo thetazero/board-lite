@@ -648,27 +648,14 @@ export function frameColor(kind: string, element?: string): string {
 export const KIND_ICON: Record<string, string> = {
   // A building card goes on a hex of the map: its mark is the hex, not a house (a house reads as one building, like the Market).
   building: '<path d="M0 -9 L7.8 -4.5 V4.5 L0 9 L-7.8 4.5 V-4.5 Z"/><path d="M0 -4.5 L3.9 -2.25 V2.25 L0 4.5 L-3.9 2.25 V-2.25 Z" fill="#0003"/>',
-  upgrade: '<path d="M0 -9 L2.6 -3 L9 -2.8 L4 1.6 L5.6 8 L0 4.4 L-5.6 8 L-4 1.6 L-9 -2.8 L-2.6 -3 Z"/>',
+  // An upgrade improves a building: an arrow up, not a star (the star is points).
+  upgrade: '<path d="M0 -9 L8 -1 H3.5 V8.5 H-3.5 V-1 H-8 Z"/>',
   action: '<path d="M0 -9 L2 -2 L9 0 L2 2 L0 9 L-2 2 L-9 0 L-2 -2 Z"/>',
   dragon: '<ellipse cx="0" cy="1" rx="6" ry="8"/><path d="M-5 0 L-2 -2 L0 1 L2 -2 L5 0" fill="none" stroke="#0005" stroke-width="1.4"/>',
 };
 
 export function kindIcon(kind: string, size = 14, color = '#fff'): string {
   return `<svg class="kicon" width="${size}" height="${size}" viewBox="-10 -10 20 20" fill="${color}">${KIND_ICON[kind] ?? ''}</svg>`;
-}
-
-// ---------- small folded glyphs for card stats ----------
-
-const GLYPH: Record<string, string> = {
-  health: f([[0, 8], [-8, 0], [-8, -4], [-4, -7], [0, -3]], '#e5484d', 0.15) + f([[0, 8], [0, -3], [4, -7], [8, -4], [8, 0]], '#e5484d', -0.15),
-  attack: [-5, 0, 5].map((x) => f([[x - 3, 8], [x + 2.5, -8], [x + 3.5, -7], [x - 1, 8]], '#d9dde6', x < 0 ? 0.2 : -0.05)).join(''),
-  // Combat power: a folded shield, gold.
-  power: f([[0, -9], [-8, -6], [-7, 2], [0, 9]], '#e9b84a', 0.18) + f([[0, -9], [8, -6], [7, 2], [0, 9]], '#e9b84a', -0.18),
-  growth: f([[-6, -8], [6, -8], [0, 0]], '#e9b84a', 0.15) + f([[0, 0], [-6, 8], [6, 8]], '#e9b84a', -0.15) + f([[-7, -9], [7, -9], [7, -7.5], [-7, -7.5]], '#a0673a') + f([[-7, 7.5], [7, 7.5], [7, 9], [-7, 9]], '#a0673a'),
-};
-
-export function glyph(name: string, label: string, size = 1.1): string {
-  return `<svg class="glyph" style="width:${size}em;height:${size}em" viewBox="-10 -10 20 20" role="img" aria-label="${label}"><title>${label}</title>${GLYPH[name] ?? ''}</svg>`;
 }
 
 // A dragon at one life stage, for the stat rows: the card's dragon, smaller when younger.

@@ -54,7 +54,7 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
 .pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
-.talkbar, .mehead, .ally, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
+.talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
@@ -62,7 +62,7 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 :is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
 :is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
-.panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
+.panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .sent, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
    hard edge below; pressed, it lies flat. Plain is cream card, primary blue,
@@ -93,7 +93,6 @@ small { color: var(--muted); }
 .ricon { vertical-align: middle; }
 .hpbar { display: inline-block; width: 4em; height: .5em; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 2px; overflow: hidden; vertical-align: middle; }
 .hpbar span { display: block; height: 100%; transition: width .6s; }
-.elem { color: var(--ec); font-weight: 700; }
 .ok { color: var(--good); font-weight: 800; }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
@@ -294,20 +293,24 @@ q::after { content: close-quote; }
 .target h2 { margin: 0 0 .4em; font-size: 1.6em; }
 .target .num { position: absolute; top: -.5em; left: -.5em; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: #111; font-weight: 900; font-size: 1.4em; display: flex; align-items: center; justify-content: center; }
 .weak { color: var(--good); } .strong { color: var(--warn); }
-.loot { margin-top: .5em; font-size: 1.2em; }
+.loot { margin-top: .5em; font-size: 1.2em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .3em; }
+.loot-label { font-size: .75em; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: .2em; }
+.elem { color: color-mix(in oklab, var(--ec) 50%, var(--text)); }
 .status { margin-top: 1em; font-size: 1.4em; display: flex; gap: 1em; justify-content: center; align-items: center; flex-wrap: wrap; }
 /* A kingdom's defenders: a picture per kind, how many, health, attack, weak and strong */
 .foes { display: flex; flex-direction: column; gap: .35em; }
-.foe { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .6em; font-weight: 700; white-space: nowrap; }
-.foe-pic { display: inline-flex; align-items: center; gap: .15em; min-width: 3.6em; }
-.foe-n { font-size: 1.05em; }
-.foe-stats, .foe-elems { display: inline-flex; align-items: center; gap: .3em; }
-.foe-elems > span { display: inline-flex; align-items: center; gap: .1em; margin-left: .3em; }
+.foe { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .6em; }
+.foe-pic { display: inline-flex; align-items: center; }
+.foe-body { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.foe-name { font-weight: 800; }
+.foe-stats { display: flex; flex-wrap: wrap; gap: 0 .8em; }
+.foe-stats .stat { margin: 0; font-weight: 400; }
+.foe-stats .stat b, .stat.power b { font-weight: 800; }
+.foe-elem { font-size: .9em; font-weight: 600; }
 .target .foes { font-size: 1.2em; }
 .target .loot { font-size: 1.5em; }
-.pips { display: inline-flex; gap: .1em; vertical-align: middle; font-size: .6em; margin-left: .3em; }
-.pips .later { opacity: .3; display: inline-flex; }
-.raidbox h1 .tag { font-size: .5em; vertical-align: middle; }
+.moreraids { display: inline-block; vertical-align: middle; font-size: .55em; margin-left: .6em; padding: .1em .6em; border-radius: .3em; background: var(--gold, #f2b600); color: #1a1218; font-weight: 800; }
+.raidbox h1 .tag { font-size: .45em; vertical-align: middle; font-weight: 600; opacity: .8; border: 1px solid currentColor; border-radius: .3em; padding: .05em .4em; margin-left: .4em; }
 /* The raid's arena: raiders left, defenders right */
 .arena { display: flex; gap: 2em; justify-content: center; align-items: center; }
 .arena .vs { opacity: .6; }
@@ -320,7 +323,8 @@ q::after { content: close-quote; }
 .rd.sent { opacity: 1; filter: drop-shadow(0 0 .3em var(--pc)); }
 .rd .hpbar { width: 2.2em; height: .35em; }
 .rd small { font-size: .55em; color: var(--text); white-space: nowrap; }
-.home { display: inline-flex; }
+.home { display: inline-flex; align-items: center; gap: .4em; font-size: 1.1em; }
+.home.none { font-style: italic; opacity: .55; font-size: .95em; }
 .fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; opacity: .55; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
 .battle { position: relative; }
@@ -414,7 +418,8 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 /* The roost: your dragons, and an empty nest for each one you have room for. */
 .roost { display: flex; align-items: center; gap: .6em; padding: .45em .7em; }
 .roost .nests { display: flex; flex-wrap: wrap; gap: .35em .9em; align-items: center; }
-.nest { width: 40px; height: 40px; opacity: .85; }
+.nest { width: 32px; height: 32px; opacity: .85; flex: none; }
+.roost .room { display: inline-flex; align-items: center; gap: .35em; color: var(--muted); font-size: .9em; white-space: nowrap; }
 .phone .status { margin: .5em .7em 0; font-size: 1.1em; font-weight: 700; padding: .45em 1em; justify-content: flex-start; color: var(--text); border-bottom: 1px dashed var(--line); }
 /* your turn, and anything you're asked to do: a gold ribbon */
 .phone .status.you { --text: var(--ink); --muted: var(--ink-soft); --hit: #c0392b; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); border: 0; margin: .55em .4em 0; padding: .45em 1.3em; font-size: 1.3em; filter: drop-shadow(0 .15em .2em #0009); }
@@ -483,8 +488,10 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .zoomacts .row { justify-content: center; }
 .zoomacts .hint { color: var(--muted); }
 .dstats { margin: .4em .2em 0; display: grid; gap: .1em; }
-.drow { display: grid; grid-template-columns: 4.2em 1fr 1fr; align-items: center; gap: .4em; font-weight: 700; }
-.drow span, .dgrow { display: inline-flex; align-items: center; gap: .3em; }
+.drow { display: grid; grid-template-columns: 4.2em 1fr; align-items: center; gap: .4em; font-weight: 700; }
+.drow .dvals { display: flex; flex-wrap: wrap; gap: 0 1em; }
+.drow .dvals .stat { margin: 0; }
+.dgrow { display: inline-flex; align-items: center; gap: .3em; }
 .drow .sfig { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .drow .sfig small { color: #6a5d52; font-size: .72em; font-weight: 600; line-height: 1; }
 .drow .stagefig { width: 4.2em; height: 2.6em; }
@@ -599,8 +606,8 @@ button.on:disabled { opacity: 1; }
 .row.big2 > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15em; }
 .row.big2 > button small { font-size: .7em; font-weight: 600; }
 .row.big2 > button small .chip { margin: 0 .15em; }
-.sent { display: flex; flex-wrap: wrap; gap: .4em; margin-bottom: .6em; }
-.stat { display: inline-flex; align-items: center; gap: .1em; margin-left: .3em; }
+.sent { display: flex; flex-wrap: wrap; align-items: center; gap: .4em; margin-bottom: .6em; padding: .4em .6em; color: var(--text); }
+.stat { display: inline-flex; align-items: baseline; gap: .25em; margin-left: .3em; white-space: nowrap; }
 .stat.power { font-weight: 800; }
 .stat.power.big { font-size: 1.15em; }
 .status .over, .status .tag { display: inline-flex; align-items: center; gap: .15em; margin-left: .4em; font-size: .85em; }
@@ -613,8 +620,10 @@ button.on:disabled { opacity: 1; }
 .plobby button { width: auto; }
 
 /* Phone raid: the target drawn above the choice, who else is going */
-.ptarget { padding: .6em .8em; margin-bottom: .6em; display: flex; align-items: center; justify-content: space-between; gap: .6em; }
-.ptarget .loot { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .2em; }
+.ptarget { padding: .6em .8em; margin-bottom: .6em; display: flex; align-items: center; justify-content: space-between; gap: .4em .6em; }
+.ptarget .tname { margin: 0; flex: 1; font-size: 1.15em; }
+.ptarget .foes, .ptarget .loot { flex-basis: 100%; }
+.ptarget .loot { margin: 0; }
 .choice .foes { margin: .2em 0; font-size: .95em; }
 .choice .loot { margin: 0; }
 .allies { display: flex; flex-wrap: wrap; gap: .4em .9em; margin-bottom: .6em; }
@@ -624,9 +633,7 @@ button.on:disabled { opacity: 1; }
 /* Narrow phones: a defender's stats wrap under its picture, the loot under the defenders */
 .ptarget { flex-wrap: wrap; }
 .ptarget .foes, .choice .foes { min-width: 0; }
-.ptarget .foe, .choice .foe { display: flex; flex-wrap: wrap; white-space: normal; gap: .2em .6em; }
-.ptarget .foe > span, .choice .foe > span { white-space: nowrap; }
-@media (max-width: 360px) { .ptarget .loot { flex-direction: row; gap: .6em; } }
+
 /* In the raid the hand is only to look at: on a short screen it gives way to the choice */
 @media (max-height: 700px) {
   body.phone.raiding .handfan { display: none; }

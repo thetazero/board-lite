@@ -6,10 +6,10 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, esc, foeStack, hpBar, icon, powerTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { qrSvg } from './qr.ts';
-import { ART_DEFS, cardArt, frameColor, glyph, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
+import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -481,17 +481,28 @@ function status(g: PublicState, me: Me): string {
   if (me.deciding) {
     let what = '';
     if (g.phase === 'action') what = me.myTurn ? 'Your turn' : 'An offer for you';
-    else if (g.phase === 'discard') what = `Discard ${me.hand.length - me.handCap} <span class="over">${icon('cards', 1.2)}${me.hand.length}/${me.handCap}</span>`;
-    else if (g.phase === 'cards') what = `Keep 1 ${icon('cards', 1.2)}`;
-    else if (g.raid?.step === 'vote') what = `${icon('raid', 1.3)} Vote`;
-    else if (g.raid?.step === 'commit') what = `${icon('raid', 1.3)} ${esc(g.raid.target!.name)} <span class="tag">${icon('public', 1.1)}</span>`;
-    else what = `${icon('raid', 1.3)} ${esc(g.raid!.target!.name)} <span class="tag">${icon('secret', 1.1)}</span>`;
+    else if (g.phase === 'discard') { const n = me.hand.length - me.handCap; what = `Discard ${n} card${n === 1 ? '' : 's'}`; }
+    else if (g.phase === 'cards') what = 'Keep 1 card';
+    else what = raidStep(g);
     return `<div class="status you"><span>${what}</span></div>`;
   }
+  // In a raid the step and the kingdom stay on screen whatever you've done.
+  if (g.phase === 'raid' && g.raid) return `<div class="status raidstep"><span>${raidStep(g)}</span></div><div class="status"><span>${waitText(g)}</span></div>${away(g)}`;
+  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>${away(g)}`;
+  return `<div class="status"><span>${waitText(g)}</span></div>${away(g)}`;
+}
+
+function waitText(g: PublicState): string {
   const tags = g.waitingOn.map((p) => playerTag(p, names));
   const w = tags.length < 2 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`;
-  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>${away(g)}`;
-  return `<div class="status"><span>Waiting for ${w || 'the table'}.</span></div>${away(g)}`;
+  return `Waiting for ${w || 'the table'}.`;
+}
+
+// The raid's step by its rules name. The kingdom is named on its panel below,
+// which every raid screen shows, whatever you've done.
+function raidStep(g: PublicState): string {
+  const r = g.raid!;
+  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or bail'}`;
 }
 
 // The menu under your name: quitting is there, out of the way of the game.
@@ -574,8 +585,8 @@ function tradeOpen(g: PublicState, me: Me): boolean {
   return g.phase === 'action' && tab === 'trade' && !picking && me.hand.length > 0;
 }
 
-// Your dragons at home: one place in the roost per dragon you can house,
-// empty places drawn as empty nests. The nests are the count: no "1/3".
+// Your dragons at home, then the room left for more: one empty nest with the
+// count in words, so the row doesn't fill with unlabelled baskets.
 // Tapping a dragon opens its card.
 const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
   <path d="M-10 -1 Q0 3 10 -1 L8 5 Q0 10 -8 5 Z" fill="#8a5a32"/><path d="M-10 -1 Q0 -5 10 -1 Q0 3 -10 -1 Z" fill="#3b2a1c"/>
@@ -584,7 +595,7 @@ function roost(g: PublicState, me: Me): string {
   const mine = g.dragons.filter((d) => d.owner === me.seat);
   const empty = Math.max(0, me.dragonCapacity - mine.length);
   if (!mine.length && !empty) return '';
-  return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${NEST.repeat(empty)}</div></section>`;
+  return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>` : ''}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
   return `<button class="dtap" data-dragon="${d.id}" aria-label="${esc(dragonName(d, g.dragons))}: open its card">${dragonChip(d, g.dragons, g.round)}</button>`;
@@ -624,7 +635,7 @@ const KIND_LABEL = { building: 'Building', upgrade: 'Upgrade', action: 'Action',
 // What a card costs, with what you're short of marked.
 function costChips(cost: CardView['cost'], me: Me): string {
   const parts = RESOURCES.filter((r) => (cost[r] ?? 0) > 0).map((r) => `<span class="chip${me.resources[r] < cost[r]! ? ' short' : ''}">${cost[r]}${resIcon(r, 1.15)}</span>`);
-  return parts.join('');
+  return parts.join('') || '<span class="chip free">Free</span>'; // a blank strip reads as a cost that failed to show
 }
 
 // The card's corner: its kind, or a dragon's element.
@@ -647,9 +658,9 @@ function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''):
 // the roost names it, with its health and attack, how fast it grows, and one sentence on how it picks targets.
 // A hatched dragon's card marks the stage it's at now.
 function dragonStats(key: string, element: string, d: { growth: number; targeting: string; stages: DragonStageView[] }, now = 0): string {
-  const rows = d.stages.map((st, i) => `<div class="drow${i + 1 === now ? ' now' : ''}"><span class="sfig">${stageFigure(key, element, i)}<small>${STAGE_LABEL[i + 1]}</small></span><span>${glyph('health', 'health')}${st.hp}</span><span>${glyph('attack', 'attack')}${iconText(esc(st.attack))}</span></div>`).join('');
+  const rows = d.stages.map((st, i) => `<div class="drow${i + 1 === now ? ' now' : ''}"><span class="sfig">${stageFigure(key, element, i)}<small>${STAGE_LABEL[i + 1]}</small></span><span class="dvals">${statTag('Health', st.hp)}${statTag('Attack', esc(st.attack))}</span></div>`).join('');
   const sentence = `${d.targeting[0].toUpperCase()}${d.targeting.slice(1)}.`;
-  return `<div class="dstats">${rows}<div class="dgrow" title="Growth steps per life stage (a fed dragon grows a step each round)">${glyph('growth', 'growth steps per stage')}${d.growth} per stage</div></div><p class="ctext">${esc(sentence)}</p>`;
+  return `<div class="dstats">${rows}<div class="dgrow">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it's fed</div></div><p class="ctext">${esc(sentence)}</p>`;
 }
 
 // A card tapped open: full size, its rule text, and how to play it.
@@ -671,7 +682,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean): string {
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
       <b class="cname">${esc(c.name)}</b>
       <div class="ccost"><span>${costChips(c.cost, me)}</span><small>${KIND_LABEL[c.kind]}</small></div>
-      ${c.dragon ? dragonStats(c.key, c.element ?? 'fire', c.dragon) : `${c.fauna ? foeStack([c.fauna], 1.6) : ''}<p class="ctext">${iconText(esc(c.text))}</p>`}
+      ${c.dragon ? dragonStats(c.key, c.element ?? 'fire', c.dragon) : `${c.fauna ? `${powerTag(c.fauna.power)}${foeStack([c.fauna], 1.6)}${lootLine(c.fauna.loot, 1.2)}` : ''}<p class="ctext">${iconText(esc(c.text))}</p>`}
     </div>
     <div class="zoomacts">${actions}</div>
     ${me.hand.length > 1 ? `<div class="zoomnav"><button class="ghost" data-zoomnav="-1" aria-label="Previous card">‹</button><span>${me.hand.indexOf(c) + 1} / ${me.hand.length}</span><button class="ghost" data-zoomnav="1" aria-label="Next card">›</button></div>` : ''}
@@ -686,7 +697,7 @@ function dragonZoom(g: PublicState, d: DragonView): string {
   const i = mine.indexOf(d);
   const grow = d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const resting = d.resting || (d.backIn !== null && !d.canRaid) ? ` ${dragonState(d, g.round)}` : ''; // why it sits out, as the roost says
-  const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${glyph('health', 'health')}${d.hp}/${d.maxHp}` : ''}${resting}`;
+  const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${statTag('Health', `${d.hp}/${d.maxHp}`)}` : ''}${resting}`;
   return `<div class="zoom" id="zoom">
     <div class="card big k-dragon" style="--kc:${frameColor('dragon', d.element)}">
       <div class="cart">${cardArt('dragon', d.key, d.element)}<span class="ckind">${elemIcon(d.element, 1)}</span></div>
@@ -738,8 +749,8 @@ function moreView(me: Me): string {
       <div class="row">${eggs}</div>${egg.room ? '' : '<p class="blocked">No room for another dragon: build a roost first.</p>'}</section>
     <section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
-      <div class="bankrow"><span>Get</span>${pick('get', bank.get)}</div>
-      <div class="bank"><span class="stepper"><button data-btimes="-1">−</button><b>${bank.times}</b><button data-btimes="1">+</button></span>
+      <div class="bankrow"><span>Gain</span>${pick('get', bank.get)}</div>
+      <div class="bank"><span class="steplabel">Times</span><span class="stepper"><button data-btimes="-1" aria-label="Trade 1 time fewer">−</button><b>${bank.times}</b><button data-btimes="1" aria-label="Trade 1 time more">+</button></span>
         <button id="bankgo" class="primary" ${me.resources[bank.give as 'stone'] >= me.bankRate * bank.times && bank.give !== bank.get ? '' : 'disabled'}>Trade <span class="chip">${me.bankRate * bank.times}${resIcon(bank.give, 1.25)}</span>→<span class="chip">${bank.times}${resIcon(bank.get, 1.25)}</span></button></div></section>`;
 }
 
@@ -782,8 +793,7 @@ function huntView(g: PublicState, me: Me): string {
   const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
   // A great beast pays in points, for good; it's 1 try each round, to the end.
   const great = h.fauna.points !== undefined;
-  const prize = great ? iconText(`${h.fauna.points} point`, 1.4) : resChips(h.fauna.loot, 1.4);
-  return `<h3 class="huntname">${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${prize}</div></section>
+  return `<h3 class="huntname">${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}</section>
     ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: '<button id="huntoff" class="big ghost">Cancel</button>', note: `Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}` })}`;
 }
 
@@ -795,7 +805,7 @@ function huntView(g: PublicState, me: Me): string {
 function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o: { go: string; out: string; note?: string; locked?: boolean }): string {
   const list = me.raidReady.map((id) => {
     const d = g.dragons.find((x) => x.id === id)!;
-    return `<button class="dragon pick${chosen.has(id) ? ' on' : ''}" data-${attr}="${id}" ${o.locked ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span><i class="tick"></i></button>`;
+    return `<button class="dragon pick${chosen.has(id) ? ' on' : ''}" data-${attr}="${id}" ${o.locked ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} ${statTag('Health', d.hp)} ${statTag('Attack', esc(d.attack))}</span><i class="tick"></i></button>`;
   }).join('');
   const n = chosen.size;
   const sent = [...chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
@@ -872,7 +882,7 @@ function fitMap(g: PublicState) {
 
 // The kingdom under attack, drawn: its defenders by kind and its loot.
 function targetPanel(t: TargetView): string {
-  return `<section class="ptarget">${powerTag(t.power, 'big')}${foeStack(t.units, 1.8)}<div class="loot">${resChips(t.loot, 1.4)}</div></section>`;
+  return `<section class="ptarget"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.8)}${lootLine(t.loot, 1.4)}</section>`;
 }
 
 // Each raid step is its choices as buttons. A choice once made stays on screen,
@@ -885,7 +895,7 @@ function raidView(g: PublicState, me: Me): string {
   if (raid.step === 'vote') {
     const voted = me.myVote !== null;
     return `${raid.candidates.map((t, i) => `
-      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}<span class="loot">${resChips(t.loot, 1.3)}</span></button>`).join('')}`;
+      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}${lootLine(t.loot, 1.3)}</button>`).join('')}`;
   }
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return targetPanel(raid.target!); // nobody fit to go: the roost above shows why
@@ -901,7 +911,7 @@ function raidView(g: PublicState, me: Me): string {
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
     return `${targetPanel(raid.target!)}
-      <div class="sent">${sent}${powerTag(sum(mine))}</div>
+      <div class="sent">${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
       <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
@@ -992,9 +1002,9 @@ talk.form.onsubmit = (e) => {
 
 function talkHtml(text: string, g: PublicState): string {
   const pub = /^(P\d) says: "(.*)"$/.exec(text);
-  if (pub) return `${named(pub[1], names)} <q>${named(pub[2], names, g.dragons)}</q>`;
+  if (pub) return `${named(pub[1], names)} <q>${esc(pub[2])}</q>`;
   const priv = /^(P\d) to (P\d) \(private\): "(.*)"$/.exec(text);
-  if (priv) return `${named(priv[1], names)} <small>to</small> ${named(priv[2], names)} <small>(private)</small> <q>${named(priv[3], names, g.dragons)}</q>`;
+  if (priv) return `${named(priv[1], names)} <small>to</small> ${named(priv[2], names)} <small>(private)</small> <q>${esc(priv[3])}</q>`;
   return named(text, names, g.dragons);
 }
 
@@ -1075,7 +1085,7 @@ function wire(g: PublicState, me: Me) {
     if (!cmd.startsWith('hunt ')) send(cmd);
   }));
   on('hunt', () => {
-    const about = '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is free and its loot is yours.</p>';
+    const about = '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is empty and its loot is yours.</p>';
     picking = { title: 'Choose a beast to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });

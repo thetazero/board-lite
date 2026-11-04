@@ -49,11 +49,18 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **no one** | nobody | No player |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
+| **weak to** / **strong against** (an element) | ×2, ½, resists, shrugs off | A beast or defender that takes double or half damage from an element: "Weak to ice", "Strong against air and lightning" |
+| **Health**, **Attack**, **Power** | a heart, swords, a shield | A stat, always said with its name: "Health 10", "Attack 1d6 on 2 targets", "Power 9" |
+| **loot** | prize, reward | What a fight pays, labelled "Loot" beside it |
 | **crystal field** | ley line, ley | The purple terrain crystal comes from, every time. One hex of it is a "crystal field hex" |
 | **<terrain> hex** ("meadow hex", "forest hex") | a bare "meadow", "forest" | A hex of a terrain, built on or not, when a card counts it or a building must go on it. |
 | **<resource> building** ("livestock building", "stone building") | pasture, quarry, lumber camp, mine (for a class) | Every building of a class: the basic building and the cards that make the same resource. A card that counts buildings says "building"; one that counts terrain says "hex", so the two never read alike (a Pasture stands on a meadow hex; "adjacent pasture" and "adjacent meadow" read the same) |
 
 Spelling is American ("harbor", "color"), to match the terrain and code names the CLI shows.
+
+## Icons
+
+Few icons, for the things the game names over and over: the five resources and points (the owner, 2026-11-03: "use icons for core resources, there should not be that many icons"). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
 
 ## Checks before you add text
 
@@ -62,6 +69,7 @@ Spelling is American ("harbor", "color"), to match the terrain and code names th
 - Is there an "it" or "they" whose thing isn't named nearby?
 - Is there a number written as a word, or a term from the "Not" column above?
 - Does the TV say the same thing the phone says, in the same words?
+- Is an icon standing for a word that isn't a resource or points? Write the word.
 
 ## Sources
 

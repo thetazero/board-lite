@@ -200,7 +200,7 @@ export class Room {
   private cleanName(name: string): string {
     const clean = tidyName(name);
     if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
-    if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}.`);
+    if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}: choose another name.`);
     return clean;
   }
 
