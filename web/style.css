@@ -92,7 +92,7 @@ small { color: var(--muted); }
 .chip.free { color: var(--muted); font-weight: 500; }
 .ricon { vertical-align: middle; }
 .hpbar { display: inline-block; width: 4em; height: .5em; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 2px; overflow: hidden; vertical-align: middle; }
-.hpbar span { display: block; height: 100%; transition: width .6s; }
+.hpbar span { display: block; height: 100%; transition: width .6s ease-out, background-color .6s; }
 .ok { color: var(--good); font-weight: 800; }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
@@ -328,7 +328,9 @@ q::after { content: close-quote; }
 .fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; opacity: .55; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
 .battle { position: relative; }
-.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; }
+.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; animation: beamin .12s ease-out; transition: opacity .25s; }
+.beam.gone { opacity: 0; }
+@keyframes beamin { from { scale: 0 1; opacity: .4; } }
 .battle .bvs { position: relative; z-index: 1; text-shadow: 0 0 .3em #000; }
 .fighter.unit .ricon { flex: none; }
 .fighter.unit b { font-size: .8em; }
@@ -345,9 +347,13 @@ q::after { content: close-quote; }
 .fighter.down { opacity: .3; }
 .fighter.strike { animation: strike .25s; }
 @keyframes strike { 50% { transform: scale(1.06) rotate(-1deg); background: var(--paper-hi); } }
-.fighter .dmg { position: absolute; top: -.2em; left: 50%; color: var(--hit); font-weight: 900; font-size: 1.3em; animation: dmg .9s forwards; pointer-events: none; }
+.fighter .dmg { position: absolute; top: -.2em; left: 50%; color: var(--hit); font-weight: 900; font-size: 1.3em; line-height: 1; animation: dmg 1.2s forwards; pointer-events: none; transform: translateY(calc(var(--slot, 0) * -.95em)) scale(calc(1 - var(--slot, 0) * .3)); transform-origin: 50% 100%; transition: transform .15s ease-out; }
+.fighter .dmg.gone { animation: dmg 1.2s forwards, out .45s forwards; }
+@keyframes out { to { opacity: 0; } }
 .fighter .dmg { left: auto; right: 3em; } .fighter.unit .dmg { left: 3em; right: auto; }
-@keyframes dmg { to { transform: translateY(-1.2em); opacity: 0; } }
+/* The number pops in, holds to be read, then drifts up and fades. It drifts on
+   translate and pops on scale, so the transform that stacks it stays free. */
+@keyframes dmg { from { scale: 1.5; } 15% { scale: 1; } 60% { translate: 0 0; opacity: 1; } to { translate: 0 -.8em; opacity: 0; } }
 .bvs { display: flex; flex-direction: column; align-items: center; color: var(--muted); min-width: 3em; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
 .bvs b { font-size: 2.4em; color: var(--text); }
