@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DRAGONS, ELEMENTS, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -321,7 +321,9 @@ export function buildingPoints(g: Game, k: string): number {
   const b = g.buildings[k];
   const up = b.upgrade ? UPGRADES[b.upgrade].points ?? 0 : 0;
   if (b.type === 'tower') return b.floors * BUILDINGS.tower_floor.points! + up;
-  return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]) + up;
+  const def = BUILDINGS[b.type];
+  const made = PRODUCTION_CLASSES.includes(def.class) ? TUNING.productionPoints : 0;
+  return (def.points ?? 0) * times(g, k, def) + made + up;
 }
 
 // Is hex k on or next to the peak, once the Thunderbird has fallen?
@@ -990,6 +992,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const give = parseResource(args[0]), get = parseResource(args[1]);
       const times = args[2] ? Number(args[2]) : 1;
       if (give === get) fail(`Trade two different resources.`);
+      if (give === 'gold' || get === 'gold') fail(`The bank doesn't trade gold: gain it from raids, or trade with a player.`);
       if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
       const rate = bankRate(g, p);
       pay(pl, { [give]: rate * times });

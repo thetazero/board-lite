@@ -27,7 +27,7 @@ let hunting: { hex: string; chosen: Set<string> } | null = null;
 let openCard: string | null = null;
 let selected = new Set<string>(); // discard picks
 let trade = fresh();
-let bank = { give: 'stone', get: 'gold', times: 1 };
+let bank = { give: 'stone', get: 'timber', times: 1 };
 let busy = false;
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
@@ -436,7 +436,7 @@ function moreView(me: Me): string {
   const eggOk = egg.affordable && egg.room;
   const eggs = egg.elements.map((e) => `<button class="elembtn iconbtn" style="--ec:${ELEMENT_COLORS[e]}" data-egg="${e}" aria-label="${e} egg" ${eggOk ? '' : 'disabled'}>${elemIcon(e, 1.9)}</button>`).join('');
   // Pick a resource by tapping its icon.
-  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
+  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
   return `
     <section class="panel"><h3>Basic buildings</h3>${basics}</section>
     <section class="panel"><h3>Special projects</h3>

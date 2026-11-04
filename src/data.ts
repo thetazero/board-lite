@@ -29,7 +29,12 @@ export const TUNING = {
   startingResources: { stone: 3, timber: 3, crystal: 3, livestock: 3 } as Bundle,
   // The tower produces this every round, no dice.
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
+  // The bank trades any resource but gold, either way: gold comes from raids,
+  // Markets, Trade Charters and other players (#98).
   bankRate: 4,
+  // Every building of a resource class (PRODUCTION_CLASSES) is worth this many
+  // points, as a Catan settlement is: the engine is also a way to win (#98).
+  productionPoints: 1,
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
@@ -60,6 +65,9 @@ export type BuildingClass = (typeof CLASSES)[number];
 export const CLASS_NAMES: Record<BuildingClass, string> = {
   quarry: 'quarry', lumber: 'lumber camp', mine: 'mine', pasture: 'pasture', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
 };
+// The resource classes: their buildings make resources and are worth
+// TUNING.productionPoints each.
+export const PRODUCTION_CLASSES: BuildingClass[] = ['quarry', 'lumber', 'mine', 'pasture'];
 // The tower is a monument (it holds floors) and a dragon building (it houses one).
 export const TOWER_CLASSES: BuildingClass[] = ['monument', 'dragon'];
 
@@ -87,17 +95,19 @@ export interface BuildingDef {
   per?: Counted;
 }
 
+// Text for a building of a resource class: its point, then what it makes.
+const made = (makes: string) => `Worth ${TUNING.productionPoints} point; makes ${makes}.`;
 const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = TERRAIN_NOUN[per]): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${noun}.` });
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: made(`1 ${r} each round for each adjacent ${noun}`) });
 const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}.` });
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: made(`1 ${r} each round for each adjacent ${CLASS_NAMES[per]}`) });
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
-  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
-  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
-  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
-  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: made('1d4 stone each round') },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: made('1d4 timber each round') },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: made('1d4 crystal each round') },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: made('1d4 livestock each round') },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 2, timber: 2 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // The always-open way to turn gold, which comes from raids, into points.
   tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 3, gold: 2 }, points: 1, onTower: true, text: 'Adds a floor to your tower, worth 1 point.' },

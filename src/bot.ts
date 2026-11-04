@@ -59,8 +59,10 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
       if (hexes.length && canAfford(pl, BUILDINGS[b].cost)) out.push(`build ${b} ${pick(rng, hexes)}`);
     }
     const rate = bankRate(g, p);
-    const rich = RESOURCES.filter((r) => pl.resources[r] >= rate + 2);
-    if (rich.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, RESOURCES.filter((r) => !rich.includes(r)).concat(['gold']))}`);
+    const traded = RESOURCES.filter((r) => r !== 'gold');
+    const rich = traded.filter((r) => pl.resources[r] >= rate + 2);
+    const poor = traded.filter((r) => !rich.includes(r));
+    if (rich.length && poor.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, poor)}`);
     out.push('end');
     return out;
   }

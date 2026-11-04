@@ -166,7 +166,7 @@ export function commandHints(g: Game, p: number): string[] {
     const fauna = huntable(g, p);
     if (fauna.length && fighters.length) out.push(`clear <hex> <dragon ids...>   (fight the beast there to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${fighters.join(' ')}; you can fight: ${fauna.map((k) => `${k} ${faunaDef(g.map[k].fauna!).name}`).join(', ')})`);
     out.push(`project <${ELEMENTS.join('|')}>   (base dragon egg, no card needed, costs ${bundleText(specialProjectCost(DRAGONS.fire_whelp.cost))})`);
-    out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1)`);
+    out.push(`bank <give resource> <get resource> [times]   (your rate: ${bankRate(g, p)}:1, not gold)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
     for (const o of g.offers.filter((x) => x.from === p)) out.push(`cancel ${o.id}`);
     out.push(g.offers.some((o) => o.to === p) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
