@@ -191,7 +191,7 @@ test('a player who is away: the table lets a bot play for them, and their phone 
   // A CLI or Claude player coming back by asking anything counts too.
   goQuiet(room, 1);
   room.standInFor(ada.token, 1);
-  room.viewText(bram.token);
+  room.state(bram.token);
   assert.ok(!room.seats[1].standIn);
   // And one waiting on the table (a long "wait" or "listen") is at their seat all along.
   room.command(bram.token, `keep ${room.game!.players[1].choice[0].id}`);
@@ -354,30 +354,31 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
-    const code = String(((await (await fetch(`${base}/api/rooms`, { method: 'POST' })).json()) as { code: string }).code);
-    const url = `${base}/${code}`;
-    const joined = await cli('join', url, 'Claude');
+    const opened = await cli('new', base);
+    const url = /is open: (\S+)/.exec(opened)?.[1];
+    assert.ok(url, opened);
+    const room = rooms.get(url!.slice(-4))!;
+    const joined = await cli('join', url!, 'Claude');
     const token = /token: (\w+)/.exec(joined)?.[1];
     assert.ok(token, joined);
-    const room = rooms.get(code)!;
-    room.addBot();
-    assert.match(await cli('start', url, token!), /started/);
-    const view = await cli('view', url, token!);
+    assert.match(await cli('bot', url!, token!), /P2 Tick \(bot\)/);
+    assert.match(await cli('start', url!, token!), /started/);
+    const view = await cli('view', url!, token!);
     assert.match(view, /You are P1/);
     assert.match(view, /Your options/);
     const keep = /keep <(c\d+)\|/.exec(view)?.[1];
     assert.ok(keep, view);
-    assert.match(await cli('do', url, token!, 'keep', keep!), /You keep/);
-    assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/); // the bot keeps one too
-    assert.match(await cli('do', url, token!, 'build', 'c999', '0,0'), /Not allowed: Build a card from your hand/);
-    const ended = await cli('do', url, token!, 'end');
+    assert.match(await cli('do', url!, token!, 'keep', keep!), /You keep/);
+    assert.match(await cli('wait', url!, token!, '--timeout', '20'), /your decision/); // the bot keeps one too
+    assert.match(await cli('do', url!, token!, 'build', 'c999', '0,0'), /Not allowed: Build a card from your hand/);
+    const ended = await cli('do', url!, token!, 'end');
     assert.match(ended, /P1 ends their turn/);
     // The bot plays its turn. Everyone's dragon is still an egg, so there is no
     // raid: wait returns at our next decision, the next round's cards.
-    assert.match(await cli('wait', url, token!, '--timeout', '20'), /your decision/);
+    assert.match(await cli('wait', url!, token!, '--timeout', '20'), /your decision/);
     assert.equal(room.game!.round, 2);
     assert.equal(room.game!.phase, 'cards');
-    assert.match(await cli('status', url), /Room \w{4}: P1 Claude, P2 Tick \(bot\)/);
+    assert.match(await cli('status', url!), /Room \w{4}: P1 Claude, P2 Tick \(bot\)/);
   } finally {
     for (const r of rooms.values()) r.close();
     server.closeAllConnections();
@@ -385,7 +386,7 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
   }
 });
 
-test("a game from the CLI's file mode can be hosted; players claim its open seats", () => {
+test('a saved game with no seats file can be hosted; players claim its open seats', () => {
   const file = join(dir, 'hosted.json');
   const g = newGame(2, 4);
   for (const p of [0, 1]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
