@@ -107,6 +107,10 @@ small { color: var(--muted); }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
 .toast { position: fixed; left: 50%; bottom: 1.5em; transform: translateX(-50%) rotate(-.6deg); background: var(--sheet); border-left: .4em solid var(--bad); box-shadow: var(--lift); font-weight: 600; padding: .7em 1em; border-radius: 2px; z-index: 50; max-width: 90vw; }
+/* Toasts and notes slide up as they come and fade as they go (tv.ts). */
+.toast { animation: toastin .3s ease-out; transition: opacity .4s ease-in, translate .4s ease-in; }
+.toast.gone { opacity: 0; translate: 0 .8em; }
+@keyframes toastin { from { opacity: 0; translate: 0 .8em; } }
 .offline-note { display: none; position: fixed; top: 0; left: 0; right: 0; background: var(--grain), #c0392b; color: #fff; font-weight: 700; text-align: center; padding: .3em; z-index: 60; box-shadow: 0 .2em .4em #0006; }
 body.offline .offline-note { display: block; }
 
@@ -251,10 +255,21 @@ q::before { content: open-quote; }
 q::after { content: close-quote; }
 
 /* TV overlays */
-.overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #140f2ae8; }
-.overlay.raid { background: var(--table-mottle), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); }
-.overlay.banner { background: #140f2ad0; animation: fadein .3s; }
+/* Nothing on the TV cuts: an overlay fades in over the board and out again,
+   and a new screen in it (the next scene, the raid's next step) rises in while
+   the last one fades away above it (tv.ts, .overlay-ghost). The raid's mottled
+   table is a layer that fades in and out under the boxes. */
+.overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #140f2ae8; transition: opacity .4s ease-in, background-color .4s; }
+.overlay::before { content: ''; position: fixed; inset: 0; z-index: -1; background: var(--table-mottle), radial-gradient(ellipse at 50% 40%, #2b2452f8, #140f2afa 75%); opacity: 0; transition: opacity .4s; pointer-events: none; }
+.overlay.raid::before { opacity: 1; }
+.overlay.banner { background-color: #140f2ad0; }
+.overlay.in { animation: fadein .4s ease-out; }
+.overlay.out { opacity: 0; pointer-events: none; }
+.overlay > .enter { animation: enter .4s ease-out; }
+.overlay-ghost { position: fixed; z-index: 21; margin: 0 !important; pointer-events: none; animation: leave .4s ease-in forwards; }
 @keyframes fadein { from { opacity: 0; } }
+@keyframes enter { from { opacity: 0; translate: 0 1.5rem; } }
+@keyframes leave { to { opacity: 0; translate: 0 -1.5rem; } }
 /* the TV's big moments: a large sheet laid on the table, its top-right corner folded down */
 .production, .result, .endbox { position: relative; background: var(--sheet); border-radius: 2px; padding: 1.2em 2.5em; min-width: 40em; text-align: center; box-shadow: 0 .18em 0 var(--paper-edge), 0 1.2em 2.4em #05030fcc;
   clip-path: polygon(0 0, calc(100% - 2.2em) 0, 100% 2.2em, 100% 100%, 0 100%); }
@@ -266,8 +281,8 @@ q::after { content: close-quote; }
 .production { max-width: 92vw; }
 .production .dice { display: flex; flex-wrap: wrap; gap: .1em 0; }
 /* Everyone rolls at once, each player's dice a moment after the last's, lit in their colour. */
-.production li { visibility: hidden; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
-.production li.up { visibility: visible; }
+.production li { opacity: 0; translate: -1.5em 0; transition: opacity .35s ease-out, translate .35s ease-out; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
+.production li.up { opacity: 1; translate: none; }
 .endbox { padding: 0 0 1.2em; overflow: hidden; min-width: 44em; }
 .endbox svg.scene { display: block; width: 100%; height: 13em; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }

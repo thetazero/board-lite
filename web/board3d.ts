@@ -1574,6 +1574,11 @@ const WALK_TURN = 0.7, WALK_GO = 3.4;
 const FRESH_S = 12;
 const MARK = '#ffe27a';
 
+// Several things new at once (the board catching up after a TV scene) fold
+// up one after another, this many seconds apart, not all in one frame, so
+// the eye can follow each. At most CASCADE_MAX of them wait their turn.
+const CASCADE_S = 0.3, CASCADE_MAX = 8;
+
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
@@ -1641,6 +1646,8 @@ export class Board3D {
     if (sig !== this.mapSig) this.buildMap(g.map, sig);
     const now = clock();
     const animate = !this.firstUpdate;
+    let n = 0;
+    const next = () => now + Math.min(n++, CASCADE_MAX) * CASCADE_S;
     let regrow = false;
     for (const h of g.map) {
       const t = this.tiles.get(h.k)!;
@@ -1677,8 +1684,9 @@ export class Board3D {
       // Pop up from the page when it's new; a new floor or upgrade pops up too
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
-      this.built.set(h.k, { sig: bsig, obj, born: fresh ? now : -1e9 });
-      if (fresh) this.mark(h, now);
+      const at = fresh ? next() : -1e9;
+      this.built.set(h.k, { sig: bsig, obj, born: at });
+      if (fresh) this.mark(h, at);
     }
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
@@ -1701,15 +1709,16 @@ export class Board3D {
     for (const h of fresh) {
       const f = h.fauna!;
       const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
-      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: animate ? now : -1e9 };
+      const at = animate ? next() : -1e9;
+      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: at };
       const from = animate ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
       if (from >= 0) {
         entry.born = -1e9;
-        entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at: now };
+        entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at };
         gone.splice(from, 1);
       }
       this.beasts.set(h.k, entry);
-      if (animate) this.mark(h, now);
+      if (animate) this.mark(h, at);
     }
     this.placeDragons(g);
     this.firstUpdate = false;
@@ -2033,8 +2042,9 @@ export class Board3D {
       const pop = b.obj.userData.pop as THREE.Group;
       const age = t - b.born;
       if (age < 1.2) {
-        // Folds up from flat on the page, overshoots a little, settles.
-        const k = Math.min(1, age / 0.9);
+        // Folds up from flat on the page, overshoots a little, settles
+        // (flat until its turn, when several fold up one after another).
+        const k = Math.max(0, Math.min(1, age / 0.9));
         const back = 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2;
         pop.rotation.x = (1 - back) * -Math.PI / 2;
         pop.scale.y = Math.max(0.02, Math.min(1.08, back));
@@ -2049,7 +2059,7 @@ export class Board3D {
         this.unmark(k);
         continue;
       }
-      const fade = Math.min(1, age / 0.4) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
+      const fade = Math.max(0, Math.min(1, age / 0.4)) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
       (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * (0.8 + 0.2 * Math.cos(age * 3.5));
     }
     // The acting player's plates glow gently.
