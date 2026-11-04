@@ -613,7 +613,7 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 3,
+    seed: 82,
     until: (g) => {
       if (g.round < 4 || g.phase !== 'action') return false;
       const c = structuredClone(g);
