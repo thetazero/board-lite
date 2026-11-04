@@ -101,7 +101,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'mine': {
         const m = /^You (draw|keep) (.*)\.$/.exec(e.text);
         if (!m) break;
-        // "Sky Wyrm (c84), and building cards Ley Spire (c43), Port (c42): keep one"
+        // "Sky Wyrm (c84), and building cards Crystal Spire (c43), Port (c42): keep one"
         for (const [, name] of m[2].replace(/(^|, )(and )?building cards /g, '$1').matchAll(/([^,:]+?) \(c\d+\)/g)) {
           const k = keyOfName(name.trim());
           const tally = m[1] === 'draw' ? s.offered : s.kept;
