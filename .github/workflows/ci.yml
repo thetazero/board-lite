@@ -6,6 +6,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The whole run takes about a minute. Past 5 it is cancelled and fails.
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,4 +16,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      # `npm test` takes 30-40 s here (about 8 s on a dev machine). Past
+      # TEST_CAP seconds it is stopped and the run fails as too slow. Raise
+      # the cap only on purpose, and say why in the PR.
+      - name: npm test (capped)
+        env:
+          TEST_CAP: 120
+        run: |
+          start=$SECONDS
+          set +e
+          timeout --kill-after=10 "$TEST_CAP" npm test
+          code=$?
+          set -e
+          took=$((SECONDS - start))
+          echo "npm test took ${took}s (cap ${TEST_CAP}s)"
+          if [ "$code" = 124 ] || [ "$code" = 137 ]; then
+            echo "::error title=Tests too slow::npm test ran past its ${TEST_CAP}s cap and was stopped. It usually takes 30-40s on CI. Find what made it slower, or raise TEST_CAP in .github/workflows/ci.yml on purpose and say why in the PR."
+          fi
+          exit "$code"
