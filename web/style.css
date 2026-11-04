@@ -427,7 +427,16 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .handfan .card .ckind svg { width: calc(11px * var(--hs, 1)); height: calc(11px * var(--hs, 1)); }
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
 .handfan .card.picked { transform: translateY(calc(var(--y) - 1.6em)) rotate(calc(var(--r) / var(--hs, 1))); }
-.handfan.discarding .card:not(.picked) { filter: none; }
+.handfan .card { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body.phone.hand-below .handfan .card { touch-action: pan-y; } /* a hand after the page: an upward slide scrolls the page */
+/* The card under your thumb rises out of the hand, straight and big enough to read (phone.ts showGrip);
+   pulled out, it follows the thumb, and lights up once letting go plays it. */
+.handfan .card.peek { z-index: 99 !important; transform-origin: 50% 100%; transform: translate(var(--gx, 0px), calc(var(--y) - 4.5em + var(--gy, 0px))) scale(1.55); box-shadow: 0 0 0 2px #fff9, 0 14px 30px #000c; }
+.handfan .card.peek.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 14px 30px #000c; }
+.handfan .card.peek.picked { box-shadow: 0 0 0 3px var(--bad), 0 14px 30px #000c; }
+.handfan .card.peek.offered { box-shadow: 0 0 0 3px var(--accent), 0 14px 30px #000c; }
+.handfan .card.lift { transition: none; }
+.handfan .card.lift.out { box-shadow: 0 0 0 3px var(--accent), 0 0 22px 4px var(--accent), 0 14px 30px #000c; }
 /* Offering cards in a trade: tapped cards rise out of the fan, outlined like any other choice. */
 .handfan .card.offered { transform: translateY(calc(var(--y) - 1.6em)) rotate(calc(var(--r) / var(--hs, 1))); box-shadow: 0 0 0 3px var(--accent), 0 8px 16px #000a; }
 body.phone.has-hand { padding-bottom: calc(5.1em + 9.4em * var(--hs, 1)); } /* the fan sits over the talk bar: room for both; --hs is how far the hand has grown into free space (phone.ts fitHand) */
@@ -457,7 +466,7 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .card.dealt { animation: deal .65s cubic-bezier(.2, .9, .3, 1.15) both; }
 @keyframes deal { from { transform: translateY(-70vh) rotate(-14deg) scale(.7); opacity: 0; } 30% { opacity: 1; } }
 /* A card tapped open, over the hand. */
-.zoom { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em; padding: 1em; background: #140f2aed; overflow-y: auto; animation: fadein .15s; }
+.zoom { touch-action: pan-y; position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em; padding: 1em; background: #140f2aed; overflow-y: auto; animation: fadein .15s; }
 .card.big { width: min(19em, 88vw); cursor: default; padding: 8px 8px 10px; animation: zoomin .2s ease-out; }
 .card.big .cname { margin: -12px -11px 0; font-size: 1.45em; }
 .card.big .ckind { width: 30px; height: 30px; top: 6px; left: 6px; }
@@ -740,3 +749,13 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .card .dnow { display: inline-flex; align-items: center; gap: .3em; font-weight: 700; }
 .card .dnow .grow { color: #6a5d52; letter-spacing: -.05em; }
 .drow.now { background: color-mix(in oklab, var(--kc) 22%, transparent); border-radius: 2px; box-shadow: inset .2em 0 0 var(--kc); }
+
+/* Discarding: the cards picked to go, face up above the button, and a place for each still to pick. */
+.discardtray { display: flex; flex-wrap: wrap; justify-content: center; gap: .5em; }
+.discardtray .card, .discardtray .slot { width: 5.4em; font-size: .9em; }
+.discardtray .card .cname { font-size: .72em; margin: -7px -6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.discardtray .card .ccost { display: none; }
+.discardtray .card .ckind { width: 16px; height: 16px; }
+.discardtray .card .ckind svg { width: 10px; height: 10px; }
+.discardtray .card.picked::before { width: 20px; height: 20px; top: -7px; right: -7px; font-size: .8em; }
+.discardtray .slot { aspect-ratio: 5 / 5.4; border: 2px dashed #fff5; border-radius: 4px; }

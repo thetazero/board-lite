@@ -483,9 +483,9 @@ function render() {
   else body = actionView(g, me);
   // Your dragons are on every screen of the game, so their cards are always a tap away.
   const den = !picking && g.phase !== 'over' ? roost(g, me) : '';
-  const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
+  const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
-  const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : dragonOpen ? dragonZoom(g, dragonOpen) : '';
+  const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : dragonOpen ? dragonZoom(g, dragonOpen) : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
   const dock = !choosing && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
   document.body.classList.toggle('has-hand', !!dock);
@@ -611,11 +611,13 @@ function dragonStats(key: string, element: string, d: { growth: number; targetin
 }
 
 // A card tapped open: full size, its rule text, and how to play it.
-function cardZoom(c: CardView, me: Me, playable: boolean): string {
+function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): string {
   let actions = '';
+  const full = selected.size >= me.hand.length - me.handCap;
+  if (discarding) actions = selected.has(c.id) ? `<button class="big" data-discardpick="${c.id}">Don't discard</button>` : `<button class="primary big" data-discardpick="${c.id}" ${full ? 'disabled' : ''}>Discard</button>`;
   // Off your turn there's nothing to do with a card but read it; one you can't
   // afford shows its button greyed, the missing resources already red on the cost.
-  if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
+  else if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
   else if (!playable) actions = '';
   else if (c.blocked) actions = `<p class="blocked">${iconText(esc(c.blocked))}</p>`;
   else if (!c.affordable) actions = `<button class="primary big" disabled>${c.kind === 'dragon' ? 'Hatch' : c.kind === 'action' ? 'Play' : c.kind === 'upgrade' ? 'Upgrade' : 'Build'}</button>`;
@@ -668,7 +670,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean, offering = fals
     const ready = playable && c.affordable && !c.blocked && c.needs !== 'unplayable';
     // --x: offset from the centre as a share of the spread; --r: tilt; --y: the arc's drop.
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
-    return cardFace(c, me, playable, `${pos}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}`);
+    return cardFace(c, me, playable, `${pos}${gripStyle(c.id)}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}${gripClass(c.id)}`);
   }).join('');
   return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" style="--n:${n}">${cards}</div>`;
 }
@@ -885,9 +887,15 @@ function keepView(me: Me): string {
 
 // ---- discard / end ----
 
+// The cards picked to discard are laid out above the button, face up, one
+// place for each card still to pick: what goes is there to read before it goes.
+// Tapping one there (or again in the hand) puts it back.
 function discardView(me: Me): string {
   const n = me.hand.length - me.handCap;
-  return `<button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
+  const picks = me.hand.filter((c) => selected.has(c.id));
+  const tray = picks.map((c) => cardFace(c, me, false, '', ' traycard')).join('') + '<div class="slot"></div>'.repeat(Math.max(0, n - picks.length));
+  const hint = picks.length ? '' : '<p class="hint">Tap cards in your hand to discard them. Hold a card to read it.</p>';
+  return `<div class="discardtray">${tray}</div>${hint}<button id="discard" class="primary big" ${selected.size === n ? '' : 'disabled'}>Discard ${selected.size}/${n}</button>`;
 }
 
 // The end: the winner's moment, then where everyone finished. Nothing from the
@@ -905,6 +913,147 @@ function gameOver(g: PublicState, me: Me): string {
     ${standingsHtml(g, names, me.seat)}
     <button id="newgame" class="primary big">New game</button>
   </div>`;
+}
+
+// ---------- the hand under your thumb ----------
+
+// Held the way digital card games hold a hand: press a card and slide along the
+// hand, and the card under your thumb rises, big enough to read (a full hand
+// overlaps, so this is how you read it); hold still on one to open it; drag one
+// up out of the hand to play it (or, while discarding or offering a trade, to
+// pick it). A plain tap does what it always did.
+type Grip = { id: string; x0: number; y0: number; x: number; y: number; moved: boolean; lift: { x: number; y: number } | null; top: number; strips: { id: string; left: number; width: number }[]; hold: number };
+let grip: Grip | null = null;
+let swallowClick = 0; // a click until then ends a slide or a hold, not a tap
+let swipe: { x: number; y: number } | null = null; // a finger down on an open card
+const MOVE_PX = 8; // further than this is a slide, not a tap
+const LIFT_PX = 50; // this far up is pulling a card out of the hand
+const HOLD_MS = 450;
+
+// A tap on a card: pick it to discard, offer it, or open it.
+function tapCard(g: PublicState, me: Me, id: string) {
+  if (g.phase === 'discard' && me.deciding) {
+    if (selected.has(id)) selected.delete(id);
+    else if (selected.size < me.hand.length - me.handCap) selected.add(id);
+  } else if (tradeOpen(g, me)) {
+    if (trade.cards.has(id)) trade.cards.delete(id);
+    else trade.cards.add(id);
+  } else openCard = openCard === id ? null : id;
+  render();
+}
+
+// A card dragged out of the hand: played if it can be, straight away or on to
+// the choice it needs; otherwise opened, which says why not.
+function pullOut(id: string) {
+  const g = snap?.game;
+  const me = snap?.you;
+  const c = me?.hand.find((x) => x.id === id);
+  if (!g || !me || !c) return;
+  if ((g.phase === 'discard' && me.deciding) || tradeOpen(g, me)) return tapCard(g, me, id);
+  const ready = me.myTurn && g.phase === 'action' && c.affordable && !c.blocked;
+  if (ready && c.needs === 'hex') return pickHexFor(c);
+  if (ready && c.needs === 'none') return send(`${c.kind === 'building' ? 'build' : 'play'} ${c.id}`);
+  openCard = id;
+  render();
+}
+
+function pickHexFor(c: CardView) {
+  const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build';
+  const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
+  const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
+  const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
+  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about };
+  openCard = null;
+  render();
+}
+
+function grab(e: PointerEvent, el: HTMLElement) {
+  if (e.button > 0 || grip) return;
+  const fan = el.closest<HTMLElement>('.handfan')!;
+  const strips = [...fan.querySelectorAll<HTMLElement>('[data-card]')].map((c) => {
+    const r = c.getBoundingClientRect();
+    return { id: c.dataset.card!, left: r.left, width: r.width };
+  });
+  const id = el.dataset.card!;
+  grip = { id, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false, lift: null, top: fan.getBoundingClientRect().top, strips, hold: 0 };
+  grip.hold = window.setTimeout(() => {
+    // Held still: open the card to read it.
+    grip = null;
+    swallowClick = performance.now() + 600;
+    openCard = id;
+    render();
+  }, HOLD_MS);
+  showGrip();
+}
+
+addEventListener('pointermove', (e) => {
+  if (!grip) return;
+  grip.x = e.clientX;
+  grip.y = e.clientY;
+  if (!grip.moved && Math.hypot(grip.x - grip.x0, grip.y - grip.y0) < MOVE_PX) return;
+  if (!grip.moved) {
+    grip.moved = true;
+    clearTimeout(grip.hold);
+  }
+  if (!grip.lift && grip.y0 - grip.y > LIFT_PX && grip.y0 - grip.y > Math.abs(grip.x - grip.x0)) grip.lift = { x: grip.x, y: grip.y };
+  if (!grip.lift) {
+    // The card on top under the thumb: the last one whose left edge it has passed.
+    const under = grip.strips.filter((s) => s.left <= grip!.x).at(-1) ?? grip.strips[0];
+    if (under) grip.id = under.id;
+  }
+  showGrip();
+});
+function letGo(cancel: boolean) {
+  const g = grip;
+  if (!g) return;
+  grip = null;
+  clearTimeout(g.hold);
+  if (g.moved) swallowClick = performance.now() + 400;
+  showGrip();
+  if (g.lift && !cancel && g.y < g.top) pullOut(g.id);
+}
+addEventListener('pointerup', (e) => {
+  letGo(false);
+  // A swipe across an open card leafs through the hand (or your dragons).
+  const s = swipe;
+  swipe = null;
+  const dx = s ? e.clientX - s.x : 0;
+  if (!s || Math.abs(dx) < 50 || Math.abs(dx) < 1.5 * Math.abs(e.clientY - s.y)) return;
+  const nav = app.querySelector<HTMLElement>(`#zoom [data-zoomnav="${dx < 0 ? 1 : -1}"], #zoom [data-dragonnav="${dx < 0 ? 1 : -1}"]`);
+  if (!nav) return;
+  swallowClick = performance.now() + 400;
+  nav.click();
+});
+addEventListener('pointercancel', () => {
+  letGo(true); // the page took the touch to scroll
+  swipe = null;
+});
+
+// The grip drawn on the hand, without a render: called on every move.
+function showGrip() {
+  app.querySelectorAll<HTMLElement>('.handfan [data-card]').forEach((el) => {
+    const id = el.dataset.card!;
+    el.classList.toggle('peek', grip?.id === id);
+    el.classList.toggle('lift', grip?.id === id && !!grip.lift);
+    el.classList.toggle('out', grip?.id === id && !!grip.lift && grip.y < grip.top);
+    el.setAttribute('style', el.getAttribute('style')!.replace(/;--g[xy]:[^;]*/g, '') + gripStyle(id));
+  });
+}
+function gripClass(id: string): string {
+  if (grip?.id !== id) return '';
+  return ` peek${grip.lift ? ' lift' : ''}${grip.lift && grip.y < grip.top ? ' out' : ''}`;
+}
+// Where the risen card sits: following the thumb once pulled out, and kept on the screen.
+function gripStyle(id: string): string {
+  if (grip?.id !== id) return '';
+  const s = grip.strips.find((x) => x.id === id);
+  let gx = grip.lift ? grip.x - grip.lift.x : 0;
+  if (s) {
+    const grown = s.width * 0.55 / 2; // the peek is 1.55 times as big, grown from its middle
+    gx += Math.max(0, 6 - (s.left - grown)) - Math.max(0, s.left + s.width + grown - (innerWidth - 6));
+  }
+  const gy = grip.lift ? grip.y - grip.lift.y : 0;
+  return `;--gx:${gx.toFixed(0)}px;--gy:${gy.toFixed(0)}px`;
 }
 
 // ---------- table talk ----------
@@ -993,28 +1142,21 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   bind('[data-card]', (el) => {
-    const id = el.dataset.card!;
-    if (g.phase === 'discard') {
-      const n = me.hand.length - me.handCap;
-      if (selected.has(id)) selected.delete(id);
-      else if (selected.size < n) selected.add(id);
-    } else if (tradeOpen(g, me)) {
-      if (trade.cards.has(id)) trade.cards.delete(id);
-      else trade.cards.add(id);
-    } else openCard = openCard === id ? null : id;
+    if (performance.now() < swallowClick) return; // the end of a slide or a hold, not a tap
+    tapCard(g, me, el.dataset.card!);
+  });
+  app.querySelectorAll<HTMLElement>('.handfan [data-card]').forEach((el) => {
+    el.onpointerdown = (e) => grab(e, el);
+    el.oncontextmenu = (e) => e.preventDefault(); // holding a card opens it, not the browser's menu
+  });
+  bind('[data-discardpick]', (el) => {
+    tapCard(g, me, el.dataset.discardpick!);
+    openCard = null;
     render();
   });
   bind('[data-play]', (el) => send(`play ${el.dataset.play}`));
   bind('[data-build]', (el) => send(`build ${el.dataset.build}`));
-  bind('[data-pickhex]', (el) => {
-    const c = me.hand.find((x) => x.id === el.dataset.pickhex)!;
-    const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build';
-    const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
-    const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
-    const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
-    picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about };
-    render();
-  });
+  bind('[data-pickhex]', (el) => pickHexFor(me.hand.find((x) => x.id === el.dataset.pickhex)!));
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
     if (b.onTower) return send(`build ${b.key}`);
@@ -1073,8 +1215,9 @@ function wire(g: PublicState, me: Me) {
   });
   // Tapping outside an open card closes it.
   const zoomEl = document.getElementById('zoom');
+  if (zoomEl) zoomEl.onpointerdown = (e) => (swipe = { x: e.clientX, y: e.clientY });
   if (zoomEl) zoomEl.onclick = (e) => {
-    if (e.target !== zoomEl) return;
+    if (e.target !== zoomEl || performance.now() < swallowClick) return;
     openCard = null;
     openDragon = null;
     render();
