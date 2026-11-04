@@ -154,7 +154,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}${hatcheryNote}
 
-Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}) and most tower floors (at least ${TUNING.titleMinimum.tower}). Tower floors are worth nothing else.`;
+Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
 }
 
 function dragons(): string {

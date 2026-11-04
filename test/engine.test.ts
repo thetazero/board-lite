@@ -223,6 +223,26 @@ test('a title needs its minimum as well as the lead', () => {
   assert.equal(g.titles.tower, 0);
 });
 
+test('Largest Hoard goes to the most gold, from its minimum, and changes hands', () => {
+  const g = newGame(2, 6);
+  keepAll(g);
+  const min = TUNING.titleMinimum.hoard;
+  g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: min - 1 };
+  g.players[1].resources.gold = 0;
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.hoard, null); // the lead, one short of the minimum
+  g.players[0].resources.gold = min;
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.hoard, 0);
+  g.players[1].resources.gold = min; // a tie: the holder keeps it
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.hoard, 0);
+  g.players[1].resources.gold = min + 1;
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.hoard, 1);
+  assert.equal(score(g, 1).titles, TUNING.titlePoints);
+});
+
 test('waitingOn always names someone until the game ends', () => {
   const g = newGame(4, 77);
   const rng = { state: 5 };

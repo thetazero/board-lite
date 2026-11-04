@@ -155,7 +155,7 @@ const ICONS: Record<string, Facet[]> = {
     ['#3e7bfa', P(Array.from({ length: 8 }, (_, i) => polar(3.8, 22.5 + 45 * i)))],
     ['#111', P(Array.from({ length: 6 }, (_, i) => polar(1.7, 30 + 60 * i)))],
   ],
-  // Titles: the tallest tower, the strongest army.
+  // Titles: the tallest tower, the strongest army, the largest hoard.
   tower: [], // drawn below, as the tower building
   // Elements.
   // A flame of three tongues around a yellow core, so it reads as fire even dimmed.
@@ -356,7 +356,7 @@ const ICONS: Record<string, Facet[]> = {
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
@@ -770,6 +770,8 @@ export function buildingShapes(type: string, pc?: string): string {
 
 // The Tallest Tower title is the tower itself, as the board shows it.
 ICONS.tower = buildingFacets('tower')!;
+// The Largest Hoard title: a pile of coins, two below and one on top.
+ICONS.hoard = [...moved(ICONS.gold, -4.2, 3.6, 0.62), ...moved(ICONS.gold, 4.2, 3.6, 0.62), ...moved(ICONS.gold, 0, -3.4, 0.62)];
 
 // ---- upgrades: what each puts beside its building on the TV board ----
 // A workshop's cog.
