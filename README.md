@@ -23,6 +23,6 @@ TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `n
 - `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude players (hosting a playtest, or joining a room) and the per-seat MCP server they play through
 - `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
-- `src/shots/`: staged screenshots of the clients (`npm run shots`)
+- `src/shots/`: staged screenshots of the clients (`npm run shots`), and a whole bot game watched for jerky motion (`npm run motion`)
 
 `npm install`, then `npm test` (tests) and `npm run typecheck`. CI runs both. `npm test` fails if `docs/datasheet.md` is out of date: after changing `src/data.ts` or the rules, run `npm run datasheet` and commit the result.

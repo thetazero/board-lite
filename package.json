@@ -14,7 +14,8 @@
     "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts",
     "ci": "npm run typecheck && npm test",
-    "shots": "node src/shots/shots.ts"
+    "shots": "node src/shots/shots.ts",
+    "motion": "node src/shots/motion.ts"
   },
   "engines": {
     "node": ">=22.18"

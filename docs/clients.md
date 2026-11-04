@@ -110,6 +110,23 @@ Only one run goes at a time on the machine, whichever tab or worktree starts it:
 - **The same every run:** the games are seeded, the pages' clock is frozen, CSS animations are off, bots never move, and the TV shows a fixed address, so the same code gives byte-identical images. A change to the rules or the numbers can move a scene to a different moment (or the next seed, if its condition stops holding); `npm test` checks every scene still stages.
 - **How:** the real server and clients, with each scene hosted as a room whose seats nobody plays, so nothing moves on its own; one headless Chrome (about 1 GB) driven over the DevTools protocol on a pipe, no extra dependencies. Chrome quits when the run ends, however it ends (Ctrl-C, `kill -9`, its terminal closing), and the next run clears away a killed run's profile. The 3D board renders on the CPU (SwiftShader). Its clock (`window.boardClock`) starts frozen at 0; a shot with `frames` takes one picture per board-clock time, which is how `tv-build-3p-*` shows a building popping up and `tv-flight-2p-*` a dragon's flight. It finds Chrome at the usual paths, or set `CHROME=/path/to/chrome`. Its profile and the output stay under `~/.cache/board-lite/`, never `/tmp`.
 
+## A whole game in motion (for auditing animation)
+
+```
+npm run motion                   # 3 bots, seed 7, a move a second and a half apart, up to 8 minutes
+npm run motion -- --minutes 45 --delay 1000 --players 4 --seed 3 --out DIR
+```
+
+plays a bot game on the TV and one phone (seat 1's, which the script plays) in real time, nothing frozen, and reports motion that jumps instead of moving. A probe in each page reports, as it happens:
+
+- **cut:** an element removed while its CSS animation or transition was still running (a re-render took it away mid-way);
+- **rerun:** the same animation started again on the same thing a moment later, on a new element (a re-render replaying it, such as a card held open zooming in again whenever the table moves);
+- **snap:** a health bar or a card in the hand changed place or width with nothing animating it (often because the element was replaced, so its transition never ran);
+- **swap:** what fills the screen changed (the TV's overlay, the phone's screen) with nothing fading or moving on the way;
+- **pop:** a toast or a row that comes and goes with no animation.
+
+Each kind gets up to three clips, the frames Chrome painted around the moment: `clips/NAME.gif` and `clips/NAME.strip.jpg` (each frame labelled with its time from the moment). `report.md` lists the kinds by how often they happened; `log.jsonl` has every event. It writes to `~/.cache/board-lite/motion/latest/` and takes the same one-at-a-time turn as `npm run shots`. The 3D board renders on the CPU here, so the clips' frame rate says nothing about a real TV: the probes time the pages' own changes.
+
 ## How it's built
 
 - `src/server/server.ts`: one `node:http` server. It serves `web/`, three.js for the TV's 3D board (from `node_modules`, at `/vendor/three/`), and the room API (create, join, add bot, start, leave, quit, a bot for someone away, do a command, plus text `view`/`wait`/`status` for the CLI) and pushes a fresh snapshot to every TV and phone over server-sent events whenever anything changes. The browser code is TypeScript; the server strips its types as it serves it (Node's `stripTypeScriptTypes`), so there's no build step here either.
