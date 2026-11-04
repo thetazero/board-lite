@@ -669,7 +669,7 @@ export const SCENES: Scene[] = [
       const r = g!.raid!, ready = (p: number) => seatState(g!, p).raidReady.length;
       return [
         { file: 'phone-raid-locked-5p', caption: 'Phone, raid: locked in', client: 'phone', seat: seatWhere(g!, (p) => r.ready[p] && r.commits[p].length > 0) },
-        { file: 'phone-raid-stay-home-5p', caption: 'Phone, raid: nothing committed yet ("Lock in (stay home)")', client: 'phone', seat: seatWhere(g!, (p) => !r.ready[p] && !r.commits[p].length && ready(p) > 0), sizes: true },
+        { file: 'phone-raid-stay-home-5p', caption: 'Phone, raid: nothing committed yet (Send greyed, Stay home beside it)', client: 'phone', seat: seatWhere(g!, (p) => !r.ready[p] && !r.commits[p].length && ready(p) > 0), sizes: true },
         { file: 'phone-raid-no-dragons-5p', caption: 'Phone, raid: no dragon able to raid', client: 'phone', seat: seatWhere(g!, (p) => !ready(p)) },
       ];
     },
