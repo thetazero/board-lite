@@ -4,7 +4,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower, type Bundle } from './data.ts';
 import {
   PROJECT_DRAGONS, neighbourCount, TITLE_NAMES, backInRound, bankRate, buildableHexes, bundleText, canAfford, canRaid, cardCost, cardKind, cardName,
-  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
+  dragonCapacity, dragonName, dragonPower, faunaOnMap, huntable, lootOf, pname, production, score, specialProjectCost, stageStats, titleValues, tradeText, unitsText, upgradeTargets, waitingOn,
   type Card, type Dragon, type Game, type Title,
 } from './engine.ts';
 import { PEAK, mapRadius, nearBeast } from './map.ts';
@@ -89,11 +89,11 @@ function raidText(g: Game, p: number): string[] {
   const out: string[] = [];
   if (raid.step === 'vote') {
     out.push('Raid: vote for a target. Candidates:');
-    raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(t)}`));
+    raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(g, t)}`));
     out.push(`  Voted: ${raid.votes.map((v, q) => `${pname(q)} ${v === null ? 'not yet' : 'yes'}`).join(', ')}`);
     return out;
   }
-  out.push(`Raid target: ${targetText(raid.target!)}`);
+  out.push(`Raid target: ${targetText(g, raid.target!)}`);
   if (raid.step === 'commit') {
     out.push(`Commitments (public, not locked until everyone is ready):`);
     for (let q = 0; q < g.players.length; q++) out.push(`  ${pname(q)}: ${raid.commits[q].length ? `${raid.commits[q].join(' ')} (power ${commitPower(g, raid.commits[q])})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`);
@@ -111,13 +111,13 @@ function commitPower(g: Game, ids: string[]): number {
   return ids.reduce((s, id) => s + dragonPower(g.dragons.find((d) => d.id === id)!), 0);
 }
 
-export function targetText(t: string): string {
+export function targetText(g: Game, t: string): string {
   const def = TARGETS[t];
   const units = def.units.map((u) => {
     const x = UNITS[u];
     return `${x.name} (combat power ${combatPower(x)}; ${x.hp}hp ${x.targets}x${x.dice}d${x.sides}${x.weak.length ? ` weak:${x.weak.join('/')}` : ''}${x.strong.length ? ` strong:${x.strong.join('/')}` : ''})`;
   });
-  return `${def.name} — combat power ${targetPower(t)}; defenders: ${units.join(', ')}; loot ${bundleText(def.loot)} (split by the combat power each player still has fighting at the end)`;
+  return `${def.name} — combat power ${targetPower(t)}; defenders: ${units.join(', ')}; loot ${bundleText(lootOf(g, t))} (split by the combat power each player still has fighting at the end)`;
 }
 
 export function faunaText(k: string): string {
@@ -252,6 +252,7 @@ export function playerView(g: Game, p: number, logLines = 25): string {
   out.push(`Fauna: ${fauna.length ? fauna.map((k) => `${k} ${faunaText(g.map[k].fauna!)}${g.buildings[k] ? ` on ${pname(g.buildings[k].owner)}'s ${g.buildings[k].type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them.`);
   const slain = Object.entries(g.slain).map(([k, q]) => `${BEASTS[k].name} by ${pname(q)}`);
   out.push(`Great beasts: a Thunderbird on the peak (${PEAK}) and a Leviathan off a coast, each worth ${BEASTS.thunderbird.points} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak make ${TUNING.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
+  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${Object.keys(TARGETS).map((t) => `${TARGETS[t].name} (power ${targetPower(t)}) ${bundleText(lootOf(g, t))}`).join('; ')}.`);
   if (g.phase === 'raid') {
     out.push('');
     out.push(...raidText(g, p));

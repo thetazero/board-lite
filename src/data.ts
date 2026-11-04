@@ -35,7 +35,6 @@ export const TUNING = {
   titlePoints: 2,
   // A title needs at least this much: dragon points, tower floors, buildings (tower included).
   titleMinimum: { army: 10, tower: 4, territory: 9 },
-  raidCandidates: 3,
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -329,7 +328,8 @@ export const TARGETS: Record<string, TargetDef> = {
   // loot that grows with its square, about power² ÷ 18 in value: easy kingdoms
   // give little, hard ones a lot. Per point of power sent, the hardest pays
   // about three times the easiest. Brindle's one gold is the only gold a
-  // young dragon can win alone (#80).
+  // young dragon can win alone (#80). This is printed loot: each kingdom adds
+  // 1 gold after every raid it doesn't fall in (the engine's hoard, #99).
   brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, gold: 1 } }, // 8
   archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 4, timber: 4 } }, // 19
   frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24

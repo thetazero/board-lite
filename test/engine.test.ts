@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { playerView } from '../src/view.ts';
 import { PEAK, distance, mapRadius, neighbors } from '../src/map.ts';
@@ -447,6 +447,9 @@ test('raid loot is split by the combat power still fighting at the end, the rest
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2; // stop at the next raid's vote, before the next production
+    g.hoard.archers_hold = seed % 4; // some gold hoarded, split like the rest
+    const loot = lootOf(g, 'archers_hold');
+    const hoard = { ...g.hoard };
     const before = g.players.map((pl) => ({ ...pl.resources }));
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
     apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
@@ -454,7 +457,9 @@ test('raid loot is split by the combat power still fighting at the end, the rest
     apply(g, 0, 'fight'); apply(g, 1, 'fight');
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd' || !end.won) continue;
-    const loot = TARGETS.archers_hold.loot;
+    assert.equal(loot.gold, TARGETS.archers_hold.loot.gold! + hoard.archers_hold);
+    // The kingdom that fell is back to its printed loot; every other one adds 1 gold.
+    for (const t of Object.keys(TARGETS)) assert.equal(g.hoard[t], t === 'archers_hold' ? 0 : hoard[t] + 1, t);
     const total = end.power.reduce((s, x) => s + x, 0);
     const top = end.winners[end.power.indexOf(Math.max(...end.power))];
     for (const r of RESOURCES) {

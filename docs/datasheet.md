@@ -199,7 +199,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (3 are offered each raid; average damage is the defenders' total a combat round). Loot:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot:
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
 |---|---|---|---|---|---|
@@ -229,7 +229,13 @@ Chance the kingdom falls to one player's raiders fighting to the end, from 100 r
 | Abyss Wyrm (water), adult (22) | 100% | 100% | 11% | 25% | 20% | 0% |
 | Reef Drake (water), adult (17) | 100% | 93% | 0% | 0% | 0% | 0% |
 
-Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.2, young 0.5, adult 2.6. A Tower Floor takes 2 gold.
+Gold a lone base dragon expects from one raid on the kingdom that pays it best (if its vote wins), by how much extra gold the kingdoms have hoarded. A Tower Floor takes 2 gold.
+
+| Hoarded | Hatchling | Young | Adult |
+|---|---|---|---|
+| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 3.7 (Archer's Hold) |
+| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 6.5 (Archer's Hold) |
+| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 9.3 (Archer's Hold) |
 
 Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages, losses included, from 400 raids each.
 
@@ -361,6 +367,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 15 | 21 | 28 | 0 | 80% | 27% | 93% | 7%, median round 20 | 13%, median round 20 |
-| 3 | 15 | 20 | 31 | 0 | 77% | 57% | 97% | 23%, median round 19 | 20%, median round 21 |
-| 4 | 13 | 19 | 25 | 0 | 77% | 80% | 93% | 20%, median round 17 | 40%, median round 17 |
+| 2 | 14 | 19 | 27 | 0 | 73% | 47% | 80% | 10%, median round 21 | 20%, median round 19 |
+| 3 | 13 | 20 | 24 | 0 | 63% | 70% | 87% | 27%, median round 18 | 13%, median round 17 |
+| 4 | 14 | 18 | 23 | 0 | 63% | 80% | 90% | 23%, median round 18 | 17%, median round 19 |
