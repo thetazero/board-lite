@@ -5,7 +5,7 @@
 // the same rolled up over a batch, with what's never or always used flagged,
 // and two batches side by side. See "Stats" in docs/playtest.md.
 //
-//   node src/playtest/stats.ts DIR                  print a batch's stats (saving them to DIR/stats.json when exact)
+//   node src/playtest/stats.ts DIR                  print a batch's stats (saving each exact game to DIR/stats.json)
 //   node src/playtest/stats.ts --compare DIR1 DIR2  two batches side by side
 //
 // Points are rebuilt from the log's events (buildings, floors, dragons and
@@ -101,8 +101,9 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'mine': {
         const m = /^You (draw|keep) (.*)\.$/.exec(e.text);
         if (!m) break;
-        for (const [, name] of m[2].matchAll(/([^,:]+?) \(c\d+\)/g)) {
-          const k = keyOfName(name.replace(/^(and )?building cards /, '').trim());
+        // "Sky Wyrm (c84), and building cards Ley Spire (c43), Port (c42): keep one"
+        for (const [, name] of m[2].replace(/(^|, )(and )?building cards /g, '$1').matchAll(/([^,:]+?) \(c\d+\)/g)) {
+          const k = keyOfName(name.trim());
           const tally = m[1] === 'draw' ? s.offered : s.kept;
           tally[k] = (tally[k] ?? 0) + 1;
         }
@@ -187,37 +188,72 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   return s;
 }
 
-// The finished games of a batch (g1, g2, ...). A game this code can't read at
-// all (a card it no longer knows, say) is left out and named in `skipped`.
-export function batchStats(dir: string): { games: GameStats[]; skipped: string[] } {
-  const games: GameStats[] = [], skipped: string[] = [];
-  const dirs = readdirSync(dir, { withFileTypes: true })
+// The finished games of a batch (g1, g2, ...), each counted or, when this code
+// can't read it at all (a card it no longer knows, say), its error.
+type Read = { game: string; stats?: GameStats; error?: string };
+function readGames(dir: string): Read[] {
+  return readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && /^g\d+$/.test(d.name) && existsSync(join(dir, d.name, 'game.json')) && existsSync(join(dir, d.name, 'results.json')))
-    .sort((a, b) => Number(a.name.slice(1)) - Number(b.name.slice(1)));
-  for (const d of dirs) {
-    const res = JSON.parse(readFileSync(join(dir, d.name, 'results.json'), 'utf8'));
-    if (res.status !== 'over') continue;
-    try {
-      games.push(gameStats(JSON.parse(readFileSync(join(dir, d.name, 'game.json'), 'utf8')), res, d.name));
-    } catch (e) {
-      skipped.push(`${d.name} (${(e as Error).message}${res.commit ? `; played on ${res.commit}` : ''})`);
-    }
-  }
-  return { games, skipped };
+    .sort((a, b) => Number(a.name.slice(1)) - Number(b.name.slice(1)))
+    .flatMap((d): Read[] => {
+      const res = JSON.parse(readFileSync(join(dir, d.name, 'results.json'), 'utf8'));
+      if (res.status !== 'over') return [];
+      try {
+        return [{ game: d.name, stats: gameStats(JSON.parse(readFileSync(join(dir, d.name, 'game.json'), 'utf8')), res, d.name) }];
+      } catch (e) {
+        return [{ game: d.name, error: `${d.name} (${(e as Error).message}${res.commit ? `; played on ${res.commit}` : ''})` }];
+      }
+    });
 }
 
-// A batch's stats as this code counts them; when that isn't exact (the rules
-// changed since) but the batch has a stats.json from when it was, that instead.
-// Exact stats are saved to DIR/stats.json, so a batch keeps its own numbers
-// for later comparisons once the rules move on.
-export interface Batch { games: GameStats[]; skipped: string[]; saved?: boolean }
+// The finished games of a batch; a game this code can't read is left out and named in `skipped`.
+export function batchStats(dir: string): { games: GameStats[]; skipped: string[] } {
+  const all = readGames(dir);
+  return { games: all.flatMap((x) => (x.stats ? [x.stats] : [])), skipped: all.flatMap((x) => (x.error ? [x.error] : [])) };
+}
+
+// Saved stats from before #136 counted "and building cards Port" as its own
+// card; fold those keys into the card's own.
+function cleanSaved(s: GameStats): GameStats {
+  for (const t of [s.offered, s.kept]) {
+    for (const k of Object.keys(t)) {
+      const m = /^(?:and_)?building_cards_(.+)$/.exec(k);
+      if (m) { t[m[1]] = (t[m[1]] ?? 0) + t[k]; delete t[k]; }
+    }
+  }
+  return s;
+}
+
+// A batch's stats, game by game: each finished game as this code counts it;
+// when that isn't exact (the rules changed since) but stats.json has the game
+// from when it was, that instead. Every exact game is saved to DIR/stats.json,
+// beside the games saved before, so a batch keeps its own numbers for later
+// comparisons once the rules move on, and a run while the batch is still
+// playing only adds the games still to come later.
+export interface Batch { games: GameStats[]; skipped: string[]; saved?: string[] }
 export function loadBatch(dir: string): Batch {
-  const now = batchStats(dir);
   const file = join(dir, 'stats.json');
-  const exact = !now.skipped.length && now.games.every((s) => !s.check.length);
-  if (exact && now.games.length) writeFileSync(file, `${JSON.stringify(now.games)}\n`);
-  else if (!exact && existsSync(file)) return { games: JSON.parse(readFileSync(file, 'utf8')), skipped: [], saved: true };
-  return now;
+  const before: GameStats[] = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as GameStats[]).map(cleanSaved) : [];
+  const keep = new Map(before.map((s) => [s.game, s]));
+  const games: GameStats[] = [], skipped: string[] = [], saved: string[] = [];
+  let changed = false;
+  for (const x of readGames(dir)) {
+    const exact = x.stats && !x.stats.check.length;
+    if (exact) {
+      if (JSON.stringify(keep.get(x.game)) !== JSON.stringify(x.stats)) changed = true;
+      keep.set(x.game, x.stats!);
+      games.push(x.stats!);
+    } else if (keep.has(x.game)) {
+      games.push(keep.get(x.game)!);
+      saved.push(x.game);
+    } else if (x.stats) games.push(x.stats);
+    else skipped.push(x.error!);
+  }
+  if (changed) {
+    const all = [...keep.values()].sort((a, b) => Number(a.game.slice(1)) - Number(b.game.slice(1)));
+    writeFileSync(file, `${JSON.stringify(all)}\n`);
+  }
+  return { games, skipped, ...(saved.length ? { saved } : {}) };
 }
 
 // ---------- the catalog: everything a player could use ----------
@@ -334,7 +370,7 @@ function catalogRoll(games: GameStats[], also: GameStats[] = []) {
 
 export function batchMarkdown({ games, skipped, saved }: Batch): string {
   const L: string[] = ['## What happened', ''];
-  if (saved) L.push('Read from this batch\'s stats.json: the rules have changed since it was played, so these are the numbers counted under its own rules.', '');
+  if (saved?.length) L.push(`${saved.length === games.length ? 'Every game' : saved.join(', ')} read from this batch's stats.json: the rules have changed since ${saved.length === 1 ? 'it was' : 'they were'} played, so these are the numbers counted under ${saved.length === 1 ? 'its' : 'their'} own rules.`, '');
   if (skipped.length) L.push(`**Not counted, this code can't read them (run stats.ts from the commit they were played on):** ${skipped.join(', ')}.`, '');
   if (!games.length) return [...L, 'No finished games.', ''].join('\n');
   const seatGames = sum(games.map((s) => s.seats.length));
