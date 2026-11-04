@@ -363,6 +363,23 @@ function makeRoom(staged: Staged, code: string): Room {
   return room;
 }
 
+// The room's seats and game as they are now, and a function that puts them
+// back. The seats stay the same objects (a page's open stream counts itself
+// on its seat), and the game goes back through mutate(), so it's saved too.
+function keep(room: Room): () => void {
+  const seats = room.seats.map((s) => [s, { ...s }] as const);
+  const game = room.game && structuredClone(room.game);
+  return () => {
+    room.seats = seats.map(([s, was]) => Object.assign(s, was, { connected: s.connected }));
+    if (game) {
+      room.mutate((g) => {
+        for (const k of Object.keys(g)) if (!(k in game)) delete (g as any)[k];
+        Object.assign(g, structuredClone(game));
+      });
+    } else room.changed();
+  };
+}
+
 // ---------- the run ----------
 
 interface Done extends Shot {
@@ -415,9 +432,12 @@ async function main() {
       rooms.set(code, room);
       for (const shot of st.scene.shots(st.game)) {
         const own: [string, Device] = ['', shot.client === 'tv' ? TV : PHONE];
-        // A shot that changes the room (a tap that sends a command, a `then`) is taken at one size only.
+        // A shot that changes the room itself (a `then`, a live move, typing) is taken at one size only.
         const sizes = (shot.sizes || everySize) && !shot.then && !shot.live && !shot.fill ? [own, ...SIZES[shot.client]] : [own];
+        // Its taps can still change the room (Leave takes the seat away): each size starts from the room as it was.
+        const before = sizes.length > 1 ? keep(room) : null;
         for (const [size, device] of sizes) {
+          if (size && before) before();
           const ts = Date.now();
           const file = size ? `${shot.file}@${size}` : shot.file;
           try {
