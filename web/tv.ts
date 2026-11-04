@@ -8,6 +8,7 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
+  fadeAway,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
@@ -680,12 +681,6 @@ function note(html: string) {
   setTimeout(() => fadeAway(t), 8000);
 }
 
-// A toast or note fades as it goes (style.css), then leaves.
-function fadeAway(t: HTMLElement) {
-  t.classList.add('gone');
-  t.ontransitionend = () => t.remove();
-  setTimeout(() => t.remove(), FADE_MS * 2); // if nothing animates
-}
 
 function toast(e: unknown) {
   const t = document.createElement('div');

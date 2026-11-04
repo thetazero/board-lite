@@ -454,11 +454,14 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
    cost on the stock below. A faint grain sits over all of it. */
 .handfan { --cw: 6.6em; position: fixed; left: 50%; bottom: 3.9em; z-index: 15; width: min(100vw, 34em); height: calc(9.4em * var(--hs, 1)); transform: translateX(-50%); pointer-events: none; }
 .handfan::before { content: ''; position: absolute; inset: auto 0 -3.2em; height: 7em; background: var(--table); background-color: var(--bg); background-attachment: fixed; -webkit-mask-image: linear-gradient(to top, #000 55%, transparent); mask-image: linear-gradient(to top, #000 55%, transparent); }
+/* The hand comes up from the bottom edge (it leaves the same way: .leave-down). */
+.handfan { animation: handin .3s ease-out; }
+@keyframes handin { from { translate: 0 3em; opacity: 0; } }
 .handfan.empty { height: auto; pointer-events: auto; text-align: center; }
 .handfan.empty .hint { position: relative; margin: 0 1em .8em; }
 /* Each card: placed by its share of the spread (--x), tilted (--r) and dropped along the arc (--y). */
 .handfan .card { position: absolute; left: calc(50% - var(--cw) / 2 + var(--x) * min(37% - var(--cw) / 2, (var(--n) - 1) * var(--cw) * .45)); top: .6em; width: var(--cw); font-size: calc(.78em * var(--hs, 1)); pointer-events: auto;
-  transform: translateY(var(--y)) rotate(calc(var(--r) / var(--hs, 1))); transform-origin: 50% 160%; transition: transform .15s; }
+  transform: translateY(var(--y)) rotate(calc(var(--r) / var(--hs, 1))); transform-origin: 50% 160%; transition: transform .15s, left .25s ease-out; }
 .handfan .card .cname { font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .handfan .card.longname .cname { font-size: .8em; letter-spacing: -.02em; padding-top: .42em; padding-bottom: .48em; }
 .handfan .card .ccost { flex-wrap: nowrap; white-space: nowrap; }
@@ -714,9 +717,9 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* ================= A game with no TV (remote mode) =================
    On the phone: the table view is the TV's page for the room in a frame over
    the phone's own page, shown by the You / Table switch by the talk bar. */
-.tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; background: #140f2a; }
+.tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; opacity: 0; background: #140f2a; transition: opacity .3s, visibility 0s .3s; }
 .tableview iframe { display: block; width: 100%; height: 100%; border: 0; }
-body.table-on .tableview { visibility: visible; }
+body.table-on .tableview { visibility: visible; opacity: 1; transition: opacity .3s; }
 body.table-on { overflow: hidden; }
 body.table-on .talkbar { z-index: 36; }
 body.remote .talkbar > .latest { padding-right: 9.5em; }
@@ -799,9 +802,22 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 /* Discarding: the cards picked to go, face up above the button, and a place for each still to pick. */
 .discardtray { display: flex; flex-wrap: wrap; justify-content: center; gap: .5em; }
 .discardtray .card, .discardtray .slot { width: 5.4em; font-size: .9em; }
+.discardtray .card { animation: zoomin .2s ease-out; } /* laid down as it's picked (only then: phone.ts updates in place) */
 .discardtray .card .cname { font-size: .72em; margin: -7px -6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .discardtray .card .ccost { display: none; }
 .discardtray .card .ckind { width: 16px; height: 16px; }
 .discardtray .card .ckind svg { width: 10px; height: 10px; }
 .discardtray .card.picked::before { width: 20px; height: 20px; top: -7px; right: -7px; font-size: .8em; }
 .discardtray .slot { aspect-ratio: 5 / 5.4; border: 2px dashed #fff5; border-radius: 4px; }
+
+/* Nothing on the phone cuts (phone.ts, morph.ts): the page updates in place,
+   a new screen rises in while the last one fades away above it, the hand slides
+   away down the bottom edge, and an open card fades as it closes. */
+.screen { animation: enter .3s ease-out; }
+.leaving { position: fixed !important; right: auto !important; bottom: auto !important; margin: 0 !important; transform: none !important; box-sizing: border-box; pointer-events: none; }
+.leaving.leave-up { z-index: 4; overflow: hidden; animation: leave .3s ease-in forwards; }
+.leaving.leave-down { z-index: 14; animation: handout .3s ease-in forwards; }
+.leaving.leave-fade { z-index: 30; animation: out .15s ease-in forwards; }
+@keyframes handout { to { translate: 0 3em; opacity: 0; } }
+/* The phone's open panels come in rather than appear. */
+.pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }
