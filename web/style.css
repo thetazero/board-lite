@@ -530,6 +530,12 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .choice { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
 .choice b { font-size: 1.15em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
+/* A dragon to send: a box at the row's end that ticks when tapped, so the row reads as a choice. */
+.dragon.pick > span { flex: 1; }
+.dragon .tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
+.dragon.on .tick { border-color: var(--ink); background: var(--ink); }
+.dragon.on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
+.sendask { margin: .3em 0 0; font-size: 1.05em; color: var(--paper); }
 
 .dragon em { font-style: normal; color: var(--warn); font-weight: 800; }
 .big-note { font-size: 1.2em; text-align: center; padding: 1.2em .5em; margin: 0; }

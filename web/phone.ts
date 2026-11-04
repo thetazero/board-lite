@@ -553,20 +553,29 @@ function tradeView(g: PublicState, me: Me): string {
 function huntView(g: PublicState, me: Me): string {
   const h = g.map.find((x) => x.k === hunting!.hex);
   if (!h?.fauna) return '';
-  const list = me.raidReady.map((id) => {
-    const d = g.dragons.find((x) => x.id === id)!;
-    return `<button class="dragon${hunting!.chosen.has(id) ? ' on' : ''}" data-hunter="${id}">${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
-  }).join('');
   const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
-  const n = hunting!.chosen.size;
-  const sent = [...hunting!.chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
   // A great beast pays in points, for good; it's 1 try each round, to the end.
   const great = h.fauna.points !== undefined;
   const prize = great ? iconText(`${h.fauna.points} point`, 1.4) : resChips(h.fauna.loot, 1.4);
   return `<h3 class="huntname">${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}<div class="loot">${prize}</div></section>
-    ${list}
-    <p class="hint">Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}</p>
-    <div class="row big2"><button id="huntgo" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button><button id="huntoff" class="big ghost">Cancel</button></div>`;
+    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: '<button id="huntoff" class="big ghost">Cancel</button>', note: `Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}` })}`;
+}
+
+// Choosing dragons to send into a fight, the same on every screen that asks
+// (a raid's commit step, a beast to clear or slay): under "Choose dragons to
+// send", your raid-ready dragons, each with a box that ticks when you tap it,
+// then Send (with the power you send) beside the way out. Locked in, the
+// picks stay on screen, ticked, and the buttons go.
+function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o: { go: string; out: string; note?: string; locked?: boolean }): string {
+  const list = me.raidReady.map((id) => {
+    const d = g.dragons.find((x) => x.id === id)!;
+    return `<button class="dragon pick${chosen.has(id) ? ' on' : ''}" data-${attr}="${id}" ${o.locked ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span><i class="tick"></i></button>`;
+  }).join('');
+  const n = chosen.size;
+  const sent = [...chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
+  const note = o.note ? `<p class="hint">${o.note}</p>` : '';
+  const buttons = o.locked ? '' : `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button>${o.out}</div>`;
+  return `${o.locked ? '' : `<h3 class="sendask">Choose dragons to send</h3>`}${list}${note}${buttons}`;
 }
 
 // Picking a hex: the map, what you're placing and Cancel, on one screen. The
@@ -654,14 +663,8 @@ function raidView(g: PublicState, me: Me): string {
   }
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return `${roost(g, me)}${targetPanel(raid.target!)}`; // nobody fit to go: the roost shows why
-    const committed = new Set(raid.commits[me.seat]);
-    const ready = raid.ready[me.seat];
-    const list = me.raidReady.map((id) => {
-      const d = dragon(id);
-      return `<button class="dragon${committed.has(id) ? ' on' : ''}" data-commit="${id}" ${ready ? 'disabled' : ''}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${powerTag(d.power)} <span class="stat">${glyph('health', 'health')}${d.hp}</span> <span class="stat">${glyph('attack', 'attack')}${iconText(esc(d.attack))}</span></span></button>`;
-    }).join('');
-    const hint = !ready && !committed.size ? '<p class="hint"><small>Tap dragons to send them.</small></p>' : '';
-    return `${targetPanel(raid.target!)}${list}${hint}${ready ? '' : `<button id="ready" class="primary big">${committed.size ? `Send ${dragons(committed.size)} ${powerTag(sum(raid.commits[me.seat]))}` : `${buildingIcon('roost', 22, '#fff')} Stay home`}</button>`}`;
+    const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
+    return `${targetPanel(raid.target!)}${sendPicker(g, me, new Set(raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
@@ -926,6 +929,15 @@ function wire(g: PublicState, me: Me) {
     send(`commit ${[...cur].join(' ') || 'none'}`);
   });
   on('ready', () => send('ready'));
+  // Staying home drops any dragons tapped first, then locks in with none.
+  on('stayhome', () => {
+    if (busy) return;
+    busy = true;
+    const go = (command: string) => post(`/api/rooms/${code}/do`, { token, command });
+    return (g.raid!.commits[me.seat].length ? go('commit none') : Promise.resolve()).then(() => go('ready'))
+      .catch(toast)
+      .finally(() => (busy = false));
+  });
   on('fight', () => send('fight'));
   on('bail', () => send('bail'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
