@@ -21,6 +21,7 @@ const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const THREE_BUILD = fileURLToPath(new URL('../../node_modules/three/build/', import.meta.url));
 const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three.module.js', '/vendor/three/three.core.js': 'three.core.js' };
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
+const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
 const MAX_BODY = 4096;
 
 const TYPES: Record<string, string> = {
@@ -44,12 +45,13 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
 
   setInterval(() => {
     for (const [code, room] of rooms) {
-      if (Date.now() - room.lastActive > ROOM_IDLE_MS && !hostFiles.includes(room.file)) {
+      const idle = Date.now() - room.lastActive;
+      if ((idle > ROOM_IDLE_MS || (room.abandoned && idle > ABANDONED_MS)) && !hostFiles.includes(room.file)) {
         room.close();
         rooms.delete(code);
       }
     }
-  }, 10 * 60 * 1000).unref();
+  }, 60 * 1000).unref();
 
   function getRoom(code: string): Room {
     const room = rooms.get(code.toUpperCase());
