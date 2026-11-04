@@ -97,11 +97,10 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 - N is 20 (it was 15), raised "a bit" as the owner asked. Buildings pay back more slowly to match: a basic production building in about 4.5 rounds, so one built early pays for itself by the middle of the game and earns about twice its cost by the end (`docs/datasheet.md`).
 - Point sources:
   - Dragons, by life stage.
-  - Buildings: some building cards are worth points (e.g. tower floors, monuments).
-  - Upgrades can add points to their building.
+  - Monuments: only monument cards are worth building points. The owner (2026-11-03): "VP buildings should be expensive monuments only". Production buildings, tower floors and upgrades are worth no points (#98).
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
-  - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
-  - Titles take real investment: "strongest army and largest territory need a larger threshold".
+  - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest hoard (#109). Kept to these three. Largest territory is dropped: "it just intensifies ecomic snowball, while talesr tower is: 1. literally visually cool 2. a side quest/resource sink" (owner, 2026-11-03). Tower floors count only toward the tower title.
+  - Titles take real investment. The owner, of the army and territory titles: "strongest army and largest territory need a larger threshold".
   - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 2 points (1 until #80).
 
 ## Buildings
@@ -229,7 +228,7 @@ The owner's calls (2026-11-03), after playing the first clients:
 The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in the first rules engine's PR (#3), and `docs/rules.md` has the rules as played.
 
 - Card picking: 1 action card is dealt; 2 building cards are drawn and one is kept (the owner's "draw two keep 1"), all at once in the cards phase.
-- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid mostly in gold, so raid loot always has a way into points. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
+- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid mostly in gold (since #98, floors count only toward the tower title). Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
 - The first player rotates each round.
 - The tower produces 1 of each non-gold resource and houses 1 dragon.

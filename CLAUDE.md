@@ -4,4 +4,4 @@ Start with `README.md`. Before and after changing any tuning number in `src/data
 
 Before writing or changing any text a player reads (cards, buttons, the TV, the phone, `docs/rules.md`, the CLI's view and errors), read `docs/wording.md` and follow it.
 
-The owner's rule for every change: "design simple core system that work well, not add a million edge cases." Fix the system behind a problem, not each symptom. Also from the owner: "make no mistakes".
+Before changing a rule, read the design principles and complexity budget at the top of `docs/design.md`. A change has to stay within the budget; one that raises a ceiling says why in its PR.
