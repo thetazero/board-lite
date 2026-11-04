@@ -44,7 +44,7 @@ No TV, or players who aren't in the same room: on the join form (the server's ba
 Each phone then shows the table as well as its own hand:
 
 - **You / Table**, by the talk bar at the bottom: one tap switches between your own view and the table, any time. The table is what the TV would show (the board, every player's card, the feed, the titles and beasts, the raid's vote and commitments), one thing under another, to scroll through. Table talk stays on screen in both.
-- **Cutscenes cut in on their own:** when the TV would play one of its moments (the round's production rolls, a raid's fight or "No one raids", a fight against a great beast), every phone switches to the table for it and back to where it was when it's done. Switch by hand during one and the phone stays where you put it. The end of the game is on your own view already (the winner and the standings), and on the table too.
+- **Cutscenes cut in on their own:** when the TV would play one of its moments (the round's production rolls, a raid's fight or "No one raids", any fight against a beast), every phone switches to the table for it and back to where it was when it's done. Switch by hand during one and the phone stays where you put it. The end of the game is on your own view already (the winner and the standings), and on the table too.
 - **Light:** the table is the TV's page with the flat map, never the 3D board: a phone doesn't load three.js.
 
 A game made on a TV is the same as before: no switch, no table on the phones.
