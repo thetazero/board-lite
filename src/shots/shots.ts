@@ -2,19 +2,21 @@
 // tuning how the game looks. One command, one headless Chrome, the real
 // server and clients:
 //
-//   npm run shots [-- --only raid] [--every-size] [--out DIR]
+//   npm run shots [-- --only raid] [--every-size] [--out NAME]
 //
 // Each scene in scenes.ts becomes a room on a private server (every seat a
 // player nobody drives, so nothing moves on its own). Chrome is driven over
 // the DevTools protocol with Node's own WebSocket: no dependencies. The page
 // clock is frozen and CSS animations are off, so a scene renders the same
-// on every run. The run goes to ~/.cache/board-lite/staged-shots/latest (the last
-// run moves to latest.previous) with an index.html contact sheet that marks
-// what changed since the previous run. Only one run goes at a time on the
-// machine (turn.ts): one started meanwhile waits for it, and says so.
+// on every run. The run goes to ~/.cache/board-lite/staged-shots/<checkout>
+// (the last run moves to <checkout>.previous) with an index.html contact sheet
+// that marks what changed since the previous run. Shots are WebP, a tenth of a
+// PNG's size, and one the same as the previous run's is a link to that file,
+// not a copy. Finished work is cleared away (tidy.ts). Only one run goes at a
+// time on the machine (turn.ts): one started meanwhile waits for it, and says so.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -23,9 +25,12 @@ import { Room, seatsFile } from '../server/room.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
 import { NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
+import { checkName, claim, defaultName, KEEP_DAYS, tidy } from './tidy.ts';
 import { takeTurn } from './turn.ts';
 
 const CACHE = join(homedir(), '.cache', 'board-lite', 'staged-shots'); // on disk: /tmp is RAM on the dev machine
+const CHECKOUT = resolve(import.meta.dirname, '..', '..'); // the checkout whose clients are shot
+const QUALITY = 85; // WebP: text and edges stay sharp; a PNG is ten times the size
 interface Device { width: number; height: number; deviceScaleFactor: number; mobile: boolean }
 const TV: Device = { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false };
 const PHONE: Device = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true };
@@ -122,26 +127,12 @@ function findChrome(): string {
   return found;
 }
 
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
 // Chrome is driven over a pipe, not a port: when this process ends, however it
 // ends (Ctrl-C, kill -9, its tab closing), the kernel closes our end and
 // Chrome quits on its own. A port would leave it running, holding a gigabyte.
 async function launchChrome(): Promise<{ proc: ChildProcess; cdp: Cdp; gone: Promise<void> }> {
   // A profile of its own, so runs from several worktrees at once don't collide.
-  // Named by this run's process, so the next run can clear away the profile of a run that was killed outright.
-  mkdirSync(CACHE, { recursive: true });
-  for (const dir of readdirSync(CACHE)) {
-    const pid = /^chrome-profile-(\d+)-/.exec(dir)?.[1];
-    if (pid && !alive(Number(pid))) rmSync(join(CACHE, dir), { recursive: true, force: true });
-  }
+  // The next run clears away the profile of a run that was killed outright (tidy.ts).
   const profile = mkdtempSync(join(CACHE, `chrome-profile-${process.pid}-`));
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-pipe', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
@@ -343,16 +334,16 @@ class Tab {
   // (Shooting the whole page at once stretches the screen to the page's
   // height, and everything sized against the screen grows with it.)
   // Each screen comes with what the phone's hand of cards sits over, if anything (COVERED).
-  async pngs(device: Device): Promise<{ png: Buffer; covered: string[] }[]> {
+  async images(device: Device): Promise<{ image: Buffer; covered: string[] }[]> {
     const shoot = async () => ({
-      png: Buffer.from((await this.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'),
+      image: Buffer.from((await this.send('Page.captureScreenshot', { format: 'webp', quality: QUALITY })).data, 'base64'),
       covered: device.mobile ? await this.eval<string[]>(COVERED) : [],
     });
     if (!device.mobile) return [await shoot()];
     const [page, screen] = await this.eval<[number, number]>('[document.documentElement.scrollHeight, innerHeight]');
     // A page that scrolls only a sliver (under 24px: padding, nothing more to see) is one screen.
     const n = page - screen < 24 ? 1 : Math.min(MAX_SCREENS, Math.ceil(page / screen));
-    const out: { png: Buffer; covered: string[] }[] = [];
+    const out: { image: Buffer; covered: string[] }[] = [];
     for (let i = 0; i < n; i++) {
       await this.eval(`scrollTo(0, ${n > 1 ? Math.round(((page - screen) * i) / (n - 1)) : 0})`);
       await this.settle();
@@ -423,12 +414,12 @@ interface Done extends Shot {
   scene: string;
   size: string; // '' for the shot's own size
   width: number; // the screen's width in CSS pixels
-  screens: number; // a long phone page is several screens: file.png, file.2.png, ...
+  screens: number; // a long phone page is several screens: file.webp, file.2.webp, ...
   ms: number;
   changed: boolean | null; // null: no previous run to compare with
 }
 
-const pngName = (file: string, i: number) => `${file}${i ? `.${i + 1}` : ''}.png`;
+const imageName = (file: string, i: number) => `${file}${i ? `.${i + 1}` : ''}.webp`;
 
 async function main() {
   // One run at a time on this machine, whichever tab or worktree it's from: each holds a gigabyte or two.
@@ -441,11 +432,14 @@ async function main() {
   const t0 = Date.now();
   const only = flag('only');
   const everySize = process.argv.includes('--every-size');
-  const out = resolve(flag('out') ?? join(CACHE, 'latest'));
+  const out = join(CACHE, flag('out') ? checkName(flag('out')!) : defaultName(CHECKOUT));
   const prev = `${out}.previous`;
+  const cleared = tidy(CACHE, [out, prev]);
+  if (cleared.length) console.log(`Cleared away ${cleared.length} old run(s) and profile(s) (their checkout is gone, or untouched for ${KEEP_DAYS} days): ${cleared.join(', ')}`);
   rmSync(prev, { recursive: true, force: true });
   if (existsSync(out)) renameSync(out, prev);
   mkdirSync(out, { recursive: true });
+  claim(out, CHECKOUT);
 
   const staged = SCENES.filter((s) => !only || s.name.includes(only)).map((s) => stage(s));
   const tStaged = Date.now();
@@ -534,19 +528,21 @@ async function main() {
                 if (!ok) throw new Error('No dragon on the board can fly');
               }
               if (!shot.loading) await tab.settle();
-              const pngs = await tab.pngs(device);
+              const images = await tab.images(device);
               let changed: boolean | null = null;
-              pngs.forEach(({ png, covered: c }, i) => {
-                if (c.length) covered.push(`${pngName(name, i)}: ${c.join(', ')}`);
-                writeFileSync(join(out, pngName(name, i)), png);
-                const before = join(prev, pngName(name, i));
-                const differs = existsSync(before) ? !readFileSync(before).equals(png) : existsSync(prev) ? true : null;
+              images.forEach(({ image, covered: c }, i) => {
+                if (c.length) covered.push(`${imageName(name, i)}: ${c.join(', ')}`);
+                const before = join(prev, imageName(name, i));
+                const differs = existsSync(before) ? !readFileSync(before).equals(image) : existsSync(prev) ? true : null;
+                // The same as last time: the same file, not a second copy of it.
+                if (differs === false) linkSync(before, join(out, imageName(name, i)));
+                else writeFileSync(join(out, imageName(name, i)), image);
                 changed = changed || differs;
               });
-              if (existsSync(join(prev, pngName(name, pngs.length)))) changed = true; // it used to be longer
+              if (existsSync(join(prev, imageName(name, images.length)))) changed = true; // it used to be longer
               const caption = clockAt === null ? shot.caption : `${shot.caption} (frame ${fi + 1} of ${frames.length})`;
-              done.push({ ...shot, file: name, caption, scene: st.scene.name, size, width: device.width, screens: pngs.length, ms: Date.now() - ts, changed });
-              console.log(`${changed ? '* ' : '  '}${name}.png${pngs.length > 1 ? ` (${pngs.length} screens)` : ''}  ${Date.now() - ts} ms`);
+              done.push({ ...shot, file: name, caption, scene: st.scene.name, size, width: device.width, screens: images.length, ms: Date.now() - ts, changed });
+              console.log(`${changed ? '* ' : '  '}${name}.webp${images.length > 1 ? ` (${images.length} screens)` : ''}  ${Date.now() - ts} ms`);
             }
             if (shot.offline) await tab.offline(false);
             screenGone?.();
@@ -583,10 +579,10 @@ function contactSheet(done: Done[], prev: string | null): string {
   // Every screen at the same scale (a TV pixel is a third, a phone pixel 0.6), so sizes compare at a glance.
   const card = (d: Done) => {
     const w = Math.round(d.width * (d.client === 'tv' && !d.table ? 1 / 3 : 0.6));
-    const imgs = Array.from({ length: d.screens }, (_, i) => `<a href="${pngName(d.file, i)}"><img src="${pngName(d.file, i)}" loading="lazy" style="width:${w}px"></a>`).join('');
+    const imgs = Array.from({ length: d.screens }, (_, i) => `<a href="${imageName(d.file, i)}"><img src="${imageName(d.file, i)}" loading="lazy" style="width:${w}px"></a>`).join('');
     return `<figure class="${d.changed ? 'changed' : ''}">
     <div class="screens">${imgs}</div>
-    <figcaption style="max-width:${Math.max(w * d.screens, 240)}px"><b>${esc(d.file)}</b> ${esc(d.caption)}${d.size ? ` <i>(${esc(d.size)})</i>` : ''}${d.screens > 1 ? ` <i>${d.screens} screens, scrolled</i>` : ''}${d.changed ? ` <a class="was" href="file://${esc(join(prev!, `${d.file}.png`))}">changed: see before</a>` : ''}</figcaption></figure>`;
+    <figcaption style="max-width:${Math.max(w * d.screens, 240)}px"><b>${esc(d.file)}</b> ${esc(d.caption)}${d.size ? ` <i>(${esc(d.size)})</i>` : ''}${d.screens > 1 ? ` <i>${d.screens} screens, scrolled</i>` : ''}${d.changed ? ` <a class="was" href="file://${esc(join(prev!, imageName(d.file, 0)))}">changed: see before</a>` : ''}</figcaption></figure>`;
   };
   const group = (client: string, sized: boolean) => done.filter((d) => d.client === client && !!d.size === sized).map(card).join('');
   return `<!doctype html><meta charset="utf-8"><title>board-lite shots</title>
