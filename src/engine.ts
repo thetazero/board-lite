@@ -815,7 +815,7 @@ function checkRaidOver(g: Game): boolean {
 // ---------- fauna ----------
 
 // A player's dragons attack the beast on hex k, in a raid's combat, to the
-// end. Each sits out this round's raids. If the beast falls, the hex is free
+// end. Each sits out this round's raids. If the beast falls, the hex is empty
 // and its loot (and a great beast's points, for good) goes to the player; if
 // not, it stays, healed. A player gets one try at a great beast a round.
 function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {

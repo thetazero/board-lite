@@ -3,7 +3,6 @@
 
 import type { DragonView, EventView, HexView, PublicState, Res, Snapshot, UnitView } from '../src/state.ts';
 import { buildingShapes, icon, iconShapes } from './icons.ts';
-import { glyph } from './art.ts';
 
 // The colour each great beast marks the hexes it holds with (the TV's board uses the same).
 export const HOLD_COLORS: Record<string, string> = { thunderbird: '#5b4bb7', leviathan: '#1f7f9b' };
@@ -140,14 +139,10 @@ const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]
 const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
 // Punctuation right after an icon stays on its line, not wrapped alone onto the next.
 const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
-// Dice to roll, "2d6", read as a count and the die: "2" and a white square.
-const DICE_WORD = /\b(\d+)d(4|6|8)\b/g;
-export function diceChip(n: number | string, sides: number, size = 1.2): string {
-  return `<span class="tchip dicechip">${n}${icon(`d${sides}`, size)}</span>`;
-}
+// Dice to roll stay words, "2d6", as the rules write them: only the core
+// resources and points are icons (docs/design.md, Look and feel).
 export function iconText(html: string, size = 1.2): string {
   return html
-    .replace(DICE_WORD, (_, n, s) => diceChip(n, Number(s), size))
     .replace(RES_WORD, (_, n, r, p) => glue(`<span class="tchip">${n ?? ''}${icon(r, size)}</span>`, p))
     .replace(POINTS_WORD, (m, n, p) => glue(`<span class="tchip">${m.includes('more') ? '+' : ''}${n}${icon('points', size)}</span>`, p));
 }
@@ -227,12 +222,12 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][ev.stage]}` : '';
     }
     case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
-    case 'floor': return `${who(ev.p)} adds a tower floor ${buildingChip('tower', ev.p)} <span class="floors">${ev.floors}</span>`;
-    case 'upgrade': return `${who(ev.p)} adds ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'floor': return `${whose(ev.p)} tower ${buildingChip('tower', ev.p)} rises to ${ev.floors} floor${ev.floors === 1 ? '' : 's'}`;
+    case 'upgrade': return `${who(ev.p)} adds ${a(ev.name)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
     case 'play': {
       const on = ev.hex ? g.map.find((h) => h.k === ev.hex)?.building : null;
-      const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `${icon('raid', 1.2)}×${ev.raids}` : ev.fauna ? `${icon(ev.fauna, 1.5)}${on ? `<span class="arrow">➜</span>${buildingChip(on.type, on.owner, null, 26, on.cls)}` : ''}` : '';
+      const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `: ${ev.raids} extra raid${ev.raids === 1 ? '' : 's'} this round` : ev.fauna ? `${icon(ev.fauna, 1.5)}${on ? `<span class="arrow">➜</span>${buildingChip(on.type, on.owner, null, 26, on.cls)}` : ''}` : '';
       return `${who(ev.p)} plays <span class="evcard">${esc(ev.name)}</span> ${what}`;
     }
     case 'bank': return `${who(ev.p)} trades ${res(ev.give)} to the bank for ${res(ev.get)}`;
@@ -242,11 +237,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       const t = `<span class="title-badge">${icon(TITLE_ICON[ev.t], 1.1)}</span><b>${esc(g.titles.find((x) => x.key === ev.t)?.name ?? '')}</b>`;
       return ev.p === null ? `No one holds ${t}` : `${who(ev.p)} takes ${t}`;
     }
-    case 'discard': return `${who(ev.p)} discards ${ev.n} ${icon('cards', 1.2)}`;
+    case 'discard': return `${who(ev.p)} discards ${ev.n} card${ev.n === 1 ? '' : 's'}`;
     case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
     case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
     case 'raidEnd': return ev.won
-      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2)}`).join(', ')}`
+      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
@@ -299,8 +294,19 @@ export function incomeText(x: { base: number; dice: number[] }): string {
 }
 
 // Combat power: one rough number per dragon or kingdom; a side's add up.
-export function powerTag(n: number, cls = ''): string {
-  return `<span class="stat power ${cls}" title="combat power">${glyph('power', 'combat power')}${n}</span>`;
+export function powerTag(n: number, cls = '', label = 'Power'): string {
+  return `<span class="stat power ${cls}" title="combat power">${label} <b>${n}</b></span>`;
+}
+
+// A stat said in words: "Health 10", "Attack 1d6".
+export function statTag(label: string, value: string | number): string {
+  return `<span class="stat">${label} <b>${value}</b></span>`;
+}
+
+// Elements as words in their own colours: "ice", "air and lightning".
+export function elemWords(es: string[]): string {
+  const w = es.map((e) => `<b class="elem" style="--ec:${ELEMENT_COLORS[e]}">${e}</b>`);
+  return w.length < 2 ? w.join('') : `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
 }
 
 // Why a dragon sits out, or its health. A healing one shows the rounds until it can raid.
@@ -324,9 +330,10 @@ export function unitIcon(name: string, size = 2): string {
   return icon(name.toLowerCase().replace(/[^a-z]+/g, '_'), size, 'ricon unit-art');
 }
 
-// A kingdom's defenders by kind, drawn: each kind's picture with how many
-// there are, its health and attack, and the elements it takes double (×2)
-// or half (½) from. Four Archers are one picture marked ×4, not four lines.
+// A kingdom's defenders by kind, drawn: each kind's picture and name with how
+// many there are, then its stats in words: health, attack, and the elements it
+// is weak to (takes double from) or strong against (takes half from). Four
+// Archers are one picture marked ×4, not four lines.
 export function foeStack(units: UnitView[], size = 2): string {
   const kinds: { u: UnitView; n: number; up: number }[] = [];
   for (const u of units) {
@@ -335,10 +342,17 @@ export function foeStack(units: UnitView[], size = 2): string {
   }
   return `<div class="foes">${kinds.map(({ u, n }) => `
     <div class="foe">
-      <span class="foe-pic">${unitIcon(u.name, size)}${n > 1 ? `<b class="foe-n">×${n}</b>` : ''}</span>
-      <span class="foe-stats"><span class="stat">${glyph('health', 'health')}${u.maxHp}</span><span class="stat">${glyph('attack', 'attack')}${iconText(esc(u.attack))}</span></span>
-      <span class="foe-elems">${u.weak.length ? `<span class="weak">×2${u.weak.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}${u.strong.length ? `<span class="strong">½${u.strong.map((e) => elemIcon(e, 1.15)).join('')}</span>` : ''}</span>
+      <span class="foe-pic">${unitIcon(u.name, size)}</span>
+      <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ` : ''}${esc(u.name)}</b>
+      <span class="foe-stats">${statTag('Health', u.maxHp)}${statTag('Attack', esc(u.attack))}</span>
+      ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}${u.strong.length ? `<span class="foe-elem strong">Strong against ${elemWords(u.strong)}</span>` : ''}</span>
     </div>`).join('')}</div>`;
+}
+
+// What a fight pays, labelled: "Loot 3 timber 2 gold", or the points a great beast is worth.
+export function lootLine(loot: Res, size = 1.3, points?: number): string {
+  const what = points !== undefined ? `<span class="chip">${points}${icon('points', size)}</span>` : resChips(loot, size) || 'none';
+  return `<div class="loot"><span class="loot-label">${points !== undefined ? 'Worth' : 'Loot'}</span>${what}</div>`;
 }
 
 // A rolled die: the same white shape as a die to roll, with what it landed on.
