@@ -10,7 +10,6 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
-import { BEASTS } from '../data.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { publicState, seatState, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { afterMove, playerView, publicStatus, seatStatus, visibleLog } from '../view.ts';
@@ -102,7 +101,7 @@ export class Room {
   }
 
   private holdForScenes(events: Game['log']) {
-    const ms = this.screens > 0 ? scenesMs(scenesOf(events, (k) => k in BEASTS)) : 0;
+    const ms = this.screens > 0 ? scenesMs(scenesOf(events)) : 0;
     if (!ms) return;
     this.sceneUntil = Math.max(Date.now(), this.sceneUntil) + ms;
     if (this.sceneTimer) clearTimeout(this.sceneTimer);

@@ -84,7 +84,7 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   // Round 1's raid: every dragon is an egg, so no one could raid: no scene for it.
   const r1 = g.log.filter((e) => e.round === 1 && !e.to);
   assert.ok(r1.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'unable'));
-  assert.deepEqual(scenesOf(r1, () => false).map((s) => s.kind), ['roll'], 'only the opening roll');
+  assert.deepEqual(scenesOf(r1).map((s) => s.kind), ['roll'], 'only the opening roll');
   // Round 2 has begun, and its roll is on the TV: the phones wait for it.
   const left = room.snapshot(seats[0].token).scene;
   assert.ok(left > 0 && left < 4000, `the roll takes ${left} ms`);

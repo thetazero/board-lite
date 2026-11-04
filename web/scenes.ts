@@ -11,7 +11,7 @@ export interface SceneEvent { round: number; ev?: GameEvent; dice?: unknown[] }
 export type Scene =
   | { kind: 'roll'; at: number; rolls: number[]; ms: number } // at: the round event; rolls: the produce events with dice
   | { kind: 'fight'; at: number; combat: number[]; end: number | null; ms: number } // a raid's fight; end: its raidEnd
-  | { kind: 'hunt'; at: number; combat: number[]; end: number | null; ms: number } // a great beast's fight; end: its cleared
+  | { kind: 'hunt'; at: number; combat: number[]; end: number | null; ms: number } // a fight against fauna; end: its cleared
   | { kind: 'noRaid'; at: number; ms: number };
 
 // Each player's dice tumble a moment after the last's, all landing within
@@ -30,10 +30,8 @@ const fightMs = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400 + O
 
 export const NO_RAID_MS = 2500;
 
-// The scenes in a run of new events, in order. isBeast: whether a fauna key
-// is a great beast (only those fights are replayed; clearing fauna is a line
-// in the feed).
-export function scenesOf(events: SceneEvent[], isBeast: (fauna: string) => boolean): Scene[] {
+// The scenes in a run of new events, in order.
+export function scenesOf(events: SceneEvent[]): Scene[] {
   const out: Scene[] = [];
   const fightOf = (at: number, last: 'raidEnd' | 'cleared') => {
     const combat: number[] = [];
@@ -53,7 +51,7 @@ export function scenesOf(events: SceneEvent[], isBeast: (fauna: string) => boole
     } else if (ev?.k === 'fight') {
       const f = fightOf(at, 'raidEnd');
       out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat)) });
-    } else if (ev?.k === 'hunt' && isBeast(ev.fauna)) {
+    } else if (ev?.k === 'hunt') {
       const f = fightOf(at, 'cleared');
       out.push({ kind: 'hunt', at, ...f, ms: fightMs(hits(f.combat)) });
     } else if (ev?.k === 'noRaid' && ev.why !== 'unable') {

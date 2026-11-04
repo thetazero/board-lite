@@ -356,7 +356,7 @@ const banners: Banner[] = [];
 let bannerUp = false;
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
-  for (const sc of scenesOf(fresh, (k) => g.beasts.some((b) => b.key === k))) banners.push(banner(g, sc, fresh));
+  for (const sc of scenesOf(fresh)) banners.push(banner(g, sc, fresh));
 }
 
 function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
@@ -422,19 +422,20 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   return battle(g, head, dragons, fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
-// A great beast's fight: one player's dragons against it, to the end, played
-// out like a raid's. The table watches the race.
+// A fight against fauna, a great beast or not: one player's dragons against
+// it, to the end, played out like a raid's, then what they got for it. Every
+// fight in the game gets this replay, so the table sees it happen.
 function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh: EventView[]): Banner {
   const ev = fresh[sc.at].ev as Extract<EventView['ev'], { k: 'hunt' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'cleared' }>);
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
-  const beast = g.beasts.find((b) => b.key === ev.fauna)!;
-  const outcome = !end ? '' : end.won
-    ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? beast.points} ${icon('points', 1.6)}</span></div>`
-    : `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`;
+  const great = g.beasts.some((b) => b.key === ev.fauna);
+  const outcome = !end ? '' : !end.won ? `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`
+    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
+    : `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${icon(ev.fauna, 1.4)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, '', [{ name: ev.name, hp: beast.hp }], rounds, outcome, undefined, sc.ms);
+  return battle(g, head, dragons, '', [{ name: ev.name, hp: ev.hp }], rounds, outcome, undefined, sc.ms);
 }
 
 function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
