@@ -106,7 +106,7 @@ test('stats.json saved while a batch plays gains the games that finish later, an
     all[0].offered = { port: 1, and_building_cards_port: 2 };
     writeFileSync(file, JSON.stringify(all));
     const g1 = JSON.parse(readFileSync(join(dir, 'g1', 'game.json'), 'utf8'));
-    g1.log.findLast((e: { ev?: { k: string } }) => e.ev?.k === 'final').ev.totals[0] += 5;
+    g1.round += 1; // the rebuild no longer matches the saved game
     writeFileSync(join(dir, 'g1', 'game.json'), JSON.stringify(g1));
     const b = loadBatch(dir);
     assert.deepEqual(b.games.map((s) => s.game), ['g1', 'g2']);
