@@ -44,7 +44,7 @@ const MAX_SCREENS = 4; // a long phone page is shot one screen at a time, scroll
 // the hand is fixed to the bottom edge, so it must never sit over anything
 // (a card held open or the talk sheet open covers everything anyway).
 const COVERED = `(() => {
-  const cards = [...document.querySelectorAll('.handfan .card')].map((c) => c.getBoundingClientRect()).filter((r) => r.height);
+  const cards = [...document.querySelectorAll('.handfan .card:not(.peek)')].map((c) => c.getBoundingClientRect()).filter((r) => r.height);
   if (!cards.length || document.querySelector('.zoom, .talkbar.open, .menu')) return []; // a sheet over the hand
   const hits = new Set();
   for (const el of document.querySelectorAll('#app *')) {
@@ -311,6 +311,22 @@ class Tab {
     await this.settle();
   }
 
+  // Puts a finger down on an element and slides it (dx, dy), without letting go.
+  async press(selector: string, dx: number, dy: number) {
+    const ok = await this.eval<boolean>(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      const x = r.left + Math.min(12, r.width / 2), y = r.top + r.height / 2;
+      const at = (type, t, cx, cy) => t.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy }));
+      at('pointerdown', el, x, y);
+      for (let i = 1; i <= 4; i++) at('pointermove', document, x + ${dx} * i / 4, y + ${dy} * i / 4);
+      return true;
+    })()`);
+    if (!ok) throw new Error(`Nothing to press: ${selector}`);
+    await this.settle();
+  }
+
   // Types into an input the way a person would, so the page sees it as typed.
   async type(selector: string, value: string) {
     const ok = await this.eval<boolean>(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -505,6 +521,7 @@ async function main() {
               if (shot.fill.name !== undefined) await tab.type('#name', shot.fill.name);
             }
             for (const sel of shot.clicks ?? []) await tab.click(sel);
+            if (shot.press) await tab.press(shot.press.on, shot.press.dx ?? 0, shot.press.dy ?? 0);
             if (shot.waitFor && shot.hold) await tab.hold(shot.waitFor, 30000);
             else if (shot.waitFor) await tab.waitFor(`document.querySelector(${JSON.stringify(shot.waitFor)})`, shot.waitFor, 30000);
             if (shot.waitMs) await sleep(shot.waitMs);

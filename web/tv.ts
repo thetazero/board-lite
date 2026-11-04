@@ -6,7 +6,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, powerTag,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -500,28 +500,46 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
         // The stroke: from the attacker's inner edge to the target's, in the
         // dragon's element colour, or the defenders' steel.
         const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : '#c9ced6';
-        battle.querySelector('.beam')?.remove();
+        // The last stroke fades out under the new one, never just blinks off.
+        battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
         battle.append(beam(battle, a, t, h.by === 'dragon', c));
       }
       if (t) {
-        t.querySelector('.hpbar')!.outerHTML = hpBar(now, max);
-        // Hits can land faster than a number fades: the new one replaces the
-        // last, so a −4 and a −8 never read as one −48.
-        t.querySelectorAll('.dmg').forEach((old) => old.remove());
+        // The bar drains to its new width (style.css eases it) rather than
+        // being redrawn at it.
+        const fill = t.querySelector<HTMLElement>('.hpbar > span')!;
+        const { width, color } = hpFill(now, max);
+        fill.style.width = width;
+        fill.style.background = color;
+        // Hits can land faster than a number reads. A new one doesn't cut the
+        // last: that one moves up a line, smaller, and fades, so a −4 sits
+        // over a −8 and never beside it as one −48. Only those two are up at
+        // once, so none rises into the fighter above.
+        t.querySelectorAll<HTMLElement>('.dmg').forEach((old) => {
+          if (old.classList.contains('gone')) return old.remove();
+          old.style.setProperty('--slot', '1');
+          fade(old, 450);
+        });
         const pop = document.createElement('span');
         pop.className = 'dmg';
         pop.textContent = `−${h.dmg}`;
         t.append(pop);
-        setTimeout(() => pop.remove(), 900);
+        pop.addEventListener('animationend', (e) => { if (e.target === pop && e.animationName === 'dmg') pop.remove(); });
         if (now <= 0) t.classList.add('down');
       }
     }, FIGHT_LEAD_MS + n * step));
     setTimeout(() => {
-      battle.querySelector('.beam')?.remove();
+      battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
       el.querySelector('.outcome')!.classList.add('show');
     }, FIGHT_LEAD_MS + hits.length * step + 400);
   };
   return { html, ms, play, top };
+}
+
+// Takes a stroke or a number away with a short fade instead of a cut.
+function fade(x: Element, ms = 250) {
+  x.classList.add('gone');
+  setTimeout(() => x.remove(), ms);
 }
 
 // A line from one fighter's facing edge to another's, drawn over the battle.

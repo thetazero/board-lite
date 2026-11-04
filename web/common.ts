@@ -325,9 +325,15 @@ export function healingText(n: number): string {
 }
 
 export function hpBar(hp: number, max: number): string {
+  const { width, color } = hpFill(hp, max);
+  return `<span class="hpbar"><span style="width:${width};background:${color}"></span></span>`;
+}
+
+// How full a health bar is and its colour, for setting a drawn bar's fill in
+// place so it drains rather than jumps.
+export function hpFill(hp: number, max: number): { width: string; color: string } {
   const pct = max ? Math.max(0, Math.min(100, (hp / max) * 100)) : 0;
-  const color = pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d';
-  return `<span class="hpbar"><span style="width:${pct}%;background:${color}"></span></span>`;
+  return { width: `${pct}%`, color: pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d' };
 }
 
 // ---------- the raid's defenders ----------
