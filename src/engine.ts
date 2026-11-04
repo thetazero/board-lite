@@ -103,9 +103,9 @@ export type GameEvent =
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
-  | { k: 'decline'; p: number; from: number }
+  | { k: 'decline'; p: number; from: number; give: string; get: string }
   | { k: 'withdraw'; p: number }
-  | { k: 'expire' }
+  | { k: 'expire'; from: number; to: number; give: string; get: string }
   | { k: 'end'; p: number }
   | { k: 'title'; t: Title; p: number | null }
   | { k: 'discard'; p: number; n: number }
@@ -553,7 +553,7 @@ export function turnOrder(g: Game): number[] {
 }
 
 function endTurn(g: Game) {
-  for (const o of g.offers) log(g, `Offer ${o.id} expires.`, { k: 'expire' });
+  for (const o of g.offers) log(g, `Offer ${o.id} expires.`, { k: 'expire', from: o.from, to: o.to, give: tradeText(g, o.give), get: tradeText(g, o.get) });
   g.offers = [];
   const next = (g.turn + 1) % g.players.length;
   if (next !== firstPlayer(g)) {
@@ -1010,7 +1010,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     const o = g.offers.find((x) => x.id === args[0]);
     if (!o || o.to !== p) fail(`There is no offer "${args[0] ?? ''}" made to you.`);
     g.offers = g.offers.filter((x) => x !== o);
-    if (verb === 'decline') return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from });
+    if (verb === 'decline') return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from, give: tradeText(g, o!.give), get: tradeText(g, o!.get) });
     const problem = acceptProblem(g, o!);
     if (problem) fail(problem);
     const giveText = tradeText(g, o!.give), getText = tradeText(g, o!.get);

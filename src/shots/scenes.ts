@@ -455,6 +455,11 @@ export const SCENES: Scene[] = [
       },
       { file: 'phone-trade-own-offer-4p', caption: "Phone: your own offer out, on someone else's turn", client: 'phone', seat: (g!.turn + 2) % 4 },
       {
+        // It changes the room: the acting player accepts the offer made to them.
+        file: 'phone-trade-accepted-4p', caption: 'Phone: the player you offered accepts', client: 'phone', seat: (g!.turn + 2) % 4,
+        then: (room) => room.mutate((g2) => apply(g2, g2.turn, `accept ${g2.offers.find((o) => o.to === g2.turn)!.id}`)), waitFor: '.notices .toast',
+      },
+      {
         // Last: it changes the room. The offerer has spent what they offered, so Accept is off and says why.
         file: 'phone-trade-cant-accept-4p', caption: 'Phone: an offer the offerer can no longer pay (Accept is off, with the reason)', client: 'phone', seat: (g!.turn + 1) % 4,
         then: (room) => room.mutate((g2) => drain(g2, g2.turn)), waitFor: '.offer.in .blocked',
