@@ -797,7 +797,7 @@ function dragonOption(id: string, attrs: string, stats?: string, ticked?: boolea
 function moreView(me: Me): string {
   // Each row: what it is, its cost and its button, and why when the button is off.
   const row = (art: string, name: string, cost: CardView['cost'], button: string, why: string | null) =>
-    `<div class="proj${why ? ' dim' : ''}">${art}<b>${esc(name)}</b> ${resChips(cost)}${button}</div>${whyLine(why)}`;
+    `<div class="proj${why ? ' dim' : ''}">${art}<span class="what"><b>${esc(name)}</b><span class="costs">${resChips(cost)}</span></span>${button}</div>${whyLine(why)}`;
   const basics = me.basics.map((b) => row(buildingIcon(b.key, 22, '#4a3d45', b.cls), b.name, b.cost, btn('Build', `data-basic="${b.key}"`, b.why, ''), b.why)).join('');
   // The egg's button opens the choice of its element, as a basic building's opens the choice of its hex.
   const egg = me.eggProject;

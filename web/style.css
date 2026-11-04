@@ -118,7 +118,9 @@ body.offline .offline-note { display: block; }
 body.phone.offline { padding-top: 2em; }
 body.phone .offline-note { line-height: 1.4em; }
 body.phone.offline .mehead { top: 2em; }
-body.offline #app { filter: grayscale(.8); opacity: .55; }
+/* Greyed with a sheet over the page, not a filter on #app: a filter would make
+   #app the box the fixed hand and bars are placed in, and move them. */
+body.phone.offline::after { content: ''; position: fixed; inset: 0; z-index: 55; pointer-events: none; backdrop-filter: grayscale(.8); background: #1b1530a0; }
 
 /* map */
 svg.map { width: 100%; height: 100%; display: block; }
@@ -514,7 +516,7 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
 .card.dealt { animation: deal .65s cubic-bezier(.2, .9, .3, 1.15) both; }
 @keyframes deal { from { transform: translateY(-70vh) rotate(-14deg) scale(.7); opacity: 0; } 30% { opacity: 1; } }
 /* A card tapped open, over the hand. */
-.zoom { touch-action: pan-y; position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em; padding: 1em; background: #140f2aed; overflow-y: auto; animation: fadein .15s; }
+.zoom { touch-action: pan-y; position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 1em; padding: 1em; background: #140f2aed; overflow-y: auto; animation: fadein .15s; }
 .card.big { width: min(19em, 88vw); cursor: default; padding: 8px 8px 10px; animation: zoomin .2s ease-out; }
 .card.big .cname { margin: -12px -11px 0; font-size: 1.45em; }
 .card.big .ckind { width: 30px; height: 30px; top: 6px; left: 6px; }
@@ -584,6 +586,11 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
   .picker .pmap { grid-row: 1 / 4; grid-column: 1; }
   .picker > :not(.pmap) { grid-column: 2; }
   .picker .pabout { align-items: flex-start; }
+  /* A card tapped open: the card on the left, its buttons and why on the right. */
+  .zoom { display: grid; grid-template-columns: auto auto; grid-template-rows: 1fr auto; justify-content: center; align-content: safe center; column-gap: 1.5em; }
+  .zoom > .card.big { grid-row: 1 / 3; }
+  .zoom > .zoomacts { align-self: end; }
+  .zoom > .zoomnav { grid-column: 2; align-self: start; justify-self: center; }
 }
 .choice { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
 .choice b { font-size: 1.15em; }
@@ -641,6 +648,11 @@ body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100
 .keepone .card.big .cname { font-size: 1.25em; }
 .proj > svg { flex: none; margin-right: -.2em; }
 .proj b { min-width: 6.5em; }
+/* The name and its costs take what the button leaves; on a narrow phone the
+   costs drop under the name rather than push the button off the edge. */
+.proj .what { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .2em .5em; }
+.proj .costs { display: flex; gap: .5em; white-space: nowrap; }
+.proj button { flex: none; }
 /* Anything chosen (a tab, a player, a resource, a dragon, a vote) is lit the
    same way, gold on gold, and stays lit once made. */
 button.on { --edge: #a8801c; background: var(--grain), var(--mottle), linear-gradient(180deg, #fcd660, #f0bb34); color: var(--ink); }
