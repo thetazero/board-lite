@@ -124,6 +124,41 @@ test('a room of bots plays itself to the end', { timeout: 120_000 }, async (t) =
   assert.equal(room.game!.phase, 'over');
 });
 
+// #192: the timer that ends a scene can fire a moment before Date.now() says
+// the scene is over (Node's timers keep their own clock), or the wall clock can
+// step back mid-scene. Either way the bot whose turn is next must still move.
+test('after a scene, the next bot moves even if the clock says the scene is not quite over', { timeout: 30_000 }, async (t) => {
+  const room = new Room('LATE', { botDelayMs: 0, dir });
+  room.addBot();
+  room.addBot();
+  const tvGone = room.connect(null);
+  const realNow = Date.now.bind(Date);
+  let lag = 0;
+  t.mock.method(Date, 'now', () => realNow() - lag);
+  let held = -1; // the log's length when the first scene began
+  let deadline: NodeJS.Timeout | undefined;
+  const moved = new Promise<void>((resolve, reject) => {
+    t.mock.method(console, 'error', (...args: unknown[]) => reject(new Error(args.map(String).join(' '))));
+    room.subscribe(() => {
+      const g = room.game;
+      if (!g) return;
+      if (held < 0 && room.sceneLeft() > 0) {
+        held = g.log.length;
+        lag = 30; // the clock steps back as the scene starts
+        deadline = setTimeout(() => reject(new Error('no bot moved after the scene')), room.sceneLeft() + 5000);
+      } else if (held >= 0 && g.log.length > held) resolve();
+    });
+  });
+  room.start(room.hostToken, 3);
+  try {
+    await moved;
+  } finally {
+    clearTimeout(deadline);
+    tvGone();
+    room.close();
+  }
+});
+
 test("the lobby and the join form name the game's real goal", () => {
   assert.equal(POINTS_TO_WIN, TUNING.pointsToWin, 'web/common.ts POINTS_TO_WIN must match TUNING.pointsToWin');
 });
