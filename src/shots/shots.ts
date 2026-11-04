@@ -453,6 +453,7 @@ async function main() {
               url = `${base}${shot.path ?? `/${code}`}?n=${n++}`;
               if (shot.remember) storage.name = shot.remember;
             }
+            const screenGone = shot.screen ? room.connect(null) : null;
             await tab.load(url, device, { storage, loading: shot.loading });
             if (shot.live) {
               room.mutate((g) => drive(g, st.rng, st.scene.live!));
@@ -498,6 +499,7 @@ async function main() {
               console.log(`${changed ? '* ' : '  '}${name}.png${pngs.length > 1 ? ` (${pngs.length} screens)` : ''}  ${Date.now() - ts} ms`);
             }
             if (shot.offline) await tab.offline(false);
+            screenGone?.();
           } catch (e) {
             failures++;
             await tab.offline(false).catch(() => {});

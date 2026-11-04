@@ -171,10 +171,23 @@ function onSnapshot(s: Snapshot) {
     openCard = null;
     if (s.game.phase !== 'action') trade = fresh();
   }
-  if (navigator.vibrate && s.you.deciding && !prev?.you?.deciding) navigator.vibrate(120);
+  // The TV is playing a scene (a fight, the round's roll): the whole table
+  // watches it, and the next decision waits until it's over. Nothing that
+  // changed shows yet, so the phone doesn't give the ending away.
+  if (s.scene > 0) {
+    renderWatch(s.you);
+    renderTalk();
+    return;
+  }
+  if (navigator.vibrate && s.you.deciding && !(prev?.you?.deciding && !prev.scene)) navigator.vibrate(120);
   noteDeals(s.you.hand.map((c) => c.id));
   render();
   renderTalk();
+}
+
+function renderWatch(me: Me) {
+  document.body.classList.remove('has-hand', 'raiding', 'hand-below');
+  app.innerHTML = `<div class="watchtv" style="--pc:${PLAYER_COLORS[me.seat]}"><span class="pname">${esc(me.name)}</span><h1>Watch the TV</h1></div>`;
 }
 
 function noteDeals(ids: string[]) {

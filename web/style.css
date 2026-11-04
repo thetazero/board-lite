@@ -53,16 +53,16 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
-.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog,
+.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
 .talkbar, .mehead, .ally, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
 }
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
 :is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
-.panel, .roost, .offer, .ptarget, .big-note, .mylog, .ally, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
+.panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
    hard edge below; pressed, it lies flat. Plain is cream card, primary blue,
@@ -253,10 +253,9 @@ q::after { content: close-quote; }
 .production li > b:first-child { min-width: 6em; }
 .production { max-width: 92vw; }
 .production .dice { display: flex; flex-wrap: wrap; gap: .1em 0; }
-/* Each player's roll comes up in turn; the one rolling now is lit in their colour. */
-.production li { visibility: hidden; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); opacity: .55; transition: opacity .3s; }
+/* Everyone rolls at once, each player's dice a moment after the last's, lit in their colour. */
+.production li { visibility: hidden; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production li.up { visibility: visible; }
-.production li.now { opacity: 1; background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .endbox { padding: 0 0 1.2em; overflow: hidden; min-width: 44em; }
 .endbox svg.scene { display: block; width: 100%; height: 13em; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }
@@ -646,3 +645,8 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .join-box:has(.qr) .alt { font-size: .8em; margin: -.2em 0 .4em; }
 /* What just happened to this phone: news, not an error. */
 .joinform .news { margin: 0; text-align: center; font-weight: 700; padding: .45em .8em; background: var(--grain), var(--sheet); color: var(--ink); border-left: .4em solid var(--accent); border-radius: 3px; box-shadow: var(--lift); }
+
+/* Phone, while the TV plays a scene: nothing to do but look up. */
+.watchtv { min-height: 70vh; margin: 1em; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6em; border-top: .4em solid var(--pc); text-align: center; }
+.watchtv .pname { font-size: 1.2em; font-weight: 800; }
+.watchtv h1 { margin: 0; font-size: 2.2em; }

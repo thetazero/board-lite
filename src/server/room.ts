@@ -10,10 +10,12 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
+import { BEASTS } from '../data.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { publicState, seatState, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { afterMove, playerView, publicStatus, seatStatus, visibleLog } from '../view.ts';
 import { load, save, withLock } from '../store.ts';
+import { scenesMs, scenesOf } from '../../web/scenes.ts';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
@@ -56,6 +58,13 @@ export class Room {
   private botTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private botRng = { state: Date.now() | 0 };
+  // While a TV is watching, a change that gives it a scene to play (a fight,
+  // a round's production roll) holds everyone's next decision until the scene
+  // is over: phones show "Look at the TV", bots and CLI players wait. Without
+  // a TV there are no scenes and nothing waits.
+  private screens = 0; // open event streams with no seat: TVs
+  private sceneUntil = 0; // ms epoch
+  private sceneTimer: NodeJS.Timeout | null = null;
 
   constructor(code: string, opts: RoomOptions = {}) {
     this.code = code;
@@ -85,9 +94,27 @@ export class Room {
   mutate(fn: (g: Game) => void) {
     const g = this.cached;
     if (!g) throw new RoomError('The game has not started yet.');
+    const before = g.log.length;
     fn(g); // apply() leaves the game untouched when it refuses a command
     withLock(this.file, () => save(this.file, g));
+    this.holdForScenes(g.log.slice(before).filter((e) => !e.to));
     this.changed();
+  }
+
+  private holdForScenes(events: Game['log']) {
+    const ms = this.screens > 0 ? scenesMs(scenesOf(events, (k) => k in BEASTS)) : 0;
+    if (!ms) return;
+    this.sceneUntil = Math.max(Date.now(), this.sceneUntil) + ms;
+    if (this.sceneTimer) clearTimeout(this.sceneTimer);
+    this.sceneTimer = setTimeout(() => {
+      this.sceneTimer = null;
+      this.changed();
+    }, this.sceneUntil - Date.now());
+  }
+
+  // How much longer the TV's scene runs (ms); 0 when there's none.
+  sceneLeft(): number {
+    return Math.max(0, this.sceneUntil - Date.now());
   }
 
   // ---- lobby ----
@@ -258,7 +285,7 @@ export class Room {
       const check = (): boolean => {
         const g = this.game;
         if (g?.phase === 'over') return finish('The game is over.', 0);
-        if (g && waitingOn(g).includes(p)) return finish(`P${p + 1}: your decision. Run "view" to see the board.`, 0);
+        if (g && waitingOn(g).includes(p) && !this.sceneLeft()) return finish(`P${p + 1}: your decision. Run "view" to see the board.`, 0);
         return false;
       };
       const finish = (text: string, code: number) => {
@@ -294,7 +321,7 @@ export class Room {
       const others = visibleLog(g, p).slice(since).filter((e) => !e.text.startsWith(`P${p + 1} `));
       if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
       const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
-      return waitingOn(g).includes(p) && !awaitingAnswer;
+      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft();
     };
     if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
     const left = this.holding(p);
@@ -329,7 +356,7 @@ export class Room {
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over') return;
+    if (this.botTimer || !g || g.phase === 'over' || this.sceneLeft()) return;
     const botPlays = (p: number) => this.seats[p]?.kind === 'bot' || !!this.seats[p]?.standIn;
     if (!waitingOn(g).some(botPlays)) return;
     this.botTimer = setTimeout(() => {
@@ -368,6 +395,7 @@ export class Room {
       lobby: this.lobby(),
       seat: p,
       game: g ? publicState(g) : null,
+      scene: this.sceneLeft(),
       you: g && p >= 0 && this.seats[p].kind === 'player' ? { ...seatState(g, p), name: this.seats[p].name } : null,
     };
   }
@@ -378,6 +406,10 @@ export class Room {
   }
 
   connect(tok: string | null): () => void {
+    if (tok === null) {
+      this.screens++;
+      return () => void this.screens--;
+    }
     const s = this.seats.find((x) => x.token === tok);
     if (!s) return () => {};
     s.connected++;
@@ -397,7 +429,8 @@ export class Room {
 
   close() {
     if (this.botTimer) clearTimeout(this.botTimer);
-    this.botTimer = null;
+    if (this.sceneTimer) clearTimeout(this.sceneTimer);
+    this.botTimer = this.sceneTimer = null;
     this.listeners.clear();
   }
 }

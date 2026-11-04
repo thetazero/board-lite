@@ -118,7 +118,7 @@ export type GameEvent =
   | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; units: { name: string; hp: number }[] }
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[] } // shares and power line up with winners
-  | { k: 'noRaid'; why: 'nobody' | 'bailed' }
+  | { k: 'noRaid'; why: 'unable' | 'nobody' | 'bailed' } // unable: no dragon was raid-ready
   | { k: 'again' }
   | { k: 'begin'; players: number }
   | { k: 'final'; totals: number[]; winner: number }
@@ -565,7 +565,7 @@ function startRaid(g: Game) {
   g.phase = 'raid';
   const n = g.players.length;
   if (!g.dragons.some(canRaid)) {
-    log(g, 'No one has a raid-ready dragon: no raid this round.', { k: 'noRaid', why: 'nobody' });
+    log(g, 'No one has a raid-ready dragon: no raid this round.', { k: 'noRaid', why: 'unable' });
     finishRaid(g);
     return;
   }

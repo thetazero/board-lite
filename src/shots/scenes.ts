@@ -33,7 +33,8 @@ export interface Shot {
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
   waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
-  live?: boolean; // TV: load the page, then let the scene's `live` moves happen, then shoot
+  live?: boolean; // load the page, then let the scene's `live` moves happen, then shoot
+  screen?: boolean; // phone: a TV is watching the room too, so its scenes hold the phones
   sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
   frames?: number[]; // TV: one shot per time on the 3D board's clock (seconds; the page opens at 0)
   flight?: boolean; // and the frames are fractions (0 to 1) of the way through the first dragon flight instead
@@ -404,7 +405,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote', // the raid is over
     liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''), // and won
-    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replayed, at the end: who won and what they took", client: 'tv', live: true, waitMs: 6600 }],
+    shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replayed, at the end: who won and what they took", client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
     // The same raid, caught mid-replay.
@@ -414,7 +415,17 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
     live: (g) => g.raid === null || g.raid.step === 'vote',
     liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
-    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2200 }],
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 1300 }],
+  },
+  {
+    // The same raid, on a raider's phone while the TV replays it.
+    name: 'raid-watch-3p',
+    players: 3,
+    seed: 3,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
+    live: (g) => g.raid === null || g.raid.step === 'vote',
+    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    shots: () => [{ file: 'phone-raid-watch-3p', caption: 'Phone, while the TV replays a fight: everyone watches, and the next decision waits', client: 'phone', seat: 1, live: true, screen: true, waitMs: 600 }],
   },
   {
     // A fight one raider bailed out of: they're shown flown home beside it.
@@ -444,7 +455,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.phase === 'discard',
     live: (g) => g.phase === 'action',
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with each player's production roll, one after another (the second rolling)", client: 'tv', live: true, waitMs: 1800 }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 900 }],
   },
   {
     name: 'production-done-6p',
@@ -710,7 +721,8 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 1 && g.phase === 'action' && g.turn === turnOrder(g).at(-1),
     live: (g) => g.round > 1,
     liveEnd: (g) => /no raid this round/.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-nobody-3p', caption: 'TV: no one has a raid-ready dragon yet, so there is no raid', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    // The TV opens on round 1's own banner, then round 2's; with no raid to show in between, that's all.
+    shots: () => [{ file: 'tv-raid-nobody-3p', caption: "TV: no one had a raid-ready dragon, so round 1 has no raid scene: a moment later round 2 is on to keeping cards", client: 'tv', live: true, waitMs: 3200 }],
   },
   {
     // The round's last raid is fought, then the next round opens: two banners back to back.

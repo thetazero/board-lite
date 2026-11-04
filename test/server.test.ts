@@ -14,6 +14,7 @@ import { startServer } from '../src/server/server.ts';
 import type { Snapshot } from '../src/state.ts';
 import { TUNING } from '../src/data.ts';
 import { POINTS_TO_WIN } from '../web/common.ts';
+import { scenesOf } from '../web/scenes.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-test-')); // a few small game files
@@ -58,6 +59,42 @@ test('phones can play a whole game through a room, and see only their own hand',
   const end = room.snapshot(seats[0].token);
   assert.equal(end.game!.winner, g.winner);
   assert.equal(end.game!.finalTotals!.length, 3);
+  assert.equal(end.scene, 0, 'with no TV watching, nothing is held for scenes');
+  room.close();
+});
+
+test('while a TV watches, its scene holds the next decision until it ends', async () => {
+  const room = new Room('SCEN', { dir });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  const tvGone = room.connect(null);
+  room.start(room.hostToken, 7);
+  const g = room.game!;
+  const rng = { state: 3 };
+  while (g.round === 1) {
+    const p = waitingOn(g)[0];
+    for (const cmd of candidateCommands(g, p, rng)) {
+      try {
+        room.command(seats[p].token, cmd);
+        break;
+      } catch (e) {
+        if (!(e instanceof RoomError)) throw e;
+      }
+    }
+  }
+  // Round 1's raid: every dragon is an egg, so no one could raid: no scene for it.
+  const r1 = g.log.filter((e) => e.round === 1 && !e.to);
+  assert.ok(r1.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'unable'));
+  assert.deepEqual(scenesOf(r1, () => false).map((s) => s.kind), ['roll'], 'only the opening roll');
+  // Round 2 has begun, and its roll is on the TV: the phones wait for it.
+  const left = room.snapshot(seats[0].token).scene;
+  assert.ok(left > 0 && left < 4000, `the roll takes ${left} ms`);
+  const t0 = Date.now();
+  const p = waitingOn(g)[0];
+  const r = await room.wait(seats[p].token, 10000);
+  assert.equal(r.code, 0);
+  assert.ok(Date.now() - t0 >= left - 50, 'wait returns only once the scene is over');
+  assert.equal(room.snapshot(seats[p].token).scene, 0);
+  tvGone();
   room.close();
 });
 

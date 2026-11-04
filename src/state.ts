@@ -361,5 +361,6 @@ export interface Snapshot {
   lobby: Lobby;
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
+  scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
   you: (SeatState & { name: string }) | null;
 }
