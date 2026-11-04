@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { botStep } from '../src/bot.ts';
+import { apply, newGame, score, type Game } from '../src/engine.ts';
+import { batchMarkdown, batchStats, compareMarkdown, gameStats } from '../src/playtest/stats.ts';
+
+const seats = (n: number) => ({ seats: Array.from({ length: n }, (_, i) => ({ model: i ? 'haiku' : 'opus' })) });
+const events = (g: Game, k: string) => g.log.filter((e) => e.ev?.k === k).map((e) => e.ev as Record<string, unknown>);
+
+test('points rebuilt from the log equal score() at any point in a game, and the counts match the log', () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const players = 2 + (seed % 4);
+    const g = newGame(players, seed);
+    apply(g, 0, 'say anyone want timber?');
+    apply(g, 1, 'tell P1 maybe');
+    const rng = { state: seed * 7 };
+    const stop = seed % 3 ? Infinity : 150 + seed * 40; // some games cut off mid-round
+    for (let i = 0; g.phase !== 'over' && i < Math.min(stop, 20000); i++) botStep(g, rng);
+    const s = gameStats(g, seats(players), `seed ${seed}`);
+    assert.deepEqual(s.check, [], `seed ${seed}`);
+    assert.equal(s.points.length, g.round);
+    g.players.forEach((_, p) => {
+      const want = score(g, p);
+      const got = s.points.at(-1)![p];
+      assert.deepEqual([got.dragons, got.buildings, got.titles, got.beasts, got.public], [want.dragons, want.buildings, want.titles, want.beasts, want.public], `seed ${seed} P${p + 1}`);
+    });
+    const total = (c: Record<string, number[]>) => Object.values(c).flat().reduce((a, b) => a + b, 0);
+    assert.equal(total(s.built), events(g, 'build').length + events(g, 'floor').length);
+    assert.equal(total(s.upgraded), events(g, 'upgrade').length);
+    assert.equal(total(s.played), events(g, 'play').length);
+    assert.equal(total(s.hatched), events(g, 'hatch').length);
+    assert.equal(s.bank.trades.reduce((a, b) => a + b, 0), events(g, 'bank').length);
+    assert.equal(s.trades.accepted.reduce((a, b) => a + b, 0), 2 * events(g, 'trade').length);
+    assert.deepEqual([s.talk.said[0], s.talk.told[1]], [1, 1]);
+    assert.equal(s.talk.words[0], 3);
+    assert.equal(s.titles.length, events(g, 'title').length);
+  }
+});
+
+test('a batch reads its finished games, flags what is never used, and compares with another', () => {
+  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
+  try {
+    for (let i = 1; i <= 3; i++) {
+      const g = newGame(3, i);
+      for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: i } as never);
+      mkdirSync(join(dir, `g${i}`));
+      writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
+      writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status: i === 3 ? 'stalled' : 'over', ...seats(3) }));
+    }
+    const b = batchStats(dir);
+    assert.deepEqual(b.games.map((s) => s.game), ['g1', 'g2']);
+    const md = batchMarkdown(b);
+    assert.match(md, /match its saved end/);
+    const rows = md.split('\n').filter((l) => /^\| [A-Z][^|]* \| \d+ \| \d+ \| \d+ \|/.test(l));
+    assert.ok(rows.length > 40);
+    for (const l of rows) {
+      const [uses, games] = l.split('|').slice(2, 4).map(Number);
+      // Elements are counted but never flagged.
+      if (!/^\| (fire|ice|lightning|air|water) /.test(l)) assert.equal(/\*\*(never|always)\*\*/.exec(l)?.[1], uses === 0 ? 'never' : games === 2 ? 'always' : undefined, l);
+    }
+    assert.match(md, /### g2: \d+ rounds/);
+    assert.match(compareMarkdown({ dir: 'A', games: b.games }, { dir: 'B', games: b.games.slice(1) }), /\| rounds \| [\d.]+ \| [\d.]+ \|/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
