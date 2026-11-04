@@ -247,8 +247,10 @@ function render() {
   const g = snap!.game!;
   const me = snap!.you!;
   let body = '';
+  // Choosing a hex or the dragons to send is a choice of its own: the hand steps aside for it.
+  const choosing = !!picking || !!(hunting && g.phase === 'action' && me.myTurn);
   if (picking) body = hexPicker(g);
-  else if (hunting && g.phase === 'action' && me.myTurn) body = huntView(g, me);
+  else if (choosing) body = huntView(g, me);
   else if (g.phase === 'over') body = gameOver(g, me);
   else if (g.phase === 'discard') body = me.deciding ? discardView(me) : '';
   else if (g.phase === 'raid') body = raidView(g, me);
@@ -258,7 +260,7 @@ function render() {
   const open = !picking && g.phase !== 'discard' ? me.hand.find((c) => c.id === openCard) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action') : '';
   // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
-  const dock = !picking && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
+  const dock = !choosing && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
@@ -270,11 +272,15 @@ function render() {
 
 // The hand grows into the free screen below the buttons, so a turn with nothing
 // open isn't a few buttons up top, the cards at the bottom and nothing between.
-// It never shrinks below its usual size (an open panel scrolls above it instead),
-// and a card never gets wider than about two fifths of the screen.
+// It never shrinks below its usual size, and a card never gets wider than about
+// two fifths of the screen. When the page is too long for the hand to fit below
+// it (an open panel, a long choice, a short screen), the hand stops being held
+// along the bottom edge and sits after the page instead, so it never covers
+// what's above it: scroll down to it.
 function fitHand() {
   const fan = app.querySelector<HTMLElement>('.handfan:not(.empty)');
   const main = app.querySelector<HTMLElement>('.pbody');
+  document.body.classList.remove('hand-below');
   if (!fan || !main) return document.body.style.removeProperty('--hs');
   const em = parseFloat(getComputedStyle(document.body).fontSize);
   const width = Math.min(innerWidth, 34 * em);
@@ -284,6 +290,7 @@ function fitHand() {
   const byWidth = (0.42 * width) / (6.6 * 0.78 * em);
   const hs = Math.max(1, Math.min(byHeight, byWidth));
   document.body.style.setProperty('--hs', hs.toFixed(3));
+  document.body.classList.toggle('hand-below', byHeight < 1);
 }
 function refit() {
   if (!snap?.game || !snap.you) return;
