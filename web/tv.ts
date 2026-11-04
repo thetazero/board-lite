@@ -227,7 +227,7 @@ function renderGame(g: PublicState) {
           <span class="pname">${esc(names[i])}${seatTag(seat)}</span>
           ${titles}
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
-          <span class="pts">${icon('points', 1.3)}<b>${p.publicPoints}</b></span>
+          <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>

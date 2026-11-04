@@ -9,7 +9,7 @@ The game should read like a well-edited board game: the box's rulebook, the card
 1. **Talk to the player as "you", in the present tense, in the active voice.** "You draw 1 action card." "Ada builds a Quarry." Not "A card is drawn", not "Ada built a Quarry". Other players are named, or "each other player" or "everyone". A player whose pronoun is needed is "they".
 2. **Tell people what to do with imperatives.** Card text and buttons are commands: "Gain 2 gold.", "Place a Wolf Pack on…", "Build", "Choose a hex for the Quarry." Don't ask the player a question to tell them what to do ("Send the Cave Bear where?", "Who's going?"), and don't say "you should" or "you can now".
 3. **Same thing, same words.** One name for each thing, used everywhere: a card's verb is its button's verb and its log line's verb; a rules step's name is its heading on the TV and the phone. A different word means a different thing.
-4. **Numbers as numerals.** "Gain 2 gold", "1 extra step", "First to 15 points wins". Not "two gold", not "one more raid". (A sentence doesn't start with a numeral, and "one of your dragons" is a pronoun, not a count.)
+4. **Numbers as numerals.** "Gain 2 gold", "1 extra step", "First to 20 points wins". Not "two gold", not "one more raid". (A sentence doesn't start with a numeral, and "one of your dragons" is a pronoun, not a count.)
 5. **Plain and short.** Cut words until the meaning would change. No "it" or "they" whose thing isn't on the same line. An exclamation mark only for the game's end ("Ada wins!").
 
 ## Kinds of text
