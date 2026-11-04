@@ -6,9 +6,10 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { qrSvg } from './qr.ts';
+import { morph } from './morph.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -255,15 +256,16 @@ function offerNotice(text: string) {
   const n = document.createElement('button');
   n.className = 'toast news';
   n.innerHTML = `${named(text, names, snap?.game?.dragons)} <small>Tap to close</small>`;
-  n.onclick = () => n.remove();
+  n.onclick = () => fadeAway(n);
   box.append(n);
-  while (box.children.length > 3) box.firstElementChild!.remove();
+  const up = [...box.children].filter((x) => !x.classList.contains('gone'));
+  for (const old of up.slice(0, -3)) fadeAway(old as HTMLElement);
   if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
 }
 
 function renderWatch(me: Me) {
   document.body.classList.remove('has-hand', 'raiding', 'hand-below');
-  app.innerHTML = `<div class="watchtv" style="--pc:${PLAYER_COLORS[me.seat]}"><span class="pname">${esc(me.name)}</span><h1>${snap?.lobby.remote ? 'Watch the table' : 'Watch the TV'}</h1></div>`;
+  morph(app, screen('watch', `<div class="watchtv" style="--pc:${PLAYER_COLORS[me.seat]}"><span class="pname">${esc(me.name)}</span><h1>${snap?.lobby.remote ? 'Watch the table' : 'Watch the TV'}</h1></div>`));
 }
 
 function noteDeals(ids: string[]) {
@@ -306,7 +308,7 @@ function renderLobby() {
   const first = me === 0;
   const pc = PLAYER_COLORS[me] ?? '#888';
   // Your tower in your colour stands at the front: that's your colour for the game.
-  app.innerHTML = `
+  morph(app, screen('lobby', `
     <div class="plobby" style="--pc:${pc}">
       <div class="hero">${tableScene([pc])}</div>
       <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
@@ -317,7 +319,7 @@ function renderLobby() {
         <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>`
       : `<p class="hint">${l.remote ? 'The first player starts the game.' : 'The first player or the TV starts the game.'}</p>`}
       <button id="leave" class="ghost">Leave</button>
-    </div>`;
+    </div>`));
   if (first) {
     on('bot', () => post(`/api/rooms/${code}/bot`, { token }));
     on('start', () => post(`/api/rooms/${code}/start`, { token }));
@@ -465,7 +467,7 @@ function header(g: PublicState, me: Me): string {
   const hidden = me.hiddenPoints ? `<small class="hiddenpts" title="Secret Hoard cards in your hand, counted in the total">${me.hiddenPoints}${icon('points', 0.9)} in hand</small>` : '';
   // Name, points and resources stay on screen together while the page scrolls.
   return `
-    <div class="mehead" style="--pc:${PLAYER_COLORS[me.seat]}">
+    <div class="mehead" data-key="head" data-leave="up" style="--pc:${PLAYER_COLORS[me.seat]}">
       <header class="me">
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
@@ -544,10 +546,20 @@ function render() {
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
-  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}${menu ? menuSheet() : ''}`;
+  const key = picking ? `pick ${picking.title}` : choosing ? 'hunt' : g.phase === 'over' ? 'over'
+    : g.phase === 'raid' ? `raid ${g.round} ${g.raidsLeft} ${g.raid?.step}` : g.phase === 'action' ? `action ${me.myTurn}` : `${g.phase} ${me.deciding} ${me.choice.length > 0}`;
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
+}
+
+// What the phone is asking or showing, as one screen: a new one (your turn,
+// the raid's next step, the card to keep, Watch the TV) rises in while the
+// last one fades away above it (morph.ts, style.css), and everything that
+// stays on it (an open card, the hand) updates in place, with no cut.
+function screen(key: string, html: string): string {
+  return `<div class="screen" data-key="screen ${esc(key)}" data-leave="up">${html}</div>`;
 }
 
 // The hand grows into the free screen below the buttons, so a turn with nothing
@@ -557,9 +569,13 @@ function render() {
 // it (an open panel, a long choice, a short screen), the hand stops being held
 // along the bottom edge and sits after the page instead, so it never covers
 // what's above it: scroll down to it.
+let lastFan: HTMLElement | null = null;
 function fitHand() {
   const fan = app.querySelector<HTMLElement>('.handfan:not(.empty)');
   const main = app.querySelector<HTMLElement>('.pbody');
+  const was = document.body.classList.contains('hand-below');
+  const from = fan && fan === lastFan ? fan.getBoundingClientRect() : null;
+  lastFan = fan;
   document.body.classList.remove('hand-below');
   if (!fan || !main) return document.body.style.removeProperty('--hs');
   const em = parseFloat(getComputedStyle(document.body).fontSize);
@@ -571,6 +587,11 @@ function fitHand() {
   const hs = Math.max(1, Math.min(byHeight, byWidth));
   document.body.style.setProperty('--hs', hs.toFixed(3));
   document.body.classList.toggle('hand-below', byHeight < 1);
+  // Moving between the bottom edge and the end of the page, the hand slides there.
+  if (from && was !== byHeight < 1 && getComputedStyle(fan).animationName !== 'none') {
+    const to = fan.getBoundingClientRect();
+    fan.animate([{ translate: `${from.left - to.left}px ${from.top - to.top}px` }, { translate: '0 0' }], { duration: 350, easing: 'ease-out' });
+  }
 }
 function refit() {
   if (!snap?.game || !snap.you) return;
@@ -679,8 +700,8 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
   else if (c.needs === 'hex') actions = `<button class="primary big" data-pickhex="${c.id}">${c.kind === 'upgrade' ? 'Upgrade' : c.fauna ? 'Place' : c.kind === 'action' ? 'Play' : 'Build'}</button>`;
   else if (c.kind === 'building') actions = `<button class="primary big" data-build="${c.id}">Build</button>`;
   else actions = `<button class="primary big" data-play="${c.id}">${c.kind === 'dragon' ? 'Hatch' : 'Play'}</button>`;
-  return `<div class="zoom" id="zoom">
-    <div class="card big k-${c.kind}" style="--kc:${frameColor(c.kind, c.element)}">
+  return `<div class="zoom" id="zoom" data-leave="fade">
+    <div class="card big k-${c.kind}" data-key="big ${c.id}" style="--kc:${frameColor(c.kind, c.element)}">
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
       <b class="cname">${esc(c.name)}</b>
       <div class="ccost"><span>${costChips(c.cost, me)}</span><small>${KIND_LABEL[c.kind]}</small></div>
@@ -700,8 +721,8 @@ function dragonZoom(g: PublicState, d: DragonView): string {
   const grow = d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const resting = d.resting || (d.backIn !== null && !d.canRaid) ? ` ${dragonState(d, g.round)}` : ''; // why it sits out, as the roost says
   const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${statTag('Health', `${d.hp}/${d.maxHp}`)}` : ''}${resting}`;
-  return `<div class="zoom" id="zoom">
-    <div class="card big k-dragon" style="--kc:${frameColor('dragon', d.element)}">
+  return `<div class="zoom" id="zoom" data-leave="fade">
+    <div class="card big k-dragon" data-key="big ${d.id}" style="--kc:${frameColor('dragon', d.element)}">
       <div class="cart">${cardArt('dragon', d.key, d.element)}<span class="ckind">${elemIcon(d.element, 1)}</span></div>
       <b class="cname">${esc(dragonName(d, g.dragons))}</b>
       <div class="ccost"><span class="dnow">${now}</span><small>${KIND_LABEL.dragon}</small></div>
@@ -715,7 +736,7 @@ function dragonZoom(g: PublicState, d: DragonView): string {
 // overlapping when there are many. On your turn the cards you can play now glow.
 function handFan(me: Me, playable: boolean, discarding: boolean, offering = false): string {
   const n = me.hand.length;
-  if (!n) return '<div class="handfan empty"></div>';
+  if (!n) return '<div class="handfan empty" id="hand"></div>';
   const mid = (n - 1) / 2;
   const tilt = Math.min(6, 36 / n); // degrees between neighbours
   const cards = me.hand.map((c, i) => {
@@ -725,7 +746,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean, offering = fals
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
     return cardFace(c, me, playable, `${pos}${gripStyle(c.id)}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}${gripClass(c.id)}`);
   }).join('');
-  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" style="--n:${n}">${cards}</div>`;
+  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" id="hand" data-leave="down" style="--n:${n}">${cards}</div>`;
 }
 
 function dragonLabel(id: string): string {
@@ -1369,7 +1390,7 @@ function toast(e: unknown) {
   // The engine names players P1, P2...; the toast names them as every other screen does.
   t.innerHTML = named(e instanceof Error ? e.message : String(e), names);
   document.body.append(t);
-  setTimeout(() => t.remove(), 3500);
+  setTimeout(() => fadeAway(t), 3500);
 }
 
 boot().catch(toast);
