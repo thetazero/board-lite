@@ -44,6 +44,7 @@ export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
+  remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
 }
 
 export class Room {
@@ -384,6 +385,7 @@ export class Room {
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       file: this.file,
+      remote: !!this.opts.remote,
     };
   }
 

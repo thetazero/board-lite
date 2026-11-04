@@ -15,7 +15,7 @@
 //
 // See docs/playtest.md and docs/play-vs-claude.md.
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -220,8 +220,14 @@ function seatLabel(q: number): string {
   return t?.kind === 'bot' ? 'bot' : `${t?.kind === 'open' ? 'open' : 'player'}: ${t?.name ?? '?'}`;
 }
 
+// The code the game ran on, so its stats can be counted under the same rules
+// later (src/playtest/stats.ts); "-dirty" if it had uncommitted changes.
+const commit = (() => {
+  try { return execFileSync('git', ['describe', '--always', '--dirty'], { cwd: fileURLToPath(new URL('.', import.meta.url)), encoding: 'utf8' }).trim(); } catch { return undefined; }
+})();
+
 function writeResults(g: Game | null, status: string, started: number) {
-  const base = { status, ...(hosted ? { seed } : { room: roomUrl }), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
+  const base = { status, ...(commit ? { commit } : {}), ...(hosted ? { seed } : { room: roomUrl }), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
   if (!g) {
     writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.model, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })) }, null, 2)}\n`);
     return { ...base, rounds: 0, winner: null };

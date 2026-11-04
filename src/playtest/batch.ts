@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs a batch of playtest games, the same models rotated one seat per game so
 // each model sits in every seat equally often, then writes the batch's win
-// rates to summary.md. See "Depth batches" in docs/playtest.md.
+// rates and stats to summary.md. See "Depth batches" in docs/playtest.md.
 //
 //   node src/playtest/batch.ts --games 30 --models opus,haiku,haiku [--out DIR] [run.ts options]
 //   node src/playtest/batch.ts --summary DIR
@@ -12,6 +12,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultPool } from './slots.ts';
+import { batchMarkdown, loadBatch } from './stats.ts';
 import { summary } from './tally.ts';
 
 const USAGE = `node src/playtest/batch.ts --games N --models <m1,m2,...> [--out DIR] [options]
@@ -30,8 +31,9 @@ const args = process.argv.slice(2);
 const opt = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 if (args.includes('--help')) { console.log(USAGE); process.exit(0); }
 
+// Win rates, then what happened in every game (src/playtest/stats.ts).
 function writeSummary(dir: string) {
-  const text = summary(dir);
+  const text = `${summary(dir)}\n${batchMarkdown(loadBatch(dir))}`;
   writeFileSync(join(dir, 'summary.md'), text);
   console.log(text);
 }

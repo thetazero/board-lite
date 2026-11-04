@@ -355,6 +355,7 @@ export interface Lobby {
   minPlayers: number;
   maxPlayers: number;
   file: string; // where the server saves the game
+  remote: boolean; // no TV: a phone made the room, and each phone shows the table itself
 }
 
 export interface Snapshot {

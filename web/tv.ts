@@ -1,5 +1,8 @@
 // The TV: the shared board. Shows everything public, never anyone's hand.
 // Lobby -> board, with overlays for production dice, the raid and the end.
+// With ?remote, it's the table view inside a phone of a game with no TV
+// (phone.ts): the flat map, laid out for a phone, and it tells the phone when
+// a cutscene (a banner) starts and ends, so the phone can cut to it.
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
@@ -7,7 +10,7 @@ import {
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
 } from './common.ts';
 import { ART_DEFS, glyph, tableScene, towerToken, winnerScene } from './art.ts';
-import { Board3D } from './board3d.ts';
+import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
 import { FIGHT_LEAD_MS, ROLL_SPIN_MS, ROLL_STAGGER_MS, hitStep, scenesOf, type Scene } from './scenes.ts';
 
@@ -24,10 +27,19 @@ let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tails
 let seenLog = -1; // highest log index already animated
 // The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
 let board3d: Board3D | null | undefined;
+let Board3DClass: typeof Board3D | null = null; // loaded only on a real TV: three.js is the heaviest thing on the page
+const remote = new URLSearchParams(location.search).has('remote');
 
 async function boot() {
   const params = new URLSearchParams(location.search);
   code = (params.get('room') ?? '').toUpperCase();
+  if (remote) {
+    // Inside a phone: watch the room, never make one.
+    document.body.classList.add('remote');
+    board3d = null;
+    return watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
+  }
+  Board3DClass = (await import('./board3d.ts')).Board3D;
   hostToken = localStorage.getItem(`tv:${code}`) ?? '';
   if (code) {
     const ok = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => r.ok).catch(() => false);
@@ -51,6 +63,7 @@ function onSnapshot(s: Snapshot) {
   names = s.lobby.seats.map((x) => x.name);
   if (!s.game) {
     $('overlay').className = 'overlay hidden';
+    if (remote) return void (app.innerHTML = '');
     return renderLobby();
   }
   const log = s.game.log;
@@ -222,7 +235,7 @@ function renderGame(g: PublicState) {
   const feed = [...g.log.map((e) => ({ i: e.i, html: eventHtml(e, g, names), said: false })), ...g.talk.map((e) => ({ i: e.i, html: talkLine(e.text, g), said: true }))]
     .filter((x) => x.html).sort((a, b) => a.i - b.i).slice(-5)
     .map((x) => `<li${x.said ? ' class="said"' : ''}>${x.html}</li>`).join('');
-  if (board3d === undefined) board3d = Board3D.supported() ? new Board3D() : null;
+  if (board3d === undefined) board3d = Board3DClass?.supported() ? new Board3DClass() : null;
   const highlight = g.phase === 'action' ? g.turn : null;
   // The flat map needs a legend; the 3D board shows what things are.
   const flat = () => {
@@ -244,7 +257,7 @@ function renderGame(g: PublicState) {
         <span class="round">Round ${bannerTop?.round ?? g.round}</span>
         <span class="phase">${phaseLabel(g)}</span>
         <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
-        <span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>
+        ${remote ? '' : `<span class="roomcode">Join: <b>${esc(joinUrl())}</b>${tailscaleUrl() ? ` <small>· Tailscale <b>${esc(tailscaleUrl()!)}</b></small>` : ''}</span>`}
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul>
@@ -267,6 +280,7 @@ function renderGame(g: PublicState) {
 // down until both columns fit, together, so every card is the same size:
 // many dragons in a big game take more room.
 function fitSide() {
+  if (remote) return; // a phone's table view scrolls instead
   const sides = [...app.querySelectorAll<HTMLElement>('.side')];
   if (!sides.length) return;
   let px = parseFloat(getComputedStyle(sides[0]).fontSize);
@@ -508,8 +522,8 @@ function updateOverlay(g: PublicState) {
     el.innerHTML = `<div class="endbox" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
       <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
       ${standingsHtml(g, names)}
-      <button class="primary" id="again">New game</button></div>`;
-    $('again').onclick = () => (location.href = '/tv');
+      ${remote ? '' : '<button class="primary" id="again">New game</button>'}</div>`;
+    if (!remote) $('again').onclick = () => (location.href = '/tv');
     return;
   }
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
@@ -521,6 +535,7 @@ function showBanner(b: Banner) {
   const el = $('overlay');
   bannerUp = true;
   bannerTop = b.top ?? null;
+  cut(true);
   el.className = 'overlay banner';
   el.innerHTML = b.html;
   b.play?.(el);
@@ -530,8 +545,16 @@ function showBanner(b: Banner) {
     bannerTop = null;
     if (!snap?.game) return;
     updateOverlay(snap.game);
-    if (!bannerUp) renderGame(snap.game); // the scenes are over: the board catches up
+    if (!bannerUp) {
+      renderGame(snap.game); // the scenes are over: the board catches up
+      cut(false);
+    }
   }, b.ms);
+}
+
+// In a phone (remote mode): a cutscene starts or ends.
+function cut(on: boolean) {
+  if (remote && parent !== window) parent.postMessage({ boardLite: 'cut', on }, location.origin);
 }
 
 // News for the table, not an error: shown longer, without the error's red edge.

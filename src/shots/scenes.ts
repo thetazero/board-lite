@@ -38,6 +38,7 @@ export interface Shot {
   sizes?: boolean; // also shot at every other screen size of its client (shots.ts SIZES); --every-size does this for all
   frames?: number[]; // TV: one shot per time on the 3D board's clock (seconds; the page opens at 0)
   flight?: boolean; // and the frames are fractions (0 to 1) of the way through the first dragon flight instead
+  table?: boolean; // TV: the table view a phone shows in a game with no TV (/tv?remote), on a phone's screen
 }
 
 export interface Scene {
@@ -49,6 +50,7 @@ export interface Scene {
   bots?: number[]; // in a game: seats the server plays (they never move while staged)
   away?: number[]; // seats whose player has gone quiet (shown "(away)")
   resume?: boolean; // a saved game hosted again: every seat open until a phone claims it
+  remote?: boolean; // a game with no TV: made from a phone, each phone shows the table
   until?: (g: Game) => boolean; // play bot moves until this holds
   setup?: (g: Game) => void; // scripted commands once it holds
   live?: (g: Game) => boolean; // for live shots: bot moves after the TV is open, until this holds
@@ -905,6 +907,126 @@ export const SCENES: Scene[] = [
       { file: 'phone-join-seats-3p', caption: "Phone: the room's address mid-game: tap your name to take your seat back", client: 'phone', waitFor: '.seats', sizes: true },
       { file: 'phone-seat-back-3p', caption: 'Phone: a seat taken back (by tapping its name)', client: 'phone', clicks: ['[data-seat]'], waitFor: '.mehead' },
       { file: 'tv-back-3p', caption: 'TV: a player a bot was playing for is back', client: 'tv', then: (room) => { room.join('Bram'); } },
+    ],
+  },
+  // ---------- a game with no TV (remote mode) ----------
+  {
+    name: 'remote-lobby',
+    players: 2,
+    seed: 1,
+    lobby: { bots: 1 },
+    remote: true,
+    shots: () => [
+      { file: 'phone-remote-lobby-host', caption: 'No TV: the lobby on the phone that made the game, with the code to join by', client: 'phone', seat: 0, sizes: true },
+    ],
+  },
+  {
+    name: 'remote-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 2 && g.phase === 'action' && canPlaceCard(g, g.turn),
+    shots: (g) => [
+      { file: 'phone-remote-you-3p', caption: 'No TV: your own view, with the You / Table switch by the talk bar', client: 'phone', seat: g!.turn, sizes: true },
+      { file: 'phone-remote-table-3p', caption: 'No TV: the table view, switched to', client: 'phone', seat: g!.turn, clicks: ['.viewswitch [data-view=table]'], waitFor: '.table-on', waitMs: 600, sizes: true },
+      { file: 'tv-remote-table-3p', caption: 'No TV: the table view on its own (the whole page, scrolled)', client: 'tv', table: true, sizes: true },
+      { file: 'phone-remote-talk-3p', caption: 'No TV: the talk sheet open over the table view', client: 'phone', seat: g!.turn, clicks: ['.viewswitch [data-view=table]', '.talkbar .latest'], waitMs: 600 },
+    ],
+  },
+  {
+    name: 'remote-late-6p',
+    players: 6,
+    seed: 1,
+    remote: true,
+    until: (g) => g.phase === 'action' && best(g) >= 11 && g.dragons.length >= 8,
+    shots: () => [{ file: 'tv-remote-table-late-6p', caption: 'No TV: the table view late in a 6-player game', client: 'tv', table: true, sizes: true }],
+  },
+  {
+    name: 'remote-vote-5p',
+    players: 5,
+    seed: 1,
+    remote: true,
+    until: (g) => step(g) === 'vote' && g.round >= 3,
+    shots: (g) => [
+      { file: 'phone-remote-vote-5p', caption: 'No TV: your vote, on your own view', client: 'phone', seat: waitingOn(g!)[0] },
+      { file: 'tv-remote-vote-5p', caption: 'No TV: the vote on the table view', client: 'tv', table: true, sizes: true },
+    ],
+  },
+  {
+    name: 'remote-commit-4p',
+    players: 4,
+    seed: 1,
+    remote: true,
+    until: (g) => step(g) === 'commit' && g.round >= 3 && committed(g) >= 1,
+    shots: () => [{ file: 'tv-remote-commit-4p', caption: 'No TV: commitments on the table view', client: 'tv', table: true, sizes: true }],
+  },
+  {
+    name: 'remote-production-4p',
+    players: 4,
+    seed: 1,
+    remote: true,
+    until: (g) => g.phase === 'discard',
+    live: (g) => g.phase === 'action',
+    shots: (g) => [{ file: 'phone-remote-production-4p', caption: "No TV: the round's production rolls cut in on the phone", client: 'phone', seat: 0, live: true, waitFor: '.table-on', waitMs: 1800 }],
+  },
+  {
+    name: 'remote-production-done-6p',
+    players: 6,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round >= 4 && g.phase === 'discard',
+    live: (g) => g.phase === 'action',
+    shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
+  },
+  {
+    name: 'remote-fight-3p',
+    players: 3,
+    seed: 3,
+    remote: true,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
+    live: (g) => g.raid === null || g.raid.step === 'vote',
+    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    shots: () => [{ file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 }],
+  },
+  {
+    name: 'remote-fight-end-3p',
+    players: 3,
+    seed: 3,
+    remote: true,
+    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
+    live: (g) => g.raid === null || g.raid.step === 'vote',
+    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    shots: () => [{ file: 'tv-remote-fight-end-3p', caption: "No TV: a raid's fight at its end, on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
+  },
+  {
+    name: 'remote-beast-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => beastHunters(g),
+    shots: (g) => [
+      { file: 'phone-remote-beast-3p', caption: 'No TV: a fight against the Thunderbird cuts in on another player\'s phone', client: 'phone', seat: (g!.turn + 1) % 3, waitFor: '.table-on', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
+    ],
+  },
+  {
+    name: 'remote-beast-end-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round >= 3 && g.phase === 'action',
+    setup: (g) => beastHunters(g),
+    shots: () => [{ file: 'tv-remote-beast-end-3p', caption: 'No TV: the Thunderbird slain, on the table view', client: 'tv', table: true, waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
+  },
+  {
+    name: 'remote-over-4p',
+    players: 4,
+    seed: 1,
+    remote: true,
+    until: (g) => g.phase === 'over',
+    shots: (g) => [
+      { file: 'phone-remote-over-4p', caption: 'No TV: the end, on your own view', client: 'phone', seat: g!.winner! },
+      { file: 'tv-remote-over-4p', caption: 'No TV: the final scores on the table view', client: 'tv', table: true, sizes: true },
     ],
   },
 ];
