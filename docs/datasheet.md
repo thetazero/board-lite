@@ -50,8 +50,8 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Healing Potion | action card | 3 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
 | War Horn | action card | 3 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | 4 | nothing | Worth 1 point while in your hand. | 1 |
-| Wolf Call | action card | 2 | 1 crystal, 2 gold | Place a Wolf Pack on any land hex with no tower or beast. | — |
-| Rouse the Bear | action card | 1 | 2 crystal, 3 gold | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Wolf Call | action card | 2 | 3 crystal | Place a Wolf Pack on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | 1 | 5 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | 1 | 3 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Ice Dragon | base dragon | 1 | 3 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Lightning Dragon | base dragon | 1 | 3 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
@@ -161,7 +161,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points (at least 10) and most tower floors (at least 4). Tower floors are worth nothing else.
+Titles: 2 points each, for most dragon points (at least 6) and most tower floors (at least 3). Tower floors are worth nothing else.
 
 ## Dragons
 
@@ -277,8 +277,8 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 | Card | Sends | Cost | Copies |
 |---|---|---|---|
-| Wolf Call | Wolf Pack | 1 crystal, 2 gold | 2 |
-| Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 1 |
+| Wolf Call | Wolf Pack | 3 crystal | 2 |
+| Rouse the Bear | Cave Bear | 5 crystal | 1 |
 
 ## Great beasts
 
@@ -311,9 +311,9 @@ How much of each resource every card in both decks costs in total (each card cou
 |---|---|---|---|
 | stone | 113 | 22% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
 | timber | 98 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 124 | 24% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| crystal | 131 | 26% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
 | livestock | 63 | 12% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 110 | 22% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| gold | 103 | 20% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
@@ -357,12 +357,12 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 41. Last column: 
 
 30 games per player count between the random bot (`src/bot.ts`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-Army held and Tower held: share of games that end with someone holding each title (it needs 10 dragon points or 4 tower floors).
+Army held and Tower held: share of games that end with someone holding each title (it needs 6 dragon points or 3 tower floors).
 
 The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|
-| 2 | 17 | 26 | 35 | 0 | 100% | 73% | 50%, median round 23 | 50%, median round 25 |
-| 3 | 18 | 27 | 35 | 0 | 100% | 100% | 57%, median round 25 | 57%, median round 23 |
-| 4 | 18 | 24 | 31 | 0 | 100% | 100% | 67%, median round 23 | 70%, median round 22 |
+| 2 | 17 | 28 | 37 | 0 | 100% | 90% | 40%, median round 29 | 43%, median round 25 |
+| 3 | 17 | 25 | 43 | 0 | 100% | 97% | 53%, median round 22 | 50%, median round 24 |
+| 4 | 17 | 25 | 32 | 0 | 100% | 100% | 60%, median round 21 | 77%, median round 22 |

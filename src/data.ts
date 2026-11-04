@@ -33,8 +33,9 @@ export const TUNING = {
   livestockPerDragon: 1,
   dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
   titlePoints: 2,
-  // A title needs at least this much: dragon points, tower floors.
-  titleMinimum: { army: 10, tower: 4 },
+  // A title needs at least this much: dragon points, tower floors. Set at
+  // mid-game values, so titles are held and taken during the game (#100).
+  titleMinimum: { army: 6, tower: 3 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,
@@ -166,9 +167,10 @@ export const ACTIONS: Record<string, ActionDef> = {
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 3 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
-  // catan, you just don't want to over do it").
-  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 1, gold: 2 }, text: 'Place a Wolf Pack on any land hex with no tower or beast.', copies: 2 },
-  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 2, gold: 3 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 1 },
+  // catan, you just don't want to over do it"). Dear in crystal, not gold:
+  // gold is what points are bought with, so no one paid it (#100).
+  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 3 }, text: 'Place a Wolf Pack on any land hex with no tower or beast.', copies: 2 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 5 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 1 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';

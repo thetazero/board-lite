@@ -67,7 +67,7 @@ function mapText(g: Game): string[] {
   const lines: string[] = [];
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, L ley line, G meadow, . plains, H harbor, ~ ocean (no buildings).');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${Object.entries(BUILDING_CODE).map(([k, c]) => `${c} ${k === 'tower' ? 'tower' : BUILDINGS[k].name}`).join(', ')}.`);
-  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing and scores nothing): ${Object.entries(FAUNA_CODE).map(([k, c]) => `${c} ${faunaDef(k).name}${BEASTS[k] ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   for (let r = -R; r <= R; r++) {
     const cells: string[] = [];
     for (let q = -R; q <= R; q++) {

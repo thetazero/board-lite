@@ -371,6 +371,9 @@ test('building cards count their neighbours, whoever owns them', () => {
   const free = neighbors(next).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
   g.buildings[free] = { type: 'monument', owner: 1, upgrade: null, floors: 0 }; // P2's
   assert.equal(buildingPoints(g, next), touching + 1);
+  // A beast on the monument shuts it down: it scores nothing until cleared.
+  g.map[next].fauna = 'wolf_pack';
+  assert.equal(buildingPoints(g, next), 0);
 });
 
 test('a fight replays from its events: the hits add up to the result', () => {
@@ -636,10 +639,10 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
   assert.throws(() => apply(g, 1, `play c999 ${g.towers[0]}`), RuleError);
   const ocean = Object.keys(g.map).find((k) => g.map[k].terrain === 'ocean')!;
   assert.throws(() => apply(g, 1, `play c999 ${ocean}`), RuleError);
-  const gold = g.players[1].resources.gold;
+  const crystal = g.players[1].resources.crystal;
   apply(g, 1, `play c999 ${near}`);
   assert.equal(g.map[near].fauna, 'wolf_pack');
-  assert.equal(g.players[1].resources.gold, gold - ACTIONS.wolf_call.cost.gold!);
+  assert.equal(g.players[1].resources.crystal, crystal - ACTIONS.wolf_call.cost.crystal!);
   assert.equal(production(g, 0).livestock.dice.length, 0);
   assert.ok(!g.players[1].hand.includes(card));
 });

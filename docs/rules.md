@@ -30,7 +30,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
-**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call, Rouse the Bear), which place a beast on any land hex with no tower or beast: next to someone, or on their building.
+**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing and scores nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call, Rouse the Bear), which place a beast on any land hex with no tower or beast: next to someone, or on their building.
 
 **Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **2 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and shrugs off lightning, air and water; the Leviathan is weak to lightning and shrugs off water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
@@ -39,10 +39,10 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 ## Points
 
 - Dragons: hatchling 1, young 2, adult 3. Eggs 0.
-- Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts. No other building is worth points: not production buildings, not the tower, not its floors.
+- Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts, and nothing while a beast is on it. No other building is worth points: not production buildings, not the tower, not its floors.
 - Secret Hoard cards: 1 each while in hand (hidden until the end).
 - Great beasts: 2 each to whoever slays it, for good.
-- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 10) and Tallest Tower (most floors, at least 4). Tower floors (3 stone and 2 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Titles, 2 each: Strongest Dragon Army (most dragon points, at least 6) and Tallest Tower (most floors, at least 3). Tower floors (3 stone and 2 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 

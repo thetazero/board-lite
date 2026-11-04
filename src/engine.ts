@@ -323,7 +323,7 @@ export function madeResource(def: BuildingDef): Resource | null {
 // are worth any; the tower and its floors are not.
 export function buildingPoints(g: Game, k: string): number {
   const b = g.buildings[k];
-  if (b.type === 'tower') return 0;
+  if (b.type === 'tower' || g.map[k]?.fauna) return 0; // a building under fauna scores nothing
   return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]);
 }
 

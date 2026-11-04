@@ -46,7 +46,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 Playtests showed that refusing to trade and taking land first were the only ways to slow a leader, and they weren't enough. The owner (2026-11-03): "you're right that only positive sum trading + a bit of land contention is insufficient". Of three options (one robber-like piece, "take that" cards, secret split-or-grab raid loot), the owner chose many nuisance pieces: "nusience pieces, and not just one sounds beautiful. Like aggressive fauna you need to clear out with dragons to expand and action cards that place them near opponents (or on top shutting down the tiles production)".
 
 - The starting map has fauna on it, in a few strengths ("yes").
-- Fauna blocks building on its hex and shuts down the production of a building it sits on (chosen over spreading or eating livestock).
+- Fauna blocks building on its hex and shuts down the production of a building it sits on (chosen over spreading or eating livestock). *(Provisionally, #100: a building under a beast also scores nothing, so a beast on a monument takes its points away until it's cleared. The fauna cards cost crystal, not gold. Reasoning in the pull request for issue #100.)*
 - Clearing fauna "its not a raid but uses the same combat system". Anyone can clear any fauna ("anyone"), and clearing pays "some livestock? (food)", scaled by how strong the beast is.
 - "you can chose to fight fauna or raid (but maybe this is a dragon level choice)… maybe you can go half half": each dragon either fights fauna or raids in a round, never both, so a player can split their dragons.
 - New fauna comes only from action cards: "card only for now". The board doesn't respawn it.
@@ -100,7 +100,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Monuments: only monument cards are worth building points. The owner (2026-11-03): "VP buildings should be expensive monuments only". Production buildings, tower floors and upgrades are worth no points (#98). Gold was too cheap to turn into points ("4 fold for 2 points is just insane right?"), so Gilding is gone and a monument costs 10 gold, while raid gold stays big ("raids are supposed to be gold farms and large amounts of gold feels good").
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
   - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest hoard (#109). Kept to these three. Largest territory is dropped: "it just intensifies ecomic snowball, while talesr tower is: 1. literally visually cool 2. a side quest/resource sink" (owner, 2026-11-03). Tower floors count only toward the tower title.
-  - Titles take real investment. The owner, of the army and territory titles: "strongest army and largest territory need a larger threshold".
+  - Titles take real investment. The owner, of the army and territory titles: "strongest army and largest territory need a larger threshold". *(Provisionally, #100: the minimums are 6 dragon points and 3 floors, values a player reaches mid-game, so titles are held and taken during the game instead of at the end. Reasoning in the pull request for issue #100.)*
   - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 2 points (1 until #80).
 
 ## Buildings
