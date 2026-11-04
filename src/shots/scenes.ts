@@ -1,13 +1,13 @@
-// Staged game situations for screenshots (src/shots/shots.ts). Each scene is
-// reached by playing a seeded game with the random bot until a condition
-// holds, then sometimes scripting a few commands (trade offers, which the bot
-// never makes). Everything is seeded, so a scene comes out the same on every
-// run until the rules or the numbers change; if a condition never holds for
-// the scene's seed, the next seeds are tried, in order.
+// Staged game situations for screenshots (src/shots/shots.ts). A scene opens
+// with a seeded bot game played to a point every game reaches (a round, a
+// phase, the round before the end), then stages what its shots are about:
+// the hand, the dragons, the buildings, the raid's votes and choices. Nothing
+// searches for a lucky game, so a tuning change can't make a scene fail to
+// stage unless it takes away what the scene shows.
 
-import { botStep } from '../bot.ts';
-import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../data.ts';
-import { apply, newGame, score, turnOrder, waitingOn, type Game } from '../engine.ts';
+import { botStep, standInMove } from '../bot.ts';
+import { ACTIONS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
+import { apply, buildableHexes, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Game } from '../engine.ts';
 import { PEAK, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -51,21 +51,21 @@ export interface Scene {
   away?: number[]; // seats whose player has gone quiet (shown "(away)")
   resume?: boolean; // a saved game hosted again: every seat open until a phone claims it
   remote?: boolean; // a game with no TV: made from a phone, each phone shows the table
-  until?: (g: Game) => boolean; // play bot moves until this holds
-  setup?: (g: Game) => void; // scripted commands once it holds
-  live?: (g: Game) => boolean; // for live shots: bot moves after the TV is open, until this holds
-  liveEnd?: (g: Game) => boolean; // and where those moves must end up (else the next seed is tried)
+  // Play bot moves until this holds. Only a point every game reaches: a
+  // round, a phase, whose turn. What the shots need is staged in `setup`.
+  until?: (g: Game) => boolean;
+  setup?: (g: Game) => void; // staged state and scripted commands once it holds
+  live?: (g: Game, rng: Rng) => void; // for live shots: the moves made once the page is open
+  liveEnd?: (g: Game) => boolean; // and what must hold after them (checked when staging)
   shots: (g: Game | null) => Shot[];
 }
 
 export interface Staged {
   scene: Scene;
   game: Game | null;
-  seed: number; // the seed that worked
   rng: Rng; // the bot's dice, to carry on into live moves
 }
 
-const SEED_TRIES = 40;
 const MAX_STEPS = 30000;
 
 // Bot moves until `until` holds. False if the game ended first.
@@ -79,40 +79,135 @@ export function drive(g: Game, rng: Rng, until: (g: Game) => boolean): boolean {
 }
 
 export function stage(scene: Scene): Staged {
-  if (scene.lobby) return { scene, game: null, seed: scene.seed, rng: { state: scene.seed } };
-  for (let seed = scene.seed; seed < scene.seed + SEED_TRIES; seed++) {
-    const g = newGame(scene.players, seed);
-    const rng = { state: seed * 7919 };
-    if (!drive(g, rng, scene.until ?? (() => true))) continue;
-    scene.setup?.(g);
-    // A live scene must also reach its end state from here (checked on a copy).
-    if (scene.live) {
-      const after = structuredClone(g);
-      if (!drive(after, { ...rng }, scene.live) || (scene.liveEnd && !scene.liveEnd(after))) continue;
-    }
-    return { scene, game: g, seed, rng };
+  const fail = (why: string): never => {
+    throw new Error(`Scene ${scene.name}: ${why}.`);
+  };
+  if (scene.lobby) return { scene, game: null, rng: { state: scene.seed } };
+  const g = newGame(scene.players, scene.seed);
+  const rng = { state: scene.seed * 7919 };
+  if (!drive(g, rng, scene.until ?? (() => true))) fail('the game ended before its opening did');
+  scene.setup?.(g);
+  // A live scene's moves must end where it says (checked on a copy).
+  if (scene.live) {
+    const after = structuredClone(g);
+    scene.live(after, { ...rng });
+    if (scene.liveEnd && !scene.liveEnd(after)) fail('its live moves end somewhere else');
   }
-  throw new Error(`Scene ${scene.name}: no game from seed ${scene.seed} to ${scene.seed + SEED_TRIES - 1} reaches it.`);
+  return { scene, game: g, rng };
 }
 
-// ---------- conditions ----------
+// Live moves: the bots play until `until` holds.
+const bots = (until: (g: Game) => boolean) => (g: Game, rng: Rng) => void drive(g, rng, until);
 
-const step = (g: Game) => (g.phase === 'raid' ? g.raid!.step : null);
+// ---------- staging ----------
+
+// The moves that change as little as they can (the stand-in's: end the turn,
+// keep the first card, vote for the first target, send nothing, bail), made
+// for whoever is waited on until `until` holds.
+function pass(g: Game, until: (g: Game) => boolean) {
+  for (let steps = 0; !until(g); steps++) {
+    if (g.phase === 'over' || steps > 5000) throw new Error('pass: never got there');
+    standInMove(g, waitingOn(g)[0]);
+  }
+}
+
+// From the action phase to this round's raid vote: everyone ends their turn.
+// Someone must have a dragon able to raid (see `arm`).
+function toVote(g: Game) {
+  const round = g.round;
+  pass(g, (x) => x.phase === 'raid' || x.round !== round);
+  if (g.phase !== 'raid') throw new Error('toVote: no raid this round');
+}
+
+// The raid's targets, weakest first.
+const byPower = (g: Game) => [...g.raid!.candidates].sort((a, b) => targetPower(a) - targetPower(b));
+// Seats in `who` vote for target t (all who haven't voted, by default).
+function vote(g: Game, t: string, who = g.players.map((_, p) => p)) {
+  for (const p of who) if (g.raid!.votes[p] === null) apply(g, p, `vote ${g.raid!.candidates.indexOf(t) + 1}`);
+}
+// Seat p sends every dragon able to raid, and locks in.
+function sendAll(g: Game, p: number) {
+  apply(g, p, `commit ${g.dragons.filter((d) => d.owner === p && ready(d)).map((d) => d.id).join(' ')}`);
+  apply(g, p, 'ready');
+}
+// To the fight-or-bail step: the raiders send everything, everyone else stays home.
+function toBail(g: Game, raiders: number[]) {
+  for (const p of raiders) sendAll(g, p);
+  for (const p of g.players.keys()) if (!g.raid!.ready[p]) apply(g, p, 'ready');
+}
+const ready = (d: { stage: number; resting: string; damage: number }) => d.stage > 0 && !d.resting && !d.damage;
+
+// Seat p's dragons, replaced by one fresh dragon at each stage given (0 an egg,
+// 3 an adult), each ready to raid; roosts are built beside their land until
+// they fit.
+function arm(g: Game, p: number, stages: number[]) {
+  g.dragons = g.dragons.filter((d) => d.owner !== p);
+  while (dragonCapacity(g, p) < stages.length) {
+    const k = buildableHexes(g, p, 'roost').sort()[0];
+    if (!k) throw new Error(`arm: no room for a roost for P${p + 1}`);
+    g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+  }
+  const keys = Object.keys(DRAGONS);
+  stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0, resting: '' }));
+}
+
+// Seat p's hand gets `extra` more cards than the hand limit allows.
+function overHand(g: Game, p: number, extra: number) {
+  const pl = g.players[p];
+  while (pl.hand.length < TUNING.handCap + extra) pl.hand.push({ id: `c${800 + pl.hand.length}`, deck: 'action', key: 'windfall' });
+}
+// From the action phase to the round's discards: `over` hold too many cards,
+// everyone else is within the limit, and no one raids.
+function toDiscard(g: Game, over: number[], extra = 1) {
+  for (const p of g.players.keys()) {
+    g.players[p].hand = g.players[p].hand.slice(0, TUNING.handCap);
+    if (over.includes(p)) overHand(g, p, extra);
+  }
+  pass(g, (x) => x.phase === 'discard');
+}
+
+// The last round of this seed's bot game, found by playing it out on a copy:
+// `until: late(...)` stops in the round before it, so the board is as full as
+// the game gets while it is still on.
+function late(players: number, seed: number) {
+  let round = 0; // found the first time it's asked
+  return (x: Game) => {
+    if (!round) {
+      const g = newGame(players, seed);
+      drive(g, { state: seed * 7919 }, (y) => y.phase === 'over');
+      round = g.round - 1;
+    }
+    return x.round === round && x.phase === 'action';
+  };
+}
+
+// ---------- conditions and staging helpers ----------
+
 const best = (g: Game) => Math.max(...g.players.map((_, p) => score(g, p).total));
-const dragonsOf = (g: Game, p: number) => g.dragons.filter((d) => d.owner === p);
-const buildingsOf = (g: Game, p: number) => Object.values(g.buildings).filter((b) => b.owner === p).length;
-// The acting player can play a building card on a hex right now.
-// A building card the acting player has a hex for, affordable or not.
+// A building card in seat p's hand they have a hex for, affordable or not.
 const placeableCard = (g: Game, p: number) => seatState(g, p).hand.find((c) => c.kind === 'building' && c.needs === 'hex' && !c.blocked && c.hexes.length);
-// Tops up the acting player's resources to pay for that card. Bots rarely
-// afford one in round 2, so the early scenes add what is missing.
-function affordACard(g: Game) {
-  const c = placeableCard(g, g.turn)!;
-  const have = g.players[g.turn].resources;
-  for (const [r, n] of Object.entries(c.cost) as [keyof typeof have, number][]) have[r] = Math.max(have[r], n);
+// The acting player holds a building card they have a hex for (one is dealt
+// if not), and what it costs.
+function canBuild(g: Game) {
+  const p = g.turn, pl = g.players[p];
+  if (!placeableCard(g, p)) {
+    const key = Object.keys(BUILDINGS).sort().find((k) => !BUILDINGS[k].basic && !BUILDINGS[k].onTower && buildableHexes(g, p, k).length);
+    if (!key) throw new Error('canBuild: no building card fits');
+    pl.hand.push({ id: `c${850 + pl.hand.length}`, deck: 'building', key });
+  }
+  const c = placeableCard(g, p)!;
+  for (const [r, n] of Object.entries(c.cost) as [keyof typeof pl.resources, number][]) pl.resources[r] = Math.max(pl.resources[r], n);
 }
-const committed = (g: Game) => g.raid!.commits.filter((c) => c.length).length;
-const fightingPlayers = (g: Game) => new Set(g.raid!.fighters.map((id) => g.dragons.find((d) => d.id === id)!.owner)).size;
+const dist = (a: string, b: string) => { const [q, r] = a.split(',').map(Number), [q2, r2] = b.split(',').map(Number); return Math.max(Math.abs(q - q2), Math.abs(r - r2), Math.abs(q + r - q2 - r2)); };
+// At least n buildings besides the towers, roosts added for each seat in turn if not.
+function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)) {
+  for (let i = 0; Object.values(g.buildings).filter((b) => b.type !== 'tower').length < n; i++) {
+    if (i > 50) throw new Error('buildingsAtLeast: no room');
+    const p = seats[i % seats.length];
+    const k = buildableHexes(g, p, 'roost').sort()[0];
+    if (k) g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+  }
+}
 
 // The first seat (in seat order) matching a condition.
 function seatWhere(g: Game, ok: (p: number) => boolean): number {
@@ -121,15 +216,10 @@ function seatWhere(g: Game, ok: (p: number) => boolean): number {
   return p;
 }
 
-// The hand the acting player would hold with these cards, and how the phone sees it.
+// Seat p's hand, staged: one card per key.
 const ALL_CARDS = [...Object.keys(BUILDINGS), ...Object.keys(UPGRADES), ...Object.keys(ACTIONS), ...Object.keys(DRAGONS)];
 function giveHand(g: Game, p: number, keys: string[]) {
   g.players[p].hand = keys.map((key, i) => ({ id: `c${900 + i}`, deck: DRAGONS[key] || ACTIONS[key] ? 'action' : 'building', key }));
-}
-function handWith(g: Game, p: number, keys: string[]) {
-  const c = structuredClone(g);
-  giveHand(c, p, keys);
-  return seatState(c, p).hand;
 }
 const card = (id: string) => `[data-card="${id}"]`;
 // Why each card can't be played, one card per reason.
@@ -199,8 +289,8 @@ export const SCENES: Scene[] = [
     name: 'early-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
-    setup: affordACard,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: canBuild,
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
@@ -226,16 +316,27 @@ export const SCENES: Scene[] = [
     name: 'build-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
-    setup: affordACard,
-    live: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: canBuild,
+    live: (g) => {
+      const c = placeableCard(g, g.turn)!;
+      apply(g, g.turn, `build ${c.id} ${c.hexes[0]}`);
+    },
+    liveEnd: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
     shots: () => [{ file: 'tv-build-3p', caption: 'TV: a new building pops up from the page', client: 'tv', live: true, frames: [0, 0.15, 0.3, 0.45, 0.7, 1.2] }],
   },
   {
     name: 'port-4p',
     players: 4,
     seed: 1,
-    until: (g) => g.phase === 'action' && Object.values(g.buildings).some((b) => b.type === 'port'),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // A port on the harbor nearest a tower, that tower's player's.
+    setup: (g) => {
+      const near = (k: string) => Math.min(...g.towers.map((t) => dist(k, t)));
+      const k = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => near(a) - near(b) || a.localeCompare(b))[0];
+      const owner = g.towers.findIndex((t) => dist(k, t) === near(k));
+      g.buildings[k] = { type: 'port', owner, upgrade: null, floors: 0 };
+    },
     shots: () => [{ file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' }],
   },
   {
@@ -380,7 +481,12 @@ export const SCENES: Scene[] = [
     name: 'vote-5p',
     players: 5,
     seed: 1,
-    until: (g) => g.round >= 3 && step(g) === 'vote' && g.raid!.votes.filter((v) => v !== null).length === 2,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+      vote(g, byPower(g)[0], turnOrder(g).slice(0, 2));
+    },
     shots: (g) => [
       { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted', client: 'tv', sizes: true },
       { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] === null), sizes: true },
@@ -391,7 +497,15 @@ export const SCENES: Scene[] = [
     name: 'commit-4p',
     players: 4,
     seed: 1,
-    until: (g) => g.round >= 4 && step(g) === 'commit' && committed(g) >= 1 && g.players.some((_, p) => !g.raid!.ready[p] && seatState(g, p).raidReady.length >= 2),
+    until: (g) => g.round === 4 && g.phase === 'action',
+    // One raider is in; the next seat has two dragons to choose from.
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === (t + 1) % 4 ? [2, 2] : [2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      sendAll(g, t);
+    },
     shots: (g) => {
       const choosing = seatWhere(g!, (p) => !g!.raid!.ready[p] && seatState(g!, p).raidReady.length >= 2);
       return [
@@ -404,7 +518,16 @@ export const SCENES: Scene[] = [
     name: 'bail-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.some((c) => c !== null),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Two raiders; one has chosen to fight.
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [t, (t + 1) % 3]);
+      apply(g, t, 'fight');
+    },
     shots: (g) => [
       { file: 'tv-raid-bail-3p', caption: 'TV, fight or bail (3 players): one has chosen', client: 'tv' },
       { file: 'phone-raid-bail-3p', caption: 'Phone: fight or bail, in secret', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !g!.raid!.choices[p]) },
@@ -413,48 +536,61 @@ export const SCENES: Scene[] = [
   {
     name: 'raid-result-3p',
     players: 3,
-    seed: 3,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
-    live: (g) => g.raid === null || g.raid.step === 'vote', // the raid is over
-    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''), // and won
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-result-3p', caption: "TV: a raid's fight replayed, at the end: who won and what they took", client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
     // The same raid, caught mid-replay.
     name: 'raid-fight-3p',
     players: 3,
-    seed: 3,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
-    live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 1300 }],
   },
   {
     // The same raid, on a raider's phone while the TV replays it.
     name: 'raid-watch-3p',
     players: 3,
-    seed: 3,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
-    live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'phone-raid-watch-3p', caption: 'Phone, while the TV replays a fight: everyone watches, and the next decision waits', client: 'phone', seat: 1, live: true, screen: true, waitMs: 600 }],
   },
   {
     // A fight one raider bailed out of: they're shown flown home beside it.
     name: 'raid-fled-4p',
     players: 4,
-    seed: 5,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c) => c === null),
-    setup: (g) => apply(g, seatWhere(g, (p) => g.raid!.commits[p].length > 0), 'bail'),
-    live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls\.|holds\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''), // the rest fought
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Three raiders: the first bails, the second fights, the third decides live.
+    setup: (g) => {
+      const [a, b, c] = turnOrder(g);
+      for (const p of g.players.keys()) arm(g, p, [a, b, c].includes(p) ? [3, 3] : [0]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [a, b, c]);
+      apply(g, a, 'bail');
+      apply(g, b, 'fight');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
     shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 2200 }],
   },
   {
     name: 'discard-4p',
     players: 4,
     seed: 1,
-    until: (g) => g.phase === 'discard',
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [g.turn]),
     shots: (g) => [
       { file: 'tv-discard-4p', caption: 'TV, end of round: someone is discarding', client: 'tv' },
       { file: 'phone-discard-4p', caption: 'Phone: over the hand limit, one card picked', client: 'phone', seat: waitingOn(g!)[0], clicks: ['[data-card]'], sizes: true },
@@ -465,23 +601,25 @@ export const SCENES: Scene[] = [
     name: 'production-4p',
     players: 4,
     seed: 1,
-    until: (g) => g.phase === 'discard',
-    live: (g) => g.phase === 'action',
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [0]),
+    live: bots((g) => g.phase === 'action'),
     shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitMs: 900 }],
   },
   {
     name: 'production-done-6p',
     players: 6,
     seed: 1,
-    until: (g) => g.round >= 4 && g.phase === 'discard',
-    live: (g) => g.phase === 'action',
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [0]),
+    live: bots((g) => g.phase === 'action'),
     shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
   },
   {
     name: 'late-6p',
     players: 6,
     seed: 1,
-    until: (g) => g.phase === 'action' && best(g) >= 11 && g.dragons.length >= 8,
+    until: late(6, 1),
     shots: (g) => {
       const leader = seatWhere(g!, (p) => score(g!, p).total === best(g!));
       return [
@@ -494,7 +632,7 @@ export const SCENES: Scene[] = [
     name: 'late-2p',
     players: 2,
     seed: 1,
-    until: (g) => g.phase === 'action' && best(g) >= 11 && g.players.every((_, p) => buildingsOf(g, p) >= 5),
+    until: late(2, 1),
     shots: () => [
       { file: 'tv-late-2p', caption: 'TV, late game (2 players)', client: 'tv' },
       { file: 'tv-flight-2p', caption: "TV: a dragon's flight round its home", client: 'tv', flight: true, frames: [0.08, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95] },
@@ -504,7 +642,7 @@ export const SCENES: Scene[] = [
     name: 'late-5p',
     players: 5,
     seed: 1,
-    until: (g) => g.phase === 'action' && best(g) >= 11 && g.players.every((_, p) => dragonsOf(g, p).length >= 1),
+    until: late(5, 1),
     shots: (g) => [
       { file: 'tv-late-5p', caption: 'TV, late game (5 players)', client: 'tv' },
       { file: 'phone-late-5p-turn', caption: 'Phone, late game: your turn', client: 'phone', seat: g!.turn },
@@ -611,10 +749,21 @@ export const SCENES: Scene[] = [
     name: 'hand-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action' && handWith(g, g.turn, PLAYABLE).every((c) => !c.blocked || c.needs === 'unplayable'),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // A hatchling to grow, a hurt young dragon to heal, and a basic building
+    // without an upgrade, beside the land a monument can go on.
     setup: (g) => {
-      giveHand(g, g.turn, PLAYABLE);
-      for (const r of Object.keys(g.players[g.turn].resources)) g.players[g.turn].resources[r as 'gold'] = 8;
+      const t = g.turn;
+      arm(g, t, [1, 2]);
+      g.dragons.filter((d) => d.owner === t)[1].damage = 3;
+      if (!upgradeTargets(g, t, 'workshop').length) {
+        const [type, k] = ['pasture', 'quarry', 'lumber_camp', 'crystal_mine'].map((b) => [b, buildableHexes(g, t, b).sort()[0]]).find(([, k]) => k)!;
+        g.buildings[k] = { type, owner: t, upgrade: null, floors: 0 };
+      }
+      giveHand(g, t, PLAYABLE);
+      for (const r of Object.keys(g.players[t].resources)) g.players[t].resources[r as 'gold'] = 20;
+      const stuck = seatState(g, t).hand.filter((c) => c.blocked && c.needs !== 'unplayable');
+      if (stuck.length) throw new Error(`hand-3p: ${stuck.map((c) => c.key).join(', ')} can't be played`);
     },
     shots: (g) => {
       const id = (key: string) => `c${900 + PLAYABLE.indexOf(key)}`;
@@ -636,16 +785,26 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 140,
-    until: (g) => {
-      if (g.round < 4 || g.phase !== 'action') return false;
-      const hand = g.players[g.turn].hand;
-      giveHand(g, g.turn, ALL_CARDS);
-      const ok = blockedReasons(g, g.turn).length >= 6 && seatState(g, g.turn).hand.some((x) => !x.blocked && !x.affordable);
-      g.players[g.turn].hand = hand;
-      return ok;
+    seed: 1,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    // Every building the acting player has takes an upgrade, their dragons are
+    // unhurt adults with no room for more, one building card has no hex of its
+    // terrain left, and they have nothing to pay with.
+    setup: (g) => {
+      const t = g.turn;
+      for (const [k, b] of Object.entries(g.buildings)) {
+        if (b.owner !== t || b.upgrade) continue;
+        const u = Object.keys(UPGRADES).find((u) => upgradeTargets(g, t, u).includes(k));
+        if (u) b.upgrade = u;
+      }
+      arm(g, t, []);
+      arm(g, t, Array(dragonCapacity(g, t)).fill(3));
+      const terrain = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].terrain && BUILDINGS[k].terrain !== 'plains').sort((a, b) => buildableHexes(g, t, a).length - buildableHexes(g, t, b).length)[0];
+      for (const k of buildableHexes(g, t, terrain)) g.map[k].terrain = 'plains';
+      drain(g, t);
+      giveHand(g, t, ALL_CARDS);
+      if (blockedReasons(g, t).length < 6) throw new Error(`blocked-3p: only ${blockedReasons(g, t).length} reasons`);
     },
-    setup: (g) => giveHand(g, g.turn, ALL_CARDS),
     shots: (g) => {
       const me = { client: 'phone' as const, seat: g!.turn };
       const poor = seatState(g!, g!.turn).hand.find((x) => !x.blocked && !x.affordable)!;
@@ -667,7 +826,8 @@ export const SCENES: Scene[] = [
     name: 'discard-many',
     players: 4,
     seed: 1,
-    until: (g) => g.phase === 'discard' && g.players.some((pl) => pl.hand.length - seatState(g, 0).handCap >= 2),
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [g.turn], 3),
     shots: (g) => [
       { file: 'phone-discard-many', caption: 'Phone: discarding several cards, two picked', client: 'phone', seat: seatWhere(g!, (p) => g!.players[p].hand.length - seatState(g!, p).handCap >= 2), clicks: ['[data-card]', '[data-card]:not(.picked)'] },
     ],
@@ -678,17 +838,29 @@ export const SCENES: Scene[] = [
     name: 'horn-4p',
     players: 4,
     seed: 1,
-    until: (g) => step(g) === 'vote' && g.raidsLeft >= 2,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const pl = g.players[g.turn];
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      pl.hand.push({ id: 'c899', deck: 'action', key: 'war_horn' });
+      pl.resources.crystal = Math.max(pl.resources.crystal, ACTIONS.war_horn.cost.crystal ?? 0);
+      apply(g, g.turn, 'play c899');
+      toVote(g);
+    },
     shots: () => [{ file: 'tv-two-raids-4p', caption: 'TV: a round with two raids (War Horn), the first vote', client: 'tv' }],
   },
   {
     name: 'commit-5p',
     players: 5,
     seed: 1,
-    until: (g) => {
-      if (step(g) !== 'commit') return false;
-      const r = g.raid!, ready = (p: number) => seatState(g, p).raidReady.length;
-      return g.players.some((_, p) => r.ready[p] && r.commits[p].length) && g.players.some((_, p) => !r.ready[p] && !r.commits[p].length && ready(p)) && g.players.some((_, p) => !ready(p));
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // The acting player is in; the next has a dragon and hasn't chosen; the rest have only eggs.
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 5 ? [2] : [0]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      sendAll(g, t);
     },
     shots: (g) => {
       const r = g!.raid!, ready = (p: number) => seatState(g!, p).raidReady.length;
@@ -703,7 +875,15 @@ export const SCENES: Scene[] = [
     name: 'bail-4p',
     players: 4,
     seed: 1,
-    until: (g) => step(g) === 'bail' && g.players.some((_, p) => !g.raid!.commits[p].length) && g.players.some((_, p) => g.raid!.commits[p].length && g.raid!.choices[p]),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 4 ? [2] : [0]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [t, (t + 1) % 4]);
+      apply(g, t, 'fight');
+    },
     shots: (g) => [
       { file: 'phone-raid-not-in-4p', caption: "Phone, fight or bail: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
       { file: 'phone-raid-chose-4p', caption: 'Phone, fight or bail: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
@@ -713,17 +893,34 @@ export const SCENES: Scene[] = [
     name: 'raid-lost-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 1,
-    live: raidOver,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Two hatchlings against the strongest kingdom; one has chosen to fight.
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [1] : [0]);
+      toVote(g);
+      vote(g, byPower(g).at(-1)!);
+      toBail(g, [t, (t + 1) % 3]);
+      apply(g, (t + 1) % 3, 'fight');
+    },
+    live: bots(raidOver),
     liveEnd: (g) => /holds\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid, at the end of the replay ("… holds")', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
     name: 'raid-bailed-2p',
     players: 2,
-    seed: 77,
-    until: (g) => step(g) === 'bail' && committed(g) >= 1,
-    live: raidOver,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Both send a dragon; the first bails, and the second bails live.
+    setup: (g) => {
+      for (const p of [0, 1]) arm(g, p, [1]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [0, 1]);
+      apply(g, 0, 'bail');
+    },
+    live: (g) => apply(g, 1, 'bail'),
     liveEnd: (g) => /Everyone bails/.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-bailed-2p', caption: 'TV: everyone bailed (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
@@ -733,7 +930,8 @@ export const SCENES: Scene[] = [
     seed: 1,
     // Everyone starts with an egg, so round 1 has no raid: it ends on the last player's turn.
     until: (g) => g.round === 1 && g.phase === 'action' && g.turn === turnOrder(g).at(-1),
-    live: (g) => g.round > 1,
+    setup: (g) => g.dragons.forEach((d) => (d.stage = 0)),
+    live: (g) => pass(g, (x) => x.round > 1),
     liveEnd: (g) => /no raid this round/.test(raidOutcome(g)),
     // The TV opens on round 1's own banner, then round 2's; with no raid to show in between, that's all.
     shots: () => [{ file: 'tv-raid-nobody-3p', caption: "TV: no one had a raid-ready dragon, so round 1 has no raid scene: a moment later round 2 is on to keeping cards", client: 'tv', live: true, waitMs: 3200 }],
@@ -743,8 +941,16 @@ export const SCENES: Scene[] = [
     name: 'banners-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && g.raidsLeft === 1 && committed(g) >= 1,
-    live: (g) => g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [3] : [0]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [t, (t + 1) % 3]);
+      apply(g, (t + 1) % 3, 'fight');
+    },
+    live: bots((g) => g.phase === 'action'),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-banners-3p', caption: "TV: the next round's production, right after a raid's result", client: 'tv', live: true, waitFor: '#overlay .production', waitMs: 1800 }],
   },
@@ -785,9 +991,10 @@ export const SCENES: Scene[] = [
     name: 'fauna-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action' && Object.values(g.buildings).some((b) => b.owner !== g.turn && b.type !== 'tower'),
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       const p = g.turn;
+      if (!Object.values(g.buildings).some((b) => b.owner !== p && b.type !== 'tower')) buildingsAtLeast(g, Object.keys(g.buildings).length - g.towers.length + 1, [(p + 1) % 3]);
       const theirs = Object.keys(g.buildings).find((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower')!;
       g.map[theirs].fauna = 'cave_bear';
       const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
@@ -812,7 +1019,7 @@ export const SCENES: Scene[] = [
     name: 'beasts-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
     shots: (g) => [
       { file: 'tv-beasts-3p', caption: 'TV: the Thunderbird on its peak and the Leviathan off its harbor, the hexes they hold ringed', client: 'tv', waitMs: 4800 },
@@ -827,7 +1034,7 @@ export const SCENES: Scene[] = [
     name: 'beasts-slain-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
     shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +2 points for good', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
   },
@@ -837,7 +1044,7 @@ export const SCENES: Scene[] = [
     name: 'peak-free-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       beastHunters(g);
       huntPeak(g);
@@ -854,7 +1061,7 @@ export const SCENES: Scene[] = [
     name: 'fauna-fight-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => bearHunters(g),
     shots: () => [{ file: 'tv-fauna-fight-3p', caption: 'TV: two hatchlings against a Cave Bear, mid-replay', client: 'tv', waitMs: 1400, then: (room) => room.mutate((g2) => huntBear(g2)) }],
   },
@@ -863,7 +1070,7 @@ export const SCENES: Scene[] = [
     name: 'fauna-cleared-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => bearHunters(g),
     shots: () => [{ file: 'tv-fauna-cleared-3p', caption: 'TV: the Cave Bear falls: +4 livestock', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntBear(g2)) }],
   },
@@ -874,9 +1081,10 @@ export const SCENES: Scene[] = [
     name: 'fauna-terrain-3p',
     players: 3,
     seed: 1,
-    until: (g) => g.round >= 3 && g.phase === 'action' && Object.values(g.buildings).filter((b) => b.type !== 'tower').length >= 3,
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       const p = g.turn;
+      buildingsAtLeast(g, 3);
       for (const h of Object.values(g.map)) delete h.fauna;
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
@@ -937,8 +1145,8 @@ export const SCENES: Scene[] = [
     players: 3,
     seed: 1,
     remote: true,
-    until: (g) => g.round === 2 && g.phase === 'action' && !!placeableCard(g, g.turn),
-    setup: affordACard,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: canBuild,
     shots: (g) => [
       { file: 'phone-remote-you-3p', caption: 'No TV: your own view, with the You / Table switch by the talk bar', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-remote-table-3p', caption: 'No TV: the table view, switched to', client: 'phone', seat: g!.turn, clicks: ['.viewswitch [data-view=table]'], waitFor: '.table-on', waitMs: 600, sizes: true },
@@ -951,7 +1159,7 @@ export const SCENES: Scene[] = [
     players: 6,
     seed: 1,
     remote: true,
-    until: (g) => g.phase === 'action' && best(g) >= 11 && g.dragons.length >= 8,
+    until: late(6, 1),
     shots: () => [{ file: 'tv-remote-table-late-6p', caption: 'No TV: the table view late in a 6-player game', client: 'tv', table: true, sizes: true }],
   },
   {
@@ -959,7 +1167,11 @@ export const SCENES: Scene[] = [
     players: 5,
     seed: 1,
     remote: true,
-    until: (g) => step(g) === 'vote' && g.round >= 3,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+    },
     shots: (g) => [
       { file: 'phone-remote-vote-5p', caption: 'No TV: your vote, on your own view', client: 'phone', seat: waitingOn(g!)[0] },
       { file: 'tv-remote-vote-5p', caption: 'No TV: the vote on the table view', client: 'tv', table: true, sizes: true },
@@ -970,7 +1182,13 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     remote: true,
-    until: (g) => step(g) === 'commit' && g.round >= 3 && committed(g) >= 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      sendAll(g, g.turn);
+    },
     shots: () => [{ file: 'tv-remote-commit-4p', caption: 'No TV: commitments on the table view', client: 'tv', table: true, sizes: true }],
   },
   {
@@ -978,8 +1196,9 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     remote: true,
-    until: (g) => g.phase === 'discard',
-    live: (g) => g.phase === 'action',
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [0]),
+    live: bots((g) => g.phase === 'action'),
     shots: (g) => [{ file: 'phone-remote-production-4p', caption: "No TV: the round's production rolls cut in on the phone", client: 'phone', seat: 0, live: true, waitFor: '.table-on', waitMs: 1800 }],
   },
   {
@@ -987,28 +1206,31 @@ export const SCENES: Scene[] = [
     players: 6,
     seed: 1,
     remote: true,
-    until: (g) => g.round >= 4 && g.phase === 'discard',
-    live: (g) => g.phase === 'action',
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => toDiscard(g, [0]),
+    live: bots((g) => g.phase === 'action'),
     shots: () => [{ file: 'tv-remote-production-done-6p', caption: "No TV: every production roll landed (6 players), on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', waitMs: 300 }],
   },
   {
     name: 'remote-fight-3p',
     players: 3,
-    seed: 3,
+    seed: 1,
     remote: true,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
-    live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 }],
   },
   {
     name: 'remote-fight-end-3p',
     players: 3,
-    seed: 3,
+    seed: 1,
     remote: true,
-    until: (g) => g.round >= 3 && step(g) === 'bail' && committed(g) >= 2 && g.raid!.choices.every((c, p) => c !== null || !g.raid!.commits[p].length || p === 0),
-    live: (g) => g.raid === null || g.raid.step === 'vote',
-    liveEnd: (g) => /falls\./.test(g.log.findLast((e) => /falls\.|holds\.|Everyone bails/.test(e.text))?.text ?? ''),
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-remote-fight-end-3p', caption: "No TV: a raid's fight at its end, on the table view", client: 'tv', table: true, live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
@@ -1016,7 +1238,7 @@ export const SCENES: Scene[] = [
     players: 3,
     seed: 1,
     remote: true,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
     shots: (g) => [
       { file: 'phone-remote-beast-3p', caption: 'No TV: a fight against the Thunderbird cuts in on another player\'s phone', client: 'phone', seat: (g!.turn + 1) % 3, waitFor: '.table-on', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
@@ -1027,7 +1249,7 @@ export const SCENES: Scene[] = [
     players: 3,
     seed: 1,
     remote: true,
-    until: (g) => g.round >= 3 && g.phase === 'action',
+    until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
     shots: () => [{ file: 'tv-remote-beast-end-3p', caption: 'No TV: the Thunderbird slain, on the table view', client: 'tv', table: true, waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
   },
@@ -1043,6 +1265,18 @@ export const SCENES: Scene[] = [
     ],
   },
 ];
+
+// A raid sure to be won, one decision from its end: the first two in turn
+// order send two adults each against the weakest kingdom, and the second has
+// chosen to fight; the first decides live.
+function wonRaid(g: Game) {
+  const [a, b] = turnOrder(g);
+  for (const p of g.players.keys()) arm(g, p, p === a || p === b ? [3, 3] : [0]);
+  toVote(g);
+  vote(g, byPower(g)[0]);
+  toBail(g, [a, b]);
+  apply(g, b, 'fight');
+}
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
 function beastHunters(g: Game) {

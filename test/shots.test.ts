@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publicState, seatState } from '../src/state.ts';
-import { SCENES, drive, stage } from '../src/shots/scenes.ts';
+import { SCENES, stage } from '../src/shots/scenes.ts';
 
 // The browser part (npm run shots) needs Chrome and isn't run here; the
 // staging is, so a rules change that makes a scene unreachable shows up in CI.
@@ -23,7 +23,6 @@ test('every screenshot scene stages, the same way every time', () => {
     if (a.game) {
       publicState(a.game);
       a.game.players.forEach((_, p) => seatState(a.game!, p));
-      if (scene.live) assert.ok(drive(a.game, a.rng, scene.live), `${scene.name} reaches its live end`);
     }
   }
   // The games cover every player count the game supports.
