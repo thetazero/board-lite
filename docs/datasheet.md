@@ -141,7 +141,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points (at least 10) and most tower floors (at least 4). Tower floors are worth nothing else.
+Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most gold (at least 10). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 
