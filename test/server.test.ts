@@ -90,6 +90,92 @@ test('lobby rules: names, size, joining late', () => {
   room.close();
 });
 
+// Seats count as here while they hold a stream or asked something in the last minute.
+const goQuiet = (room: Room, i: number) => Object.assign(room.seats[i], { connected: 0, seen: 0 });
+
+test('a player who quits: a bot makes as few moves as it can, and the seat can be taken back by name', async () => {
+  const room = new Room('QUIT', { dir, botDelayMs: 0 });
+  const [ada, bram, cora] = ['Ada', 'Bram', 'Cora'].map((n) => room.join(n));
+  room.start(ada.token, 7);
+  const g = room.game!;
+  const stock = () => JSON.stringify(g.players[1].resources);
+  const quitter = bram.token;
+  room.quit(quitter);
+  assert.ok(room.seats[1].left && room.seats[1].standIn);
+  assert.throws(() => room.command(quitter, 'end'), /not in this game/, 'the phone that quit no longer holds the seat');
+  assert.equal(room.lobby().seats[1].connected, false);
+  // The table plays on; the bot answers for Bram at once.
+  for (let i = 0; i < 300 && g.round < 3; i++) {
+    const p = waitingOn(g).find((q) => q !== 1);
+    if (p !== undefined) {
+      const [seat] = [ada, bram, cora].filter((_, k) => k === p);
+      for (const cmd of candidateCommands(g, p, { state: i }).filter((c) => !c.startsWith('accept'))) {
+        try {
+          room.command(seat.token, cmd);
+          break;
+        } catch (e) {
+          if (!(e instanceof RoomError)) throw e;
+        }
+      }
+    }
+    await sleep(1);
+  }
+  assert.ok(g.round >= 3, 'the game did not stall on the seat that quit');
+  assert.equal(Object.keys(g.buildings).filter((k) => g.buildings[k].owner === 1).length, 1, 'the stand-in builds nothing (only the tower)');
+  assert.notEqual(stock(), '{}');
+  // Anyone (Bram on another phone) takes the seat back with its name.
+  assert.throws(() => room.join('Ada'), /playing on another phone/, "a seat someone is at can't be taken");
+  const back = room.join(' bram ');
+  assert.equal(back, room.seats[1]);
+  assert.ok(!back.left && !back.standIn);
+  room.command(back.token, 'say hello');
+  room.close();
+});
+
+test('a player who is away: the table lets a bot play for them, and their phone coming back hands the seat back', async () => {
+  const room = new Room('AWAY', { dir, botDelayMs: 60_000 });
+  const [ada, bram] = ['Ada', 'Bram'].map((n) => room.join(n));
+  assert.throws(() => room.standInFor(ada.token, 1), /not running/);
+  room.start(ada.token, 7);
+  assert.throws(() => room.standInFor(ada.token, 1), /is back/, "only for someone who isn't here");
+  goQuiet(room, 1);
+  assert.throws(() => room.standInFor('nobody', 1), /not in this game/);
+  room.standInFor(ada.token, 1);
+  assert.ok(room.seats[1].standIn && !room.seats[1].left);
+  assert.equal(room.lobby().seats[1].standIn, true);
+  // The game hasn't moved on (the bot's timer is long here); Bram's phone reconnects.
+  const disconnect = room.connect(bram.token);
+  assert.ok(!room.seats[1].standIn, 'back in their own hands');
+  disconnect();
+  // A CLI or Claude player coming back by asking anything counts too.
+  goQuiet(room, 1);
+  room.standInFor(ada.token, 1);
+  room.viewText(bram.token);
+  assert.ok(!room.seats[1].standIn);
+  // And one waiting on the table (a long "wait" or "listen") is at their seat all along.
+  room.command(bram.token, `keep ${room.game!.players[1].choice[0].id}`);
+  const waiting = room.wait(bram.token, 20);
+  room.seats[1].seen = 0; // a minute later, still waiting
+  assert.throws(() => room.standInFor(ada.token, 1), /is back/);
+  await waiting;
+  assert.equal(room.seats[1].connected, 0);
+  room.close();
+});
+
+test('the stand-in keeps the game moving to the end without spending anything', async () => {
+  const room = new Room('STND', { dir, botDelayMs: 0 });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.start(seats[0].token, 5);
+  const g = room.game!;
+  const dragons = g.dragons.length; // each player starts with one
+  for (const s of seats) room.quit(s.token);
+  for (let i = 0; i < 2000 && g.round < 6; i++) await sleep(1);
+  room.close();
+  assert.ok(g.round >= 6, `stuck in round ${g.round}, phase ${g.phase} ${g.raid?.step ?? ''}`);
+  assert.equal(Object.keys(g.buildings).length, 2, 'only the towers');
+  assert.equal(g.dragons.length, dragons, 'no eggs hatched');
+});
+
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
   const { server, rooms } = startServer(0, { dir });
   await new Promise((r) => server.once('listening', r));
@@ -130,6 +216,11 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     const g = rooms.get(made.code)!.game!;
     apply(g, 1, `keep ${g.players[1].choice[0].id}`);
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end' })).status, 200);
+    // Mid-game: a bot for someone away (not an open seat), and quitting.
+    assert.match((await post(`/api/rooms/${made.code}/standin`, { token: ada, seat: 1 })).body.error, /No such player/);
+    assert.equal((await post(`/api/rooms/${made.code}/quit`, { token: ada })).status, 200);
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'say hi' })).status, 400, 'the seat is no longer theirs');
+    assert.equal((await post(`/api/rooms/${made.code}/join`, { name: 'ADA' })).status, 200, 'taken back by name');
 
     // The clients are served with their TypeScript types stripped.
     const page = await fetch(`${base}/`);

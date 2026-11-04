@@ -325,16 +325,17 @@ export interface TargetDef {
 
 export const TARGETS: Record<string, TargetDef> = {
   // A ladder of combat power (in brackets; a base adult dragon is 17), with
-  // loot that grows with it: easy kingdoms give little, hard ones a lot.
-  // Printed gold was halved in #99 once coalitions began taking the top ones. Brindle's one gold is the only gold a young dragon can win alone
-  // (#80). This is printed loot: each kingdom adds 1 gold after every raid it
-  // doesn't fall in (engine's hoard, #99), so a kingdom left alone pays more.
+  // loot that grows with its square, about power² ÷ 18 in value: easy kingdoms
+  // give little, hard ones a lot. Per point of power sent, the hardest pays
+  // about three times the easiest. Brindle's one gold is the only gold a
+  // young dragon can win alone (#80). This is printed loot: each kingdom adds
+  // 1 gold after every raid it doesn't fall in (the engine's hoard, #99).
   brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, gold: 1 } }, // 8
-  archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 2, timber: 4 } }, // 19
-  frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 3, crystal: 4 } }, // 24
-  knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 5, stone: 4 } }, // 28
-  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 9 } }, // 35
-  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 15, livestock: 4 } }, // 45
+  archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 4, timber: 4 } }, // 19
+  frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24
+  knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 10, stone: 4 } }, // 28
+  stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 17 } }, // 35
+  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 27, livestock: 4 } }, // 45
 };
 
 export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => s + combatPower(UNITS[u]), 0);

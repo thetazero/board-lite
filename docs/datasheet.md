@@ -1,29 +1,86 @@
 # Tuning datasheet
 
-Generated from `src/data.ts` and the engine by `npm run datasheet`; don't edit by hand. `npm test` fails when it is out of date, so after changing any number, rerun `npm run datasheet` and read the diff: it shows what the change does to payback, cost per point and raid odds.
+Generated from `src/data.ts` and the engine by `npm run datasheet`; don't edit by hand. `npm test` fails when it is out of date, so after changing any number, rerun `npm run datasheet` and read the diff: it shows what the change does to costs, points and raid odds.
 
 ## Economy baseline
 
-Yardstick for every "value" below: 1 per stone, timber, crystal or livestock, and 4 per gold (the bank's 4:1 price for it). Gold comes only from raids and Markets, Trade Charters.
-
-- Start: 3 stone, 3 timber, 3 crystal, 3 livestock (value 12). Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round (value 4), no dice.
+- Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 action card; hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 20 points. Titles are 2 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
+- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters, clearing fauna, and the bank.
 - Bank: 4:1, 3:1 with a Port.
+
+## Costs
+
+Everything that can be bought, as the game has it. Basic buildings have no copies: anyone may build them, no card needed. Dragon points are hatchling / young / adult.
+
+| Name | Kind | Copies | Cost | Does | Points |
+|---|---|---|---|---|---|
+| Quarry | basic building | — | 4 timber, 4 crystal, 3 livestock | Makes 1d4 stone each round. | — |
+| Lumber Camp | basic building | — | 4 stone, 4 crystal, 3 livestock | Makes 1d4 timber each round. | — |
+| Crystal Mine | basic building | — | 4 stone, 4 timber, 3 livestock | Makes 1d4 crystal each round. | — |
+| Pasture | basic building | — | 3 stone, 4 timber, 4 crystal | Makes 1d4 livestock each round. | — |
+| Roost | basic building | — | 2 stone, 2 timber | Houses 2 more dragons. | — |
+| Tower Floor | basic building | — | 3 stone, 2 gold | Adds a floor to your tower, worth 1 point. | 1 |
+| Cliff Works | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent mountain. | — |
+| Stonemason | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent quarry. | — |
+| Woodcutter's Hut | building card | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent forest. | — |
+| Sawmill | building card | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent lumber camp. | — |
+| Driftwood Yard | building card | 1 | 4 stone, 3 crystal, 3 livestock | Makes 1 timber each round for each adjacent ocean hex. | — |
+| Ley Spire | building card | 2 | 3 stone, 3 timber, 2 livestock | Makes 1 crystal each round for each adjacent ley line. | — |
+| Gem Cutter | building card | 2 | 3 stone, 3 timber, 2 livestock | Makes 1 crystal each round for each adjacent mine. | — |
+| Smelter | building card | 1 | 2 stone, 3 timber, 3 livestock | Makes 1 crystal each round for each adjacent quarry. | — |
+| Shepherd's Fold | building card | 2 | 3 stone, 3 timber, 2 crystal | Makes 1 livestock each round for each adjacent meadow. | — |
+| Drovers' Barn | building card | 2 | 2 stone, 3 timber, 3 crystal | Makes 1 livestock each round for each adjacent pasture. | — |
+| Fishery | building card | 1 | 3 stone, 4 timber, 3 crystal | Makes 1 livestock each round for each adjacent ocean hex. | — |
+| Hatchery | building card | 2 | 3 stone, 3 timber, 3 crystal | Your dragons grow 1 extra step each round. | — |
+| Port | building card | 3 | 1 stone, 3 timber, 1 livestock | You trade with the bank at 3:1. | — |
+| Market | building card | 2 | 3 stone, 3 timber, 3 crystal, 2 gold | Makes 1 gold each round for each adjacent trade building. | — |
+| Monument | building card | 2 | 3 stone, 2 timber, 3 gold | Worth 1 point for each adjacent monument. | 1 each |
+| Standing Stones | building card | 2 | 2 stone, 2 crystal, 3 gold | Worth 1 point for each adjacent ley line. | 1 each |
+| Lighthouse | building card | 2 | 4 stone, 2 timber, 3 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
+| Guildhall | building card | 1 | 2 stone, 2 timber, 3 gold | Worth 1 point for each adjacent trade building. | 1 each |
+| Workshop | upgrade | 4 | 4 stone, 4 timber, 1 crystal | This quarry, lumber camp, mine or pasture makes 2 more. | — |
+| Gilding | upgrade | 3 | 4 gold | This tower or monument is worth 2 more points. | 2 |
+| Nesting Grounds | upgrade | 3 | 2 stone, 1 timber | This roost, hatchery or tower houses 2 more dragons. | — |
+| Trade Charter | upgrade | 3 | 2 stone, 4 gold | This port or market makes 1 more gold each round. | — |
+| Windfall | action card | 5 | nothing | Gain 3 of one resource other than gold. | — |
+| Buried Treasure | action card | 4 | nothing | Gain 2 gold. | — |
+| Growth Elixir | action card | 4 | 3 gold | Grow one of your dragons to its next life stage. | — |
+| Healing Potion | action card | 3 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
+| War Horn | action card | 3 | 1 crystal | Hold 1 more raid this round. | — |
+| Secret Hoard | action card | 4 | nothing | Worth 1 point while in your hand. | 1 |
+| Wolf Call | action card | 2 | 1 crystal, 2 gold | Place a Wolf Pack on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | 1 | 2 crystal, 3 gold | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Fire Dragon | base dragon | 1 | 3 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Ice Dragon | base dragon | 1 | 3 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Lightning Dragon | base dragon | 1 | 3 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Air Dragon | base dragon | 1 | 3 crystal, 2 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Water Dragon | base dragon | 1 | 3 crystal, 2 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Ember Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | fire, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Cinder Drake | dragon card | 1 | 4 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Frost Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | ice, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Rime Drake | dragon card | 1 | 4 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Storm Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | lightning, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Bolt Drake | dragon card | 1 | 4 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Sky Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | air, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Zephyr Drake | dragon card | 1 | 4 crystal, 2 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Abyss Wyrm | dragon card | 1 | 4 crystal, 2 livestock, 1 gold | water, grows a stage every 3 rounds | 1 / 2 / 3 |
+| Reef Drake | dragon card | 1 | 4 crystal, 2 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
 
 ## Basic production buildings
 
-Anyone may build these, no card needed. Payback = value of the cost ÷ average output a round. ⚠ marks under 2 rounds.
+Anyone may build these, no card needed.
 
-| Building | Terrain | Cost | Value | Output a round | Payback | Payback with Workshop |
-|---|---|---|---|---|---|---|
-| Quarry | mountain | 4 timber, 4 crystal, 3 livestock | 11 | d4 stone (avg 2.5) | 4.4 | 4.4 |
-| Lumber Camp | forest | 4 stone, 4 crystal, 3 livestock | 11 | d4 timber (avg 2.5) | 4.4 | 4.4 |
-| Crystal Mine | ley | 4 stone, 4 timber, 3 livestock | 11 | d4 crystal (avg 2.5) | 4.4 | 4.4 |
-| Pasture | meadow | 3 stone, 4 timber, 4 crystal | 11 | d4 livestock (avg 2.5) | 4.4 | 4.4 |
+| Building | Terrain | Cost | Makes each round |
+|---|---|---|---|
+| Quarry | mountain | 4 timber, 4 crystal, 3 livestock | d4 stone (avg 2.5) |
+| Lumber Camp | forest | 4 stone, 4 crystal, 3 livestock | d4 timber (avg 2.5) |
+| Crystal Mine | ley | 4 stone, 4 timber, 3 livestock | d4 crystal (avg 2.5) |
+| Pasture | meadow | 3 stone, 4 timber, 4 crystal | d4 livestock (avg 2.5) |
 
-Workshop (4 stone, 4 timber, 1 crystal, value 9) adds 2 a round: it pays for itself in 4.5 rounds on its own.
+Workshop (4 stone, 4 timber, 1 crystal): makes 2 more a round.
 
 ## Land
 
@@ -60,66 +117,52 @@ Harbors (for ports, the only way to beat the bank's 4:1):
 
 ## Building cards that count their neighbours
 
-Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building). Makers show payback in rounds; point buildings show value per point. "Map" is for 3 players: the best count on an open hex touching a tower / share of land hexes with 2 or more.
+Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building). "Map" is for 3 players: the best count on an open hex touching a tower / share of land hexes with 2 or more.
 
-| Card | Class | Counts | Cost | Value | Each one adds | At 1 | At 2 | At 3 | Map |
-|---|---|---|---|---|---|---|---|---|---|
-| Cliff Works | quarry | mountain hexes | 3 timber, 3 crystal, 2 livestock | 8 | 1 stone a round | 8 | 4 | 2.7 | 1.6 / 25% |
-| Stonemason | quarry | quarries (anyone's) | 3 timber, 3 crystal, 2 livestock | 8 | 1 stone a round | 8 | 4 | 2.7 | built |
-| Woodcutter's Hut | lumber camp | forest hexes | 3 stone, 3 crystal, 2 livestock | 8 | 1 timber a round | 8 | 4 | 2.7 | 1.6 / 22% |
-| Sawmill | lumber camp | lumber camps (anyone's) | 3 stone, 3 crystal, 2 livestock | 8 | 1 timber a round | 8 | 4 | 2.7 | built |
-| Driftwood Yard | lumber camp | ocean hexes | 4 stone, 3 crystal, 3 livestock | 10 | 1 timber a round | 10 | 5 | 3.3 | 3 / 39% |
-| Ley Spire | mine | ley hexes | 3 stone, 3 timber, 2 livestock | 8 | 1 crystal a round | 8 | 4 | 2.7 | 1.6 / 20% |
-| Gem Cutter | mine | mines (anyone's) | 3 stone, 3 timber, 2 livestock | 8 | 1 crystal a round | 8 | 4 | 2.7 | built |
-| Smelter | mine | quarries (anyone's) | 2 stone, 3 timber, 3 livestock | 8 | 1 crystal a round | 8 | 4 | 2.7 | built |
-| Shepherd's Fold | pasture | meadow hexes | 3 stone, 3 timber, 2 crystal | 8 | 1 livestock a round | 8 | 4 | 2.7 | 1.6 / 20% |
-| Drovers' Barn | pasture | pastures (anyone's) | 2 stone, 3 timber, 3 crystal | 8 | 1 livestock a round | 8 | 4 | 2.7 | built |
-| Fishery | pasture | ocean hexes | 3 stone, 4 timber, 3 crystal | 10 | 1 livestock a round | 10 | 5 | 3.3 | 3 / 39% |
-| Market | trade building | trade buildings (anyone's) | 3 stone, 3 timber, 3 crystal, 2 gold | 17 | 1 gold a round | 4.3 | 2.1 | 1.4 ⚠ | built |
-| Monument | monument | monuments (anyone's) | 3 stone, 2 timber, 3 gold | 17 | 1 point | 17 | 8.5 | 5.7 | built |
-| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 3 gold | 16 | 1 point | 16 | 8 | 5.3 | 1.6 / 20% |
-| Lighthouse | monument | ocean hexes | 4 stone, 2 timber, 3 gold | 18 | 1 point | 18 | 9 | 6 | 3 / 39% |
-| Guildhall | monument | trade buildings (anyone's) | 2 stone, 2 timber, 3 gold | 16 | 1 point | 16 | 8 | 5.3 | built |
-
-## Dragon and trade buildings and upgrades
-
-| Card | Kind | Cost | Value | Does |
-|---|---|---|---|---|
-| Roost | basic building | 2 stone, 2 timber | 4 | Houses 2 more dragons. |
-| Hatchery | building card | 3 stone, 3 timber, 3 crystal | 9 | Your dragons grow 1 extra step each round. |
-| Port | building card | 1 stone, 3 timber, 1 livestock | 5 | You trade with the bank at 3:1. Saves 1 per resource bought vs the bank: pays back after buying 5. |
-| Nesting Grounds | upgrade (dragon building) | 2 stone, 1 timber | 3 | This roost, hatchery or tower houses 2 more dragons. |
-| Trade Charter | upgrade (trade building) | 2 stone, 4 gold | 18 | This port or market makes 1 more gold each round. Pays back in 4.5 rounds. |
+| Card | Class | Counts | Cost | Each one adds | Map |
+|---|---|---|---|---|---|
+| Cliff Works | quarry | mountain hexes | 3 timber, 3 crystal, 2 livestock | 1 stone a round | 1.6 / 25% |
+| Stonemason | quarry | quarries (anyone's) | 3 timber, 3 crystal, 2 livestock | 1 stone a round | built |
+| Woodcutter's Hut | lumber camp | forest hexes | 3 stone, 3 crystal, 2 livestock | 1 timber a round | 1.6 / 22% |
+| Sawmill | lumber camp | lumber camps (anyone's) | 3 stone, 3 crystal, 2 livestock | 1 timber a round | built |
+| Driftwood Yard | lumber camp | ocean hexes | 4 stone, 3 crystal, 3 livestock | 1 timber a round | 3 / 39% |
+| Ley Spire | mine | ley hexes | 3 stone, 3 timber, 2 livestock | 1 crystal a round | 1.6 / 20% |
+| Gem Cutter | mine | mines (anyone's) | 3 stone, 3 timber, 2 livestock | 1 crystal a round | built |
+| Smelter | mine | quarries (anyone's) | 2 stone, 3 timber, 3 livestock | 1 crystal a round | built |
+| Shepherd's Fold | pasture | meadow hexes | 3 stone, 3 timber, 2 crystal | 1 livestock a round | 1.6 / 20% |
+| Drovers' Barn | pasture | pastures (anyone's) | 2 stone, 3 timber, 3 crystal | 1 livestock a round | built |
+| Fishery | pasture | ocean hexes | 3 stone, 4 timber, 3 crystal | 1 livestock a round | 3 / 39% |
+| Market | trade building | trade buildings (anyone's) | 3 stone, 3 timber, 3 crystal, 2 gold | 1 gold a round | built |
+| Monument | monument | monuments (anyone's) | 3 stone, 2 timber, 3 gold | 1 point | built |
+| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 3 gold | 1 point | 1.6 / 20% |
+| Lighthouse | monument | ocean hexes | 4 stone, 2 timber, 3 gold | 1 point | 3 / 39% |
+| Guildhall | monument | trade buildings (anyone's) | 2 stone, 2 timber, 3 gold | 1 point | built |
 
 ## Points
 
-Value per point = value of everything paid ÷ points. Dragon costs include the livestock eaten while growing, from egg, without a hatchery; an adult keeps eating 1 a round. The tower alone makes 4 value a round, so a point at value V takes V ÷ 4 rounds of tower income.
+Every way to make points. Dragon costs include the livestock eaten while growing, from egg, without a hatchery; an adult keeps eating 1 livestock a round. Neighbour-counting monuments are shown at 2 neighbours.
 
-| Source | Pays | Points | Value per point | Ready |
+| Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
-| Tower Floor | 3 stone, 2 gold | 1 | 11 | now |
-| Monument, 2 neighbours | 3 stone, 2 timber, 3 gold | 2 | 8.5 | now |
-| Standing Stones, 2 neighbours | 2 stone, 2 crystal, 3 gold | 2 | 8 | now |
-| Lighthouse, 2 neighbours | 4 stone, 2 timber, 3 gold | 2 | 9 | now |
-| Guildhall, 2 neighbours | 2 stone, 2 timber, 3 gold | 2 | 8 | now |
-| Gilding (upgrade) | 4 gold | 2 | 8 | now |
-| Secret Hoard (action card) | nothing | 1 | 0 | now, uses a hand slot |
-| Base dragon, hatchling | 3 crystal, 2 livestock + 2 livestock | 1 | 7 | 2 rounds |
-| Base dragon, young | 3 crystal, 2 livestock + 4 livestock | 2 | 4.5 | 4 rounds |
-| Base dragon, adult | 3 crystal, 2 livestock + 6 livestock | 3 | 3.7 | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 4 crystal, 2 livestock, 1 gold + 3 livestock | 1 | 13 | 3 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 4 crystal, 2 livestock, 1 gold + 6 livestock | 2 | 8 | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 4 crystal, 2 livestock, 1 gold + 9 livestock | 3 | 6.3 | 9 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, hatchling | 4 crystal, 2 livestock + 2 livestock | 1 | 8 | 2 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, young | 4 crystal, 2 livestock + 4 livestock | 2 | 5 | 4 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 4 crystal, 2 livestock + 6 livestock | 3 | 4 | 6 rounds |
-| Base dragon by special project, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 5.3 | 6 rounds |
-
-Cheapest paid point: Base dragon, adult at 3.7. Dearest: Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling at 13, 3.5× as much.
+| Tower Floor | 3 stone, 2 gold | 1 | 3 stone, 2 gold | now |
+| Monument, 2 neighbours | 3 stone, 2 timber, 3 gold | 2 | 1.5 stone, 1 timber, 1.5 gold | now |
+| Standing Stones, 2 neighbours | 2 stone, 2 crystal, 3 gold | 2 | 1 stone, 1 crystal, 1.5 gold | now |
+| Lighthouse, 2 neighbours | 4 stone, 2 timber, 3 gold | 2 | 2 stone, 1 timber, 1.5 gold | now |
+| Guildhall, 2 neighbours | 2 stone, 2 timber, 3 gold | 2 | 1 stone, 1 timber, 1.5 gold | now |
+| Gilding (upgrade) | 4 gold | 2 | 2 gold | now |
+| Secret Hoard (action card) | nothing | 1 | nothing | now, uses a hand slot |
+| Base dragon, hatchling | 3 crystal, 2 livestock + 2 livestock | 1 | 3 crystal, 4 livestock | 2 rounds |
+| Base dragon, young | 3 crystal, 2 livestock + 4 livestock | 2 | 1.5 crystal, 3 livestock | 4 rounds |
+| Base dragon, adult | 3 crystal, 2 livestock + 6 livestock | 3 | 1 crystal, 2.7 livestock | 6 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 4 crystal, 2 livestock, 1 gold + 3 livestock | 1 | 4 crystal, 5 livestock, 1 gold | 3 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 4 crystal, 2 livestock, 1 gold + 6 livestock | 2 | 2 crystal, 4 livestock, 0.5 gold | 6 rounds |
+| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 4 crystal, 2 livestock, 1 gold + 9 livestock | 3 | 1.3 crystal, 3.7 livestock, 0.3 gold | 9 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, hatchling | 4 crystal, 2 livestock + 2 livestock | 1 | 4 crystal, 4 livestock | 2 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, young | 4 crystal, 2 livestock + 4 livestock | 2 | 2 crystal, 3 livestock | 4 rounds |
+| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 4 crystal, 2 livestock + 6 livestock | 3 | 1.3 crystal, 2.7 livestock | 6 rounds |
+| Base dragon by special project, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 2 crystal, 3.3 livestock | 6 rounds |
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
-
-Fed to the end of the game, hatched in round 1, after 15 rounds (the owner's target) / 19 rounds (the random bots' median, see Game length): base dragon 6.7 / 8, wyrm 8.3 / 9.7, drake 7 / 8.3 per point. A building's points cost nothing more once built.
 
 Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most buildings, tower included (at least 9).
 
@@ -156,16 +199,16 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way (Lanchester's square law). It ignores elements and targeting, so it is a rough guide on purpose: compare it with the odds below.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Printed loot grows with power; the last column is loot value per point of power sent:
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot:
 
-| Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Loot value | Value per power |
-|---|---|---|---|---|---|---|---|
-| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold | 6 | 0.8 |
-| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 2 gold | 12 | 0.6 |
-| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 3 gold | 16 | 0.7 |
-| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 5 gold | 24 | 0.9 |
-| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 9 gold | 36 | 1 |
-| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 15 gold | 64 | 1.4 |
+| Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
+|---|---|---|---|---|---|
+| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold |
+| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold |
+| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold |
 
 Chance the kingdom falls to one player's raiders fighting to the end, from 100 raids through the engine per cell. Base dragon rows average the five elements, with the worst and best element in brackets. Power is in brackets after each raider.
 
@@ -190,30 +233,30 @@ Gold a lone base dragon expects from one raid on the kingdom that pays it best (
 
 | Hoarded | Hatchling | Young | Adult |
 |---|---|---|---|
-| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 1.9 (Archer's Hold) |
-| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 4.6 (Archer's Hold) |
-| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 7.4 (Archer's Hold) |
+| none (printed loot) | 0.4 (Hamlet of Brindle) | 1 (Hamlet of Brindle) | 3.7 (Archer's Hold) |
+| 3 gold each | 1.4 (Hamlet of Brindle) | 4 (Hamlet of Brindle) | 6.5 (Archer's Hold) |
+| 6 gold each | 2.4 (Hamlet of Brindle) | 6.9 (Hamlet of Brindle) | 9.3 (Archer's Hold) |
 
-Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages in value, losses included, from 400 raids each.
+Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages, losses included, from 400 raids each.
 
-| Kingdom | Loot value | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
+| Kingdom | Loot | Falls: alone → with the tag-along | Carrier alone takes | Carrier takes, shared | Tag-along takes | Tag-along if it falls and the hatchling stands | Raid rounds the hatchling then misses |
 |---|---|---|---|---|---|---|---|
-| Hamlet of Brindle (8) | 6 | 100% → 100% | 6 | 6 | 0 | about 0 | 0 |
-| Stormspire (35) | 36 | 67% → 82% | 24.1 | 27.9 | 1.6 | about 4 | 0.8 |
+| Hamlet of Brindle (8) | 2 livestock, 1 gold | 100% → 100% | 2 livestock, 1 gold | 2 livestock, 1 gold | nothing | about nothing | 0 |
+| Stormspire (35) | 17 gold | 67% → 82% | 11.4 gold | 13.1 gold | 0.8 gold | about 2 gold | 0.8 |
 
 Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
 
-Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 12.3 in value, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 3.5, and misses 2.9 raid rounds.
+Being bailed on, from 400 raids each (elements varying): two players each send a base adult to Knightsgate (power 28). If both fight, it falls 92% of the time, each takes 1.8 stone, 4.5 gold, and each dragon misses 1.8 raid rounds on average. If one secretly bails, the one left alone wins 14% of the time, takes 0.6 stone, 1.4 gold, and misses 2.9 raid rounds.
 
 ## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses 2.5 value a round). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player; if not, it stays at full health. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player; if not, it stays at full health. New fauna comes only from cards.
 
-| Beast | Health | Attack (avg) | Strong vs | Weak vs | Loot | Loot value | Starts |
-|---|---|---|---|---|---|---|---|
-| Wolf Pack | 8 | 1×1d6 (3.5) | — | fire | 2 livestock | 2 | 2 steps from the nearest tower |
-| Cave Bear | 16 | 1×1d10 (5.5) | ice | lightning | 4 livestock | 4 | 3 steps from the nearest tower |
-| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 4 livestock, 2 gold | 12 | 4+ steps from the nearest tower |
+| Beast | Health | Attack (avg) | Strong vs | Weak vs | Loot | Starts |
+|---|---|---|---|---|---|---|
+| Wolf Pack | 8 | 1×1d6 (3.5) | — | fire | 2 livestock | 2 steps from the nearest tower |
+| Cave Bear | 16 | 1×1d10 (5.5) | ice | lightning | 4 livestock | 3 steps from the nearest tower |
+| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 
 Chance the beast falls, from 100 fights through the engine per cell, averaged over the five base dragons' elements (worst–best element in brackets):
 
@@ -235,10 +278,10 @@ On the starting map (one beast per 8 land hexes, none within 1 step of a tower),
 
 Cards that send fauna (action cards; see Decks for how often they come):
 
-| Card | Sends | Cost | Value | Copies |
-|---|---|---|---|---|
-| Wolf Call | Wolf Pack | 1 crystal, 2 gold | 9 | 2 |
-| Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 14 | 1 |
+| Card | Sends | Cost | Copies |
+|---|---|---|---|
+| Wolf Call | Wolf Pack | 1 crystal, 2 gold | 2 |
+| Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 1 |
 
 ## Great beasts
 
@@ -324,6 +367,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|---|
-| 2 | 13 | 19 | 34 | 0 | 77% | 37% | 87% | 17%, median round 18 | 20%, median round 17 |
-| 3 | 14 | 19 | 23 | 0 | 63% | 57% | 93% | 20%, median round 19 | 27%, median round 19 |
-| 4 | 13 | 19 | 22 | 0 | 60% | 67% | 90% | 30%, median round 18 | 17%, median round 13 |
+| 2 | 14 | 19 | 27 | 0 | 73% | 47% | 80% | 10%, median round 21 | 20%, median round 19 |
+| 3 | 13 | 20 | 24 | 0 | 63% | 70% | 87% | 27%, median round 18 | 13%, median round 17 |
+| 4 | 14 | 18 | 23 | 0 | 63% | 80% | 90% | 23%, median round 18 | 17%, median round 19 |

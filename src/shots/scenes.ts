@@ -197,7 +197,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
       { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
-      { file: 'phone-join-started', caption: 'Phone: joining a game that has started, every seat taken', client: 'phone', fill: { name: 'Zed' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-join-started', caption: "Phone: the room's address for a game that has started, everyone at their seat", client: 'phone', waitFor: '.seats' },
     ],
   },
   {
@@ -557,6 +557,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     shots: () => [
       { file: 'tv-resume-3p', caption: 'TV: a saved game hosted again, every seat open', client: 'tv' },
+      { file: 'phone-resume-open', caption: "Phone: the room's address for a resumed game: take an open seat with a name", client: 'phone', waitFor: '.seats' },
       { file: 'phone-resume-join', caption: 'Phone: joining a resumed game takes an open seat', client: 'phone', fill: { name: 'Ada' }, clicks: ['#join button[type=submit]'], waitFor: '.mehead' },
     ],
   },
@@ -613,7 +614,7 @@ export const SCENES: Scene[] = [
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,
-    seed: 3,
+    seed: 82,
     until: (g) => {
       if (g.round < 4 || g.phase !== 'action') return false;
       const c = structuredClone(g);
@@ -854,6 +855,26 @@ export const SCENES: Scene[] = [
         ...kinds.flatMap((k) => [send(k, false), send(k, true)]),
       ];
     },
+  },
+  // ---------- away, quitting, taking a seat back (last, so the scenes above keep their room codes) ----------
+  {
+    // A player who's away, one who quits, and taking a seat back. Each shot
+    // changes the room, in this order.
+    name: 'away-3p',
+    players: 3,
+    seed: 1,
+    away: [1],
+    until: (g) => g.round === 2 && g.phase === 'action' && g.turn === 1,
+    shots: () => [
+      { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
+      { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
+      { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
+      { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
+      { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },
+      { file: 'phone-join-seats-3p', caption: "Phone: the room's address mid-game: tap your name to take your seat back", client: 'phone', waitFor: '.seats', sizes: true },
+      { file: 'phone-seat-back-3p', caption: 'Phone: a seat taken back (by tapping its name)', client: 'phone', clicks: ['[data-seat]'], waitFor: '.mehead' },
+      { file: 'tv-back-3p', caption: 'TV: a player a bot was playing for is back', client: 'tv', then: (room) => { room.join('Bram'); } },
+    ],
   },
 ];
 

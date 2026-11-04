@@ -29,6 +29,7 @@ let selected = new Set<string>(); // discard picks
 let trade = fresh();
 let bank = { give: 'stone', get: 'gold', times: 1 };
 let busy = false;
+let menu = false; // the menu under your name (Quit game) is open
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
 let seenHand: Set<string> | null = null;
@@ -51,9 +52,12 @@ async function boot() {
     localStorage.setItem('seat', JSON.stringify({ code: hash.get('code'), token: hash.get('token') }));
     history.replaceState(null, '', '/');
   }
+  // The seat this phone holds comes back on its own: a reload, a closed tab, a
+  // phone that slept. A room's address (the TV's QR code) for another room
+  // wins over a seat remembered from an earlier game.
   try {
     const saved = JSON.parse(localStorage.getItem('seat') ?? 'null');
-    if (saved?.code && saved?.token) {
+    if (saved?.code && saved?.token && (!code || code === saved.code)) {
       const r = await fetch(`/api/rooms/${saved.code}?token=${saved.token}`);
       if (r.ok && (await r.json()).seated) return enter(saved.code, saved.token);
     }
@@ -61,35 +65,83 @@ async function boot() {
   renderJoin();
 }
 
-// What was typed survives a failed join, so a wrong code doesn't cost the name too.
-function renderJoin(err = '', typed?: { code: string; name: string }) {
+type RoomInfo = { lobby: Snapshot['lobby'] } | null;
+const roomInfo = (c: string): Promise<RoomInfo> => fetch(`/api/rooms/${c}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+// The join form. Opened from a room's address (the QR code on the TV), it asks
+// only for a name; a game that has started instead shows the seats a player
+// can take back. What was typed survives a failed join, so a wrong code
+// doesn't cost the name too.
+// `news` says what just happened to this phone (you quit, you were removed).
+async function renderJoin(err = '', typed?: { code: string; name: string }, news = '') {
   const name = typed?.name ?? localStorage.getItem('name') ?? '';
+  const c = typed?.code ?? code;
+  const room = /^[A-Za-z]{4}$/.test(c) ? await roomInfo(c.toUpperCase()) : null;
+  if (room?.lobby.started) return renderSeats(room.lobby, err, name, news);
+  const known = !!room; // the room is there: no code to type
   app.innerHTML = `
     <div class="joinpage">
       <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
       <form class="joinform" id="join">
+        ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
-        <label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(typed?.code ?? code)}" required></label>
+        ${known ? `<p class="roomline">Room <b>${esc(room!.lobby.code)}</b></p><input id="code" type="hidden" value="${esc(room!.lobby.code)}">`
+          : `<label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(c)}" required></label>`}
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <button class="primary big" type="submit">Join</button>
         <p class="error">${esc(err)}</p>
       </form>
     </div>`;
-  const form = document.getElementById('join') as HTMLFormElement;
+  wireJoin();
+}
+
+function wireJoin() {
+  const form = document.getElementById('join') as HTMLFormElement | null;
+  if (!form) return;
   form.onsubmit = async (e) => {
     e.preventDefault();
     const c = (document.getElementById('code') as HTMLInputElement).value.trim().toUpperCase();
     const n = (document.getElementById('name') as HTMLInputElement).value.trim();
-    code = c;
-    try {
-      const r = await post(`/api/rooms/${c}/join`, { name: n });
-      localStorage.setItem('name', n);
-      localStorage.setItem('seat', JSON.stringify({ code: c, token: r.token }));
-      enter(c, String(r.token));
-    } catch (er) {
-      renderJoin(er instanceof Error ? er.message : String(er), { code: c, name: n });
-    }
+    await join(c, n, n);
   };
+}
+
+// `name` is a new player's name, or the name of the seat being taken back.
+async function join(c: string, name: string, typed: string) {
+  code = c;
+  try {
+    const r = await post(`/api/rooms/${c}/join`, { name });
+    localStorage.setItem('name', name);
+    localStorage.setItem('seat', JSON.stringify({ code: c, token: r.token }));
+    enter(c, String(r.token));
+  } catch (er) {
+    renderJoin(er instanceof Error ? er.message : String(er), { code: c, name: typed });
+  }
+}
+
+// A game that has started: tap your name to take your seat back (after closing
+// the tab, on another phone, or after quitting). A seat with someone at it
+// isn't offered. A saved game hosted again also has open seats: join those
+// with a name.
+function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '') {
+  const free = l.seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'player' && (s.left || !s.connected));
+  const open = l.seats.some((s) => s.kind === 'open');
+  const seats = free.map(({ s, i }) => `<button class="seatbtn" data-seat="${esc(s.name)}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span><span class="tag">${s.left ? 'Quit' : 'Away'}</span></button>`).join('');
+  app.innerHTML = `
+    <div class="joinpage">
+      <div class="hero">${tableScene(l.seats.map((_, i) => PLAYER_COLORS[i]), 360, 200)}<h1 class="title">board-lite</h1></div>
+      <div class="joinform seats">
+        ${news ? `<p class="news">${esc(news)}</p>` : ''}
+        <p class="roomline">Room <b>${esc(l.code)}</b>: the game has started.</p>
+        ${free.length ? `<p>Tap your name to take your seat back.</p><div class="seatlist">${seats}</div>` : open ? '' : '<p>Every seat is taken.</p>'}
+        ${open ? `<form id="join" class="joinform inner"><p>${free.length ? 'Or take' : 'Take'} an open seat:</p><input id="code" type="hidden" value="${esc(l.code)}">
+          <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
+          <button class="primary big" type="submit">Join</button></form>` : ''}
+        <p class="error">${esc(err)}</p>
+      </div>
+    </div>`;
+  app.querySelectorAll<HTMLElement>('[data-seat]').forEach((b) => (b.onclick = () => join(l.code, b.dataset.seat!, name)));
+  wireJoin();
 }
 
 function enter(c: string, t: string) {
@@ -108,6 +160,7 @@ function onSnapshot(s: Snapshot) {
     seenHand = new Set(); // watching from the lobby: the first hand is dealt in
     return renderLobby();
   }
+  if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
@@ -150,7 +203,9 @@ function leaveToJoin(msg: string) {
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
-  renderJoin(msg);
+  document.body.classList.remove('has-hand', 'hand-below', 'raiding');
+  document.body.style.removeProperty('--hs');
+  renderJoin('', undefined, msg);
 }
 
 // ---------- lobby ----------
@@ -219,6 +274,7 @@ function header(g: PublicState, me: Me): string {
       <header class="me">
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
+        <button id="menu" class="ghost menubtn" aria-label="Menu" aria-expanded="${menu}">⋯</button>
       </header>
       <div class="resbar">${res}</div>
     </div>`;
@@ -239,8 +295,24 @@ function status(g: PublicState, me: Me): string {
   }
   const tags = g.waitingOn.map((p) => playerTag(p, names));
   const w = tags.length < 2 ? tags.join('') : `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`;
-  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>`;
-  return `<div class="status"><span>Waiting for ${w || 'the table'}.</span></div>`;
+  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>${away(g)}`;
+  return `<div class="status"><span>Waiting for ${w || 'the table'}.</span></div>${away(g)}`;
+}
+
+// The menu under your name: quitting is there, out of the way of the game.
+function menuSheet(): string {
+  return `<div class="menuback" id="menuclose"></div><div class="menu"><h3>Quit game</h3>
+    <p>A bot plays your seat for the rest of the game, as little as it can. To come back, open the room's address and tap your name.</p>
+    <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
+}
+
+// The table waits on someone whose phone is gone (closed, asleep, out of
+// Wi-Fi): anyone may let a bot play for them, so the game doesn't stall. Their
+// phone coming back hands the seat back to them.
+function away(g: PublicState): string {
+  const seats = snap!.lobby.seats;
+  return g.waitingOn.filter((p) => seats[p]?.kind === 'player' && !seats[p].connected && !seats[p].standIn)
+    .map((p) => `<div class="awayline"><span>${playerTag(p, names)} is away.</span><button class="small" data-standin="${p}">Let a bot play</button></div>`).join('');
 }
 
 function render() {
@@ -264,7 +336,7 @@ function render() {
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('raiding', g.phase === 'raid');
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
-  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}`;
+  app.innerHTML = g.phase === 'over' && !picking ? body : `${header(g, me)}${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>${dock}${zoom}${menu ? menuSheet() : ''}`;
   fitHand();
   fitMap(g);
   wire(g, me);
@@ -857,7 +929,33 @@ function wire(g: PublicState, me: Me) {
   on('fight', () => send('fight'));
   on('bail', () => send('bail'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
-  on('newgame', () => leaveToJoin(''));
+  on('newgame', () => {
+    code = ''; // a new game is in a new room: type its code, or scan the TV
+    leaveToJoin('');
+  });
+  on('menu', () => {
+    menu = !menu;
+    render();
+  });
+  for (const id of ['menuclose', 'menucancel']) {
+    on(id, () => {
+      menu = false;
+      render();
+    });
+  }
+  on('quit', async () => {
+    stop?.(); // the seat stops being this phone's: don't hear that as someone taking it
+    stop = null;
+    try {
+      await post(`/api/rooms/${code}/quit`, { token });
+    } catch (e) {
+      enter(code, token);
+      throw e;
+    }
+    menu = false;
+    leaveToJoin('You quit. A bot plays your seat.');
+  });
+  bind('[data-standin]', (el) => post(`/api/rooms/${code}/standin`, { token, seat: Number(el.dataset.standin) }));
 }
 
 function toast(e: unknown) {
