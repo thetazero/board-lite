@@ -97,10 +97,9 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 - N is 20 (it was 15), raised "a bit" as the owner asked. Buildings pay back more slowly to match: a basic production building in about 4.5 rounds, so one built early pays for itself by the middle of the game and earns about twice its cost by the end (`docs/datasheet.md`).
 - Point sources:
   - Dragons, by life stage.
-  - Buildings: some building cards are worth points (e.g. tower floors, monuments).
-  - Upgrades can add points to their building.
+  - Buildings: only the monument cards are worth points, and each is expensive (#98). The owner, 2026-11-03: "I feel like VP buildings should be expensive monuments only." Production buildings, tower floors and upgrades are worth none. Gold was too cheap to turn into points ("4 fold for 2 points is just insane right?"), so Gilding is gone and a monument costs 10 gold, while raid gold stays big ("raids are supposed to be gold farms and large amounts of gold feels good").
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap).
-  - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest territory. Kept to these three.
+  - Titles that change hands, like Catan's "longest road": strongest dragon army and tallest tower; Largest Hoard is planned (#109). Largest Territory went in #98: "it just intensifies ecomic snowball, while talesr tower is: 1. literally visually cool 2. a side quest/resource sink". Tower floors count only toward Tallest Tower.
   - Titles take real investment: "strongest army and largest territory need a larger threshold".
   - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 2 points (1 until #80).
 
@@ -117,7 +116,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Lots of variety: "I want lots of fun variety."
   - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: one per resource (quarry, lumber camp, mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
+- Building classes so far: one per resource (quarry, lumber camp, mine, pasture), dragon buildings (roost, hatchery), monuments (the tower, its floors and the point cards), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
 
 ### Special projects
 
@@ -229,7 +228,7 @@ The owner's calls (2026-11-03), after playing the first clients:
 The doc left these open; the engine had to pick something. Each is provisional, the reasoning is in the first rules engine's PR (#3), and `docs/rules.md` has the rules as played.
 
 - Card picking: 1 action card is dealt; 2 building cards are drawn and one is kept (the owner's "draw two keep 1"), all at once in the cards phase.
-- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid mostly in gold, so raid loot always has a way into points. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
+- Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid partly in gold; since #98 it is worth no points and counts only toward Tallest Tower. Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
 - The first player rotates each round.
 - The tower produces 1 of each non-gold resource and houses 1 dragon.

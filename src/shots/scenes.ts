@@ -144,7 +144,7 @@ function most(g: Game, p: number, not = ''): string {
 // The production cards (building art, batch 2).
 const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
 // The dragon, trade and monument cards and the upgrades (building art, batch 3).
-const CIVIC_CARDS = ['hatchery', 'port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'gilding', 'nesting_grounds', 'trade_charter'];
+const CIVIC_CARDS = ['hatchery', 'port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds', 'trade_charter'];
 
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
@@ -303,15 +303,14 @@ export const SCENES: Scene[] = [
         .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
-        [['port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, 'gilding']],
-        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), 'gilding'], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
+        [['port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
         const k = near(p, ok);
         if (k) g.buildings[k] = { type, owner: p, upgrade, floors: 0 };
       }
       g.buildings[g.towers[0]].floors = 2;
-      g.buildings[g.towers[0]].upgrade = 'gilding';
       g.buildings[g.towers[1]].upgrade = 'nesting_grounds';
       giveHand(g, g.turn, CIVIC_CARDS);
     },

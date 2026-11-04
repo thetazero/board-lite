@@ -454,7 +454,7 @@ function cottage(w: number, d: number, h: number, wall: string, roof: string): T
   return g;
 }
 
-function tower(pc: string, floors: number, gilded: boolean): THREE.Group {
+function tower(pc: string, floors: number): THREE.Group {
   const g = new THREE.Group();
   const base = 0.85, step = 0.3;
   const h = base + step * floors;
@@ -465,8 +465,8 @@ function tower(pc: string, floors: number, gilded: boolean): THREE.Group {
     const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
     g.add(part(box(0.1, 0.1, 0.08), WALL, { at: [Math.sin(a) * 0.29, h + 0.05, Math.cos(a) * 0.29], rot: [0, a, 0] }));
   }
-  g.add(part(cone(0.4, 0.62, 6), gilded ? GOLD : pc, { at: [0, h + 0.31 + 0.04, 0] }));
-  const f = flag(gilded ? GOLD : pc, 0.35);
+  g.add(part(cone(0.4, 0.62, 6), pc, { at: [0, h + 0.31 + 0.04, 0] }));
+  const f = flag(pc, 0.35);
   f.position.y = h + 0.6;
   g.add(f);
   // Door and windows face the room.
@@ -887,18 +887,18 @@ function market(): THREE.Group {
 }
 
 // An obelisk on a stepped plinth, tipped with gold.
-function monument(gilded: boolean): THREE.Group {
+function monument(): THREE.Group {
   return group(
     part(box(0.6, 0.1, 0.6), MONUMENT_DARK, { at: [0, 0.05, 0] }),
     part(box(0.42, 0.1, 0.42), MONUMENT_STONE, { at: [0, 0.15, 0] }),
-    part(cyl(0.07, 0.15, 1.15, 4), gilded ? mix(GOLD, WALL, 0.35) : MONUMENT_STONE, { at: [0, 0.775, 0], rot: [0, Math.PI / 4, 0] }),
+    part(cyl(0.07, 0.15, 1.15, 4), MONUMENT_STONE, { at: [0, 0.775, 0], rot: [0, Math.PI / 4, 0] }),
     part(cone(0.1, 0.18, 4), GOLD, { at: [0, 1.44, 0], rot: [0, Math.PI / 4, 0], glow: 0.15 }),
   );
 }
 
 // A ring of standing stones round a glowing ley stone; at the back a
 // trilithon, its lintel carrying a gold sun.
-function standingStones(gilded: boolean): THREE.Group {
+function standingStones(): THREE.Group {
   const g = new THREE.Group();
   const n = 6, R = 0.44;
   for (let i = 0; i < n; i++) {
@@ -907,10 +907,10 @@ function standingStones(gilded: boolean): THREE.Group {
     if (back) continue;
     const h = 0.4 + ((i * 37) % 10) / 50;
     g.add(part(box(0.13, h, 0.09), i % 2 ? MONUMENT_STONE : MONUMENT_DARK, { at: [Math.cos(a) * R, h / 2, Math.sin(a) * R], rot: [0, -a + Math.PI / 2, (i % 3 - 1) * 0.07] }));
-    g.add(part(cone(0.07, 0.06, 4), gilded ? GOLD : MONUMENT_STONE, { at: [Math.cos(a) * R, h + 0.03, Math.sin(a) * R], rot: [0, -a + Math.PI / 4, 0], crease: false }));
+    g.add(part(cone(0.07, 0.06, 4), MONUMENT_STONE, { at: [Math.cos(a) * R, h + 0.03, Math.sin(a) * R], rot: [0, -a + Math.PI / 4, 0], crease: false }));
   }
   for (const x of [-0.2, 0.2]) g.add(part(box(0.15, 0.7, 0.12), MONUMENT_STONE, { at: [x, 0.35, -0.4] }));
-  g.add(part(box(0.62, 0.13, 0.15), gilded ? mix(GOLD, WALL, 0.3) : MONUMENT_DARK, { at: [0, 0.76, -0.4] }));
+  g.add(part(box(0.62, 0.13, 0.15), MONUMENT_DARK, { at: [0, 0.76, -0.4] }));
   g.add(part(cyl(0.11, 0.11, 0.04, 8), GOLD, { at: [0, 0.58, -0.33], rot: [Math.PI / 2, 0, 0], glow: 0.2 }));
   // The ley stone in the middle, and the violet line it sits on.
   g.add(part(box(0.5, 0.012, 0.06), CRYSTAL, { at: [0, 0.006, 0.05], rot: [0, 0.5, 0], glow: 0.4, crease: false }));
@@ -922,14 +922,14 @@ function standingStones(gilded: boolean): THREE.Group {
 
 // A lighthouse on a rock, facing the sea: a tall pale tower, a gold lantern
 // lit at its top under a cap.
-function lighthouse(gilded: boolean): THREE.Group {
+function lighthouse(): THREE.Group {
   const g = new THREE.Group();
   g.add(part(new THREE.DodecahedronGeometry(0.34, 0), STONE, { at: [0, 0.08, 0], scale: [1.3, 0.55, 1.2] }));
   g.add(part(cyl(0.15, 0.24, 1.0, 8), MONUMENT_STONE, { at: [0, 0.6, 0] }));
   for (const y of [0.45, 0.8]) g.add(part(cyl(0.2 - (y - 0.45) * 0.17, 0.21 - (y - 0.45) * 0.17, 0.07, 8), MONUMENT_DARK, { at: [0, y, 0], crease: false }));
   g.add(part(cyl(0.21, 0.21, 0.04, 8), MONUMENT_DARK, { at: [0, 1.12, 0] }));
   g.add(part(cyl(0.12, 0.12, 0.18, 8), '#ffd23f', { at: [0, 1.23, 0], glow: 0.8 }));
-  g.add(part(cone(0.17, 0.18, 8), gilded ? GOLD : MONUMENT_DARK, { at: [0, 1.41, 0] }));
+  g.add(part(cone(0.17, 0.18, 8), MONUMENT_DARK, { at: [0, 1.41, 0] }));
   g.add(part(cone(0.04, 0.1, 4), GOLD, { at: [0, 1.54, 0], glow: 0.15 }));
   // The door, toward the land.
   g.add(part(box(0.1, 0.16, 0.02), DARK, { at: [0, 0.3, -0.2], crease: false }));
@@ -939,13 +939,13 @@ function lighthouse(gilded: boolean): THREE.Group {
 // A guildhall: a pale stone hall behind a columned porch, a gold finial on
 // its roof and banners in the goods' colours hung between the columns (the
 // trade it honours).
-function guildhall(gilded: boolean): THREE.Group {
+function guildhall(): THREE.Group {
   const g = new THREE.Group();
   g.add(part(box(0.8, 0.07, 0.62), MONUMENT_DARK, { at: [0, 0.035, -0.05] }));
   g.add(part(box(0.66, 0.42, 0.36), MONUMENT_STONE, { at: [0, 0.28, -0.16] }));
   g.add(gable(0.74, 0.62, 0.26, MONUMENT_DARK, 0.6).translateZ(-0.06));
   // The pediment's face over the porch.
-  g.add(part(sheet([[-0.36, 0, 0], [0.36, 0, 0], [0, 0.22, 0]], [[0, 1, 2]]), gilded ? mix(GOLD, WALL, 0.25) : MONUMENT_STONE, { at: [0, 0.53, 0.25], two: true }));
+  g.add(part(sheet([[-0.36, 0, 0], [0.36, 0, 0], [0, 0.22, 0]], [[0, 1, 2]]), MONUMENT_STONE, { at: [0, 0.53, 0.25], two: true }));
   for (let i = 0; i < 4; i++) g.add(part(cyl(0.035, 0.04, 0.42, 6), WALL, { at: [-0.27 + i * 0.18, 0.28, 0.21] }));
   g.add(part(box(0.7, 0.05, 0.1), MONUMENT_STONE, { at: [0, 0.51, 0.21] }));
   // Banners in three of the goods' colours between the columns.
@@ -1237,9 +1237,8 @@ const NESTING_PERCHES: Perch[] = [{ x: -0.42, y: 0, z: 0.52, face: 1.7 }, { x: -
 
 function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Group; offset: [number, number] } {
   const pc = PLAYER_COLORS[b.owner];
-  const gilded = b.upgrade === 'gilding';
   switch (b.type) {
-    case 'tower': return { model: tower(pc, b.floors, gilded), offset: [-0.15, -0.2] };
+    case 'tower': return { model: tower(pc, b.floors), offset: [-0.15, -0.2] };
     case 'quarry': return { model: quarry(), offset: [0, 0] };
     case 'lumber_camp': return { model: lumberCamp(), offset: [0, 0] };
     case 'crystal_mine': return { model: crystalMine(), offset: [0, 0] };
@@ -1248,10 +1247,10 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'hatchery': return { model: hatchery(), offset: [0, 0] };
     case 'port': return { model: port(), offset: [0, 0] };
     case 'market': return { model: market(), offset: [0, 0] };
-    case 'monument': return { model: monument(gilded), offset: [0, 0] };
-    case 'standing_stones': return { model: standingStones(gilded), offset: [0, 0] };
-    case 'lighthouse': return { model: lighthouse(gilded), offset: [0, 0] };
-    case 'guildhall': return { model: guildhall(gilded), offset: [0, 0] };
+    case 'monument': return { model: monument(), offset: [0, 0] };
+    case 'standing_stones': return { model: standingStones(), offset: [0, 0] };
+    case 'lighthouse': return { model: lighthouse(), offset: [0, 0] };
+    case 'guildhall': return { model: guildhall(), offset: [0, 0] };
     case 'cliff_works': return { model: cliffWorks(), offset: [0, 0] };
     case 'stonemason': return { model: stonemason(), offset: [0, 0] };
     case 'woodcutter': return { model: woodcutter(), offset: [0, 0] };
@@ -1271,7 +1270,7 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
 const UPGRADE_AT: [number, number] = [-0.56, 0.4];
 
 // What each upgrade puts beside the building it's on, as its card and icon
-// show it (icons.ts): a workshop's cog, gilding's crown, nesting grounds' nest
+// show it (icons.ts): a workshop's cog, nesting grounds' nest
 // (the dragons it houses sit by it), a trade charter's sealed scroll.
 function upgradeMark(key: string): THREE.Group {
   const g = new THREE.Group();
@@ -1290,17 +1289,6 @@ function upgradeMark(key: string): THREE.Group {
       cog.position.set(0, 0.36, 0);
       cog.rotation.x = -0.7; // tipped back to face the camera
       g.add(cog);
-      break;
-    }
-    case 'gilding': {
-      // A gold crown on a cream cushion.
-      g.add(part(box(0.24, 0.07, 0.24), WALL, { at: [0, 0.035, 0], rot: [0, Math.PI / 4, 0] }));
-      g.add(part(cyl(0.12, 0.11, 0.09, 10), GOLD, { at: [0, 0.115, 0] }));
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2 + Math.PI / 2;
-        g.add(part(cone(0.04, 0.1, 4), GOLD, { at: [Math.cos(a) * 0.1, 0.21, Math.sin(a) * 0.1], glow: 0.12 }));
-      }
-      g.add(part(new THREE.OctahedronGeometry(0.03, 0), '#d64545', { at: [0, 0.12, 0.115], crease: false }));
       break;
     }
     case 'nesting_grounds': {

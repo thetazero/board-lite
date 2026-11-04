@@ -56,15 +56,6 @@ function sword(deg: number): Facet[] {
   ];
 }
 
-// A small hex tile, its top half lit.
-function hexFacets(cx: number, cy: number, light: string, dark: string): Facet[] {
-  const c = (deg: number): [number, number] => { const [x, y] = polar(4.6, deg); return [cx + x, cy + y]; };
-  return [
-    [light, P([c(150), c(210), c(270), c(330), c(30)])],
-    [dark, P([c(30), c(90), c(150)])],
-  ];
-}
-
 // A die's paper shape, and its pips as small dark octagons.
 const DIE: Record<string, Facet[]> = {
   d6: [
@@ -164,13 +155,8 @@ const ICONS: Record<string, Facet[]> = {
     ['#3e7bfa', P(Array.from({ length: 8 }, (_, i) => polar(3.8, 22.5 + 45 * i)))],
     ['#111', P(Array.from({ length: 6 }, (_, i) => polar(1.7, 30 + 60 * i)))],
   ],
-  // Titles: the tallest tower, the largest territory, the strongest army.
+  // Titles: the tallest tower, the strongest army.
   tower: [], // drawn below, as the tower building
-  territory: [
-    ...hexFacets(-4.6, -4, '#a6d46a', '#6f9a3a'),
-    ...hexFacets(4.6, -4, '#e3d39f', '#b39f62'),
-    ...hexFacets(0, 4, '#4f8a5a', '#2f5e3a'),
-  ],
   // Elements.
   // A flame of three tongues around a yellow core, so it reads as fire even dimmed.
   fire: [
@@ -370,8 +356,8 @@ const ICONS: Record<string, Facet[]> = {
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', territory: 'largest territory', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
-  workshop: 'Workshop', gilding: 'Gilding', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
+const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+  workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
@@ -794,19 +780,6 @@ ICONS.workshop = [
   }),
   ...bevel(16, 7.2, 3.2, 0, '#eef1f5', '#c9ced6', '#8d949e'),
   ['#3a302b', P(Array.from({ length: 8 }, (_, i) => polar(3.2, 22.5 + i * 45)))],
-];
-// Gilding's crown, a red stone set in its band.
-ICONS.gilding = [
-  ['#ffe9a3', P([[-8.6, 4], [-8.6, -6.6], [-4.6, -1.6], [0, -9], [0, 4]])],
-  ['#e0a820', P([[0, -9], [4.6, -1.6], [8.6, -6.6], [8.6, 4], [0, 4]])],
-  ['#c79314', P([[-8.6, 4], [8.6, 4], [8.6, 7.6], [-8.6, 7.6]])],
-  ['#f5c542', P([[-8.6, 4], [0, 4], [0, 7.6], [-8.6, 7.6]])],
-  ['#e5484d', P([[0, 3.6], [1.8, 5.8], [0, 8], [-1.8, 5.8]])],
-  ['#3e7bfa', P([[-5.4, 4.6], [-4.2, 5.8], [-5.4, 7], [-6.6, 5.8]])],
-  ['#30a46c', P([[5.4, 4.6], [6.6, 5.8], [5.4, 7], [4.2, 5.8]])],
-  ['#fffbe6', P([[-8.6, -6.6], [-7.6, -7.8], [-9.6, -7.8]])],
-  ['#fffbe6', P([[0, -9], [1, -10], [-1, -10]])],
-  ['#fffbe6', P([[8.6, -6.6], [9.6, -7.8], [7.6, -7.8]])],
 ];
 // Nesting grounds' nest, with eggs in it.
 ICONS.nesting_grounds = moved(NEST(0, 2.4), 0, 0, 1.55);

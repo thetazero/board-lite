@@ -22,7 +22,7 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Crystal Mine | basic building | — | 4 stone, 4 timber, 3 livestock | Makes 1d4 crystal each round. | — |
 | Pasture | basic building | — | 3 stone, 4 timber, 4 crystal | Makes 1d4 livestock each round. | — |
 | Roost | basic building | — | 2 stone, 2 timber | Houses 2 more dragons. | — |
-| Tower Floor | basic building | — | 3 stone, 2 gold | Adds a floor to your tower, worth 1 point. | 1 |
+| Tower Floor | basic building | — | 3 stone, 2 gold | Adds a floor to your tower. Floors count toward Tallest Tower. | — |
 | Cliff Works | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent mountain. | — |
 | Stonemason | building card | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent quarry. | — |
 | Woodcutter's Hut | building card | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent forest. | — |
@@ -37,12 +37,11 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Hatchery | building card | 2 | 3 stone, 3 timber, 3 crystal | Your dragons grow 1 extra step each round. | — |
 | Port | building card | 3 | 1 stone, 3 timber, 1 livestock | You trade with the bank at 3:1. | — |
 | Market | building card | 2 | 3 stone, 3 timber, 3 crystal, 2 gold | Makes 1 gold each round for each adjacent trade building. | — |
-| Monument | building card | 2 | 3 stone, 2 timber, 3 gold | Worth 1 point for each adjacent monument. | 1 each |
-| Standing Stones | building card | 2 | 2 stone, 2 crystal, 3 gold | Worth 1 point for each adjacent ley line. | 1 each |
-| Lighthouse | building card | 2 | 4 stone, 2 timber, 3 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
-| Guildhall | building card | 1 | 2 stone, 2 timber, 3 gold | Worth 1 point for each adjacent trade building. | 1 each |
+| Monument | building card | 2 | 4 stone, 3 timber, 10 gold | Worth 1 point for each adjacent monument. | 1 each |
+| Standing Stones | building card | 2 | 3 stone, 3 crystal, 10 gold | Worth 1 point for each adjacent ley line. | 1 each |
+| Lighthouse | building card | 2 | 5 stone, 3 timber, 10 gold | Worth 1 point for each adjacent ocean hex. | 1 each |
+| Guildhall | building card | 1 | 3 stone, 3 timber, 10 gold | Worth 1 point for each adjacent trade building. | 1 each |
 | Workshop | upgrade | 4 | 4 stone, 4 timber, 1 crystal | This quarry, lumber camp, mine or pasture makes 2 more. | — |
-| Gilding | upgrade | 3 | 4 gold | This tower or monument is worth 2 more points. | 2 |
 | Nesting Grounds | upgrade | 3 | 2 stone, 1 timber | This roost, hatchery or tower houses 2 more dragons. | — |
 | Trade Charter | upgrade | 3 | 2 stone, 4 gold | This port or market makes 1 more gold each round. | — |
 | Windfall | action card | 5 | nothing | Gain 3 of one resource other than gold. | — |
@@ -133,10 +132,10 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Drovers' Barn | pasture | pastures (anyone's) | 2 stone, 3 timber, 3 crystal | 1 livestock a round | built |
 | Fishery | pasture | ocean hexes | 3 stone, 4 timber, 3 crystal | 1 livestock a round | 3 / 39% |
 | Market | trade building | trade buildings (anyone's) | 3 stone, 3 timber, 3 crystal, 2 gold | 1 gold a round | built |
-| Monument | monument | monuments (anyone's) | 3 stone, 2 timber, 3 gold | 1 point | built |
-| Standing Stones | monument | ley hexes | 2 stone, 2 crystal, 3 gold | 1 point | 1.6 / 20% |
-| Lighthouse | monument | ocean hexes | 4 stone, 2 timber, 3 gold | 1 point | 3 / 39% |
-| Guildhall | monument | trade buildings (anyone's) | 2 stone, 2 timber, 3 gold | 1 point | built |
+| Monument | monument | monuments (anyone's) | 4 stone, 3 timber, 10 gold | 1 point | built |
+| Standing Stones | monument | ley hexes | 3 stone, 3 crystal, 10 gold | 1 point | 1.6 / 20% |
+| Lighthouse | monument | ocean hexes | 5 stone, 3 timber, 10 gold | 1 point | 3 / 39% |
+| Guildhall | monument | trade buildings (anyone's) | 3 stone, 3 timber, 10 gold | 1 point | built |
 
 ## Points
 
@@ -144,12 +143,10 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
-| Tower Floor | 3 stone, 2 gold | 1 | 3 stone, 2 gold | now |
-| Monument, 2 neighbours | 3 stone, 2 timber, 3 gold | 2 | 1.5 stone, 1 timber, 1.5 gold | now |
-| Standing Stones, 2 neighbours | 2 stone, 2 crystal, 3 gold | 2 | 1 stone, 1 crystal, 1.5 gold | now |
-| Lighthouse, 2 neighbours | 4 stone, 2 timber, 3 gold | 2 | 2 stone, 1 timber, 1.5 gold | now |
-| Guildhall, 2 neighbours | 2 stone, 2 timber, 3 gold | 2 | 1 stone, 1 timber, 1.5 gold | now |
-| Gilding (upgrade) | 4 gold | 2 | 2 gold | now |
+| Monument, 2 neighbours | 4 stone, 3 timber, 10 gold | 2 | 2 stone, 1.5 timber, 5 gold | now |
+| Standing Stones, 2 neighbours | 3 stone, 3 crystal, 10 gold | 2 | 1.5 stone, 1.5 crystal, 5 gold | now |
+| Lighthouse, 2 neighbours | 5 stone, 3 timber, 10 gold | 2 | 2.5 stone, 1.5 timber, 5 gold | now |
+| Guildhall, 2 neighbours | 3 stone, 3 timber, 10 gold | 2 | 1.5 stone, 1.5 timber, 5 gold | now |
 | Secret Hoard (action card) | nothing | 1 | nothing | now, uses a hand slot |
 | Base dragon, hatchling | 3 crystal, 2 livestock + 2 livestock | 1 | 3 crystal, 4 livestock | 2 rounds |
 | Base dragon, young | 3 crystal, 2 livestock + 4 livestock | 2 | 1.5 crystal, 3 livestock | 4 rounds |
@@ -164,7 +161,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
 
-Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most buildings, tower included (at least 9).
+Titles: 2 points each, for most dragon points (at least 10) and most tower floors (at least 4). Tower floors are worth nothing else.
 
 ## Dragons
 
@@ -229,7 +226,7 @@ Chance the kingdom falls to one player's raiders fighting to the end, from 100 r
 | Abyss Wyrm (water), adult (22) | 100% | 100% | 11% | 25% | 20% | 0% |
 | Reef Drake (water), adult (17) | 100% | 93% | 0% | 0% | 0% | 0% |
 
-Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.2, young 0.5, adult 2.6. A Tower Floor takes 2 gold.
+Gold a lone base dragon expects from one raid on the best of the 3 kingdoms offered (if its vote wins): hatchling 0.2, young 0.5, adult 2.6. A Monument takes 10 gold.
 
 Shared raids: loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power). Here one player carries the raid with two base adults (34 power), and a second tags along with a base hatchling (5). Base dragons' elements vary from raid to raid. Takes are averages, losses included, from 400 raids each.
 
@@ -306,40 +303,39 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 106 | 23% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 93 | 20% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 122 | 27% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 63 | 14% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 73 | 16% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| stone | 113 | 22% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 98 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 124 | 24% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 63 | 12% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 110 | 22% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
-Building deck 46 cards (18 buildings, 4 upgrades), action deck 41. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 75% of the time.
+Building deck 43 cards (18 buildings, 3 upgrades), action deck 41. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 67% of the time.
 
 | Card | Deck | Copies | Share of deck | By round 5 |
 |---|---|---|---|---|
-| Cliff Works | building | 2 | 4% | 39% |
-| Stonemason | building | 2 | 4% | 39% |
-| Woodcutter's Hut | building | 2 | 4% | 39% |
-| Sawmill | building | 2 | 4% | 39% |
-| Driftwood Yard | building | 1 | 2% | 22% |
-| Ley Spire | building | 2 | 4% | 39% |
-| Gem Cutter | building | 2 | 4% | 39% |
-| Smelter | building | 1 | 2% | 22% |
-| Shepherd's Fold | building | 2 | 4% | 39% |
-| Drovers' Barn | building | 2 | 4% | 39% |
-| Fishery | building | 1 | 2% | 22% |
-| Hatchery | building | 2 | 4% | 39% |
-| Port | building | 3 | 7% | 53% |
-| Market | building | 2 | 4% | 39% |
-| Monument | building | 2 | 4% | 39% |
-| Standing Stones | building | 2 | 4% | 39% |
-| Lighthouse | building | 2 | 4% | 39% |
-| Guildhall | building | 1 | 2% | 22% |
-| Workshop | building deck (upgrade) | 4 | 9% | 64% |
-| Gilding | building deck (upgrade) | 3 | 7% | 53% |
-| Nesting Grounds | building deck (upgrade) | 3 | 7% | 53% |
-| Trade Charter | building deck (upgrade) | 3 | 7% | 53% |
+| Cliff Works | building | 2 | 5% | 42% |
+| Stonemason | building | 2 | 5% | 42% |
+| Woodcutter's Hut | building | 2 | 5% | 42% |
+| Sawmill | building | 2 | 5% | 42% |
+| Driftwood Yard | building | 1 | 2% | 23% |
+| Ley Spire | building | 2 | 5% | 42% |
+| Gem Cutter | building | 2 | 5% | 42% |
+| Smelter | building | 1 | 2% | 23% |
+| Shepherd's Fold | building | 2 | 5% | 42% |
+| Drovers' Barn | building | 2 | 5% | 42% |
+| Fishery | building | 1 | 2% | 23% |
+| Hatchery | building | 2 | 5% | 42% |
+| Port | building | 3 | 7% | 56% |
+| Market | building | 2 | 5% | 42% |
+| Monument | building | 2 | 5% | 42% |
+| Standing Stones | building | 2 | 5% | 42% |
+| Lighthouse | building | 2 | 5% | 42% |
+| Guildhall | building | 1 | 2% | 23% |
+| Workshop | building deck (upgrade) | 4 | 9% | 67% |
+| Nesting Grounds | building deck (upgrade) | 3 | 7% | 56% |
+| Trade Charter | building deck (upgrade) | 3 | 7% | 56% |
 | Windfall | action | 5 | 12% | 50% |
 | Buried Treasure | action | 4 | 10% | 42% |
 | Growth Elixir | action | 4 | 10% | 42% |
@@ -348,19 +344,19 @@ Building deck 46 cards (18 buildings, 4 upgrades), action deck 41. Last column: 
 | Secret Hoard | action | 4 | 10% | 42% |
 | Wolf Call | action | 2 | 5% | 23% |
 | Rouse the Bear | action | 1 | 2% | 12% |
-| Any upgrade (4 kinds) | building deck (upgrade) | 13 | 28% | 98% |
+| Any upgrade (3 kinds) | building deck (upgrade) | 10 | 23% | 95% |
 | Any dragon (15 kinds) | action | 15 | 37% | 91% |
 
 ## Game length (random bots)
 
 30 games per player count between the random bot (`src/bot.ts`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-Last three columns: share of games that end with someone holding each title (it needs 10 dragon points, 4 tower floors or 9 buildings).
+Army held and Tower held: share of games that end with someone holding each title (it needs 10 dragon points or 4 tower floors).
 
 The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
 
-| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Territory held | Thunderbird slain | Leviathan slain |
-|---|---|---|---|---|---|---|---|---|---|
-| 2 | 15 | 21 | 28 | 0 | 80% | 27% | 93% | 7%, median round 20 | 13%, median round 20 |
-| 3 | 15 | 20 | 31 | 0 | 77% | 57% | 97% | 23%, median round 19 | 20%, median round 21 |
-| 4 | 13 | 19 | 25 | 0 | 77% | 80% | 93% | 20%, median round 17 | 40%, median round 17 |
+| Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Thunderbird slain | Leviathan slain |
+|---|---|---|---|---|---|---|---|---|
+| 2 | 19 | 27 | 40 | 0 | 100% | 73% | 47%, median round 25 | 50%, median round 24 |
+| 3 | 20 | 25 | 31 | 0 | 100% | 77% | 47%, median round 23 | 70%, median round 22 |
+| 4 | 14 | 23 | 36 | 0 | 100% | 97% | 70%, median round 20 | 67%, median round 20 |

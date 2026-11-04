@@ -52,7 +52,7 @@ function costs(): string {
   const pts = (n?: number) => (n ? String(n) : '—');
   const rows: (string | number)[][] = [
     ...Object.values(BUILDINGS).map((b) => [b.name, b.basic ? 'basic building' : 'building card', b.copies ?? '—', cost(b.cost), b.text, b.per && b.points ? `${b.points} each` : pts(b.points)]),
-    ...Object.values(UPGRADES).map((u) => [u.name, 'upgrade', u.copies, cost(u.cost), u.text, pts(u.points)]),
+    ...Object.values(UPGRADES).map((u) => [u.name, 'upgrade', u.copies, cost(u.cost), u.text, '—']),
     ...Object.values(ACTIONS).map((a) => [a.name, 'action card', a.copies, cost(a.cost), a.text, a.effect === 'hidden_point' ? '1' : '—']),
     ...Object.values(DRAGONS).map((d) => [d.name, d.base ? 'base dragon' : 'dragon card', d.copies, cost(d.cost), `${d.element}, grows a stage every ${d.growthTime} rounds`, TUNING.dragonPointsByStage.slice(1).join(' / ')]),
   ];
@@ -223,9 +223,6 @@ function pointSources(): PointSource[] {
     const pts = b.points! * (b.per ? 2 : 1);
     out.push({ name: b.per ? `${b.name}, 2 neighbours` : b.name, pays: b.cost, shown: cost(b.cost), points: pts, ready: 'now' });
   }
-  for (const u of Object.values(UPGRADES).filter((u) => u.points)) {
-    out.push({ name: `${u.name} (upgrade)`, pays: u.cost, shown: cost(u.cost), points: u.points!, ready: 'now' });
-  }
   for (const a of Object.values(ACTIONS).filter((a) => a.effect === 'hidden_point')) {
     out.push({ name: `${a.name} (action card)`, pays: a.cost, shown: cost(a.cost), points: 1, ready: 'now, uses a hand slot' });
   }
@@ -261,7 +258,7 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}${hatcheryNote}
 
-Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most buildings, tower included (at least ${TUNING.titleMinimum.territory}).`;
+Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}) and most tower floors (at least ${TUNING.titleMinimum.tower}). Tower floors are worth nothing else.`;
 }
 
 function dragons(): string {
@@ -413,8 +410,8 @@ function raids(): string {
     pick(0, []);
     return sets.reduce((s, x) => s + x, 0) / sets.length;
   };
-  const floor = BUILDINGS.tower_floor;
-  const goldLine = `Gold a lone base dragon expects from one raid on the best of the ${TUNING.raidCandidates} kingdoms offered (if its vote wins): hatchling ${n1(bestOf(goldEach[0]))}, young ${n1(bestOf(goldEach[1]))}, adult ${n1(bestOf(goldEach[2]))}. A ${floor.name} takes ${floor.cost.gold} gold.`;
+  const mon = BUILDINGS.monument;
+  const goldLine = `Gold a lone base dragon expects from one raid on the best of the ${TUNING.raidCandidates} kingdoms offered (if its vote wins): hatchling ${n1(bestOf(goldEach[0]))}, young ${n1(bestOf(goldEach[1]))}, adult ${n1(bestOf(goldEach[2]))}. A ${mon.name} takes ${mon.cost.gold} gold.`;
   const pairCells = targets.map((t) => {
     const all = baseKeys.map((k) => odds(t, [{ key: k, stage: 2 }, { key: k, stage: 2 }], salt++));
     return pct(all.reduce((s, o) => s + o, 0) / all.length);
@@ -631,7 +628,7 @@ function length(): string {
   const rows = botGames().map(({ players, games }) => {
     const rounds: number[] = [];
     let stalled = 0;
-    const held = { army: 0, tower: 0, territory: 0 };
+    const held = { army: 0, tower: 0 };
     const slain: Record<string, number[]> = Object.fromEntries(Object.keys(BEASTS).map((k) => [k, []]));
     for (const g of games) {
       if (g.phase === 'over') rounds.push(g.round);
@@ -650,11 +647,11 @@ function length(): string {
 
 ${GAMES} games per player count between the random bot (\`src/bot.ts\`). Random bots play badly, so this is a sanity check on pace, not a prediction.
 
-Last three columns: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points, ${TUNING.titleMinimum.tower} tower floors or ${TUNING.titleMinimum.territory} buildings).
+Army held and Tower held: share of games that end with someone holding each title (it needs ${TUNING.titleMinimum.army} dragon points or ${TUNING.titleMinimum.tower} tower floors).
 
 The bots try a great beast now and then once they have three grown dragons ready, whatever their elements; the last columns are the share of games in which each beast fell, and when.
 
-${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', 'Territory held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
+${table(['Players', 'Fewest rounds', 'Median', 'Most', 'Stalled', 'Army held', 'Tower held', ...Object.values(BEASTS).map((b) => `${b.name} slain`)], rows)}`;
 }
 
 export function datasheet(): string {
