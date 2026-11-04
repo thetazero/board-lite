@@ -97,7 +97,7 @@ export type GameEvent =
   | { k: 'upgrade'; p: number; u: string; name: string; on: string; hex: string }
   | { k: 'hatch'; p: number; d: string; project?: boolean }
   | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
-  | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; ds: string[] } // a player's dragons attack fauna
+  | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; hp: number; ds: string[] } // a player's dragons attack fauna, at full health
   | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle; points?: number }
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
@@ -825,7 +825,7 @@ function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   }
   for (const d of ds) d.resting = 'hunted';
   const b: Battle = { units: [{ key: f, hp: def.hp }], fighters: ds.map((d) => d.id) };
-  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, ds: [...b.fighters] });
+  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, hp: def.hp, ds: [...b.fighters] });
   for (let round = 1; b.units[0].hp > 0 && b.fighters.length; round++) combatRound(g, b, round);
   const won = b.units[0].hp <= 0;
   if (won) {
