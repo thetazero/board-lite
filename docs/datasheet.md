@@ -50,8 +50,8 @@ Everything that can be bought, as the game has it. Basic buildings have no copie
 | Healing Potion | action card | 3 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
 | War Horn | action card | 3 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | 4 | nothing | Worth 1 point while in your hand. | 1 |
-| Wolf Call | action card | 2 | 1 crystal, 2 gold | Place a Wolf Pack on any land hex with no tower or beast. | — |
-| Rouse the Bear | action card | 1 | 2 crystal, 3 gold | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Wolf Call | action card | 4 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | 2 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | 1 | 3 crystal, 2 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Ice Dragon | base dragon | 1 | 3 crystal, 2 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
 | Lightning Dragon | base dragon | 1 | 3 crystal, 2 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
@@ -247,7 +247,7 @@ Being bailed on, from 400 raids each (elements varying): two players each send a
 
 ## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player; if not, it stays at full health. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is free and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. New fauna comes only from cards.
 
 | Beast | Health | Attack (avg) | Strong vs | Weak vs | Loot | Starts |
 |---|---|---|---|---|---|---|
@@ -277,8 +277,8 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 | Card | Sends | Cost | Copies |
 |---|---|---|---|
-| Wolf Call | Wolf Pack | 1 crystal, 2 gold | 2 |
-| Rouse the Bear | Cave Bear | 2 crystal, 3 gold | 1 |
+| Wolf Call | Cave Bear | 1 crystal | 4 |
+| Rouse the Bear | Basilisk | 1 crystal | 2 |
 
 ## Great beasts
 
@@ -311,13 +311,13 @@ How much of each resource every card in both decks costs in total (each card cou
 |---|---|---|---|
 | stone | 113 | 22% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
 | timber | 98 | 19% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 124 | 24% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 63 | 12% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 110 | 22% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| crystal | 126 | 25% | tower 1, Crystal Mine, Ley Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 63 | 13% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 103 | 20% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
 
 ## Decks
 
-Building deck 43 cards (18 buildings, 3 upgrades), action deck 41. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 67% of the time.
+Building deck 43 cards (18 buildings, 3 upgrades), action deck 44. Last column: chance a player draws at least one (to keep or pass over) within 5 rounds. A player draws at least one upgrade in their first 2 rounds 67% of the time.
 
 | Card | Deck | Copies | Share of deck | By round 5 |
 |---|---|---|---|---|
@@ -342,16 +342,16 @@ Building deck 43 cards (18 buildings, 3 upgrades), action deck 41. Last column: 
 | Workshop | building deck (upgrade) | 4 | 9% | 67% |
 | Nesting Grounds | building deck (upgrade) | 3 | 7% | 56% |
 | Trade Charter | building deck (upgrade) | 3 | 7% | 56% |
-| Windfall | action | 5 | 12% | 50% |
-| Buried Treasure | action | 4 | 10% | 42% |
-| Growth Elixir | action | 4 | 10% | 42% |
-| Healing Potion | action | 3 | 7% | 33% |
-| War Horn | action | 3 | 7% | 33% |
-| Secret Hoard | action | 4 | 10% | 42% |
-| Wolf Call | action | 2 | 5% | 23% |
-| Rouse the Bear | action | 1 | 2% | 12% |
+| Windfall | action | 5 | 11% | 47% |
+| Buried Treasure | action | 4 | 9% | 39% |
+| Growth Elixir | action | 4 | 9% | 39% |
+| Healing Potion | action | 3 | 7% | 31% |
+| War Horn | action | 3 | 7% | 31% |
+| Secret Hoard | action | 4 | 9% | 39% |
+| Wolf Call | action | 4 | 9% | 39% |
+| Rouse the Bear | action | 2 | 5% | 22% |
 | Any upgrade (3 kinds) | building deck (upgrade) | 10 | 23% | 95% |
-| Any dragon (15 kinds) | action | 15 | 37% | 91% |
+| Any dragon (15 kinds) | action | 15 | 34% | 89% |
 
 ## Game length (random bots)
 
@@ -363,6 +363,6 @@ The bots try a great beast now and then once they have three grown dragons ready
 
 | Players | Fewest rounds | Median | Most | Stalled | Army held | Tower held | Thunderbird slain | Leviathan slain |
 |---|---|---|---|---|---|---|---|---|
-| 2 | 17 | 26 | 35 | 0 | 100% | 73% | 50%, median round 23 | 50%, median round 25 |
-| 3 | 18 | 27 | 35 | 0 | 100% | 100% | 57%, median round 25 | 57%, median round 23 |
-| 4 | 18 | 24 | 31 | 0 | 100% | 100% | 67%, median round 23 | 70%, median round 22 |
+| 2 | 20 | 30 | 42 | 0 | 100% | 93% | 33%, median round 36 | 43%, median round 28 |
+| 3 | 16 | 27 | 43 | 0 | 100% | 83% | 63%, median round 24 | 43%, median round 25 |
+| 4 | 18 | 26 | 38 | 0 | 100% | 100% | 50%, median round 23 | 60%, median round 22 |

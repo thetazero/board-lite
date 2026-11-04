@@ -45,6 +45,9 @@ export const TUNING = {
   specialProjectMultiplier: 2,
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
+  // In production, each beast of the fauna (not a great beast) has a 1 in this
+  // many chance to move to a random adjacent land hex with no tower or beast.
+  faunaWanderOdds: 3,
   // Once the Thunderbird falls, each production building on or next to its
   // peak (the centre hex) makes this many more a round.
   peakBonus: 2,
@@ -167,8 +170,8 @@ export const ACTIONS: Record<string, ActionDef> = {
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 4 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
-  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'wolf_pack', cost: { crystal: 1, gold: 2 }, text: 'Place a Wolf Pack on any land hex with no tower or beast.', copies: 2 },
-  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 2, gold: 3 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 1 },
+  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 4 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'basilisk', cost: { crystal: 1 }, text: 'Place a Basilisk on any land hex with no tower or beast.', copies: 2 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';
@@ -283,7 +286,8 @@ export const UNITS: Record<string, UnitDef> = {
 
 // Aggressive fauna: wild beasts on the map. A hex with fauna can't be built
 // on, and a building under it produces nothing. A player's dragons clear it
-// in the same combat as a raid; the beast's loot goes to that player.
+// in the same combat as a raid; the beast's loot goes to that player, unless
+// a card sent it (#139). In production each beast may wander a hex.
 // Kept apart from UNITS: these are not raid defenders.
 export interface FaunaDef extends UnitDef {
   loot: Bundle;

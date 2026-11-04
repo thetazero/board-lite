@@ -99,6 +99,7 @@ export type GameEvent =
   | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
   | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; hp: number; ds: string[] } // a player's dragons attack fauna, at full health
   | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle; points?: number }
+  | { k: 'wander'; from: string; to: string; fauna: string; name: string } // a beast of the fauna moves 1 hex, in production
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
@@ -478,6 +479,7 @@ function startRound(g: Game) {
     gain(g.players[p], got);
     log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
   }
+  wander(g);
   // Every dragon eats, and a hurt one heals some. One that was hungry or hurt
   // sits out the round's raids; only hunger stops it growing.
   for (const d of g.dragons) {
@@ -828,16 +830,45 @@ function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
   log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, hp: def.hp, ds: [...b.fighters] });
   for (let round = 1; b.units[0].hp > 0 && b.fighters.length; round++) combatRound(g, b, round);
   const won = b.units[0].hp <= 0;
+  const loot = faunaLoot(g, k);
   if (won) {
     delete g.map[k].fauna;
-    gain(g.players[p], def.loot);
+    delete g.map[k].sent;
+    gain(g.players[p], loot);
     if (great) g.slain[f] = p;
   }
-  const prize = great ? `${great.points} point${great.points === 1 ? '' : 's'}, for good` : bundleText(def.loot);
+  const prize = great ? `${great.points} point${great.points === 1 ? '' : 's'}, for good` : bundleText(loot);
   const text = won
-    ? great ? `The ${def.name} is slain. ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} falls. ${pname(p)} gains ${prize}.`
+    ? great ? `The ${def.name} is slain. ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} falls.${Object.keys(loot).length ? ` ${pname(p)} gains ${prize}.` : ''}`
     : `The ${def.name} at ${k} holds. ${pname(p)}'s dragons fall back.`;
-  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? def.loot : {}, ...(great && won ? { points: great.points } : {}) });
+  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? loot : {}, ...(great && won ? { points: great.points } : {}) });
+}
+
+// What clearing the beast on hex k pays: its loot, or nothing if a card sent it.
+export function faunaLoot(g: Game, k: string): Bundle {
+  return g.map[k].sent ? {} : faunaDef(g.map[k].fauna!).loot;
+}
+
+// In production, each beast of the fauna (not a great beast) may move to a
+// random adjacent land hex with no tower or beast, taking its card-sent mark
+// with it.
+function wander(g: Game) {
+  const open = new Set(faunaHexes(g));
+  for (const k of faunaOnMap(g)) {
+    const f = g.map[k].fauna!;
+    if (BEASTS[f] || roll(g.rng, TUNING.faunaWanderOdds) !== 1) continue;
+    const to = neighbors(k).filter((n) => open.has(n));
+    if (!to.length) continue;
+    const n = pick(g.rng, to);
+    g.map[n].fauna = f;
+    if (g.map[k].sent) g.map[n].sent = true;
+    delete g.map[k].fauna;
+    delete g.map[k].sent;
+    open.delete(n);
+    open.add(k);
+    const b = g.buildings[n];
+    log(g, `The ${FAUNA[f].name} at ${k} moves to ${n}${b ? `, onto ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}.`, { k: 'wander', from: k, to: n, fauna: f, name: FAUNA[f].name });
+  }
 }
 
 // Where a fauna card can put its beast: any land hex without fauna or a tower.
@@ -1118,6 +1149,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
           if (!faunaHexes(g).includes(k)) fail(`Say where to place the ${FAUNA[def.fauna!].name}: a land hex with no tower or beast, like "play ${c.id} 2,-1".`);
           pay(pl, def.cost);
           g.map[k].fauna = def.fauna!;
+          g.map[k].sent = true;
           ev.hex = k;
           ev.fauna = def.fauna!;
           const b = g.buildings[k];
