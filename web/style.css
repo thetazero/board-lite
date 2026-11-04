@@ -649,6 +649,10 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .awayline { margin: .35em .7em 0; padding: .3em 1em; display: flex; align-items: center; gap: .5em; flex-wrap: wrap; font-weight: 600; color: var(--text); }
 .awayline button { margin-left: auto; }
 .toast.news { border-left-color: var(--accent); }
+/* The answers to your trade offers: they stay at the top until tapped. */
+.notices { position: fixed; top: .5em; left: 50%; transform: translateX(-50%); z-index: 55; display: flex; flex-direction: column; gap: .4em; width: max-content; max-width: 92vw; }
+.notices .toast { position: static; transform: rotate(-.6deg); max-width: none; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; }
+.notices .toast small { display: block; font-weight: 400; opacity: .7; }
 .pcard .seatnote { display: block; color: var(--warn); font-weight: 700; font-size: .9em; }
 .join-box:has(.qr) .alt { font-size: .8em; margin: -.2em 0 .4em; }
 /* What just happened to this phone: news, not an error. */

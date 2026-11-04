@@ -172,6 +172,7 @@ function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '')
 function enter(c: string, t: string) {
   code = c;
   token = t;
+  offerSeen = null;
   stop?.();
   stop = watch(code, token, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => {
     const gone = code;
@@ -192,6 +193,7 @@ function onSnapshot(s: Snapshot) {
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
   if (s.lobby.remote) table.show(code);
+  noteOffers(s.game, s.seat);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
   if (key(prev) !== key(s)) {
@@ -215,6 +217,46 @@ function onSnapshot(s: Snapshot) {
   noteDeals(s.you.hand.map((c) => c.id));
   render();
   renderTalk();
+}
+
+// What became of the offers you made: the player you offered accepts or
+// declines, or the turn ends and the offer expires. Each answer shows once, when
+// it happens, and stays until tapped, so a phone left on the table still has it.
+let offerSeen: number | null = null; // the last log line looked at; null until the first snapshot
+function noteOffers(g: PublicState, seat: number) {
+  const last = g.log.at(-1)?.i ?? -1;
+  // What happened before this phone joined (or reloaded) is old news.
+  if (offerSeen === null) return void (offerSeen = last);
+  for (const e of g.log) {
+    if (e.i <= offerSeen) continue;
+    const text = offerAnswer(e.ev, seat);
+    if (text) offerNotice(text);
+  }
+  offerSeen = Math.max(offerSeen, last);
+}
+
+function offerAnswer(ev: PublicState['log'][number]['ev'], seat: number): string {
+  if (!ev || !('from' in ev) || ev.from !== seat) return '';
+  if (ev.k === 'trade') return `P${ev.to + 1} accepts your offer: you give ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'decline') return `P${ev.p + 1} declines your offer of ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'expire') return `Your offer to P${ev.to + 1} expires: ${ev.give} for ${ev.get}.`;
+  return '';
+}
+
+function offerNotice(text: string) {
+  let box = document.querySelector<HTMLElement>('.notices');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'notices';
+    document.body.append(box);
+  }
+  const n = document.createElement('button');
+  n.className = 'toast news';
+  n.innerHTML = `${named(text, names, snap?.game?.dragons)} <small>Tap to close</small>`;
+  n.onclick = () => n.remove();
+  box.append(n);
+  while (box.children.length > 3) box.firstElementChild!.remove();
+  if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
 }
 
 function renderWatch(me: Me) {
