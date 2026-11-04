@@ -735,3 +735,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .bvs b { font-size: 1.6em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
+/* A dragon in the roost is a button: tap it for its card. */
+.dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
+.dtap:active:not(:disabled) { transform: translateY(.08em); box-shadow: none; }
+/* A hatched dragon's card: where it is now, and its stage's row marked. */
+.card .dnow { display: inline-flex; align-items: center; gap: .3em; font-weight: 700; }
+.card .dnow .grow { color: #6a5d52; letter-spacing: -.05em; }
+.drow.now { background: color-mix(in oklab, var(--kc) 22%, transparent); border-radius: 2px; box-shadow: inset .2em 0 0 var(--kc); }
