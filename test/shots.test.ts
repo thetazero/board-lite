@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { publicState, seatState } from '../src/state.ts';
-import { SCENES, stage } from '../src/shots/scenes.ts';
+import { picked, SCENES, stage } from '../src/shots/scenes.ts';
 import { checkName, claim, defaultName, KEEP_DAYS, tidy } from '../src/shots/tidy.ts';
 
 // The browser part (npm run shots) needs Chrome and isn't run here; the
@@ -31,6 +31,17 @@ test('every screenshot scene stages, the same way every time', () => {
   }
   // The games cover every player count the game supports.
   assert.deepEqual([...new Set(SCENES.filter((s) => !s.lobby).map((s) => s.players))].sort(), [2, 3, 4, 5, 6]);
+});
+
+test('a screenshot run takes only the shots it names, by file or by scene', () => {
+  const staged = SCENES.filter((s) => ['hand-3p', 'lobby', 'raid-fight-3p'].includes(s.name)).map((s) => stage(s));
+  const files = (only: string[] | null) => picked(staged, only).flatMap((p) => p.shots.map((s) => s.file));
+  assert.deepEqual(files(['phone-hand-slide']), ['phone-hand-slide']); // one shot, by its file
+  assert.deepEqual(files(['raid-fight']), ['tv-raid-fight-3p']); // a scene, by its name
+  assert.deepEqual(files(['phone-hand-slide', 'raid-fight']).sort(), ['phone-hand-slide', 'tv-raid-fight-3p']); // several
+  assert.deepEqual(picked(staged, ['phone-hand-slide']).map((p) => p.st.scene.name), ['hand-3p']); // scenes with none are left out
+  assert.deepEqual(files(['nothing-is-called-this']), []);
+  assert.ok(files(null).length > files(['hand']).length); // no names: everything (--all)
 });
 
 test('screenshot runs clear away what no one needs: gone checkouts, old runs, stray Chrome profiles', () => {

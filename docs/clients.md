@@ -82,11 +82,16 @@ starts a server with a game already in round 3, played by bots except for the fi
 ## Staged screenshots (for look tuning)
 
 ```
-npm run shots                    # every scene, under a minute and a half
-npm run shots -- --only raid     # scenes whose name contains "raid"
-npm run shots -- --every-size    # every shot at every screen size, for a full audit
-npm run shots -- --out NAME      # a folder of its own: ~/.cache/board-lite/staged-shots/NAME/
+npm run shots -- --only phone-hand           # shots whose file or scene name contains "phone-hand"
+npm run shots -- --only raid-fight,tv-vote   # several names, separated by commas
+npm run shots -- --list [--only raid]        # the shots there are and the sizes each is taken at; takes none
+npm run shots -- --only phone-hand --every-size   # those shots at every screen size too
+npm run shots -- --all                       # every shot: a few hundred images, several minutes
+npm run shots -- --all --every-size          # every shot at every size, for a full audit: about 980 images, 12 minutes
+npm run shots -- --out NAME                  # a folder of its own: ~/.cache/board-lite/staged-shots/NAME/
 ```
+
+**Shoot the screens your change touched, not everything.** A run takes only what it's asked for: `npm run shots` on its own prints how to ask and takes nothing. To check a change, find the shots that show what it touched (`--list`, or grep `src/shots/scenes.ts` for the screen), and shoot those with `--only`: a handful of shots takes seconds, not a quarter of an hour. For a before/after, run the same `--only` on the old code and then the new. Add `--every-size` to those shots when the change is to layout or sizing. Keep `--all` (and `--all --every-size`) for when a full audit is what's asked for, or a change reaches every screen (the page's base styles, a font); it stays there so a common screen nobody thought to name can still be checked.
 
 writes screenshots of the TV and phones in staged situations to `~/.cache/board-lite/staged-shots/<checkout>-<hash>/` (the checkout's folder name and a few characters of its path; the run prints where), with an `index.html` contact sheet. The run before in the same folder moves to `<folder>.previous`; files that differ from it are starred in the output and outlined in the sheet, so a visual change shows exactly which screens it touched. For a before/after, shoot the old code and then the new in the same checkout (or with the same `--out NAME`): `.previous` is the before set.
 

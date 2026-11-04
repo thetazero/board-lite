@@ -71,6 +71,17 @@ export interface Staged {
 const MAX_STEPS = 30000;
 
 // Bot moves until `until` holds. False if the game ended first.
+// The shots a run takes: those whose file or scene name contains one of the
+// names asked for (all of them, with no names), by scene; scenes with none are left out.
+export function picked(staged: Staged[], only: string[] | null): { st: Staged; shots: Shot[] }[] {
+  return staged
+    .map((st) => {
+      const shots = st.scene.shots(st.game);
+      return { st, shots: only ? shots.filter((shot) => only.some((p) => shot.file.includes(p) || st.scene.name.includes(p))) : shots };
+    })
+    .filter((p) => p.shots.length);
+}
+
 export function drive(g: Game, rng: Rng, until: (g: Game) => boolean): boolean {
   for (let steps = 0; steps < MAX_STEPS; steps++) {
     if (until(g)) return true;
