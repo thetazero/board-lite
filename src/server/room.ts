@@ -4,9 +4,12 @@
 // engine's commands through the room; every change is pushed to whoever is
 // watching. The game is saved to a file after each change (the same format
 // the CLI's file mode uses), so a server restart or a CLI look loses nothing.
+// Who sits where is saved beside it (<game>.seats.json: the code, the TV's and
+// each seat's token), so after a restart the room comes back under its own
+// code and every phone, the TV and each CLI player reconnect to their own seat.
 
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
@@ -46,10 +49,30 @@ export interface RoomOptions {
   remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
 }
 
+// What the seats file keeps: enough for every client to reconnect as before.
+interface SavedRoom {
+  code: string;
+  hostToken: string;
+  remote: boolean;
+  seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
+}
+
+/** Where a game file's seats are saved. */
+export const seatsFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.seats.json`;
+
+function readSaved(file: string): SavedRoom | null {
+  try {
+    const v = JSON.parse(readFileSync(file, 'utf8'));
+    return typeof v?.code === 'string' && typeof v?.hostToken === 'string' && Array.isArray(v?.seats) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export class Room {
   readonly code: string;
   readonly file: string;
-  readonly hostToken = token();
+  readonly hostToken: string;
   readonly opts: RoomOptions;
   seats: Seat[] = [];
   lastActive = Date.now();
@@ -57,24 +80,63 @@ export class Room {
   private botTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private botRng = { state: Date.now() | 0 };
+  private savedSeats = '';
 
   constructor(code: string, opts: RoomOptions = {}) {
     this.code = code;
-    this.opts = opts;
     this.file = opts.file ?? join(opts.dir ?? ROOMS_DIR, `${code}.json`);
     mkdirSync(dirname(this.file), { recursive: true });
-    // Hosting a saved game (from the CLI's file mode, or before a restart):
-    // every seat starts open, and players claim them by joining.
+    // Hosted again after a restart: the same TV, the same players in the same seats.
+    const saved = readSaved(seatsFile(this.file));
+    this.hostToken = saved?.hostToken ?? token();
+    this.opts = saved ? { ...opts, remote: saved.remote } : opts;
+    if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
     if (existsSync(this.file)) {
       this.cached = load(this.file);
-      this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
+      // A saved game with no seats file (from the CLI's file mode): every seat
+      // starts open, and players claim them by joining.
+      if (this.seats.length !== this.cached.players.length) {
+        this.seats = this.cached.players.map((_, p) => ({ name: `P${p + 1}`, token: token(), kind: 'open', connected: 0, seen: 0, standIn: false, left: false }));
+      }
     }
+    this.saveSeats();
+  }
+
+  /** The code a game file was hosted under before, if its seats were saved. */
+  static savedCode(gameFile: string): string | null {
+    return readSaved(seatsFile(gameFile))?.code ?? null;
+  }
+
+  /** Rooms saved in `dir` and active in the last `withinMs`: their codes and game files, to host again after a restart. */
+  static saved(dir = ROOMS_DIR, withinMs = Infinity): { code: string; file: string }[] {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return [];
+    }
+    return names.filter((n) => n.endsWith('.seats.json')).flatMap((n) => {
+      const path = join(dir, n);
+      const file = join(dir, `${n.slice(0, -'.seats.json'.length)}.json`);
+      const saved = readSaved(path);
+      const touched = Math.max(statSync(path).mtimeMs, existsSync(file) ? statSync(file).mtimeMs : 0);
+      if (!saved || Date.now() - touched > withinMs) return [];
+      return [{ code: saved.code, file }];
+    });
+  }
+
+  private saveSeats() {
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !!this.opts.remote, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const text = JSON.stringify(saved);
+    if (text === this.savedSeats) return;
+    this.savedSeats = text;
+    save(seatsFile(this.file), saved);
   }
 
   static newCode(taken: (c: string) => boolean, dir = ROOMS_DIR): string {
     for (;;) {
       const c = Array.from(randomBytes(4), (b) => LETTERS[b % LETTERS.length]).join('');
-      if (!taken(c) && !existsSync(join(dir, `${c}.json`))) return c;
+      if (!taken(c) && !existsSync(join(dir, `${c}.json`)) && !existsSync(join(dir, `${c}.seats.json`))) return c;
     }
   }
 
@@ -393,6 +455,7 @@ export class Room {
 
   changed() {
     this.lastActive = Date.now();
+    this.saveSeats();
     this.tick();
     for (const fn of this.listeners) fn();
   }

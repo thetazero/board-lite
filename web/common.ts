@@ -31,7 +31,10 @@ export async function post(path: string, body: Record<string, unknown>): Promise
 // Live snapshots of a room. Reconnects on its own if the connection drops, and
 // at once when the page comes back into view or the network comes back: a
 // phone that slept or lost Wi-Fi can hold a stream that looks open but is dead.
-export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void): () => void {
+// While the server is down it keeps trying (a restart brings the room back
+// under the same code); `onGone` is called if the server is up and the room
+// isn't there any more, and it stops trying.
+export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void, onGone?: () => void): () => void {
   let es: EventSource | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -43,10 +46,17 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
       onStatus(true);
       onSnapshot(JSON.parse(e.data));
     };
-    es.onerror = () => {
+    es.onerror = async () => {
       onStatus(false);
       es?.close();
-      if (!closed) retry = setTimeout(open, 1500);
+      if (closed) return;
+      const status = await fetch(`/api/rooms/${code}`).then((r) => r.status, () => 0);
+      if (closed) return;
+      if (status === 400 && onGone) {
+        stop();
+        return onGone();
+      }
+      retry = setTimeout(open, 1500);
     };
   };
   let hiddenAt = 0;
@@ -58,13 +68,14 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
   document.addEventListener('visibilitychange', seen);
   addEventListener('online', online);
   open();
-  return () => {
+  return stop;
+  function stop() {
     closed = true;
     clearTimeout(retry);
     es?.close();
     document.removeEventListener('visibilitychange', seen);
     removeEventListener('online', online);
-  };
+  }
 }
 
 // ---------- small DOM helpers ----------

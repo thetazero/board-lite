@@ -35,7 +35,7 @@ export function load(file: string): Game {
   return JSON.parse(readFileSync(file, 'utf8')) as Game;
 }
 
-export function save(file: string, g: Game) {
+export function save(file: string, g: unknown) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(g));
   renameSync(tmp, file);

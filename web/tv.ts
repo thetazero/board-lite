@@ -52,7 +52,8 @@ async function boot() {
     history.replaceState(null, '', `/tv?room=${code}`);
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
-  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
+  // A room the server no longer has (forgotten after hours idle): open a new one.
+  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'));
 }
 
 function onSnapshot(s: Snapshot) {

@@ -303,6 +303,54 @@ test("a game from the CLI's file mode can be hosted; players claim its open seat
   room.close();
 });
 
+test('a server restart: the room comes back under its own code, and every client to its own seat', async () => {
+  const roomsDir = mkdtempSync(join(dir, 'restart-'));
+  const serve = async (hostFiles: string[] = []) => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000 }, hostFiles, '127.0.0.1', true);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    const post = async (path: string, body: object) => (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json() as Promise<Record<string, string>>;
+    return { ...s, base, stop, post };
+  };
+  const first = await serve();
+  const made = await first.post('/api/rooms', {});
+  const ada = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Ada' })).token;
+  const bram = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Bram' })).token;
+  await first.post(`/api/rooms/${made.code}/bot`, { token: made.hostToken });
+  await first.post(`/api/rooms/${made.code}/start`, { token: ada });
+  const file = first.rooms.get(made.code)!.file;
+  first.stop();
+
+  for (const again of [await serve(), await serve([file])]) {
+    try {
+      assert.deepEqual([...again.rooms.keys()], [made.code], 'the same code, whether resumed or hosted with --game');
+      const room = again.rooms.get(made.code)!;
+      assert.deepEqual(room.seats.map((s) => [s.name, s.kind]), [['Ada', 'player'], ['Bram', 'player'], ['Tick', 'bot']]);
+      // Bram's phone reconnects first and still gets his own seat; the TV is still the TV.
+      const asBram = (await (await fetch(`${again.base}/api/rooms/${made.code}?token=${bram}`)).json()) as { seated: boolean };
+      assert.ok(asBram.seated);
+      assert.equal(room.snapshot(bram).seat, 1);
+      assert.equal(room.snapshot(ada).seat, 0);
+      assert.ok(room.canStart(made.hostToken));
+      assert.equal(room.game!.round, 1);
+    } finally {
+      again.stop();
+    }
+  }
+  // A room the server doesn't have: the clients stop retrying on a 400.
+  const third = await serve();
+  try {
+    assert.equal((await fetch(`${third.base}/api/rooms/ZZZZ`)).status, 400);
+  } finally {
+    third.stop();
+  }
+});
+
 test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {
   const { server, rooms } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
