@@ -18,10 +18,10 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Readable, Writable } from 'node:stream';
-import { Room } from '../server/room.ts';
+import { Room, seatsFile } from '../server/room.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
-import { drive, NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
+import { NAMES, SCENES, stage, type Shot, type Staged } from './scenes.ts';
 
 const CACHE = join(homedir(), '.cache', 'board-lite', 'staged-shots'); // on disk: /tmp is RAM on the dev machine
 interface Device { width: number; height: number; deviceScaleFactor: number; mobile: boolean }
@@ -342,7 +342,8 @@ const NEVER = 2 ** 31 - 1;
 
 function makeRoom(staged: Staged, code: string): Room {
   const file = join(CACHE, 'rooms', `${code}.json`);
-  rmSync(file, { force: true });
+  // A fresh room: not the game or the seats an earlier run left under this code.
+  for (const f of [file, seatsFile(file)]) rmSync(f, { force: true });
   const { scene } = staged;
   const names = scene.names ?? NAMES;
   let room: Room;
@@ -460,7 +461,7 @@ async function main() {
             // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
             if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
             if (shot.live) {
-              room.mutate((g) => drive(g, st.rng, st.scene.live!));
+              room.mutate((g) => st.scene.live!(g, st.rng));
               await sleep(100);
             }
             if (shot.then) {
