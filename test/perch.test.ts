@@ -11,7 +11,7 @@ import { neighbors } from '../src/map.ts';
 const rich = (g: Game, p: number) => (g.players[p].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 });
 
 function addDragon(g: Game, owner: number, stage: number, key = 'fire_whelp'): Dragon {
-  const d: Dragon = { id: `d${g.nextId++}`, owner, key, stage, growth: 0, damage: 0, resting: '' };
+  const d: Dragon = { id: `d${g.nextId++}`, owner, key, stage, growth: 0, damage: 0 };
   g.dragons.push(d);
   return d;
 }
@@ -51,7 +51,7 @@ test('every player starts with a Fire Dragon egg', () => {
   }
 });
 
-test("a dragon perches only on a rival's building, never a tower, and only if raid-ready", () => {
+test("a dragon perches only on a rival's building, never a tower, and only if raid-ready (hatched, not knocked out)", () => {
   const { g, pasture } = perchGame();
   const d = addDragon(g, 1, 1);
   const egg = addDragon(g, 1, 0);
@@ -60,9 +60,9 @@ test("a dragon perches only on a rival's building, never a tower, and only if ra
   assert.throws(() => apply(g, 1, `perch ${g.towers[1]} ${d.id}`), RuleError); // their own tower
   assert.throws(() => apply(g, 1, `perch ${pasture}`), RuleError); // no dragon
   assert.throws(() => apply(g, 1, `perch ${pasture} ${egg.id}`), RuleError); // an egg
-  g.dragons.find((x) => x.id === d.id)!.damage = 1;
-  assert.throws(() => apply(g, 1, `perch ${pasture} ${d.id}`), RuleError); // hurt
-  g.dragons.find((x) => x.id === d.id)!.damage = 0;
+  g.dragons.find((x) => x.id === d.id)!.damage = DRAGONS[d.key].stages[0].hp;
+  assert.throws(() => apply(g, 1, `perch ${pasture} ${d.id}`), RuleError); // knocked out
+  g.dragons.find((x) => x.id === d.id)!.damage = 1; // hurt is fine
   apply(g, 1, `perch ${pasture} ${d.id}`);
   assert.equal(g.dragons.find((x) => x.id === d.id)!.perch, pasture);
   // P1 can't perch on their own building.
@@ -133,7 +133,8 @@ test("several players' dragons perch on one building, and they fight together", 
     assert.equal(d.damage, DRAGONS[d.key].stages[0].hp); // knocked out, healing at home
   }
   assert.equal(production(g, 0).livestock.dice.length, 1);
-  for (const d of hunters) assert.equal(g.dragons.find((x) => x.id === d.id)!.resting, 'hunted');
+  // The hunters fought, but any with health left can still raid this round.
+  for (const d of hunters) { const x = g.dragons.find((y) => y.id === d.id)!; assert.equal(canRaid(x), x.damage < DRAGONS[x.key].stages[x.stage - 1].hp); }
 });
 
 test('anyone may clear perched dragons; a lost fight leaves them perched, keeping their hits', () => {

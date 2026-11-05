@@ -124,7 +124,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         bump(s.upgraded, ev.u, ev.p, n);
         break;
       case 'hatch':
-        r.dragons.push({ id: ev.d, owner: ev.p, key: keyOf[ev.d], stage: 0, growth: 0, damage: 0, resting: '' });
+        r.dragons.push({ id: ev.d, owner: ev.p, key: keyOf[ev.d], stage: 0, growth: 0, damage: 0 });
         bump(s.hatched, keyOf[ev.d], ev.p, n);
         if (ev.project) bump(s.projects, 'egg', ev.p, n);
         break;

@@ -218,8 +218,12 @@ svg.token { flex: none; }
 .tvdragon span { display: flex; align-items: center; gap: .35em; color: var(--muted); white-space: nowrap; }
 .tvdragon .hpbar { width: 3em; height: .45em; }
 .grow { color: var(--muted); letter-spacing: -.05em; }
-.st-hungry, .st-healing, .st-hunted, .st-perched { font-style: normal; font-weight: 800; }
-.st-hungry { color: var(--warn); } .st-healing { color: var(--heal); } .st-hunted { color: var(--heal); } .st-perched { color: var(--warn); }
+.st-out, .st-perched { font-style: normal; font-weight: 800; }
+.st-perched { color: var(--warn); }
+/* A knocked-out dragon is greyed: it can't fight until it heals. Its tag stays bright. */
+.st-out { align-self: flex-start; background: var(--bad); color: #fff; padding: .05em .45em; border-radius: .3em; }
+.out svg { filter: grayscale(1); opacity: .35; }
+.out > div > b, .out > div > span { opacity: .4; }
 /* The phone's and the raid's dragon chips. */
 .dchip { display: flex; align-items: center; gap: .3em; font-size: .85em; line-height: 1.15; }
 .dchip > div { display: flex; flex-direction: column; }
