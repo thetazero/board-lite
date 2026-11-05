@@ -1540,16 +1540,25 @@ function territoryGeometry(hexes: { k: string; q: number; r: number }[]): THREE.
       const rs = [1, Math.cos(Math.PI / 6), 1];
       strip(degs.map((d, j) => ground(c, rs[j], d)), degs.map((d, j) => ground(c, rs[j] * inR, d)));
       // The region turns into the next hex at corner i + 1: the gap between
-      // this strip's end and that hex's, across their shared edge, filled in.
+      // this strip's end and that hex's, across their shared edge, filled in,
       const b = next(i + 1);
       if (b) {
         const v = ground(c, 1, 60 * i + 30);
         const mine = ground(c, inR, 60 * i + 30);
         const dx = v.x - b.x, dz = v.z - b.z;
         const theirs = new THREE.Vector3(b.x + dx * inR, surface(b.lift, dx * inR, dz * inR), b.z + dz * inR);
-        tri(v.clone().setY(v.y + BORDER_T), mine.clone().setY(mine.y + BORDER_T), theirs.clone().setY(theirs.y + BORDER_T));
-        const side = [mine, theirs].map((p) => [p.clone().setY(p.y + BORDER_T), p.clone().setY(p.y - 0.03)]);
-        pos.push(...[side[0][0], side[1][1], side[1][0], side[0][0], side[0][1], side[1][1]].flatMap((p) => [p.x, p.y, p.z]));
+        // Mitred: the inner edges meet on the seam, the strip's width away from both edges.
+        const mx = (c.x + b.x) / 2 - v.x, mz = (c.z + b.z) / 2 - v.z, ml = Math.hypot(mx, mz);
+        const d = BORDER_W / Math.cos(Math.PI / 6);
+        const px = v.x + (mx / ml) * d - c.x, pz = v.z + (mz / ml) * d - c.z;
+        const miter = new THREE.Vector3(c.x + px, surface(c.lift, px, pz), c.z + pz);
+        const up = (p: THREE.Vector3) => p.clone().setY(p.y + BORDER_T);
+        tri(up(v), up(mine), up(miter));
+        tri(up(v), up(miter), up(theirs));
+        for (const [p, q] of [[mine, miter], [miter, theirs]]) {
+          const side = [up(p), up(q), q.clone().setY(q.y - 0.03), p.clone().setY(p.y - 0.03)];
+          pos.push(...[side[0], side[2], side[1], side[0], side[3], side[2]].flatMap((x) => [x.x, x.y, x.z]));
+        }
       }
     }
   }
