@@ -114,7 +114,7 @@ export interface BuildingDef {
   beside?: Counted; // must be built adjacent to at least one of these
   dragonCapacity?: number;
   growthBonus?: number;
-  bankRate?: number;
+  bankRate?: { resource: Resource; rate: number }; // a better bank rate for one resource you give
   per?: Counted;
 }
 
@@ -122,6 +122,11 @@ const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrai
   ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, points: 1, text: `Makes 1 ${r} each round for each adjacent ${noun}; worth 1 point.` });
 const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
   ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, points: 1, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}; worth 1 point.` });
+
+// A port trades one basic resource with the bank at 2:1 (#277), in place of
+// the generic 3:1 Port: one card each, gold has none.
+const portCard = (r: Resource): BuildingDef =>
+  ({ name: `${r[0].toUpperCase()}${r.slice(1)} Port`, class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: { resource: r, rate: 2 }, text: `You trade ${r} with the bank at 2:1.`, copies: 1 });
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
@@ -146,7 +151,10 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 3, crystal: 3, stone: 2 }, 2),
   fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 3, timber: 4, crystal: 3 }, 1),
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 6, timber: 6, crystal: 6 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
-  port: { name: 'Port', class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
+  stone_port: portCard('stone'),
+  timber_port: portCard('timber'),
+  crystal_port: portCard('crystal'),
+  livestock_port: portCard('livestock'),
   market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
   // Point cards: a flat 2 points each, built adjacent to what they used to
   // count (#134). About 11 resources and no gold: 50% better at points than a

@@ -3,7 +3,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  acceptProblem, apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
+  acceptProblem, apply, bankRates, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -63,8 +63,8 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
       const hexes = buildableHexes(g, p, b);
       if (hexes.length && canAfford(pl, BUILDINGS[b].cost)) out.push(`build ${b} ${pick(rng, hexes)}`);
     }
-    const rate = bankRate(g, p);
-    const rich = RESOURCES.filter((r) => pl.resources[r] >= rate + 2);
+    const rates = bankRates(g, p);
+    const rich = RESOURCES.filter((r) => pl.resources[r] >= rates[r] + 2);
     if (rich.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, RESOURCES.filter((r) => !rich.includes(r)).concat(['gold']))}`);
     out.push('end');
     return out;

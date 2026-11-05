@@ -9,15 +9,15 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 - Win at 30 points. Titles are 6 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
 - Gold: no basic building makes it. It comes from raids, Markets, Trade Charters, clearing fauna, and the bank.
-- Bank: 4:1, 3:1 with a Port.
+- Bank: 4:1. With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 
 There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
 
-### Building deck: 43 cards
+### Building deck: 44 cards
 
-18 kinds of building card (33 cards) + 3 kinds of upgrade (10 cards) = 43 cards.
+21 kinds of building card (34 cards) + 3 kinds of upgrade (10 cards) = 44 cards.
 
 | Card | Kind | Copies | Share of deck |
 |---|---|---|---|
@@ -33,7 +33,10 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Drovers' Barn | building card | 2 | 5% |
 | Fishery | building card | 1 | 2% |
 | Hatchery | building card | 2 | 5% |
-| Port | building card | 3 | 7% |
+| Stone Port | building card | 1 | 2% |
+| Timber Port | building card | 1 | 2% |
+| Crystal Port | building card | 1 | 2% |
+| Livestock Port | building card | 1 | 2% |
 | Market | building card | 2 | 5% |
 | Monument | building card | 2 | 5% |
 | Standing Stones | building card | 2 | 5% |
@@ -42,7 +45,7 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Workshop | upgrade | 4 | 9% |
 | Nesting Grounds | upgrade | 3 | 7% |
 | Trade Charter | upgrade | 3 | 7% |
-| **Total** |  | **43** | **100%** |
+| **Total** |  | **44** | **100%** |
 
 ### Action deck: 88 cards
 
@@ -99,7 +102,10 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Drovers' Barn | building card | building | 2 | 2 stone, 3 timber, 3 crystal | Makes 1 livestock each round for each adjacent livestock building; worth 1 point. | 1 |
 | Fishery | building card | building | 1 | 3 stone, 4 timber, 3 crystal | Makes 1 livestock each round for each adjacent ocean hex; worth 1 point. | 1 |
 | Hatchery | building card | building | 2 | 6 stone, 6 timber, 6 crystal | Your dragons grow 1 extra step each round. | — |
-| Port | building card | building | 3 | 2 stone, 6 timber, 2 livestock | You trade with the bank at 3:1. | — |
+| Stone Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade stone with the bank at 2:1. | — |
+| Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the bank at 2:1. | — |
+| Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the bank at 2:1. | — |
+| Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the bank at 2:1. | — |
 | Market | building card | building | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
 | Monument | building card | building | 2 | 6 stone, 5 timber | Worth 2 points. Build adjacent to a monument. | 2 |
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
@@ -156,7 +162,7 @@ The land is ringed by ocean, where nothing is built. Each of its six coasts has 
 | crystal field | Crystal Mine | 20% |
 | meadow | Pasture | 20% |
 | plains | — | 20% |
-| harbor | Port | coast |
+| harbor | Stone Port, Timber Port, Crystal Port, Livestock Port | coast |
 
 ## Building cards that count their neighbours
 
@@ -301,8 +307,8 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 154 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 131 | 16% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| stone | 156 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 137 | 16% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
 | crystal | 322 | 38% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 156 | 18% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| livestock | 158 | 18% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
 | gold | 82 | 10% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |

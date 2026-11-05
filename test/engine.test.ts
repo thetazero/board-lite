@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
-import { RuleError, apply, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -277,11 +277,16 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   g.map[harbor].terrain = 'harbor';
   g.map[land].terrain = 'plains';
   assert.throws(() => apply(g, 0, `build roost ${sea}`), RuleError); // nothing on the ocean
-  g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'port' });
+  g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
   assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
   apply(g, 0, `build cport ${harbor}`);
-  assert.equal(g.buildings[harbor].type, 'port');
-  assert.equal(bankRate(g, 0), BUILDINGS.port.bankRate);
+  assert.equal(g.buildings[harbor].type, 'stone_port');
+  // 2:1 for stone only; everything else stays 4:1.
+  assert.deepEqual(bankRates(g, 0), { stone: 2, timber: 4, crystal: 4, livestock: 4, gold: 4 });
+  g.players[0].resources = { stone: 2, timber: 4, crystal: 0, livestock: 0, gold: 0 };
+  apply(g, 0, 'bank stone gold');
+  apply(g, 0, 'bank timber crystal');
+  assert.deepEqual(g.players[0].resources, { stone: 0, timber: 0, crystal: 1, livestock: 0, gold: 1 });
 });
 
 test('a title needs its minimum as well as the lead', () => {

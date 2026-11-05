@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText } from './engine.ts';
@@ -43,7 +43,7 @@ function economy(): string {
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''}, clearing fauna, and the bank.
-- Bank: ${TUNING.bankRate}:1${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `, ${b.bankRate}:1 with a ${b.name}`).join('')}.`;
+- Bank: ${TUNING.bankRate}:1. With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
 }
 
 // Every building, upgrade, action card and dragon: what it costs and does.
@@ -99,7 +99,7 @@ ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).find((b) => b.terrain === t)?.name ?? '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
+  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
   const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
