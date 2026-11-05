@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, DECKS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -293,6 +293,12 @@ export function neighbourCount(g: Game, k: string, what: Counted): number {
   return neighbors(k).filter((n) => counts(g, n, what)).length;
 }
 
+// What a point card must be built adjacent to, as text: "a monument", "an ocean hex".
+export function besideText(what: Counted): string {
+  const noun = (TERRAIN_NOUN as Record<string, string>)[what] ?? CLASS_NAMES[what as BuildingClass];
+  return `${/^[aeiou]/.test(noun) ? 'an' : 'a'} ${noun}`;
+}
+
 // The multiplier on a building's effects at hex k: 1, or its neighbour count.
 function times(g: Game, k: string, def: BuildingDef): number {
   return def.per ? neighbourCount(g, k, def.per) : 1;
@@ -327,12 +333,13 @@ export function madeResource(def: BuildingDef): Resource | null {
   return def.produces?.resource ?? (RESOURCES.find((r) => def.makes?.[r]) ?? null);
 }
 
-// Points a building at hex k is worth right now. Only point cards (monuments)
-// are worth any; the tower and its floors are not.
+// Points a building at hex k is worth: a flat number, never multiplied by
+// what's adjacent. Production buildings and point cards (monuments) are worth
+// points; the tower and its floors are not.
 export function buildingPoints(g: Game, k: string): number {
   const b = g.buildings[k];
   if (b.type === 'tower') return 0;
-  return (BUILDINGS[b.type].points ?? 0) * times(g, k, BUILDINGS[b.type]);
+  return BUILDINGS[b.type].points ?? 0;
 }
 
 // Is hex k on or next to the peak, once the Thunderbird has fallen?
@@ -398,7 +405,7 @@ export function score(g: Game, p: number): Score {
   let buildings = 0;
   for (const [k] of ownedBuildings(g, p)) buildings += buildingPoints(g, k);
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
-  const hidden = g.players[p].hand.filter((c) => ACTIONS[c.key]?.effect === 'hidden_point').length;
+  const hidden = g.players[p].hand.reduce((s, c) => s + (ACTIONS[c.key]?.effect === 'hidden_point' ? ACTIONS[c.key].amount ?? 0 : 0), 0);
   const beasts = Object.entries(g.slain).filter(([, by]) => by === p).reduce((s, [k]) => s + BEASTS[k].points, 0);
   const pub = buildings + titles + beasts;
   return { buildings, titles, beasts, hidden, public: pub, total: pub + hidden };
@@ -956,6 +963,7 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from an adjacent hex: slay it first.`);
   if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on a ${TERRAIN_NOUN[def.terrain]}; ${k} is a ${TERRAIN_NOUN[hex.terrain]}.`);
   if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} isn't adjacent to any of your buildings.`);
+  if (def.beside && !neighbourCount(g, k, def.beside)) fail(`A ${def.name} must go adjacent to ${besideText(def.beside)}; ${k} isn't.`);
   return k;
 }
 
@@ -965,7 +973,7 @@ export function buildableHexes(g: Game, p: number, type: string): string[] {
   const out = new Set<string>();
   for (const [k] of ownedBuildings(g, p)) {
     for (const n of neighbors(k)) {
-      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && !nearBeast(g.map, n) && !g.map[n].fauna && (!def.terrain || g.map[n].terrain === def.terrain)) out.add(n);
+      if (g.map[n] && g.map[n].terrain !== 'ocean' && !g.buildings[n] && !nearBeast(g.map, n) && !g.map[n].fauna && (!def.terrain || g.map[n].terrain === def.terrain) && (!def.beside || neighbourCount(g, n, def.beside) > 0)) out.add(n);
     }
   }
   return [...out].sort();

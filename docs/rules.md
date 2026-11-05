@@ -1,6 +1,6 @@
 # board-lite rules (as the engine plays them)
 
-You are a wizard who raises dragons. Build out from your tower, hatch and feed dragons, raid neutral kingdoms for gold, and be first to **20 points**. All numbers live in `src/data.ts` and are first guesses awaiting playtests.
+You are a wizard who raises dragons. Build out from your tower, hatch and feed dragons, raid neutral kingdoms for gold, and be first to **30 points**. All numbers live in `src/data.ts` and are first guesses awaiting playtests.
 
 **Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
@@ -11,7 +11,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 1. **Production** (in turn order). Your tower gives 1 stone, timber, crystal and livestock. Each basic production building rolls its own die (a quarry makes 1d4 stone; a Workshop adds 2). Building cards make what their text says, without dice. Then each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. Then every dragon eats 1 livestock, heals 7 health and grows 1 step (plus 1 per hatchery you own); a dragon that goes hungry doesn't grow. A dragon that goes hungry, or is still hurt when production begins, **sits out** this round's raids: a dragon sits out 1 round of raids for every 7 damage it took, rounded up. A dragon moves up a life stage (egg → hatchling → young → adult) when its steps reach its card's growth time.
 2. **Cards** (all at once). Draw 1 action card and 2 building cards; keep 1 of the building cards and discard the other. Building cards hold buildings and upgrades; action cards hold actions and dragon eggs.
 3. **Actions** (one player at a time). On your turn, in any order and as often as you can pay:
-   - **Build** on an empty land hex (no building, no beast) adjacent to one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on crystal field, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor). Or add a **tower floor** on your tower, no card needed.
+   - **Build** on an empty land hex (no building, no beast) adjacent to one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on crystal field, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor; a monument card goes adjacent to what its card names). Or add a **tower floor** on your tower, no card needed.
    - **Upgrade**: put an upgrade card on one of your buildings of its class. Each building takes 1 upgrade.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
    - **Clear fauna**: send any of your raid-ready dragons against the beast on any hex. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is empty and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A great beast takes one try per player a round.
@@ -26,13 +26,13 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting (rounded down; what's left over goes to the player with the most). After every raid, each kingdom that didn't fall adds 1 gold to its loot, and the one that fell goes back to its printed loot.
 
-**End of round.** Anyone over 7 cards discards down to 7. If anyone has 20 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
+**End of round.** Anyone over 7 cards discards down to 7. If anyone has 30 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
 **Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
-**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **2 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and strong against lightning, air and water; the Leviathan is weak to lightning and strong against water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
+**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and strong against lightning, air and water; the Leviathan is weak to lightning and strong against water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
 **Adjacent hexes.** Every building has a class (stone building, timber building, crystal building, livestock building, dragon building, monument or trade building; each basic building that makes a resource is in that resource's class, with the building cards that make the same); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain, built on or not ("each adjacent meadow hex"), or buildings of a class, whoever owns them ("each adjacent livestock building"). The count is always the current one: an adjacent building built later counts too.
 
@@ -40,10 +40,11 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 Dragons are worth no points; they count toward Strongest Dragon Army.
 
-- Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): as their card says, 1 point for each adjacent hex or building it counts. No other building is worth points: not production buildings, not the tower, not its floors.
-- Secret Hoard cards: 1 each while in hand (hidden until the end).
-- Great beasts: 2 each to whoever slays it, for good.
-- Titles, 3 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Production buildings: 1 each, every stone, timber, crystal and livestock building, basic or card.
+- Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): 2 each. Each goes adjacent to at least one of what its card names: a monument (a tower is one), a crystal field hex, an ocean hex or a trade building. No other building is worth points: not the tower, not its floors.
+- Secret Hoard cards: 2 each while in hand (hidden until the end).
+- Great beasts: 4 each to whoever slays it, for good.
+- Titles, 6 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 

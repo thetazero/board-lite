@@ -72,7 +72,7 @@ export function targetText(t: TargetView): string {
 }
 
 export function faunaText(f: FaunaView): string {
-  const prize = f.points !== undefined ? `great beast: ${f.points} point for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card sent it';
+  const prize = f.points !== undefined ? `great beast: ${f.points} point${f.points === 1 ? '' : 's'} for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card sent it';
   return `${f.name} (${unitStats(f)}; ${prize})`;
 }
 
@@ -242,7 +242,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast.`);
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
-  out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
+  out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point${g.beasts[0]?.points === 1 ? '' : 's'} for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
   out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (power ${t.power}) ${resText(t.loot)}`).join('; ')}.`);
   if (g.raid) {
     out.push('');
