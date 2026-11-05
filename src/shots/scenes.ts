@@ -288,7 +288,7 @@ function most(g: Game, p: number, not = ''): string {
 // The production cards (building art, batch 2).
 const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
 // The dragon, trade and monument cards and the upgrades (building art, batch 3).
-const CIVIC_CARDS = ['hatchery', 'stone_port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds', 'trade_charter'];
+const CIVIC_CARDS = ['hatchery', 'stone_port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds'];
 
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
@@ -480,8 +480,8 @@ export const SCENES: Scene[] = [
         .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
-        [['crystal_port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
-        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
+        [['crystal_port', (k) => g.map[k].terrain === 'harbor', null], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, null], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
         const k = near(p, ok);
@@ -494,7 +494,7 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
-      { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the four upgrades (staged)', client: 'phone', seat: g!.turn },
+      { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
     ],
   },
@@ -759,7 +759,7 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 3, // seeds 1 and 2 end at a round's end, with no moment between
+    seed: 5, // seeds 1 to 4 end at a round's end, with no moment between
     // The first moment anyone has the points to win: the round plays on to its end.
     until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
     shots: (g) => {

@@ -5,7 +5,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
-  neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
@@ -341,7 +341,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const b = BUILDINGS[c.key];
     const hexes = b.onTower ? [] : buildableHexes(g, p, c.key);
     const text = placeText(b);
-    const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, neighbourCount(g, k, b.per!)])) : undefined;
+    const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, perCount(g, k, b, p)])) : undefined;
     return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? noHex(b) : null };
   }
   if (kind === 'upgrade') {
