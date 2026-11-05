@@ -88,7 +88,7 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   if (raid.step === 'vote') {
     out.push('Raid: vote for a target. Candidates:');
     raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(t)}`));
-    out.push(`  Voted: ${raid.voted.map((v, q) => `${P(q)} ${v ? 'yes' : 'not yet'}`).join(', ')}`);
+    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)} ${v === null ? 'not yet' : v + 1}`).join(', ')}`);
     return out;
   }
   out.push(`Raid target: ${targetText(raid.target!)}`);

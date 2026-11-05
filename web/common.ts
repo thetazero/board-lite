@@ -344,43 +344,6 @@ export function hpFill(hp: number, max: number): { width: string; color: string 
   return { width: `${pct}%`, color: pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d' };
 }
 
-// ---------- the raid's defenders ----------
-
-// A defender's picture, from its name ("Frost Golem" -> the frost_golem icon).
-export function unitIcon(name: string, size = 2): string {
-  return icon(name.toLowerCase().replace(/[^a-z]+/g, '_'), size, 'ricon unit-art');
-}
-
-// A kingdom's defenders by kind, drawn: each kind's picture and name with how
-// many there are, then its stats in words: health, attack, and the elements it
-// is weak to (takes double from, by the element wheel). Four
-// Archers are one picture marked ×4, not four lines.
-export function foeStack(units: UnitView[], size = 2): string {
-  const kinds: { u: UnitView; n: number; up: number }[] = [];
-  for (const u of units) {
-    const k = kinds.find((x) => x.u.name === u.name);
-    if (k) { k.n++; if (u.hp > 0) k.up++; } else kinds.push({ u, n: 1, up: u.hp > 0 ? 1 : 0 });
-  }
-  return `<div class="foes">${kinds.map(({ u, n }) => `
-    <div class="foe">
-      <span class="foe-pic">${unitIcon(u.name, size)}</span>
-      <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ${esc(plural(u.name))}` : esc(u.name)}</b>
-      <span class="foe-stats">${statTag('Health', u.maxHp)}${statTag('Attack', esc(u.attack))}</span>
-      ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}</span>
-    </div>`).join('')}</div>`;
-}
-
-// "Frost Golem" -> "Frost Golems"; names already plural ("Archers", "Militia") stay.
-function plural(name: string): string {
-  return /s$|Militia$/.test(name) ? name : `${name}s`;
-}
-
-// What a fight pays, labelled: "Loot 3 timber 2 gold", or the points a great beast is worth.
-export function lootLine(loot: Res, size = 1.3, points?: number): string {
-  const what = points !== undefined ? `<span class="chip">${points}${icon('points', size)}</span>` : resChips(loot, size) || 'none';
-  return `<div class="loot"><span class="loot-label">${points !== undefined ? 'Worth' : 'Loot'}</span>${what}</div>`;
-}
-
 // A rolled die: the same white shape as a die to roll, with what it landed on.
 export function dieFace(sides: number, value: number, cls = ''): string {
   return `<span class="die ${cls}" data-sides="${sides}">${icon(`d${sides}face`, 2.4, 'dieicon')}<b>${value}</b></span>`;

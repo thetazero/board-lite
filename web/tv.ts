@@ -6,10 +6,9 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
-  fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
+import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
@@ -321,8 +320,8 @@ function talkLine(text: string, g: PublicState): string {
 
 // The raid takes over the screen while it runs. Every step is the same
 // arena: the raiders on the left, the kingdom's defenders on the right.
-function targetCard(t: TargetView, extra = ''): string {
-  return `<div class="target">${extra}<h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}${lootLine(t.loot, 1.6)}</div>`;
+function targetCard(t: TargetView): string {
+  return `<div class="target"><h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}${lootLine(t.loot, 1.6)}</div>`;
 }
 
 function check(done: boolean): string {
@@ -356,9 +355,9 @@ function renderRaid(g: PublicState) {
   const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
   let body = '';
   if (raid.step === 'vote') {
-    body = `<h1>${icon('raid', 1.1)} Vote ${SECRET}${raidPips(g)}</h1>
-      <div class="candidates">${raid.candidates.map((t, i) => targetCard(t, `<div class="num">${i + 1}</div>`)).join('')}</div>
-      <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.voted[p])}`).join(' ')}</div>`;
+    body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
+      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names)).join('')}</div>
+      <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.votes[p] !== null)}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
     // Each player's dragons that could go, the sent ones lit; a roost for
     // anyone keeping theirs home; a tick once they're ready.

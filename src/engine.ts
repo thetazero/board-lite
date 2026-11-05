@@ -119,7 +119,7 @@ export type GameEvent =
   | { k: 'title'; t: Title; p: number | null }
   | { k: 'discard'; p: number; n: number }
   | { k: 'raid'; targets: string[] }
-  | { k: 'voted'; p: number }
+  | { k: 'voted'; p: number; t: string }
   | { k: 'votes'; votes: (number | null)[] }
   | { k: 'target'; t: string; name: string; votes: number[]; coin: boolean }
   | { k: 'commit'; p: number; ds: string[]; ready?: boolean }
@@ -1304,8 +1304,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
     const i = Number(args[0]) - 1;
     if (!(i >= 0 && i < raid.candidates.length)) fail(`Vote 1..${raid.candidates.length}.`);
     raid.votes[p] = i;
-    log(g, `You vote for ${TARGETS[raid.candidates[i]].name}.`, { k: 'mine' }, { to: [p] });
-    log(g, `${pname(p)} has voted.`, { k: 'voted', p });
+    log(g, `${pname(p)} votes for ${TARGETS[raid.candidates[i]].name}.`, { k: 'voted', p, t: raid.candidates[i] });
     if (raid.votes.every((v) => v !== null)) resolveVote(g);
     return;
   }
