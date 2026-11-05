@@ -7,7 +7,7 @@
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
   ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
+  icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, unitIcon, watch,
   fadeAway,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -403,13 +403,14 @@ function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
 }
 
 // A new round's production, as the table would roll it: everyone's dice
-// tumbling, each player's a moment after the last's, and landing. Only the
-// rolls: what they bring in is each player's own business, on their phone.
+// tumbling, each player's a moment after the last's, and landing. Each die
+// shows the resource it rolls for beside it, under a "Production" heading, so
+// someone watching can tell what the roll is for.
 // A round nobody rolls in still opens with its number, briefly.
 function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   const rows = rolls.map((x) => {
     const p = (x.ev as Extract<EventView['ev'], { k: 'produce' }>).p;
-    return `<li style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="dice">${x.dice!.map((d) => dieFace(d.sides, d.value, 'rolling')).join('')}</span></li>`;
+    return `<li style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="dice">${x.dice!.map((d) => `<span class="roll">${dieFace(d.sides, d.value, 'rolling')}${d.resource ? resIcon(d.resource, 1.4) : ''}</span>`).join('')}</span></li>`;
   }).join('');
   const play = (el: HTMLElement) => {
     el.querySelectorAll<HTMLElement>('.production li').forEach((li, k) => setTimeout(() => {
@@ -427,7 +428,7 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
       }, ROLL_SPIN_MS);
     }, ROLL_LEAD_MS + k * ROLL_STAGGER_MS));
   };
-  return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<ul>${rows}</ul>` : ''}</div>`, ms, play, top: { round, phase: 'Production' } };
+  return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<h2>Production</h2><ul>${rows}</ul>` : ''}</div>`, ms, play, top: { round, phase: 'Production' } };
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow: the

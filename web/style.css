@@ -287,7 +287,11 @@ q::after { content: close-quote; }
 .production li { display: flex; align-items: center; gap: .6em; margin: .35em 0; }
 .production li > b:first-child { min-width: 6em; }
 .production { max-width: 92vw; }
-.production .dice { display: flex; flex-wrap: wrap; gap: .1em 0; }
+.production h2 { margin: -.5em 0 .3em; font-size: 1.5em; color: var(--muted); font-family: var(--serif); }
+.production .dice { display: flex; flex-wrap: wrap; gap: .1em .9em; }
+/* A die and the resource it rolls for, side by side. */
+.production .roll { display: inline-flex; align-items: center; }
+.production .roll .ricon { margin-left: -.15em; }
 /* Everyone rolls at once, each player's dice a moment after the last's, lit in their colour. */
 .production li { opacity: 0; translate: -1.5em 0; transition: opacity .35s ease-out, translate .35s ease-out; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production li.up { opacity: 1; translate: none; }
