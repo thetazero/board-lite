@@ -83,7 +83,8 @@ small { color: var(--muted); }
 .title, .topbar .phase, .production h1, .result h1, .endbox h1, .summary h1, .recap-page h1, .recap-page h2, .raidbox h1, .target h2, .result.fight h2, .panel h3, .corner.titles h3, .pover h1, .plobby h1, .pbody h2, .trade h3, .phone .status { font-family: var(--serif); }
 /* A ribbon: a strip of paper with notched ends, like the cards' name strips. */
 .doing, .phone .status.you, .topbar .phase { clip-path: polygon(0 0, 100% 0, calc(100% - .45em) 50%, 100% 100%, 0 100%, .45em 50%); }
-.loading { padding: 2em; color: var(--muted); }
+.loading { min-height: 100vh; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; color: var(--muted); }
+.loading .title { font-size: 2.5em; }
 .hidden { display: none !important; }
 
 .ptag { color: var(--pc); font-weight: 800; }
@@ -155,6 +156,10 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 .seatcard .tag { font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 .seatcard.open { background: transparent; border: 2px dashed #f3ead740; box-shadow: none; }
 .seatcard.open.needed { border-color: #f3ead780; }
+.seatcard.open[style] { border-color: color-mix(in oklab, var(--pc) 70%, transparent); }
+.seatcard.open .pname { color: #f3ead7d0; font-weight: 600; }
+.seatcard.open svg.token { opacity: .55; }
+.table h2.seating { margin: 0; font-size: 2em; color: var(--accent); }
 .seatcard .x { position: absolute; top: .15em; right: .2em; background: none; border: none; color: #6b5a6e; font-size: 1.1em; padding: 0 .3em; opacity: 0; }
 .seatcard:hover .x { opacity: 1; }
 svg.token { flex: none; }
@@ -547,15 +552,20 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
 .joinform label small { font-weight: 500; }
 .joinform input { font-size: 1.4em; padding: .5em; color: var(--ink); }
 #code { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; }
+/* The placeholder is a hint, not a code: plain, so it can't be read as one. */
+#code::placeholder { text-transform: none; letter-spacing: normal; font-weight: 400; font-style: italic; }
 .error { color: #ff8f8f; font-weight: 700; min-height: 1.2em; }
 .plobby { padding: 0 0 1.5em; display: flex; flex-direction: column; gap: .8em; text-align: center; }
-.plobby > :not(.hero) { margin-left: 1.2em; margin-right: 1.2em; }
+.plobby .lobbybody { padding: 0 1.2em; display: flex; flex-direction: column; gap: .8em; }
 .plobby h1 { color: var(--pc); margin: .1em 0 0; }
 .plobby p { margin: 0; }
 .muted { color: var(--muted); }
 .seatlist { list-style: none; padding: 0; margin: .4em 0; display: flex; flex-direction: column; gap: .4em; text-align: left; }
 .seatlist li { display: flex; align-items: center; gap: .6em; padding: .35em .8em; background: var(--sheet); color: #2a1d33; font-weight: 800; font-size: 1.15em; border-radius: 2px; border-left: .4em solid var(--pc); box-shadow: var(--lift); }
 .seatlist li.me { box-shadow: 0 0 0 2px var(--pc); }
+.seatlist li.open { background: transparent; color: #f3ead7d0; font-weight: 600; box-shadow: none; outline: 2px dashed color-mix(in oklab, var(--pc) 70%, transparent); outline-offset: -2px; }
+.seatlist li.open svg.token { opacity: .55; }
+.seatlist .x { margin-left: auto; background: none; border: none; box-shadow: none; color: #6b5a6e; font-size: 1.3em; line-height: 1; padding: 0 .3em; width: auto; }
 .seatlist .tag { font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* your header: a sheet with your colour folded over its top, your resources on the strip below */
 .mehead { position: sticky; top: 0; z-index: 5; background: var(--sheet); box-shadow: 0 .12em 0 var(--paper-edge), 0 4px 10px #0009; }

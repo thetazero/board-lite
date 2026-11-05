@@ -6,7 +6,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -23,6 +23,9 @@ const app = $('app');
 
 let code = '';
 let hostToken = '';
+// A second TV opened on the room's address has no host token: it shows the
+// room, but adding bots and starting are for the TV that made the room.
+let isHost = false;
 let snap: Snapshot | null = null;
 let names: string[] = [];
 let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
@@ -45,13 +48,15 @@ async function boot() {
   Board3DClass = await import('./board3d.ts').then((m) => m.Board3D, (e) => (console.error('No 3D board:', e), null));
   hostToken = localStorage.getItem(`tv:${code}`) ?? '';
   if (code) {
-    const ok = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => r.ok).catch(() => false);
-    if (!ok) code = '';
+    const room = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!room) code = '';
+    isHost = !!room?.host;
   }
   if (!code) {
     const r = await post('/api/rooms', {});
     code = String(r.code);
     hostToken = String(r.hostToken);
+    isHost = true;
     localStorage.setItem(`tv:${code}`, hostToken);
     history.replaceState(null, '', `/tv?room=${code}`);
   }
@@ -65,9 +70,11 @@ function onSnapshot(s: Snapshot) {
   if (snap?.game && s.game) seatNews(snap, s);
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
-  if (!s.game) {
+  // Before the game, and while a saved game hosted again takes its seats, the TV shows the lobby.
+  if (!s.game || s.lobby.seating) {
     clearOverlay();
     if (remote) return void (app.innerHTML = '');
+    if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
     return renderLobby();
   }
   if (s.game.phase !== 'over') sawPlay = true;
@@ -115,16 +122,26 @@ function tailscaleUrl(): string | null {
   return t && lan.lan.length ? joinUrl(t) : null;
 }
 
+// The lobby: who's at the table, and how to join. A saved game hosted again
+// comes back here until every seat is taken: its seats are the game's, the
+// open ones waiting in their player's colour.
 function renderLobby() {
   const l = snap!.lobby;
   const seated = l.seats.map((_, i) => PLAYER_COLORS[i]);
+  const open = l.seats.filter((s) => s.kind === 'open').length;
   // Each seat a place card with its tower; empty places wait, dashed, up to a full table.
-  const seats = l.seats.map((s, i) => `
-    <li class="seatcard" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}
+  const seats = l.seats.map((s, i) => s.kind === 'open'
+    ? `<li class="seatcard open needed" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}<span class="pname">Open seat</span></li>`
+    : `<li class="seatcard" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}
       <span class="pname">${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
-      <button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button></li>`).join('')
-    + Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join('');
+      ${isHost ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`).join('')
+    + (l.seating ? '' : Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join(''));
   const canStart = l.seats.length >= l.minPlayers;
+  const first = firstPlayer(l);
+  const hint = l.seating ? `The game goes on once every seat is taken${isHost ? ' (a bot can take one)' : ''}.`
+    : !canStart ? `${l.minPlayers - l.seats.length > 1 ? `${l.minPlayers - l.seats.length} more players` : 'One more player'} to start (a bot counts).`
+    : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')
+    : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
   app.innerHTML = `
     <div class="lobby">
       <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}
@@ -134,7 +151,7 @@ function renderLobby() {
         <div class="join-box">
           ${qrSvg(`http://${joinUrl()}`, 'the room\'s address')}
           <div class="join-text">
-            <div class="step">Join on your phone</div>
+            <div class="step">${l.seating ? 'Take your seat on your phone' : 'Join on your phone'}</div>
             <div class="how">Point its camera at the code, or open</div>
             <div class="url">${esc(joinUrl())}</div>
             ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
@@ -143,17 +160,19 @@ function renderLobby() {
           </div>
         </div>
         <div class="table">
+          ${l.seating ? `<h2 class="seating">${open > 1 ? `${open} open seats` : 'One open seat'}</h2>` : ''}
           <ul class="seatcards">${seats}</ul>
-          <div class="lobby-actions">
-            <button id="bot" ${l.seats.length >= l.maxPlayers ? 'disabled' : ''}>Add a bot</button>
-            <button id="start" class="primary" ${canStart ? '' : 'disabled'}>Start game</button>
-          </div>
-          <p class="hint">${canStart ? 'Or start from the first player\'s phone.' : `${l.minPlayers - l.seats.length > 1 ? `${l.minPlayers - l.seats.length} more players` : 'One more player'} to start (a bot counts).`}</p>
+          ${isHost ? `<div class="lobby-actions">
+            <button id="bot" ${(l.seating ? !open : l.seats.length >= l.maxPlayers) ? 'disabled' : ''}>Add a bot</button>
+            ${l.seating ? '' : `<button id="start" class="primary" ${canStart ? '' : 'disabled'}>Start game</button>`}
+          </div>` : ''}
+          ${hint ? `<p class="hint">${hint}</p>` : ''}
         </div>
       </div>
     </div>`;
+  if (!isHost) return;
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
-  $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
+  if (!l.seating) $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
   app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, seat: Number(b.dataset.remove) }).catch(toast)));
 }
 

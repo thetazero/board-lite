@@ -263,10 +263,17 @@ export class Room {
     return !!this.game && people.length > 0 && people.every((s) => s.left);
   }
 
+  // A saved game hosted again with seats nobody holds yet: the table is back
+  // in the lobby, and the game waits (no one moves, bots included) until
+  // every seat is taken, by a player or a bot.
+  get seating(): boolean {
+    return !!this.game && this.seats.some((s) => s.kind === 'open');
+  }
+
   // Before the game, joining adds a seat. Once it's running, joining with the
   // name of a seat nobody is at takes it back (a player on a new phone, or
   // after quitting, or someone taking over for a player who left); any other
-  // name takes an open seat (one nobody holds, in a saved game hosted again).
+  // name, or a bot, takes an open seat (in a saved game hosted again).
   join(name: string, kind: SeatKind = 'player'): Seat {
     if (this.game) {
       const typed = tidyName(name).toLowerCase();
@@ -279,9 +286,9 @@ export class Room {
       }
       const clean = this.cleanName(name);
       const open = this.seats.find((s) => s.kind === 'open');
-      if (!open || kind !== 'player') throw new RoomError('That game has already started and every seat is taken.');
+      if (!open) throw new RoomError('That game has already started and every seat is taken.');
       open.name = clean;
-      open.kind = 'player';
+      open.kind = kind;
       open.token = token();
       this.changed();
       return open;
@@ -301,11 +308,14 @@ export class Room {
     return this.join(names.find((n) => !taken(n)) ?? `Cog ${this.seats.length + 1}`, 'bot');
   }
 
-  // Before the game starts a player (or bot) can be removed from the lobby.
+  // In the lobby a player (or bot) can be removed: before the game starts,
+  // their seat goes; in a saved game still taking its seats, it's open again.
   leave(seatIndex: number) {
-    if (this.game) throw new RoomError('The game has started.');
-    if (!this.seats[seatIndex]) throw new RoomError('No such player.');
-    this.seats.splice(seatIndex, 1);
+    const s = this.seats[seatIndex];
+    if (!s || s.kind === 'open') throw new RoomError('No such player.');
+    if (this.seating) Object.assign(s, { name: `P${seatIndex + 1}`, kind: 'open', token: token(), standIn: false, left: false });
+    else if (this.game) throw new RoomError('The game has started.');
+    else this.seats.splice(seatIndex, 1);
     this.changed();
   }
 
@@ -313,7 +323,7 @@ export class Room {
   // phone no longer holds the seat.
   quit(tok: string) {
     const p = this.playerSeat(tok);
-    if (!this.game) return this.leave(p);
+    if (!this.game || this.seating) return this.leave(p);
     if (this.game.phase === 'over') throw new RoomError('The game is over.');
     Object.assign(this.seats[p], { token: token(), standIn: true, left: true });
     this.changed();
@@ -401,7 +411,7 @@ export class Room {
       const check = (): boolean => {
         const g = this.game;
         if (g?.phase === 'over') return finish(0);
-        if (g && waitingOn(g).includes(p) && !this.sceneLeft()) return finish(0);
+        if (g && waitingOn(g).includes(p) && !this.sceneLeft() && !this.seating) return finish(0);
         return false;
       };
       const finish = (code: number) => {
@@ -435,7 +445,7 @@ export class Room {
       const others = visibleEvents(g, p, since).filter((e) => !e.text.startsWith(`P${p + 1} `));
       if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
       const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
-      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft();
+      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft() && !this.seating;
     };
     if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
     const left = this.holding(p);
@@ -455,6 +465,7 @@ export class Room {
 
   private act(p: number, cmd: string) {
     if (!this.game) throw new RoomError('The game has not started yet.');
+    if (this.seating) throw new RoomError('The game goes on once every seat is taken.');
     try {
       this.mutate((g) => apply(g, p, cmd));
     } catch (e) {
@@ -489,7 +500,7 @@ export class Room {
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.abandoned) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.seating) return;
     if (this.sceneLeft()) {
       if (!this.sceneTimer) this.wakeAfterScene(); // something must end the wait
       return;
@@ -521,6 +532,7 @@ export class Room {
     return {
       code: this.code,
       started: !!this.game,
+      seating: this.seating,
       // Phones hold a stream open; a CLI player counts as here if it asked anything in the last minute.
       seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left })),
       minPlayers: MIN_PLAYERS,

@@ -22,7 +22,7 @@ board-lite is running on port 8080.
 
 1. **TV:** open the TV address full screen (F11). It shows the room's QR code, address and 4-letter code. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
 2. **Phones:** scan the QR code (or type the address), type a name, tap **Join**. The name is remembered.
-3. **Start:** with 2 to 6 players, press **Start game** on the TV or the first player's phone. **Add a bot** fills a seat with the test bot.
+3. **Start:** with 2 to 6 players, press **Start game** on the TV or the first player's phone. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 
@@ -36,7 +36,7 @@ board-lite is running on port 8080.
 
 The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for the game to go on.
 
-**Restarts:** the server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change. After a restart, `npm run serve` hosts every room from the last 6 hours again, and everyone reconnects to their own seat. `npm run serve -- --game <file>` hosts one saved game.
+**Restarts:** the server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change. After a restart, `npm run serve` hosts every room from the last 6 hours again, and everyone reconnects to their own seat. `npm run serve -- --game <file>` hosts one saved game. A saved game with no seats file has every seat open: the TV and phones show the lobby, and the game goes on once every seat is taken by a player or a bot.
 
 ## After the game
 
