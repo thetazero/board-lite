@@ -6,6 +6,8 @@
 // Everything is built from a few low-poly shapes with flat shading, one paper
 // grain texture and dark crease lines on the folds, so it reads as one world.
 // The phone keeps the flat SVG map (common.ts): the phone stays lightweight.
+// It loads this file only for its rulebook, whose pictures are drawn by
+// portraits (at the end) with the same models.
 //
 // The clock is performance.now(), unless the page sets window.boardClock
 // (seconds): the staged screenshots freeze it there and step it by hand.
@@ -1757,6 +1759,54 @@ const CASCADE_S = 0.3, CASCADE_MAX = 8;
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
+// A building on its plate, as it stands on a hex (shut: a beast holds it).
+function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
+  const g = plate(b.upgrade, tileColor(terrain));
+  const { model: parts, offset } = buildingModel(b);
+  const model = bake(parts);
+  // Shut down by a beast: the building goes to dull grey paper (its border
+  // keeps its owner's colour) and sits back, so the beast in front is whole.
+  if (shut) {
+    model.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.material = shutPaper(o.material as THREE.MeshLambertMaterial);
+    });
+  }
+  const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
+  pop.position.set(0, GROUND, -0.6);
+  model.scale.setScalar(shut ? 0.95 : 1.15);
+  model.position.set(offset[0], 0, offset[1] + 0.6 - (shut ? 0.2 : 0));
+  model.rotation.y = facing;
+  pop.add(model);
+  g.add(pop);
+  g.userData.pop = pop;
+  return g;
+}
+
+// A beast on its lair, or the Thunderbird on its summit, the Leviathan in the sea.
+function beastPiece(key: string, onBuilding: boolean, k: string): THREE.Group {
+  const g = new THREE.Group();
+  const model = bake(beastModel(key), true);
+  const pop = new THREE.Group();
+  const great = key === 'thunderbird' || key === 'leviathan';
+  const [x, z] = onBuilding ? [0.08, 0.4] : [0, 0.05];
+  // The Thunderbird on its peak's summit; the Leviathan in the sea. Neither has a lair.
+  const y = key === 'thunderbird' ? TOP + PEAK_H - 0.2 : key === 'leviathan' ? -0.01 : onBuilding ? GROUND : TOP;
+  pop.position.set(x, y, z);
+  model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : 1.15); // the same size on a building's hex as on an open one
+  if (!great) pop.add(lair(onBuilding ? 0.42 : 0.58));
+  // Three-quarters to the room, half of them looking left.
+  const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
+  model.rotation.y = face;
+  model.userData.face = face;
+  const seed = hash(k) % 628 / 100;
+  for (const r of model.userData.rigs as BeastRig[]) r.phase += seed;
+  pop.add(model);
+  g.add(pop);
+  g.userData.pop = pop;
+  g.userData.figure = model;
+  return g;
+}
+
 export class Board3D {
   readonly el: HTMLDivElement;
   private renderer: THREE.WebGLRenderer;
@@ -2031,49 +2081,11 @@ export class Board3D {
   }
 
   private buildingGroup(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-    const g = plate(b.upgrade, tileColor(terrain));
-    const { model: parts, offset } = buildingModel(b);
-    const model = bake(parts);
-    // Shut down by a beast: the building goes to dull grey paper (its border
-    // keeps its owner's colour) and sits back, so the beast in front is whole.
-    if (shut) {
-      model.traverse((o) => {
-        if (o instanceof THREE.Mesh) o.material = shutPaper(o.material as THREE.MeshLambertMaterial);
-      });
-    }
-    const pop = new THREE.Group(); // hinged at the hex's back edge, for the pop-up
-    pop.position.set(0, GROUND, -0.6);
-    model.scale.setScalar(shut ? 0.95 : 1.15);
-    model.position.set(offset[0], 0, offset[1] + 0.6 - (shut ? 0.2 : 0));
-    model.rotation.y = facing;
-    pop.add(model);
-    g.add(pop);
-    g.userData.pop = pop;
-    return g;
+    return buildingPiece(b, terrain, facing, shut);
   }
 
   private beastGroup(key: string, onBuilding: boolean, k: string): THREE.Group {
-    const g = new THREE.Group();
-    const model = bake(beastModel(key), true);
-    const pop = new THREE.Group();
-    const great = key === 'thunderbird' || key === 'leviathan';
-    const [x, z] = onBuilding ? [0.08, 0.4] : [0, 0.05];
-    // The Thunderbird on its peak's summit; the Leviathan in the sea. Neither has a lair.
-    const y = key === 'thunderbird' ? TOP + PEAK_H - 0.2 : key === 'leviathan' ? -0.01 : onBuilding ? GROUND : TOP;
-    pop.position.set(x, y, z);
-    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : 1.15); // the same size on a building's hex as on an open one
-    if (!great) pop.add(lair(onBuilding ? 0.42 : 0.58));
-    // Three-quarters to the room, half of them looking left.
-    const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
-    model.rotation.y = face;
-    model.userData.face = face;
-    const seed = hash(k) % 628 / 100;
-    for (const r of model.userData.rigs as BeastRig[]) r.phase += seed;
-    pop.add(model);
-    g.add(pop);
-    g.userData.pop = pop;
-    g.userData.figure = model;
-    return g;
+    return beastPiece(key, onBuilding, k);
   }
 
   // Where a beast's figure stands, on the board.
@@ -2544,4 +2556,131 @@ export class Board3D {
     }
     return `home|${resting}|${e.view.stage}|${at}|${e.face.toFixed(3)}`;
   }
+}
+
+// ---------- portraits, for the phone's rulebook ----------
+// One hex of the board on its own, drawn as the TV draws it: its terrain and
+// scenery, and what stands on it (a building, a beast, a dragon), with the
+// same models, paper and light, from the same tilted camera. The phone's
+// rulebook (book.ts) shows these, so a piece looks the same in the book as on
+// the TV. Each is an image URL (a blob), drawn once.
+
+export interface Portrait {
+  terrain: string;
+  building?: string; // a BUILDINGS key, or 'tower'
+  upgrade?: string; // an UPGRADES key, on the building
+  owner?: number; // the building's owner (a tower's colour, the territory border)
+  floors?: number; // a tower's
+  beast?: string; // a beast on the hex (on the building, if there is one)
+  dragon?: { element: string; stage: number }; // a dragon at home on the hex
+  held?: string; // the hex is held by this great beast (its border)
+  peakZone?: boolean; // the freed peak's gold border
+  border?: boolean; // the owner's territory border round the hex
+}
+
+let SHOOTER: { renderer: THREE.WebGLRenderer; w: number; h: number } | null = null;
+
+export async function portraits(list: Portrait[], w = 240, h = 192): Promise<string[]> {
+  if (!SHOOTER || SHOOTER.w !== w || SHOOTER.h !== h) {
+    SHOOTER?.renderer.dispose();
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(w, h, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    SHOOTER = { renderer, w, h };
+  }
+  const out: string[] = [];
+  for (const p of list) {
+    const scene = portraitScene(p);
+    const camera = new THREE.PerspectiveCamera(26, w / h, 0.1, 100);
+    const box = new THREE.Box3().setFromObject(scene);
+    const center = box.getCenter(new THREE.Vector3());
+    const dir = new THREE.Vector3(0, Math.sin(CAMERA_TILT), Math.cos(CAMERA_TILT));
+    const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+    // As close as the hex and what's on it fit, as the board fits the land.
+    const fits = (dist: number) => {
+      camera.position.copy(center).addScaledVector(dir, dist);
+      camera.lookAt(center);
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      return corners.every((c) => {
+        const q = c.clone().project(camera);
+        return Math.abs(q.x) < 1 && Math.abs(q.y) < 1;
+      });
+    };
+    let lo = 1, hi = 60;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    fits(hi);
+    SHOOTER.renderer.render(scene, camera);
+    const blob = await new Promise<Blob | null>((ok) => SHOOTER!.renderer.domElement.toBlob(ok, 'image/png'));
+    out.push(blob ? URL.createObjectURL(blob) : '');
+    scene.traverse((o) => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
+    });
+  }
+  return out;
+}
+
+function portraitScene(p: Portrait): THREE.Scene {
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 0.95));
+  const sun = new THREE.DirectionalLight('#fff1dc', 3.4);
+  sun.position.set(-1.4, 3.3, 1.7); // from the room's left, as on the board
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512);
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02;
+  Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.1, far: 10 });
+  scene.add(sun, sun.target);
+  const k = `p${p.terrain}${p.building ?? ''}${p.beast ?? ''}`;
+  const owner = p.owner ?? 0;
+  const building = p.building ? { type: p.building, cls: '', name: '', owner, upgrade: p.upgrade ?? null, upgradeName: null, floors: p.floors ?? 0, does: { makes: {}, houses: 0, points: 0 } } : null;
+  const hex: HexView = {
+    k, q: 0, r: 0, terrain: p.terrain, building, perched: [],
+    fauna: p.beast ? { key: p.beast, name: '', hp: 1, maxHp: 1, attack: '', power: 0, element: 'neutral', weak: [], loot: {} } : null,
+    ...(p.held ? { held: p.held } : {}),
+    ...(p.beast === 'thunderbird' ? { peak: 'held' as const } : {}),
+    ...(p.peakZone ? { peakZone: true } : {}),
+  };
+  if (p.terrain === 'ocean') {
+    // The open sea, cut to the hex: the sheet the map lies on.
+    scene.add(part(cyl(0.98, 0.98, 0.01, 6), mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2), { at: [0, -0.01, 0], rot: [0, Math.PI / 6, 0], crease: false }));
+    scene.add(waveCrests(rng(k)));
+  } else {
+    const geo = tileGeometry();
+    const color = tileColor(p.terrain);
+    scene.add(part(geo.top, color), part(geo.sides, mix(color, '#fbf6ea', 0.6), { crease: false }));
+    scene.add(bake(group(decor(hex, 0))));
+  }
+  if (building) scene.add(buildingPiece(building, p.terrain, 0, !!p.beast));
+  if (p.border) {
+    const geo = territoryGeometry([hex]);
+    if (geo) {
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: PLAYER_COLORS[owner], map: GRAIN, flatShading: true }));
+      m.castShadow = m.receiveShadow = true;
+      scene.add(m);
+    }
+  }
+  if (p.beast) {
+    const b = beastPiece(p.beast, !!building, k);
+    for (const r of (b.userData.figure as THREE.Group).userData.rigs as BeastRig[]) animateBeast(r, 0, 0, 0);
+    scene.add(b);
+  }
+  if (p.dragon) {
+    const { element, stage } = p.dragon;
+    const obj = stage ? dragonRig(element).root : egg(element);
+    obj.scale.setScalar(STAGE_SCALE[stage]);
+    // On a building, it's perched there: round the plate's front, facing out, as on the board.
+    const a = 0.9;
+    if (building) obj.position.set(Math.cos(a) * 0.6, GROUND, Math.sin(a) * 0.6);
+    else obj.position.set(0, TOP, 0);
+    obj.rotation.y = building ? a + Math.PI / 2 : 0.75;
+    scene.add(obj);
+  }
+  return scene;
 }

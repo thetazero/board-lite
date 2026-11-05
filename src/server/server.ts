@@ -16,6 +16,7 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Room, RoomError, recapsDir, type RoomOptions } from './room.ts';
+import { rulebook } from '../state.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 // Found the way Node finds any package, so a checkout that shares a parent's
@@ -123,6 +124,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     // GET /api/info -> the addresses phones can reach this server on
     if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), tailscale: tailscaleAddresses(), port: (req.socket.localPort ?? 0) });
     // GET /api/recaps/ID -> a finished game's recap (src/recap.ts), kept after its room is gone
+    // GET /api/rulebook -> every building, card, beast and kingdom, for the phone's rulebook
+    if (parts[0] === 'rulebook' && req.method === 'GET') return json(res, 200, rulebook());
     if (parts[0] === 'recaps' && parts.length === 2 && req.method === 'GET') return recap(res, parts[1]);
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
     // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone, for a game with no TV

@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRate, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -213,11 +213,13 @@ function targetView(g: Game, key: string, hp?: number[]): TargetView {
   const t = TARGETS[key];
   return {
     key, name: t.name, loot: res(lootOf(g, key)), power: targetPower(key),
-    units: t.units.map((u, i) => {
-      const x = UNITS[u];
-      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), element: x.element, weak: ELEMENT_WEAK[x.element] };
-    }),
+    units: t.units.map((u, i) => unitView(u, hp?.[i])),
   };
+}
+
+function unitView(key: string, hp?: number): UnitView {
+  const x = UNITS[key];
+  return { name: x.name, hp: hp ?? x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), element: x.element, weak: ELEMENT_WEAK[x.element] };
 }
 
 // A beast, with the loot it gives: a card-sent one gives none.
@@ -471,4 +473,45 @@ export interface Recap {
   race: number[][]; // everyone's points at the start (0) and after each round; the last row has cards in hand too
   standings: RecapStanding[];
   moments: Moment[];
+}
+
+// The rulebook on each phone (web/book.ts): every building, upgrade, card,
+// beast and kingdom in the game, with its text, cost and stats, as printed.
+// Nothing in it depends on a game, so the server hands out the one copy.
+export interface BookBuilding { key: string; name: string; cls: string; text: string; cost: Res; terrain?: string; basic: boolean }
+export interface Rulebook {
+  buildings: BookBuilding[]; // the basic buildings, then the building cards
+  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */ }[];
+  actions: { key: string; name: string; text: string; cost: Res; fauna?: FaunaView }[];
+  dragons: { key: string; name: string; element: string; cost: Res; base: boolean; growth: number; targeting: string; stages: DragonStageView[] }[];
+  fauna: FaunaView[];
+  greatBeasts: FaunaView[];
+  kingdoms: TargetView[]; // with their printed loot
+  tower: { makes: Res; houses: number };
+  terrains: string[];
+  peakBonus: number; // what a production building on or next to the freed peak makes more
+  faunaWanderOdds: number;
+}
+
+export function rulebook(): Rulebook {
+  const building = (key: string): BookBuilding => {
+    const b = BUILDINGS[key];
+    return { key, name: b.name, cls: b.class, text: placeText(b), cost: res(b.cost), basic: !!b.basic, ...(b.terrain ? { terrain: b.terrain } : {}) };
+  };
+  return {
+    buildings: [...BASIC_BUILDINGS, ...Object.keys(BUILDINGS).filter((k) => !BUILDINGS[k].basic)].map(building),
+    upgrades: Object.entries(UPGRADES).map(([key, u]) => ({ key, name: u.name, text: u.text, cost: res(u.cost), on: u.appliesTo })),
+    actions: Object.entries(ACTIONS).map(([key, a]) => ({ key, name: a.name, text: a.text, cost: res(a.cost), ...(a.fauna ? { fauna: faunaView(a.fauna, {}) } : {}) })),
+    dragons: Object.entries(DRAGONS).map(([key, d]) => ({ key, name: d.name, element: d.element, cost: res(d.cost), base: !!d.base, growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) })),
+    fauna: Object.keys(FAUNA).map((k) => faunaView(k)),
+    greatBeasts: Object.keys(BEASTS).map((k) => faunaView(k)),
+    kingdoms: Object.entries(TARGETS).map(([key, t]) => ({
+      key, name: t.name, loot: res(t.loot), power: targetPower(key),
+      units: t.units.map((u) => unitView(u)),
+    })),
+    tower: { makes: res(TUNING.towerProduction), houses: TUNING.towerDragonCapacity },
+    terrains: ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'],
+    peakBonus: TUNING.peakBonus,
+    faunaWanderOdds: TUNING.faunaWanderOdds,
+  };
 }

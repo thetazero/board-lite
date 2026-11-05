@@ -178,7 +178,7 @@ export function resChips(b: Res, size = 1.25): string {
 // Game text (the log, card rules, offers) with the things it names over and
 // over drawn as icons: "gains 3 livestock" reads "gains 3" and a sheep. Takes
 // text that is already escaped HTML.
-const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b([.,;:!?)]?)/g;
+const RES_WORD = /\b(?:(\d+) )?(stone|timber|crystal|livestock|gold)\b(?! field)([.,;:!?)]?)/g; // "crystal field" is terrain, not the resource
 const POINTS_WORD = /\b(\d+) (?:more )?points?\b([.,;:!?)]?)/g;
 // Punctuation right after an icon stays on its line, not wrapped alone onto the next.
 const glue = (chip: string, punct: string) => (punct ? `<span class="nobr">${chip}${punct}</span>` : chip);
