@@ -875,13 +875,14 @@ export function unitsText(g: Game): string {
 
 // Loot split by power (power[p] is 0 for a player not fighting). Each
 // resource is split in proportion, rounded down. What's left over is handed
-// out 1 at a time, strongest first (the earlier seat on a tie), and the turn
-// carries on from one resource to the next: so equal powers get equal shares,
-// or as near as the loot allows.
-export function splitLoot(loot: Bundle, power: number[]): Bundle[] {
+// out 1 at a time, strongest first, and the turn carries on from one resource
+// to the next: so equal powers get equal shares, or as near as the loot
+// allows. Equal powers go in `order` (the round's turn order), so as the
+// first player moves round by round, so does who gets the odd one.
+export function splitLoot(loot: Bundle, power: number[], order: number[] = power.map((_, p) => p)): Bundle[] {
   const total = power.reduce((s, x) => s + x, 0);
   const winners = power.flatMap((x, p) => (x ? [p] : []));
-  const byPower = [...winners].sort((a, b) => power[b] - power[a] || a - b);
+  const byPower = [...winners].sort((a, b) => power[b] - power[a] || order.indexOf(a) - order.indexOf(b));
   const shares: Bundle[] = power.map(() => ({}));
   let next = 0;
   for (const r of RESOURCES) {
@@ -900,7 +901,7 @@ function checkRaidOver(g: Game): boolean {
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
-    const shares = splitLoot(loot, power);
+    const shares = splitLoot(loot, power, turnOrder(g));
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
     log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
