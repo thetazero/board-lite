@@ -17,9 +17,10 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
     <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, i, names)}</${tag}>`;
 }
 
-// Combat power drawn: the number on a shield, for where it has to read from across the room.
+// Combat power drawn: the number on a shield, for where it has to read from
+// across the room, named "Power" as the dragons' is.
 export function powerShield(n: number, size = 3): string {
-  return `<span class="pshield" style="font-size:${size}em" title="combat power">${icon('shield', 1)}<b>${n}</b></span>`;
+  return `<span class="power-big"><span class="loot-label">Power</span><span class="pshield" style="font-size:${size}em">${icon('shield', 1)}<b>${n}</b></span></span>`;
 }
 
 // Who voted for candidate i, as their tags: votes are public as they're cast.

@@ -11,7 +11,7 @@
 // (seconds): the staged screenshots freeze it there and step it by hand.
 
 import * as THREE from 'three';
-import type { DragonView, HexView, PublicState } from '../src/state.ts';
+import type { DragonView, FaunaView, HexView, PublicState } from '../src/state.ts';
 import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
 
 declare global {
@@ -1732,9 +1732,25 @@ const canFly = (d: DragonView) => d.status === 'ready';
 
 // ---------- the board ----------
 
+// How far in front of a beast's feet its plate sits, in hex radii.
+const TAG_AHEAD = 0.5;
+
+// A beast's plate: its name and its power ("Power 13"), as the dragons' are
+// said on the player cards, so a glance at the board says what it is and how
+// strong.
+function beastTag(f: FaunaView): HTMLElement {
+  const el = document.createElement('div');
+  el.className = `btag${f.points !== undefined ? ' great' : ''}`;
+  el.innerHTML = `<b></b><span>Power <b></b></span>`;
+  el.querySelector('b')!.textContent = f.name;
+  el.querySelector('span b')!.textContent = String(f.power);
+  return el;
+}
+
 // walk: a beast that wandered here from the next hex, walking in from `from`
 // (where it stood, from where it stands now) since `at` on the board's clock.
-interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number } }
+// tag: a beast's plate on the TV, its name and power, kept under its feet.
+interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number }; tag?: HTMLElement }
 
 // A wandering beast turns to face the next hex, walks there, and turns back
 // to face the room (seconds): an unhurried walk, so it's still going when
@@ -1771,6 +1787,7 @@ export class Board3D {
   private territory = new THREE.Group(); // every player's territory border
   private territorySig = '';
   private beasts = new Map<string, Built>(); // fauna, by hex
+  private tags = document.createElement('div'); // each beast's plate: what it is and how strong
   private dragons = new Map<string, DragonEntry>();
   private plateMats = PLAYER_COLORS.map((c) => new THREE.MeshLambertMaterial({ color: c, map: null, flatShading: true }));
   private highlight: number | null = null;
@@ -1795,6 +1812,8 @@ export class Board3D {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.append(this.renderer.domElement);
+    this.tags.className = 'beast-tags';
+    this.el.append(this.tags);
     GRAIN ??= paperTexture();
     this.plateMats.forEach((m) => (m.map = GRAIN));
 
@@ -1900,6 +1919,7 @@ export class Board3D {
       if ((had?.sig ?? '') === fsig) continue;
       if (had) {
         gone.push({ k: h.k, key: had.sig.split('|')[0], at: this.figureAt(had), b: had });
+        had.tag?.remove();
         this.beasts.delete(h.k);
       }
       if (f) fresh.push(h);
@@ -1908,7 +1928,8 @@ export class Board3D {
       const f = h.fauna!;
       const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
       const at = animate ? next(h.k) : -1e9;
-      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: at };
+      const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: at, tag: beastTag(f) };
+      this.tags.append(entry.tag!);
       const from = animate ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
       if (from >= 0) {
         entry.born = -1e9;
@@ -2081,6 +2102,21 @@ export class Board3D {
     return b.obj.position.clone().add((b.obj.userData.pop as THREE.Group).position);
   }
 
+  // Each beast's plate, just in front of its feet (towards the room), shown
+  // once it has folded up.
+  private placeTags(t: number) {
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    const p = new THREE.Vector3();
+    for (const b of this.beasts.values()) {
+      if (!b.tag) continue;
+      (b.obj.userData.figure as THREE.Object3D).getWorldPosition(p);
+      p.z += TAG_AHEAD;
+      p.project(this.camera);
+      b.tag.style.transform = `translate(${((p.x + 1) / 2) * w}px, ${((1 - p.y) / 2) * h}px) translate(-50%, -50%)`;
+      b.tag.hidden = t < b.born + 0.6;
+    }
+  }
+
   // A beast where it stands, or walking over from the hex it wandered from.
   private animateBeast(b: Built, t: number) {
     const m = b.obj.userData.figure as THREE.Group;
@@ -2111,6 +2147,7 @@ export class Board3D {
     for (const k of [...this.marks.keys()]) this.unmark(k);
     this.built.clear();
     this.beasts.clear();
+    this.tags.replaceChildren();
     this.dragons.clear();
     this.leaving = [];
     this.decorMoves.clear();
@@ -2401,6 +2438,7 @@ export class Board3D {
     const floaters = [this.decor, ...[...this.decorMoves.values()].flatMap((m) => [m.old, m.now])].flatMap((d) => (d.userData.floaters ?? []) as THREE.Object3D[]);
     for (const c of floaters) c.position.y = TOP + 0.03 + Math.sin(t * 1.4 + c.userData.float) * 0.03;
     for (const b of this.beasts.values()) this.animateBeast(b, t);
+    this.placeTags(t);
     const jumped = t < this.lastT || t - this.lastT > 0.5;
     this.lastT = t;
     for (const e of this.dragons.values()) this.animateDragon(e, t, jumped);
