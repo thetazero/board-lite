@@ -11,11 +11,11 @@
 
 import type { BookBuilding, FaunaView, Rulebook } from '../src/state.ts';
 import type { Portrait } from './board3d.ts';
-import { ELEMENT_COLORS, STAGE_LABEL, elemWords, esc, iconText, powerTag, resChips, statTag } from './common.ts';
+import { ELEMENT_COLORS, STAGE_LABEL, elemIcon, elemWords, esc, iconText, powerTag, resChips, statTag } from './common.ts';
 import { foeStack, lootLine } from './kingdom.ts';
 import { cardArt, frameColor } from './art.ts';
 
-export const BOOK_TABS = { board: 'Board', buildings: 'Buildings', beasts: 'Beasts', dragons: 'Dragons', kingdoms: 'Kingdoms', cards: 'Cards' } as const;
+export const BOOK_TABS = { board: 'Board', buildings: 'Buildings', beasts: 'Beasts', dragons: 'Dragons', elements: 'Elements', kingdoms: 'Kingdoms', cards: 'Cards' } as const;
 export type BookTab = keyof typeof BOOK_TABS;
 
 let book: Rulebook | null = null;
@@ -80,6 +80,38 @@ function portraitList(b: Rulebook, seat: number): { id: string; p: Portrait }[] 
   for (const f of b.greatBeasts) add(`beast ${f.key}`, { terrain: f.key === 'leviathan' ? 'ocean' : 'mountain', beast: f.key });
   for (const e of ELEMENTS) for (const s of [0, 3]) add(`dragon ${e} ${s}`, { terrain: 'plains', dragon: { element: e, stage: s } });
   return out;
+}
+
+// The element wheel in order, each element followed by the one it beats:
+// water, fire, ice, air, lightning. From the server, so it is the engine's.
+export function wheelOrder(beats: Record<string, string>): string[] {
+  const start = 'water' in beats ? 'water' : Object.keys(beats)[0];
+  const order = [start];
+  for (let e = beats[start]; e && e !== start && order.length < 10; e = beats[e]) order.push(e);
+  return order;
+}
+// A point on the wheel: element i of n, clockwise from the top, round 0,0.
+export function wheelAt(i: number, n: number, r: number): [number, number] {
+  const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+  return [r * Math.cos(a), r * Math.sin(a)];
+}
+
+// The element wheel: each element with an arrow to the one it beats, neutral
+// in the middle (no arrows: it beats nothing and nothing beats it).
+function wheel(beats: Record<string, string>): string {
+  const es = wheelOrder(beats);
+  const n = es.length, R = 36, gap = 13;
+  const arrows = es.map((_, i) => {
+    const [x1, y1] = wheelAt(i, n, R), [x2, y2] = wheelAt(i + 1, n, R);
+    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
+    const ux = dx / d, uy = dy / d;
+    return `<line x1="${(x1 + ux * gap).toFixed(2)}" y1="${(y1 + uy * gap).toFixed(2)}" x2="${(x2 - ux * gap).toFixed(2)}" y2="${(y2 - uy * gap).toFixed(2)}" marker-end="url(#wheelhead)"/>`;
+  }).join('');
+  const nodes = es.map((e, i) => {
+    const [x, y] = wheelAt(i, n, R);
+    return `<span class="wnode" style="left:${50 + x}%;top:${50 + y}%;--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 2)}<b>${cap(e)}</b></span>`;
+  }).join('') + `<span class="wnode" style="left:50%;top:50%">${elemIcon('neutral', 2)}<b>Neutral</b></span>`;
+  return `<div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>`;
 }
 
 function pic(id: string, alt: string): string {
@@ -149,6 +181,9 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
         <h3 class="bhead">${cap(e)} dragons</h3>${cards}</section>`;
     }).join('');
     return `<p class="bintro">On the board a dragon is the color of its element, whatever its card, and grows bigger at each life stage: egg, hatchling, young, adult.</p>${groups}`;
+  },
+  elements(b) {
+    return `${wheel(b.elementBeats)}<p class="wheelrule">Double damage where the arrow points.</p>`;
   },
   kingdoms(b) {
     return `<p class="bintro">Raids attack these. A kingdom that doesn’t fall adds 1 gold to its loot after every raid.</p>

@@ -339,10 +339,11 @@ export const SCENES: Scene[] = [
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
-      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
+      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the merchants', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
       { file: 'phone-hand-raised-3p', caption: "Phone: the tucked hand tapped on someone else's turn, raised to look at", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]'] },
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]', '[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
+      { file: 'phone-table-3p', caption: 'Phone, in a game with a TV: the table view, switched to by Table', client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['.viewswitch [data-view=table]'], waitFor: '.table-on', waitMs: 1200 },
       { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
       { file: 'phone-join-started', caption: "Phone: the room's address for a game that has started, everyone at their seat", client: 'phone', waitFor: '.seats' },
     ],
@@ -396,7 +397,7 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       return [
         { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
-        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+        { file: 'phone-bank-port', caption: 'Phone: the merchants with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
   },
@@ -513,7 +514,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-trade-acting-4p', caption: "Phone, acting player: an offer in, and their own out", client: 'phone', seat: g!.turn },
       {
         file: 'phone-trade-compose-4p', caption: 'Phone, acting player: putting an offer together', client: 'phone', seat: g!.turn, sizes: true,
-        clicks: ['[data-tab=trade]', '[data-to]:last-child', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '.handfan [data-card]'],
+        clicks: ['[data-tab=trade]', '[data-to]:nth-last-child(2)', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '.handfan [data-card]'],
       },
       { file: 'phone-trade-own-offer-4p', caption: "Phone: your own offer out, on someone else's turn", client: 'phone', seat: (g!.turn + 2) % 4 },
       {
@@ -525,6 +526,27 @@ export const SCENES: Scene[] = [
         // Last: it changes the room. The offerer has spent what they offered, so Accept is off and says why.
         file: 'phone-trade-cant-accept-4p', caption: 'Phone: an offer the offerer can no longer pay (Accept is off, with the reason)', client: 'phone', seat: (g!.turn + 1) % 4,
         then: (room) => room.mutate((g2) => drain(g2, g2.turn)), waitFor: '.offer.in .blocked',
+      },
+    ],
+  },
+  {
+    name: 'trade-anyone-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    // The acting player offers anyone a trade, and the next seat declines it.
+    setup: (g) => {
+      const t = g.turn;
+      apply(g, t, `offer anyone give 1 ${most(g, t)} get 1 ${most(g, (t + 2) % 4, most(g, t))}`);
+      apply(g, (t + 1) % 4, `decline ${g.offers[0].id}`);
+    },
+    shots: (g) => [
+      { file: 'tv-trade-anyone-4p', caption: 'TV: an offer to anyone', client: 'tv' },
+      { file: 'phone-trade-anyone-in-4p', caption: 'Phone: an offer to anyone, out of turn', client: 'phone', seat: (g!.turn + 2) % 4 },
+      { file: 'phone-trade-anyone-out-4p', caption: 'Phone, acting player: their offer to anyone, one player declined', client: 'phone', seat: g!.turn },
+      {
+        file: 'phone-trade-anyone-compose-4p', caption: 'Phone, acting player: putting an offer to anyone together', client: 'phone', seat: g!.turn,
+        clicks: ['[data-tab=trade]', '[data-to="anyone"]', '[data-step="give stone 1"]', '[data-step="get gold 1"]'],
       },
     ],
   },
@@ -736,7 +758,7 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 2, // seed 1's game ends at a round's end, with no moment between
+    seed: 3, // seeds 1 and 2 end at a round's end, with no moment between
     // The first moment anyone has the points to win: the round plays on to its end.
     until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
     shots: (g) => {
@@ -885,7 +907,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: what it makes now and with it, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
-        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
+        { ...me, file: 'phone-bank-picks', caption: 'Phone: the merchants, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
     },
   },
@@ -1305,7 +1327,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
-      { file: 'phone-wheel-3p', caption: 'Phone: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], sizes: true },
+      { file: 'phone-wheel-3p', caption: 'Phone: the rulebook at its elements tab: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], waitFor: '.bookpage .wheel', sizes: true },
       ...(['board', 'buildings', 'beasts', 'dragons', 'kingdoms', 'cards'] as const).map((t): Shot => ({
         file: `phone-rules-${t}-3p`, caption: `Phone: the rulebook, from Rules in the header, at its ${t} tab`, client: 'phone', seat: 2,
         clicks: ['#book', `[data-booktab="${t}"]`], waitFor: t === 'kingdoms' || t === 'cards' ? '.bookpage .bentry, .bookpage .bking' : '.bookpage img.bpic', sizes: t === 'board',

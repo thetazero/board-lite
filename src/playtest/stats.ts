@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // What happened in each playtest game, counted from its game.json, not judged
 // by a model: where each seat's points came from round by round, titles, what
-// was built, played and hatched, raids, fauna, trades, the bank and talk. Then
+// was built, played and hatched, raids, fauna, trades, the merchants and talk. Then
 // the same rolled up over a batch, with what's never or always used flagged,
 // and two batches side by side. See "Stats" in docs/playtest.md.
 //
@@ -307,7 +307,7 @@ export function gameMarkdown(s: GameStats): string {
   L.push(`- **Raids:** ${tg.length ? tg.map(([k, v]) => `${nm(k)} ${v.fell}/${v.chosen} fell`).join(', ') : 'none'}. Joined: ${bySeat(s.raids.joined)}; on the winning side: ${bySeat(s.raids.fell)}; took loot: ${bySeat(s.raids.loot)}; raid gold: ${bySeat(s.raids.gold)}; bailed: ${bySeat(s.raids.bailed)}.`);
   const fa = Object.entries(s.fauna);
   L.push(`- **Fauna and great beasts:** ${fa.length ? fa.map(([k, v]) => `${nm(k)} ${sum(v.cleared)}/${sum(v.tried)} cleared (${bySeat(v.cleared)})`).join('; ') : 'none fought'}.`);
-  L.push(`- **Trades:** offers ${bySeat(s.trades.offers)}; accepted (either side) ${bySeat(s.trades.accepted)}; declined ${bySeat(s.trades.declined)}. **Bank:** ${bySeat(s.bank.trades)} trades, ${sum(s.bank.gave)} given for ${sum(s.bank.got)}.`);
+  L.push(`- **Trades:** offers ${bySeat(s.trades.offers)}; accepted (either side) ${bySeat(s.trades.accepted)}; declined ${bySeat(s.trades.declined)}. **Merchants:** ${bySeat(s.bank.trades)} trades, ${sum(s.bank.gave)} given for ${sum(s.bank.got)}.`);
   L.push(`- **Talk:** to the table ${bySeat(s.talk.said)}; private ${bySeat(s.talk.told)}; words ${bySeat(s.talk.words)}.`);
   return L.join('\n');
 }
@@ -345,7 +345,7 @@ function modelRolls(games: GameStats[]): ModelRoll[] {
     add('great beasts slain', sum(Object.entries(s.fauna).filter(([k]) => BEASTS[k]).map(([, v]) => v.cleared[p])));
     add('trade offers', s.trades.offers[p]);
     add('trades', s.trades.accepted[p]);
-    add('bank trades', s.bank.trades[p]);
+    add('merchant trades', s.bank.trades[p]);
     add('said', s.talk.said[p]);
     add('told', s.talk.told[p]);
     add('words', s.talk.words[p]);
@@ -444,7 +444,7 @@ export function compareMarkdown(a: { dir: string; games: GameStats[] }, b: { dir
   line('great beasts slain', seats((s, p) => sum(Object.entries(s.fauna).filter(([k]) => BEASTS[k]).map(([, v]) => v.cleared[p]))));
   line('trade offers', seats((s, p) => s.trades.offers[p]));
   line('trades', (gs) => per(gs, (s) => sum(s.trades.accepted) / 2));
-  line('bank trades', seats((s, p) => s.bank.trades[p]));
+  line('merchant trades', seats((s, p) => s.bank.trades[p]));
   line('talk messages', seats((s, p) => s.talk.said[p] + s.talk.told[p]));
   line('talk words', seats((s, p) => s.talk.words[p]));
   const ca = catalogRoll(a.games, b.games), cb = catalogRoll(b.games, a.games);
