@@ -47,19 +47,19 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Trade Charter | upgrade | 3 | 7% |
 | **Total** |  | **44** | **100%** |
 
-### Action deck: 88 cards
+### Action deck: 84 cards
 
-8 kinds of action card (58 cards) + 5 kinds of base dragon (10 cards) + 10 kinds of dragon card (20 cards) = 88 cards.
+8 kinds of action card (54 cards) + 5 kinds of base dragon (10 cards) + 10 kinds of dragon card (20 cards) = 84 cards.
 
 | Card | Kind | Copies | Share of deck |
 |---|---|---|---|
 | Windfall | action card | 4 | 5% |
-| Buried Treasure | action card | 10 | 11% |
-| Growth Elixir | action card | 10 | 11% |
-| Healing Potion | action card | 8 | 9% |
+| Buried Treasure | action card | 10 | 12% |
+| Growth Elixir | action card | 10 | 12% |
+| Healing Potion | action card | 8 | 10% |
 | War Horn | action card | 6 | 7% |
-| Secret Hoard | action card | 8 | 9% |
-| Rouse the Bear | action card | 8 | 9% |
+| Secret Hoard | action card | 4 | 5% |
+| Rouse the Bear | action card | 8 | 10% |
 | Wake the Basilisk | action card | 4 | 5% |
 | Fire Dragon | base dragon | 2 | 2% |
 | Ice Dragon | base dragon | 2 | 2% |
@@ -76,7 +76,7 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Zephyr Drake | dragon card | 2 | 2% |
 | Abyss Wyrm | dragon card | 2 | 2% |
 | Reef Drake | dragon card | 2 | 2% |
-| **Total** |  | **88** | **100%** |
+| **Total** |  | **84** | **100%** |
 
 ## Costs
 
@@ -119,7 +119,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
 | Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
-| Secret Hoard | action card | action | 8 | nothing | Worth 2 points while in your hand. | 2 |
+| Secret Hoard | action card | action | 4 | nothing | Worth 2 points while in your hand. | 2 |
 | Rouse the Bear | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
 | Wake the Basilisk | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
