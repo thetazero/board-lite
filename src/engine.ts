@@ -826,24 +826,34 @@ export function unitsText(g: Game): string {
   return g.raid!.units.map((u, i) => `${UNITS[u.key].name} #${i + 1} ${u.hp}/${UNITS[u.key].hp}hp`).join(', ');
 }
 
+// Loot split by power (power[p] is 0 for a player not fighting). Each
+// resource is split in proportion, rounded down. What's left over is handed
+// out 1 at a time, strongest first (the earlier seat on a tie), and the turn
+// carries on from one resource to the next: so equal powers get equal shares,
+// or as near as the loot allows.
+export function splitLoot(loot: Bundle, power: number[]): Bundle[] {
+  const total = power.reduce((s, x) => s + x, 0);
+  const winners = power.flatMap((x, p) => (x ? [p] : []));
+  const byPower = [...winners].sort((a, b) => power[b] - power[a] || a - b);
+  const shares: Bundle[] = power.map(() => ({}));
+  let next = 0;
+  for (const r of RESOURCES) {
+    if (!loot[r]) continue;
+    let left = loot[r]!;
+    for (const p of winners) { const n = Math.floor((loot[r]! * power[p]) / total); if (n) shares[p][r] = n; left -= n; }
+    for (; left > 0; left--, next++) { const p = byPower[next % byPower.length]; shares[p][r] = (shares[p][r] ?? 0) + 1; }
+  }
+  return shares;
+}
+
 function checkRaidOver(g: Game): boolean {
   const raid = g.raid!;
   if (raid.units.every((u) => u.hp <= 0)) {
     // Loot is split by the combat power each player still has fighting.
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
-    const total = power.reduce((s, x) => s + x, 0);
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
-    const shares: Bundle[] = g.players.map(() => ({}));
-    // Each resource is split in proportion, rounded down; what's left over goes
-    // to the player with the most power standing (the earlier seat on a tie).
-    const top = winners.reduce((a, b) => (power[b] > power[a] ? b : a));
-    for (const r of RESOURCES) {
-      if (!loot[r]) continue;
-      let left = loot[r]!;
-      for (const p of winners) { const n = Math.floor((loot[r]! * power[p]) / total); if (n) shares[p][r] = n; left -= n; }
-      if (left) shares[top][r] = (shares[top][r] ?? 0) + left;
-    }
+    const shares = splitLoot(loot, power);
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
     log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
@@ -1246,13 +1256,12 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.resting === 'hunted') fail(`${d.id} fought on the map this round, so it sits out the raids anyway.`);
           if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
           if (d.resting === 'hurt') d.resting = '';
           ev.d = d.id;
-          what = `heals ${d.id}, ready to raid`;
+          what = `heals ${d.id}${canRaid(d) ? ', ready to raid' : ''}`;
           break;
         }
         case 'send_fauna': {
@@ -1338,9 +1347,9 @@ function discardCommand(g: Game, p: number, verb: string, args: string[]) {
   const pl = g.players[p];
   const over = pl.hand.length - TUNING.handCap;
   if (over <= 0) fail(`You don't need to discard.`);
-  if (verb !== 'discard') fail(`Discard ${nCards(over)}: discard <card ids>.`);
+  if (verb !== 'discard') fail(`Discard ${nCards(over)} first, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}".`);
   const ids = [...new Set(args)];
-  if (ids.length !== over) fail(`Discard exactly ${nCards(over)}.`);
+  if (ids.length !== over) fail(`Discard exactly ${nCards(over)}, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}": you hold ${pl.hand.length} and the hand limit is ${TUNING.handCap}.`);
   const cards = ids.map((id) => handCard(g, p, id));
   for (const c of cards) discardCard(g, p, c);
   log(g, `${pname(p)} discards ${nCards(ids.length)}.`, { k: 'discard', p, n: ids.length });
@@ -1378,6 +1387,7 @@ export function apply(g: Game, p: number, command: string): void {
   const snapshot = structuredClone(rest);
   const logged = g.log.length;
   try {
+    if (v === 'discard' && g.phase !== 'discard') fail(`Discard at the end of the round, after the raids, if you hold more than ${TUNING.handCap} cards.`);
     if (g.phase === 'cards') cardsCommand(g, p, v, args);
     else if (g.phase === 'action') actionCommand(g, p, v, args);
     else if (g.phase === 'raid') raidCommand(g, p, v, args);

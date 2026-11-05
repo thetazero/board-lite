@@ -158,7 +158,8 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     return out;
   }
   if (g.phase === 'discard') {
-    out.push(`discard <${you.hand.length - you.handCap} card ids>   (hand cap is ${you.handCap})`);
+    const n = you.hand.length - you.handCap;
+    out.push(`discard <${n} card ids>   (discard exactly ${n} of your ${you.hand.length} cards, like "discard ${you.hand.slice(0, n).map((c) => c.id).join(' ')}"; the hand limit is ${you.handCap})`);
     return out;
   }
   const raid = g.raid;
@@ -175,7 +176,7 @@ function phaseText(g: PublicState): string {
   if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
   if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps one of the two building cards they drew.`;
   if (g.phase === 'action') return `Round ${g.round}, action phase, ${P(g.turn)}'s turn.`;
-  if (g.phase === 'discard') return `Round ${g.round}, end of round: discarding down to the hand cap.`;
+  if (g.phase === 'discard') return `Round ${g.round}, end of round: everyone over the hand limit discards down to it.`;
   return `Round ${g.round}, raid phase (${g.raid!.step}), ${plural(g.raidsLeft, 'raid')} left this round.`;
 }
 
@@ -230,7 +231,8 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you gain (production minus what your dragons eat): ${amounts(you.income)}.`);
   out.push(`Bank rate ${you.bankRate}:1. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
-  out.push(`Hand (${you.hand.length}/${you.handCap}):`);
+  const over = you.hand.length - you.handCap;
+  out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);
   for (const c of you.hand) out.push(`  ${cardText(c)}`);
   if (you.choice.length) out.push(`Drawn, keep one: ${you.choice.map(cardText).join(' | ')}`);
   out.push('');

@@ -342,7 +342,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
   }
   if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!, {}), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
-    const ids = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted').map((d) => d.id);
+    const ids = mine.filter((d) => d.damage > 0 || d.resting === 'hurt').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };
   }
   return { ...base, text: a.text, needs: 'none' };
