@@ -191,9 +191,9 @@ test('illegal moves are refused without changing the game', () => {
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
   assert.throws(() => apply(g, 0, 'build c999 0,0'), RuleError);
-  assert.throws(() => apply(g, 0, 'bank stone timber 2'), RuleError); // can't afford 8 stone
-  assert.throws(() => apply(g, 0, 'bank stone gold'), RuleError); // the bank doesn't trade gold
-  assert.throws(() => apply(g, 0, 'bank gold stone'), RuleError);
+  assert.throws(() => apply(g, 0, 'merchants stone timber 2'), RuleError); // can't afford 8 stone
+  assert.throws(() => apply(g, 0, 'merchants stone gold'), RuleError); // the merchants don't trade gold
+  assert.throws(() => apply(g, 0, 'merchants gold stone'), RuleError);
   assert.throws(() => apply(g, 0, 'dance'), RuleError);
   assert.equal(JSON.stringify(g), before);
 });
@@ -316,11 +316,11 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   apply(g, 0, `build cport ${harbor}`);
   assert.equal(g.buildings[harbor].type, 'stone_port');
   // 2:1 for stone only; everything else stays 4:1.
-  assert.deepEqual(bankRates(g, 0), { stone: 2, timber: 4, crystal: 4, livestock: 4 }); // no gold: the bank doesn't trade it
+  assert.deepEqual(bankRates(g, 0), { stone: 2, timber: 4, crystal: 4, livestock: 4 }); // no gold: the merchants don't trade it
   g.players[0].resources = { stone: 2, timber: 4, crystal: 0, livestock: 0, gold: 8 };
-  apply(g, 0, 'bank stone livestock');
-  apply(g, 0, 'bank timber crystal');
-  assert.throws(() => apply(g, 0, 'bank gold stone 2'), RuleError);
+  apply(g, 0, 'merchants stone livestock');
+  apply(g, 0, 'merchants timber crystal');
+  assert.throws(() => apply(g, 0, 'merchants gold stone 2'), RuleError);
   assert.deepEqual(g.players[0].resources, { stone: 0, timber: 0, crystal: 1, livestock: 1, gold: 8 });
 });
 
@@ -330,10 +330,10 @@ test('a title needs its minimum as well as the lead', () => {
   g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 };
   const tower = g.buildings[g.towers[0]];
   tower.floors = TUNING.titleMinimum.tower - 1; // the lead, one short of the minimum
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.tower, null);
   tower.floors = TUNING.titleMinimum.tower;
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.tower, 0);
 });
 
@@ -343,16 +343,16 @@ test('Largest Hoard goes to the most gold, from its minimum, and changes hands',
   const min = TUNING.titleMinimum.hoard;
   g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: min - 1 };
   g.players[1].resources.gold = 0;
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.hoard, null); // the lead, one short of the minimum
   g.players[0].resources.gold = min;
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.hoard, 0);
   g.players[1].resources.gold = min; // a tie: the holder keeps it
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.hoard, 0);
   g.players[1].resources.gold = min + 1;
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.hoard, 1);
   assert.equal(score(g, 1).titles, TUNING.titlePoints);
 });
@@ -368,22 +368,22 @@ test('dragons are worth no points; Strongest Dragon Army goes to the most combat
   // 3 adults fall short (the 9 dragon points they were worth fell short of 10); a hatchling more doesn't.
   assert.ok(3 * adult < TUNING.titleMinimum.army && 3 * adult + hatchling >= TUNING.titleMinimum.army);
   for (let i = 0; i < 3; i++) add(0, 3);
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.army, null);
   assert.equal(score(g, 0).public, 0); // dragons alone score nothing
   add(0, 1);
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.army, 0);
   assert.equal(score(g, 0).public, TUNING.titlePoints);
   for (let i = 0; i < 3; i++) add(1, 3);
   add(1, 1); // a tie: the holder keeps it
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.army, 0);
   add(1, 0); // an egg has no power
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.army, 0);
   add(1, 1);
-  apply(g, 0, 'bank stone timber');
+  apply(g, 0, 'merchants stone timber');
   assert.equal(g.titles.army, 1);
   assert.equal(score(g, 1).titles, TUNING.titlePoints);
 });
@@ -602,6 +602,19 @@ test('loot left over goes out 1 at a time, strongest first, carrying on across r
   assert.deepEqual(splitLoot({ stone: 1, gold: 1 }, [3, 0, 7, 3]), [{ gold: 1 }, {}, { stone: 1 }, {}]);
   // Shares in proportion come first, then the leftover: 7 gold at 2:1 is 4 and 2, then 1 to the stronger.
   assert.deepEqual(splitLoot({ gold: 7 }, [2, 1]), [{ gold: 5 }, { gold: 2 }]);
+});
+
+test('equal powers take the odd loot in the round\'s turn order, so it moves with the first player', () => {
+  // 2 equal winners, 2 livestock and 1 gold: the first of them in turn order gets the gold.
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 1 }, [0, 5, 5], [2, 0, 1]), [{}, { livestock: 1 }, { livestock: 1, gold: 1 }]);
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 1 }, [0, 5, 5], [0, 1, 2]), [{}, { livestock: 1, gold: 1 }, { livestock: 1 }]);
+  // Over a cycle of first players, each of 3 equal raiders gets the same.
+  const got = [0, 0, 0];
+  for (let first = 0; first < 3; first++) {
+    const order = [0, 1, 2].map((i) => (first + i) % 3);
+    splitLoot({ gold: 1 }, [5, 5, 5], order).forEach((b, p) => (got[p] += b.gold ?? 0));
+  }
+  assert.deepEqual(got, [1, 1, 1]);
 });
 
 test('Healing Potion heals a knocked-out dragon, ready to fight', () => {

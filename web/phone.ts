@@ -1,8 +1,9 @@
 // The phone: one player's hidden hand and their choices. Everything public
 // is on the TV, so this stays small: resources, cards, and the decision at hand.
-// A game with no TV (remote mode: the room was made on a phone) also shows the
-// table: the TV's page for the room, in a frame over this one, behind a
-// You / Table switch, and cut to on its own while a cutscene plays.
+// Every game also shows the table: the TV's page for the room, in a frame over
+// this one, behind a You / Table switch, and cut to on its own while a cutscene
+// plays. In a game with no TV (remote mode: the room was made on a phone) that's
+// from the start; in a game with a TV, once the player first opens the table.
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
@@ -11,7 +12,7 @@ import {
 import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
-import { bookSheet, loadBook, type BookTab } from './book.ts';
+import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -52,8 +53,7 @@ let sending = false;
 // hasn't caught up yet. Null once the server shows the same.
 let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
-let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
-let bookTab: BookTab | null = null; // the rulebook, from Rules in the header, open at this tab
+let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
 // A new screen tucks it again, if no card can be played there either.
@@ -215,7 +215,8 @@ function onSnapshot(s: Snapshot) {
   }
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
-  if (s.lobby.remote) table.show(code);
+  table.show(code, s.lobby.remote);
+  table.hold(s.lobby.remote && s.scene > 0);
   noteOffers(s.game, s.seat);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
@@ -384,43 +385,69 @@ function invite(c: string): string {
     <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>`;
 }
 
-// ---------- the table, in a game with no TV ----------
+// ---------- the table ----------
 
 // The TV's page for the room, in a frame over this page, kept loaded (and
-// hidden) for the whole game so its cutscenes are queued as they happen. The
-// switch sits by the talk bar in both views. While a cutscene plays (the round's
-// dice, a raid's or a beast's fight) the frame tells this page, and the phone
-// cuts to the table and back after, unless the player switched by hand.
+// hidden) for the rest of the game so its cutscenes are queued as they happen.
+// The switch sits by the talk bar in both views. While a cutscene plays (the
+// round's dice, a raid's or a beast's fight) the frame tells this page, and in a
+// game with no TV so does the server's snapshot (its `scene`); the phone cuts to
+// the table and back after, unless the player switched by hand. While the
+// server's scene plays with no TV, You is off: there's nothing to do there.
+// In a game with a TV the frame is only made when Table is first tapped, so a
+// phone at the TV doesn't load a second board or cut away from the hand; there
+// the server's scene doesn't hold the table, and You says to watch the TV.
 const table = (() => {
   let wrap: HTMLElement | null = null;
   let sw: HTMLElement | null = null;
   let room = '';
   let on = false;
   let auto = false; // showing the table because a cutscene cut to it
+  let framed = false; // the frame says its cutscene is playing
+  let held = false; // the server says a scene is playing: there's nothing to do on the You side
   const set = (v: boolean) => {
     on = v;
     document.body.classList.toggle('table-on', v);
     sw?.querySelectorAll<HTMLElement>('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === v)));
     wrap?.setAttribute('aria-hidden', String(!v));
   };
-  addEventListener('message', (e) => {
-    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
-    if (e.data.on && !on) {
+  // Cut to the table while either says a scene plays, and back once neither does.
+  const update = () => {
+    if (!wrap) return;
+    const you = sw?.querySelector<HTMLButtonElement>('[data-view="you"]');
+    if (you) you.disabled = held;
+    if ((framed || held) && !on) {
       auto = true;
       set(true);
-    } else if (!e.data.on && auto) {
+    } else if (!framed && !held && auto) {
       auto = false;
       set(false);
     }
+  };
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
+    framed = !!e.data.on;
+    update();
   });
+  const frame = () => {
+    if (wrap?.firstChild) return;
+    wrap!.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(room)}&remote" title="The table"></iframe>`;
+  };
   return {
-    show(c: string) {
+    // The server's word on whether a scene plays, in a game with no TV: a phone
+    // joining mid-scene, or one whose frame missed it, still cuts to the table
+    // rather than saying to watch it.
+    hold(v: boolean) {
+      held = v;
+      update();
+    },
+    show(c: string, remote: boolean) {
       if (wrap && room === c) return;
       this.hide();
       room = c;
       wrap = document.createElement('div');
       wrap.className = 'tableview';
-      wrap.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(c)}&remote" title="The table"></iframe>`;
+      if (remote) frame();
       sw = document.createElement('div');
       sw.className = 'viewswitch';
       sw.setAttribute('role', 'group');
@@ -428,19 +455,22 @@ const table = (() => {
       sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
       sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
         auto = false;
+        if (b.dataset.view === 'table') frame();
         set(b.dataset.view === 'table');
       }));
       document.body.append(wrap, sw);
-      document.body.classList.add('remote');
+      document.body.classList.add('has-table');
+      document.body.classList.toggle('remote', remote);
       set(false);
+      update();
     },
     hide() {
       wrap?.remove();
       sw?.remove();
       wrap = sw = null;
       room = '';
-      auto = false;
-      document.body.classList.remove('remote', 'table-on');
+      on = auto = framed = held = false;
+      document.body.classList.remove('has-table', 'remote', 'table-on');
     },
   };
 })();
@@ -534,7 +564,7 @@ function header(g: PublicState, me: Me): string {
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
         <button id="book" class="ghost bookbtn" aria-expanded="${!!bookTab}">Rules</button>
-        <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${wheelOpen}">${wheelMark(g)}</button>
+        <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${bookTab === 'elements'}">${wheelMark(g)}</button>
         <button id="menu" class="ghost menubtn" aria-label="Menu" aria-expanded="${menu}">⋯</button>
       </header>
       <div class="resbar">${res}</div>
@@ -581,49 +611,12 @@ function menuSheet(): string {
     <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
 }
 
-// The element wheel in order, each element followed by the one it beats:
-// water, fire, ice, air, lightning. From the server, so it is the engine's.
-function wheelOrder(g: PublicState): string[] {
-  const beats = g.elementBeats;
-  const start = 'water' in beats ? 'water' : Object.keys(beats)[0];
-  const order = [start];
-  for (let e = beats[start]; e && e !== start && order.length < 10; e = beats[e]) order.push(e);
-  return order;
-}
-// A point on the wheel: element i of n, clockwise from the top, round 0,0.
-function wheelAt(i: number, n: number, r: number): [number, number] {
-  const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
-  return [r * Math.cos(a), r * Math.sin(a)];
-}
-
 // The header's mark for the wheel: a dot of each element's colour in a ring,
-// always on screen, so the wheel is one tap away.
+// always on screen, so the wheel (the rulebook's Elements tab) is one tap away.
 function wheelMark(g: PublicState): string {
-  const es = wheelOrder(g);
+  const es = wheelOrder(g.elementBeats);
   const dots = es.map((e, i) => { const [x, y] = wheelAt(i, es.length, 6); return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${ELEMENT_COLORS[e]}"/>`; }).join('');
   return `<svg viewBox="-10 -10 20 20" aria-hidden="true"><circle r="6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>${dots}</svg>`;
-}
-
-// The element wheel, opened from the header: each element with an arrow to
-// the one it beats, neutral in the middle (no arrows: it beats nothing and
-// nothing beats it), and the rule in one line (docs/rules.md, "Elements").
-function wheelSheet(g: PublicState): string {
-  const es = wheelOrder(g);
-  const n = es.length, R = 36, gap = 13;
-  const arrows = es.map((_, i) => {
-    const [x1, y1] = wheelAt(i, n, R), [x2, y2] = wheelAt(i + 1, n, R);
-    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
-    const ux = dx / d, uy = dy / d;
-    return `<line x1="${(x1 + ux * gap).toFixed(2)}" y1="${(y1 + uy * gap).toFixed(2)}" x2="${(x2 - ux * gap).toFixed(2)}" y2="${(y2 - uy * gap).toFixed(2)}" marker-end="url(#wheelhead)"/>`;
-  }).join('');
-  const nodes = es.map((e, i) => {
-    const [x, y] = wheelAt(i, n, R);
-    return `<span class="wnode" style="left:${50 + x}%;top:${50 + y}%;--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 2)}<b>${e[0].toUpperCase()}${e.slice(1)}</b></span>`;
-  }).join('') + `<span class="wnode" style="left:50%;top:50%">${elemIcon('neutral', 2)}<b>Neutral</b></span>`;
-  return `<div class="menuback" id="wheelclose"></div><div class="menu wheelsheet"><h3>Element wheel</h3>
-    <div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>
-    <p class="wheelrule">Double damage where the arrow points.</p>
-    <div class="row"><button id="wheeldone">Close</button></div></div>`;
 }
 
 // The table waits on someone whose phone is gone (closed, asleep, out of
@@ -677,7 +670,7 @@ function render() {
   const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
-  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : bookTab ? bookSheet(bookTab) : ''}`);
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : bookTab ? bookSheet(bookTab) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
@@ -770,7 +763,7 @@ function actionView(g: PublicState, me: Me): string {
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
     <div class="offer out">You offer ${o.to === null ? 'everyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
-  // Build and Trade (with the bank) open over the table and close again; the hand is always below.
+  // Build and Trade (with the merchants) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
@@ -790,7 +783,7 @@ function actionView(g: PublicState, me: Me): string {
   }).join('') : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
-  // End turn sits above an open panel, so a long one (Trade, with the bank, runs past the
+  // End turn sits above an open panel, so a long one (Trade, with the merchants, runs past the
   // screen) never pushes it down under the hand.
   return `${incoming}${mine}${tabs}${clear}${perch}${recall}${end}${content}`;
 }
@@ -927,20 +920,20 @@ function stepper(side: 'give' | 'get', r: string, n: number, max: number): strin
   return `<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span>`;
 }
 
-// The bank, on your turn: give your bank rate of one resource for 1 of another.
+// The merchants, on your turn: give your rate of one resource for 1 of another.
 function bankView(me: Me): string {
   const rate = me.bankRates[bank.give as 'stone'];
-  // The bank's Trade: what you give has to be there, and differ from what you gain.
+  // The merchants' Trade: what you give has to be there, and differ from what you gain.
   const bankWhy = bank.give === bank.get ? 'You give and gain the same resource: choose another.'
     : me.resources[bank.give as 'stone'] < rate * bank.times ? `You can't afford ${rate * bank.times} ${bank.give}.` : null;
   // Pick a resource by tapping its icon.
   // A resource a port trades better wears its rate, on the Give side.
   const usual = Math.max(...Object.values(me.bankRates));
   const tag = (side: string, r: string) => (side === 'give' && me.bankRates[r as 'stone'] < usual ? `<span class="rate">${me.bankRates[r as 'stone']}:1</span>` : '');
-  // Only what the bank trades: the basic resources, never gold.
+  // Only what the merchants trade: the basic resources, never gold.
   const traded = RESOURCES.filter((r): r is keyof Me['bankRates'] => r in me.bankRates);
   const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${traded.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}${tag(side, r) ? `, ${me.bankRates[r]}:1` : ''}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}${tag(side, r)}</button>`).join('')}</div>`;
-  return `<section class="panel"><h3>Bank</h3>
+  return `<section class="panel"><h3>Merchants</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Gain</span>${pick('get', bank.get)}</div>
       <div class="bank"><span class="steplabel">Times</span><span class="stepper"><button data-btimes="-1" aria-label="Trade 1 time fewer">−</button><b>${bank.times}</b><button data-btimes="1" aria-label="Trade 1 time more">+</button></span>
@@ -969,7 +962,7 @@ function tradeView(g: PublicState, me: Me): string {
     ? `<p class="tpick">${offered.length ? `${icon('cards', 1.2)} ${offered.map((c) => `<b>${esc(c.name)}</b>`).join(', ')}` : '<small>Tap cards in your hand to offer them too.</small>'}</p>`
     : '';
   const any = Object.values(trade.give).some(Boolean) || trade.cards.size || Object.values(trade.get).some(Boolean);
-  // On your turn the bank comes first: it's the shorter form, and the one used most.
+  // On your turn the merchants come first: it's the shorter form, and the one used most.
   return `${me.myTurn ? bankView(me) : ''}
     <section class="panel trade">
       <h3>Offer a trade to</h3><div class="row who">${who}</div>
@@ -1231,7 +1224,9 @@ function gameOver(g: PublicState, me: Me): string {
 // pick it). A plain tap does what it always did.
 type Grip = { id: string; x0: number; y0: number; x: number; y: number; moved: boolean; lift: { x: number; y: number } | null; top: number; strips: { id: string; left: number; width: number }[]; hold: number };
 let grip: Grip | null = null;
-let swallowClick = 0; // a click until then ends a slide or a hold, not a tap
+let swallowClick = 0; // a click until then ends a swipe, not a tap
+let held = false; // a hold opened a card, and the finger is still down
+let eatClick = 0; // the click that ends a press on the hand, until then: handled when it let go
 let swipe: { x: number; y: number } | null = null; // a finger down on an open card
 const MOVE_PX = 8; // further than this is a slide, not a tap
 const LIFT_PX = 50; // this far up is pulling a card out of the hand
@@ -1291,7 +1286,7 @@ function grab(e: PointerEvent, el: HTMLElement) {
   grip.hold = window.setTimeout(() => {
     // Held still: open the card to read it.
     grip = null;
-    swallowClick = performance.now() + 600;
+    held = true;
     openCard = id;
     render();
   }, HOLD_MS);
@@ -1315,14 +1310,25 @@ addEventListener('pointermove', (e) => {
   }
   showGrip();
 });
+// The press ends here, not in the card's click: the risen card has left the
+// thumb, so its click lands on whatever is under it now, often the next card
+// (#295). A tap is the card pressed, and the click that follows is eaten.
 function letGo(cancel: boolean) {
+  if (held) {
+    held = false;
+    eatClick = performance.now() + 600;
+  }
   const g = grip;
   if (!g) return;
   grip = null;
   clearTimeout(g.hold);
-  if (g.moved) swallowClick = performance.now() + 400;
+  eatClick = performance.now() + 600;
   showGrip();
-  if (g.lift && !cancel && g.y < g.top) pullOut(g.id);
+  if (cancel) return;
+  if (g.lift && g.y < g.top) return pullOut(g.id);
+  const gs = snap?.game;
+  const me = snap?.you;
+  if (!g.moved && gs && me && me.hand.some((c) => c.id === g.id)) tapCard(gs, me, g.id);
 }
 addEventListener('pointerup', (e) => {
   letGo(false);
@@ -1336,6 +1342,13 @@ addEventListener('pointerup', (e) => {
   swallowClick = performance.now() + 400;
   nav.click();
 });
+addEventListener('pointerdown', () => (eatClick = 0), true); // a new press: the last one's click isn't coming
+addEventListener('click', (e) => {
+  if (!e.isTrusted || performance.now() >= eatClick) return;
+  eatClick = 0;
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 addEventListener('pointercancel', () => {
   letGo(true); // the page took the touch to scroll
   swipe = null;
@@ -1454,7 +1467,7 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   bind('[data-card]', (el) => {
-    if (performance.now() < swallowClick) return; // the end of a slide or a hold, not a tap
+    if (performance.now() < swallowClick) return; // the end of a swipe, not a tap
     tapCard(g, me, el.dataset.card!);
   });
   bind('[data-raisehand]', () => {
@@ -1583,7 +1596,7 @@ function wire(g: PublicState, me: Me) {
     bank.times = Math.max(1, bank.times + Number(el.dataset.btimes));
     render();
   });
-  on('bankgo', () => send(`bank ${bank.give} ${bank.get} ${bank.times}`));
+  on('bankgo', () => send(`merchants ${bank.give} ${bank.get} ${bank.times}`));
   // trade
   bind('[data-to]', (el) => {
     trade.to = el.dataset.to === 'everyone' ? null : Number(el.dataset.to);
@@ -1631,23 +1644,19 @@ function wire(g: PublicState, me: Me) {
   });
   on('menu', () => {
     menu = !menu;
-    wheelOpen = false;
-    bookTab = null;
-    render();
-  });
-  on('wheel', () => {
-    wheelOpen = !wheelOpen;
-    menu = false;
     bookTab = null;
     render();
   });
   // The rulebook lies over whatever the screen is, and closes back to it.
-  on('book', () => {
-    bookTab = bookTab ? null : 'board';
-    menu = wheelOpen = false;
+  // Rules opens it at its first tab, the wheel's ring of dots at Elements.
+  const openBook = (tab: BookTab) => {
+    bookTab = bookTab ? null : tab;
+    menu = false;
     render();
     if (bookTab) loadBook(me.seat, () => bookTab && render());
-  });
+  };
+  on('book', () => openBook('board'));
+  on('wheel', () => openBook('elements'));
   for (const id of ['bookclose', 'bookdone']) {
     on(id, () => {
       bookTab = null;
@@ -1659,12 +1668,6 @@ function wire(g: PublicState, me: Me) {
     render();
     app.querySelector('.bookpage')?.scrollTo(0, 0);
   });
-  for (const id of ['wheelclose', 'wheeldone']) {
-    on(id, () => {
-      wheelOpen = false;
-      render();
-    });
-  }
   for (const id of ['menuclose', 'menucancel']) {
     on(id, () => {
       menu = false;

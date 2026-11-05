@@ -164,7 +164,7 @@ export interface SeatState {
   resources: Record<Resource, number>;
   hiddenPoints: number;
   totalPoints: number;
-  bankRates: Record<BasicResource, number>; // what you give the bank, per basic resource (never gold)
+  bankRates: Record<BasicResource, number>; // what you give the merchants, per basic resource (never gold)
   dragonsHoused: number;
   dragonCapacity: number;
   // What a round brings in, per resource: production minus what the dragons
@@ -494,6 +494,7 @@ export interface Rulebook {
   terrains: string[];
   peakBonus: number; // what a production building on or next to the freed peak makes more
   faunaWanderOdds: number;
+  elementBeats: Record<string, string>; // the element wheel: what each element beats
 }
 
 export function rulebook(): Rulebook {
@@ -516,5 +517,6 @@ export function rulebook(): Rulebook {
     terrains: ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'],
     peakBonus: TUNING.peakBonus,
     faunaWanderOdds: TUNING.faunaWanderOdds,
+    elementBeats: ELEMENT_BEATS,
   };
 }

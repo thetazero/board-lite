@@ -336,8 +336,8 @@ export function dragonCapacity(g: Game, p: number): number {
   return cap;
 }
 
-// What you give the bank for 1 of another resource, per resource you give:
-// 4, or a port's rate for its own resource. The bank trades basic resources
+// What you give the merchants for 1 of another resource, per resource you give:
+// 4, or a port's rate for its own resource. The merchants trade basic resources
 // only, never gold (#279).
 export function bankRates(g: Game, p: number): Record<BasicResource, number> {
   const rates = Object.fromEntries(BASIC_RESOURCES.map((r) => [r, TUNING.bankRate])) as Record<BasicResource, number>;
@@ -876,13 +876,14 @@ export function unitsText(g: Game): string {
 
 // Loot split by power (power[p] is 0 for a player not fighting). Each
 // resource is split in proportion, rounded down. What's left over is handed
-// out 1 at a time, strongest first (the earlier seat on a tie), and the turn
-// carries on from one resource to the next: so equal powers get equal shares,
-// or as near as the loot allows.
-export function splitLoot(loot: Bundle, power: number[]): Bundle[] {
+// out 1 at a time, strongest first, and the turn carries on from one resource
+// to the next: so equal powers get equal shares, or as near as the loot
+// allows. Equal powers go in `order` (the round's turn order), so as the
+// first player moves round by round, so does who gets the odd one.
+export function splitLoot(loot: Bundle, power: number[], order: number[] = power.map((_, p) => p)): Bundle[] {
   const total = power.reduce((s, x) => s + x, 0);
   const winners = power.flatMap((x, p) => (x ? [p] : []));
-  const byPower = [...winners].sort((a, b) => power[b] - power[a] || a - b);
+  const byPower = [...winners].sort((a, b) => power[b] - power[a] || order.indexOf(a) - order.indexOf(b));
   const shares: Bundle[] = power.map(() => ({}));
   let next = 0;
   for (const r of RESOURCES) {
@@ -901,7 +902,7 @@ function checkRaidOver(g: Game): boolean {
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
-    const shares = splitLoot(loot, power);
+    const shares = splitLoot(loot, power, turnOrder(g));
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
     log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
@@ -1196,16 +1197,17 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       log(g, `${pname(p)} ends their turn.`, { k: 'end', p });
       return endTurn(g);
     }
-    case 'bank': {
+    case 'merchants':
+    case 'bank': { // "bank" is the old name, still accepted
       const give = parseResource(args[0]), get = parseResource(args[1]);
       const times = args[2] ? Number(args[2]) : 1;
-      if (give === 'gold' || get === 'gold') fail(`The bank doesn't trade gold.`);
+      if (give === 'gold' || get === 'gold') fail(`The merchants don't trade gold.`);
       if (give === get) fail(`Trade two different resources.`);
       if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
       const rate = bankRates(g, p)[give as BasicResource];
       pay(pl, { [give]: rate * times });
       gain(pl, { [get]: times });
-      return log(g, `${pname(p)} trades ${rate * times} ${give} to the bank for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
+      return log(g, `${pname(p)} trades ${rate * times} ${give} to the merchants for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
     }
     case 'build': {
       // A basic building by name, or a building card from hand.
@@ -1350,7 +1352,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
     }
   }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, bank, offer, accept, decline, cancel, end.`);
+  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, merchants, offer, accept, decline, cancel, end.`);
 }
 
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {

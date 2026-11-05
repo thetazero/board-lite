@@ -8,8 +8,8 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 30 points. Titles are 6 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
-- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The bank doesn't trade it.
-- Bank: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
+- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The merchants don't trade it.
+- Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 
@@ -102,10 +102,10 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Drovers' Barn | building card | building | 2 | 2 stone, 3 timber, 3 crystal | Makes 1 livestock each round for each adjacent livestock building; worth 1 point. | 1 |
 | Fishery | building card | building | 1 | 3 stone, 4 timber, 3 crystal | Makes 1 livestock each round for each adjacent ocean hex; worth 1 point. | 1 |
 | Hatchery | building card | building | 2 | 6 stone, 6 timber, 6 crystal | Your dragons grow 1 extra step each round. | — |
-| Stone Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade stone with the bank at 2:1. | — |
-| Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the bank at 2:1. | — |
-| Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the bank at 2:1. | — |
-| Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the bank at 2:1. | — |
+| Stone Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade stone with the merchants at 2:1. | — |
+| Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the merchants at 2:1. | — |
+| Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the merchants at 2:1. | — |
+| Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the merchants at 2:1. | — |
 | Market | building card | building | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
 | Monument | building card | building | 2 | 6 stone, 5 timber | Worth 2 points. Build adjacent to a monument. | 2 |
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
@@ -256,7 +256,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and the earlier seat on a tie, carrying on from one resource to the next).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
 |---|---|---|---|---|---|

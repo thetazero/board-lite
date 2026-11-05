@@ -541,6 +541,12 @@ body.recap-page { font-size: 16px; }
 
 /* ================= phone ================= */
 body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2em; }
+/* The phone is tapped, not read for copying: a tap held a moment too long, or
+   two quick taps, would select a word instead of pressing the button (a vote,
+   most of all, which is a whole card of text). Nothing on it selects but what a
+   player types into, and no double-tap zooms. */
+body.phone { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 /* phone: joining and the lobby, under a strip of the papercraft scene */
 .phone .hero { position: relative; flex: none; height: 11em; overflow: hidden; }
 .phone .hero svg.scene { width: 100%; height: 100%; display: block; }
@@ -855,14 +861,9 @@ button.on:disabled { opacity: 1; }
 .seatlist .seatbtn .tag { margin-left: auto; font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* The menu under your name: out of the way, but always there. */
 .me .menubtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-size: 1.3em; line-height: 1; padding: .05em .35em .2em; margin: 0 -.5em 0 .3em; }
-/* The element wheel: a ring of element dots beside your points, one tap from the whole wheel. */
+/* The element wheel: a ring of element dots beside your points, one tap from the rulebook's Elements tab. */
 .me .wheelbtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; line-height: 0; padding: .15em; margin: 0 0 0 .4em; }
 .me .wheelbtn svg { width: 1.6em; height: 1.6em; display: block; }
-.wheelsheet .wheel { position: relative; width: min(16em, 70vw); aspect-ratio: 1; margin: .2em auto .6em; color: var(--ink-soft); }
-.wheelsheet .wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.wheelsheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
-.wheelsheet .wnode b { font-size: .85em; color: var(--ink); }
-.wheelsheet .wheelrule { color: var(--ink); font-weight: 600; }
 .menuback { position: fixed; inset: 0; background: #0008; z-index: 40; }
 .menu { position: fixed; top: .6em; left: .6em; right: .6em; max-width: 26em; margin: 0 auto; z-index: 41; background: var(--grain), var(--sheet); --text: var(--ink); color: var(--ink); border-radius: 4px; box-shadow: var(--lift); padding: .8em 1em 1em; }
 .menu h3 { margin: 0 0 .3em; font-family: var(--serif); }
@@ -873,7 +874,7 @@ button.on:disabled { opacity: 1; }
 .menu.booksheet { bottom: .6em; display: flex; flex-direction: column; padding: .6em .8em .4em; max-width: 34em; }
 .booksheet .bookbar { display: flex; align-items: center; justify-content: space-between; }
 .booksheet .bookbar h3 { margin: 0; }
-.booksheet .booktabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3em; margin: .5em 0; }
+.booksheet .booktabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3em; margin: .5em 0; }
 .booksheet .booktabs button { padding: .45em .2em; font-size: .9em; }
 .booksheet .booktabs button.on { background: var(--grain), var(--accent); color: var(--ink); }
 .booksheet .bookpage { flex: 1; overflow-y: auto; overscroll-behavior: contain; margin: 0 -.4em; padding: 0 .4em .6em; }
@@ -898,6 +899,11 @@ button.on:disabled { opacity: 1; }
 .booksheet .bdhead { display: flex; align-items: center; justify-content: space-between; gap: .4em; margin-bottom: .15em; }
 .booksheet .bstage { display: flex; align-items: center; gap: .3em; font-size: .85em; }
 .booksheet .bstage small { width: 5.2em; color: var(--ink-soft); }
+.booksheet .wheel { position: relative; width: min(16em, 70vw); aspect-ratio: 1; margin: .6em auto; color: var(--ink-soft); }
+.booksheet .wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.booksheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.booksheet .wnode b { font-size: .85em; color: var(--ink); }
+.booksheet p.wheelrule { margin: 0 0 .6em; text-align: center; color: var(--ink); font-weight: 600; }
 .booksheet .bking { box-shadow: none; border-bottom: 1px solid #0001; border-radius: 0; padding: .5em 0; margin: 0; background: none; }
 button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* Someone the table waits on is away: anyone can let a bot play for them. */
@@ -919,7 +925,7 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .watchtv .pname { font-size: 1.2em; font-weight: 800; }
 .watchtv h1 { margin: 0; font-size: 2.2em; }
 
-/* ================= A game with no TV (remote mode) =================
+/* ================= The table view (every game; from the start with no TV) =================
    On the phone: the table view is the TV's page for the room in a frame over
    the phone's own page, shown by the You / Table switch by the talk bar. */
 .tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; opacity: 0; background: #140f2a; transition: opacity .3s, visibility 0s .3s; }
@@ -927,7 +933,7 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 body.table-on .tableview { visibility: visible; opacity: 1; transition: opacity .3s; }
 body.table-on { overflow: hidden; }
 body.table-on .talkbar { z-index: 36; }
-body.remote .talkbar > .latest { padding-right: 9.5em; }
+body.has-table .talkbar > .latest { padding-right: 9.5em; }
 .viewswitch { position: fixed; right: .5em; bottom: .45em; z-index: 37; display: flex; border-radius: 99px; box-shadow: 0 .14em 0 var(--paper-edge), .05em .28em .12em #0b081a55; }
 .viewswitch button { font: inherit; font-weight: 800; padding: .45em .85em; margin: 0; box-shadow: none; transform: none; border-radius: 0; }
 .viewswitch button:first-child { border-radius: 99px 0 0 99px; }
