@@ -372,12 +372,7 @@ export const ICON_NAMES = Object.keys(ICONS);
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
-  egg: 'dragon egg', wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
-
-// An icon's polygons (fill, points on the -10..10 box), to draw it elsewhere (the TV board's canvas).
-export function iconFacets(name: string): [fill: string, points: string][] {
-  return ICONS[name] ?? [];
-}
+  wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {
@@ -790,9 +785,6 @@ export function buildingShapes(type: string, pc?: string): string {
 ICONS.tower = buildingFacets('tower')!;
 // The Largest Hoard title: a pile of coins, two below and one on top.
 ICONS.hoard = [...moved(ICONS.gold, -4.2, 3.6, 0.62), ...moved(ICONS.gold, 4.2, 3.6, 0.62), ...moved(ICONS.gold, 0, -3.4, 0.62)];
-
-// A dragon's egg: the dragon buildings' mark on the TV board's class tokens.
-ICONS.egg = EGG(0, 8.5, 17, '#ffb08a', '#d9542e');
 
 // ---- upgrades: what each puts beside its building on the TV board ----
 // A workshop's cog.

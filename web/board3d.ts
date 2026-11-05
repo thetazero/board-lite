@@ -13,7 +13,6 @@
 import * as THREE from 'three';
 import type { DragonView, HexView, PublicState } from '../src/state.ts';
 import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
-import { iconFacets } from './icons.ts';
 
 declare global {
   interface Window {
@@ -1452,9 +1451,10 @@ function upgradeMark(key: string): THREE.Group {
   return g;
 }
 
-// What a building stands on: a card in its hex's own terrain colour (so the
-// terrain still reads), ringed by a border in its owner's colour. An upgrade
-// puts a gold rim round the border and its mark (upgradeMark) at the front corner.
+// What a building stands on: a card in its hex's own terrain colour, so the
+// terrain still reads. Its owner shows as their territory's border round it
+// (territoryGeometry). An upgrade puts a gold rim on the card and its mark
+// (upgradeMark) at the front corner.
 function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry {
   const corners = (r: number) => Array.from({ length: 6 }, (_, i) => new THREE.Vector2(Math.sin((i * Math.PI) / 3) * r, Math.cos((i * Math.PI) / 3) * r));
   const shape = new THREE.Shape(corners(outer));
@@ -1463,80 +1463,49 @@ function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry 
   geo.rotateX(-Math.PI / 2); // lie flat, its depth going up
   return geo;
 }
-// What kind of building it is, at a glance: a paper token on the front-right
-// edge of its border, in front of it (the upgrade's mark is on the left) with its class's mark, the icons
-// the cards use: what a production building makes, a dragon's egg for a
-// dragon building, points for a monument, gold for a trade building.
-const CLASS_MARK: Record<string, string> = { quarry: 'stone', lumber: 'timber', mine: 'crystal', pasture: 'livestock', dragon: 'egg', monument: 'points', trade: 'gold' };
-const TOKEN_AT: [number, number] = [0.4, 0.6], TOKEN_R = 0.3;
-const TOKEN_FACE = new Map<string, THREE.MeshLambertMaterial>();
-function tokenFace(name: string): THREE.MeshLambertMaterial {
-  let m = TOKEN_FACE.get(name);
-  if (m) return m;
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const x = c.getContext('2d')!;
-  x.fillStyle = '#f6efdf';
-  x.beginPath();
-  x.arc(64, 64, 62, 0, Math.PI * 2);
-  x.fill();
-  x.lineWidth = 5;
-  x.strokeStyle = '#4a3d45';
-  x.stroke();
-  x.translate(64, 64);
-  x.scale(5, 5);
-  for (const [fill, pts] of iconFacets(name)) {
-    x.fillStyle = fill;
-    x.beginPath();
-    pts.split(' ').forEach((p, i) => {
-      const [px, py] = p.split(',').map(Number);
-      i ? x.lineTo(px, py) : x.moveTo(px, py);
-    });
-    x.closePath();
-    x.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  m = new THREE.MeshLambertMaterial({ map: t });
-  TOKEN_FACE.set(name, m);
-  return m;
-}
-function classToken(cls: string): THREE.Group | null {
-  const mark = CLASS_MARK[cls];
-  if (!mark) return null;
+function plate(upgrade: string | null, ground: string): THREE.Group {
   const g = new THREE.Group();
-  g.add(part(cyl(TOKEN_R, TOKEN_R, 0.04, 16), '#e9dfc8', { at: [0, 0.02, 0] }));
-  const face = new THREE.Mesh(new THREE.CircleGeometry(TOKEN_R, 32), tokenFace(mark));
-  face.rotation.x = -Math.PI / 2;
-  face.position.y = 0.041;
-  face.receiveShadow = true;
-  g.add(face);
-  return g;
-}
-const BORDER_IN = 0.66;
-function plate(owner: number, upgrade: string | null, cls: string | null, ground: string, mats: THREE.MeshLambertMaterial[]): THREE.Group {
-  const g = new THREE.Group();
-  const token = cls ? classToken(cls) : null;
-  if (token) {
-    token.position.set(TOKEN_AT[0], TOP + PLATE_H * 1.5, TOKEN_AT[1]); // on the border
-    g.add(token);
-  }
-  const out = upgrade ? 0.79 : 0.85;
-  if (upgrade) g.add(part(hexRing(0.88, out - 0.01, PLATE_H * 1.1), GOLD, { at: [0, TOP, 0] }));
-  g.add(part(cyl(BORDER_IN + 0.01, BORDER_IN + 0.01, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0] }));
-  const m = new THREE.Mesh(hexRing(out, BORDER_IN, PLATE_H * 1.5), mats[owner]);
-  m.position.y = TOP;
-  m.receiveShadow = true;
-  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), CREASE));
-  g.add(m);
+  g.add(part(cyl(0.9, 0.9, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
   if (upgrade) {
+    g.add(part(hexRing(0.78, 0.7, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
     const mark = bake(upgradeMark(upgrade));
     mark.scale.setScalar(1.6);
     mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
     g.add(mark);
   }
   return g;
+}
+
+// A player's territory, the hexes their buildings stand on, bordered in their
+// colour: a band just inside each edge where the next hex isn't theirs, so
+// their hexes read as one region, and two players' regions side by side each
+// keep their own line.
+const BORDER_R = 0.965, BORDER_W = 0.17; // the band, from the tile's edge in (as a corner radius)
+function territoryGeometry(hexes: [number, number][]): THREE.BufferGeometry | null {
+  const key = (x: number, z: number) => `${Math.round(x * 10)},${Math.round(z * 10)}`;
+  const mine = new Set(hexes.map(([x, z]) => key(x, z)));
+  const corner = (x: number, z: number, i: number, r: number) => {
+    const a = (Math.PI / 180) * (60 * i - 30);
+    return new THREE.Vector2(x + r * Math.cos(a), -(z + r * Math.sin(a)));
+  };
+  const parts: THREE.BufferGeometry[] = [];
+  for (const [x, z] of hexes) {
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 180) * 60 * i; // the edge from corner i to i + 1 faces this way
+      if (mine.has(key(x + SQ3 * Math.cos(a), z + SQ3 * Math.sin(a)))) continue;
+      const shape = new THREE.Shape([corner(x, z, i, BORDER_R), corner(x, z, i + 1, BORDER_R), corner(x, z, i + 1, BORDER_R - BORDER_W), corner(x, z, i, BORDER_R - BORDER_W)]);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: PLATE_H * 1.5, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
+      parts.push(geo.toNonIndexed());
+    }
+  }
+  if (!parts.length) return null;
+  const merged = new THREE.BufferGeometry();
+  for (const [name, size] of [['position', 3], ['normal', 3], ['uv', 2]] as const) {
+    merged.setAttribute(name, new THREE.Float32BufferAttribute(parts.flatMap((g) => Array.from(g.getAttribute(name).array as Float32Array)), size));
+  }
+  parts.forEach((g) => g.dispose());
+  return merged;
 }
 
 // ---------- dragons ----------
@@ -1737,6 +1706,8 @@ export class Board3D {
   private tiles = new Map<string, { hex: HexView; decorSig: string }>();
   private decor = new THREE.Group(); // everything growing on the map, merged
   private built = new Map<string, Built>();
+  private territory = new THREE.Group(); // every player's territory border
+  private territorySig = '';
   private beasts = new Map<string, Built>(); // fauna, by hex
   private dragons = new Map<string, DragonEntry>();
   private plateMats = PLAYER_COLORS.map((c) => new THREE.MeshLambertMaterial({ color: c, map: null, flatShading: true }));
@@ -1854,6 +1825,7 @@ export class Board3D {
       this.built.set(h.k, { sig: bsig, obj, born: at });
       if (fresh) this.mark(h, at);
     }
+    this.drawTerritory(g.map);
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
     // arrives, unless it wandered in from the next hex: then it walks over.
@@ -1897,6 +1869,29 @@ export class Board3D {
     }
     this.placeDragons(g, animate, now);
     this.firstUpdate = false;
+  }
+
+  // Each player's territory border, redrawn when whose buildings are where changes.
+  private drawTerritory(map: HexView[]) {
+    const sig = map.filter((h) => h.building).map((h) => `${h.k}:${h.building!.owner}`).join();
+    if (sig === this.territorySig) return;
+    this.territorySig = sig;
+    for (const c of [...this.territory.children]) {
+      this.territory.remove(c);
+      dispose(c);
+    }
+    const byOwner = new Map<number, [number, number][]>();
+    for (const h of map) if (h.building) byOwner.set(h.building.owner, [...(byOwner.get(h.building.owner) ?? []), hexXZ(h.q, h.r)]);
+    for (const [owner, hexes] of byOwner) {
+      const geo = territoryGeometry(hexes);
+      if (!geo) continue;
+      const m = new THREE.Mesh(geo, this.plateMats[owner]);
+      m.position.y = TOP;
+      m.receiveShadow = true;
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), CREASE));
+      this.territory.add(m);
+    }
+    if (!this.territory.parent) this.world.add(this.territory);
   }
 
   private mark(h: HexView, now: number) {
@@ -1975,7 +1970,7 @@ export class Board3D {
   }
 
   private buildingGroup(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-    const g = plate(b.owner, b.upgrade, b.type === 'tower' ? null : b.cls, tileColor(terrain), this.plateMats);
+    const g = plate(b.upgrade, tileColor(terrain));
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
     // Shut down by a beast: the building goes to dull grey paper (its border
@@ -2336,7 +2331,7 @@ export class Board3D {
       const fade = Math.max(0, Math.min(1, age / 0.4)) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
       (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * (0.8 + 0.2 * Math.cos(age * 3.5));
     }
-    // The acting player's plates glow gently.
+    // The acting player's territory border glows gently.
     this.plateMats.forEach((m, i) => {
       const on = this.highlight === i;
       m.emissive.set(on ? PLAYER_COLORS[i] : '#000');
