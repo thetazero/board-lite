@@ -6,7 +6,7 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, voters, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, leadsVote, voters, watch,
 } from './common.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
@@ -983,7 +983,7 @@ function raidView(g: PublicState, me: Me): string {
   if (raid.step === 'vote') {
     const voted = me.myVote !== null;
     return `${raid.candidates.map((t, i) => `
-      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}${lootLine(t.loot, 1.3)}${voters(raid.votes, i, names)}</button>`).join('')}`;
+      <button class="choice${me.myVote === i ? ' on' : ''}${leadsVote(raid.votes, i, raid.candidates.length) ? ' lead' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}${lootLine(t.loot, 1.3)}${voters(raid.votes, i, names)}</button>`).join('')}`;
   }
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return targetPanel(raid.target!); // nobody fit to go: the roost above shows why

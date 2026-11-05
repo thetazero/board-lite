@@ -121,6 +121,14 @@ export function voters(votes: (number | null)[], i: number, names: string[]): st
   return who.length ? `<div class="voters">${who.join('')}</div>` : '';
 }
 
+// Whether candidate i has the most votes so far (ties all lead: a tie is a
+// coin flip). No one leads before anyone votes.
+export function leadsVote(votes: (number | null)[], i: number, n: number): boolean {
+  const counts = Array.from({ length: n }, (_, c) => votes.filter((v) => v === c).length);
+  const best = Math.max(...counts);
+  return best > 0 && counts[i] === best;
+}
+
 // ---------- icons ----------
 
 export { icon } from './icons.ts';

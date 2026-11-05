@@ -8,7 +8,7 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
-  fadeAway, foeIcons, voters,
+  fadeAway, foeIcons, leadsVote, voters,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
@@ -326,10 +326,10 @@ function targetCard(t: TargetView): string {
 }
 
 // A kingdom to vote for, kept to what the choice needs from across the room:
-// its number, name, combat power, defenders as pictures, loot, and who has
-// voted for it. Each defender's stats wait for the commit step's card.
-function candidateCard(t: TargetView, i: number, votes: (number | null)[]): string {
-  return `<div class="target cand"><div class="num">${i + 1}</div><h2>${esc(t.name)}</h2>${powerTag(t.power, 'big')}${foeIcons(t.units, 3.2)}${lootLine(t.loot, 1.8)}${voters(votes, i, names)}</div>`;
+// its name, combat power, defenders as pictures, loot, and who has
+// voted for it, outlined while it leads. Each defender's stats wait for the commit step's card.
+function candidateCard(t: TargetView, i: number, votes: (number | null)[], n: number): string {
+  return `<div class="target cand${leadsVote(votes, i, n) ? ' lead' : ''}"><h2>${esc(t.name)}</h2>${powerTag(t.power, 'big')}${foeIcons(t.units, 3.2)}${lootLine(t.loot, 1.8)}${voters(votes, i, names)}</div>`;
 }
 
 function check(done: boolean): string {
@@ -364,8 +364,8 @@ function renderRaid(g: PublicState) {
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
-      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => candidateCard(t, i, raid.votes)).join('')}</div>
-      <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${raid.votes[p] === null ? check(false) : `<span class="vnum">${raid.votes[p]! + 1}</span>`}`).join(' ')}</div>`;
+      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => candidateCard(t, i, raid.votes, raid.candidates.length)).join('')}</div>
+      <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.votes[p] !== null)}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
     // Each player's dragons that could go, the sent ones lit; a roost for
     // anyone keeping theirs home; a tick once they're ready.
