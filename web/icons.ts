@@ -372,7 +372,12 @@ export const ICON_NAMES = Object.keys(ICONS);
 const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
-  wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
+  egg: 'dragon egg', wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
+
+// An icon's polygons (fill, points on the -10..10 box), to draw it elsewhere (the TV board's canvas).
+export function iconFacets(name: string): [fill: string, points: string][] {
+  return ICONS[name] ?? [];
+}
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {
@@ -391,7 +396,7 @@ export function icon(name: string, size = 1.25, cls = 'ricon'): string {
 // it carries its class's goods (cut stone blocks for a quarry, a log pile for a
 // lumber camp, violet crystals for a mine, white sheep for a pasture, a nest for
 // a dragon building) in its class's paper colours. Its owner shows round it
-// (the disc on the phone's map, the plate on the TV's), never on it, except the
+// (the disc on the phone's map, the border on the TV's), never on it, except the
 // tower: a player's home is their colour.
 
 const hex2rgb = (c: string) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -785,6 +790,9 @@ export function buildingShapes(type: string, pc?: string): string {
 ICONS.tower = buildingFacets('tower')!;
 // The Largest Hoard title: a pile of coins, two below and one on top.
 ICONS.hoard = [...moved(ICONS.gold, -4.2, 3.6, 0.62), ...moved(ICONS.gold, 4.2, 3.6, 0.62), ...moved(ICONS.gold, 0, -3.4, 0.62)];
+
+// A dragon's egg: the dragon buildings' mark on the TV board's class tokens.
+ICONS.egg = EGG(0, 8.5, 17, '#ffb08a', '#d9542e');
 
 // ---- upgrades: what each puts beside its building on the TV board ----
 // A workshop's cog.

@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import type { DragonView, HexView, PublicState } from '../src/state.ts';
 import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
+import { iconFacets } from './icons.ts';
 
 declare global {
   interface Window {
@@ -110,6 +111,8 @@ function paperTexture(): THREE.Texture {
 }
 
 let GRAIN: THREE.Texture | null = null;
+// A land hex's paper: its terrain's colour, a little paled.
+const tileColor = (terrain: string) => mix(TERRAIN_COLORS[terrain], '#f4ecd8', 0.12);
 const MATS = new Map<string, THREE.MeshLambertMaterial>();
 const CREASE = new THREE.LineBasicMaterial({ color: 0x2a1d12, transparent: true, opacity: 0.22 });
 
@@ -479,7 +482,7 @@ function tower(pc: string, floors: number): THREE.Group {
 // How a building shows its class: it carries its class's goods (cut stone
 // blocks, a log pile, violet crystals, white sheep, a dragon's nest) in its
 // class's paper colours, the same as its icon (icons.ts). Its owner is the
-// plate under it, never its own paper, except the tower. Buildings of one
+// border round it, never its own paper, except the tower. Buildings of one
 // class are relatives: different structures carrying the same goods.
 const STONE_BLOCK = '#d3d6db';
 const CRYSTAL = '#b98cff';
@@ -1449,13 +1452,81 @@ function upgradeMark(key: string): THREE.Group {
   return g;
 }
 
-// The owner's coloured card under a building; an upgrade puts a gold rim round
-// it and its mark (upgradeMark) at the front corner.
-function plate(owner: number, upgrade: string | null, mats: THREE.MeshLambertMaterial[]): THREE.Group {
+// What a building stands on: a card in its hex's own terrain colour (so the
+// terrain still reads), ringed by a border in its owner's colour. An upgrade
+// puts a gold rim round the border and its mark (upgradeMark) at the front corner.
+function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry {
+  const corners = (r: number) => Array.from({ length: 6 }, (_, i) => new THREE.Vector2(Math.sin((i * Math.PI) / 3) * r, Math.cos((i * Math.PI) / 3) * r));
+  const shape = new THREE.Shape(corners(outer));
+  shape.holes.push(new THREE.Path(corners(inner).reverse()));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2); // lie flat, its depth going up
+  return geo;
+}
+// What kind of building it is, at a glance: a paper token on the front-right
+// edge of its border, in front of it (the upgrade's mark is on the left) with its class's mark, the icons
+// the cards use: what a production building makes, a dragon's egg for a
+// dragon building, points for a monument, gold for a trade building.
+const CLASS_MARK: Record<string, string> = { quarry: 'stone', lumber: 'timber', mine: 'crystal', pasture: 'livestock', dragon: 'egg', monument: 'points', trade: 'gold' };
+const TOKEN_AT: [number, number] = [0.4, 0.6], TOKEN_R = 0.3;
+const TOKEN_FACE = new Map<string, THREE.MeshLambertMaterial>();
+function tokenFace(name: string): THREE.MeshLambertMaterial {
+  let m = TOKEN_FACE.get(name);
+  if (m) return m;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#f6efdf';
+  x.beginPath();
+  x.arc(64, 64, 62, 0, Math.PI * 2);
+  x.fill();
+  x.lineWidth = 5;
+  x.strokeStyle = '#4a3d45';
+  x.stroke();
+  x.translate(64, 64);
+  x.scale(5, 5);
+  for (const [fill, pts] of iconFacets(name)) {
+    x.fillStyle = fill;
+    x.beginPath();
+    pts.split(' ').forEach((p, i) => {
+      const [px, py] = p.split(',').map(Number);
+      i ? x.lineTo(px, py) : x.moveTo(px, py);
+    });
+    x.closePath();
+    x.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  m = new THREE.MeshLambertMaterial({ map: t });
+  TOKEN_FACE.set(name, m);
+  return m;
+}
+function classToken(cls: string): THREE.Group | null {
+  const mark = CLASS_MARK[cls];
+  if (!mark) return null;
   const g = new THREE.Group();
-  if (upgrade) g.add(part(cyl(0.87, 0.88, PLATE_H * 0.8, 6), GOLD, { at: [0, TOP + PLATE_H * 0.4 - 0.005, 0] }));
-  const m = new THREE.Mesh(cyl(upgrade ? 0.78 : 0.84, upgrade ? 0.79 : 0.85, PLATE_H, 6), mats[owner]);
-  m.position.y = TOP + PLATE_H / 2;
+  g.add(part(cyl(TOKEN_R, TOKEN_R, 0.04, 16), '#e9dfc8', { at: [0, 0.02, 0] }));
+  const face = new THREE.Mesh(new THREE.CircleGeometry(TOKEN_R, 32), tokenFace(mark));
+  face.rotation.x = -Math.PI / 2;
+  face.position.y = 0.041;
+  face.receiveShadow = true;
+  g.add(face);
+  return g;
+}
+const BORDER_IN = 0.66;
+function plate(owner: number, upgrade: string | null, cls: string | null, ground: string, mats: THREE.MeshLambertMaterial[]): THREE.Group {
+  const g = new THREE.Group();
+  const token = cls ? classToken(cls) : null;
+  if (token) {
+    token.position.set(TOKEN_AT[0], TOP + PLATE_H * 1.5, TOKEN_AT[1]); // on the border
+    g.add(token);
+  }
+  const out = upgrade ? 0.79 : 0.85;
+  if (upgrade) g.add(part(hexRing(0.88, out - 0.01, PLATE_H * 1.1), GOLD, { at: [0, TOP, 0] }));
+  g.add(part(cyl(BORDER_IN + 0.01, BORDER_IN + 0.01, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0] }));
+  const m = new THREE.Mesh(hexRing(out, BORDER_IN, PLATE_H * 1.5), mats[owner]);
+  m.position.y = TOP;
   m.receiveShadow = true;
   m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), CREASE));
   g.add(m);
@@ -1640,7 +1711,7 @@ interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: TH
 const WALK_TURN = 0.7, WALK_GO = 3.4;
 
 // What just changed on the board stays marked for a while: a glowing gold
-// outline round its hex (round the building's plate, which is in its owner's
+// outline round its hex (round the building's border, which is in its owner's
 // colour), pulsing gently and fading out after FRESH_S seconds.
 // The table is often looking at their phones when it happens; whoever looks
 // up late still sees what's new.
@@ -1775,7 +1846,7 @@ export class Board3D {
         }
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
+      const obj = this.placed(this.buildingGroup(b, h.terrain, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
@@ -1903,11 +1974,11 @@ export class Board3D {
     return dx || dz ? Math.atan2(dx, dz) : 0;
   }
 
-  private buildingGroup(b: NonNullable<HexView['building']>, facing: number, shut: boolean): THREE.Group {
-    const g = plate(b.owner, b.upgrade, this.plateMats);
+  private buildingGroup(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
+    const g = plate(b.owner, b.upgrade, b.type === 'tower' ? null : b.cls, tileColor(terrain), this.plateMats);
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
-    // Shut down by a beast: the building goes to dull grey paper (its plate
+    // Shut down by a beast: the building goes to dull grey paper (its border
     // keeps its owner's colour) and sits back, so the beast in front is whole.
     if (shut) {
       model.traverse((o) => {
@@ -1997,7 +2068,7 @@ export class Board3D {
       }
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
-      const color = mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12);
+      const color = tileColor(h.terrain);
       const at: [number, number, number] = [x, (r() - 0.5) * 0.02, z];
       tiles.add(part(geo.top, color, { at }), part(geo.sides, mix(color, '#fbf6ea', 0.6), { at, crease: false }));
       this.tiles.set(h.k, { hex: h, decorSig: '-' });
