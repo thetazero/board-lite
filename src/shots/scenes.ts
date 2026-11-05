@@ -7,7 +7,7 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
 import { PEAK, nearBeast, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -252,6 +252,17 @@ function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)
   }
 }
 
+// Seat p reaches the points to win (shown, not hidden): their buildings worth
+// the most points, placed where they can go, until they do.
+function pointsToWin(g: Game, p: number) {
+  const worth = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].points && !BUILDINGS[k].onTower).sort((a, b) => BUILDINGS[b].points! - BUILDINGS[a].points! || (a < b ? -1 : 1));
+  for (let i = 0; score(g, p).public < TUNING.pointsToWin; i++) {
+    const at = worth.flatMap((type) => buildableHexes(g, p, type).sort().slice(0, 1).map((k) => ({ type, k })))[0];
+    if (!at || i > 50) throw new Error('pointsToWin: no room');
+    g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
+  }
+}
+
 // The first seat (in seat order) matching a condition.
 function seatWhere(g: Game, ok: (p: number) => boolean): number {
   const p = g.players.findIndex((_, i) => ok(i));
@@ -288,7 +299,7 @@ function most(g: Game, p: number, not = ''): string {
 // The production cards (building art, batch 2).
 const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
 // The dragon, trade and monument cards and the upgrades (building art, batch 3).
-const CIVIC_CARDS = ['hatchery', 'stone_port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds', 'trade_charter'];
+const CIVIC_CARDS = ['hatchery', 'stone_port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds'];
 
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
@@ -480,8 +491,8 @@ export const SCENES: Scene[] = [
         .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
-        [['crystal_port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
-        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
+        [['crystal_port', (k) => g.map[k].terrain === 'harbor', null], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, null], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
         const k = near(p, ok);
@@ -494,7 +505,7 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
-      { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the four upgrades (staged)', client: 'phone', seat: g!.turn },
+      { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
     ],
   },
@@ -574,16 +585,21 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
-      for (const p of g.players.keys()) arm(g, p, [2]);
+      const order = turnOrder(g);
+      // The first seat has an adult dragon and a young one, so its vote is
+      // worth more than a single young dragon's.
+      for (const p of g.players.keys()) arm(g, p, p === order[0] ? [3, 2] : [2]);
       // The last seat's only dragon was knocked out clearing a beast this
       // turn, so that player doesn't vote.
-      const last = turnOrder(g).at(-1)!;
+      const last = order.at(-1)!;
       for (const d of g.dragons) if (d.owner === last) d.damage = DRAGONS[d.key].stages[d.stage - 1].hp;
       toVote(g);
-      vote(g, byPower(g)[0], turnOrder(g).slice(0, 2));
+      // Two votes, split: the one worth more power leads.
+      vote(g, byPower(g)[1], [order[0]]);
+      vote(g, byPower(g)[0], [order[1]]);
     },
     shots: (g) => [
-      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted, one has no vote', client: 'tv', sizes: true },
+      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted, split, the one worth more power leads; one has no vote', client: 'tv', sizes: true },
       { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => waitingOn(g!).includes(p)), sizes: true },
       { file: 'phone-raid-voted-5p', caption: 'Phone: voted, waiting', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] !== null) },
       { file: 'phone-raid-no-vote-5p', caption: 'Phone: no raid-ready dragon, so no vote', client: 'phone', seat: turnOrder(g!).at(-1)! },
@@ -759,9 +775,11 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 3, // seeds 1 and 2 end at a round's end, with no moment between
-    // The first moment anyone has the points to win: the round plays on to its end.
-    until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
+    seed: 1,
+    // Late in the game, the leader is staged up to the points to win: the
+    // round plays on to its end.
+    until: late(4, 1),
+    setup: (g) => pointsToWin(g, standings(g)[0].p),
     shots: (g) => {
       const top = g!.players.findIndex((_, p) => score(g!, p).public >= TUNING.pointsToWin);
       return [
@@ -1501,6 +1519,8 @@ function wonRaid(g: Game) {
   toVote(g);
   vote(g, byPower(g)[0]);
   toBail(g, [a, b]);
+  // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
+  g.dragons.find((d) => d.id === g.raid!.commits[a][0])!.damage = 8;
   apply(g, b, 'fight');
 }
 

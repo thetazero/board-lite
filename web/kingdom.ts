@@ -3,18 +3,19 @@
 // same card, so the choice looks the same wherever it's made.
 
 import type { Res, TargetView, UnitView } from '../src/state.ts';
-import { elemWords, esc, playerTag, resChips, statTag } from './common.ts';
+import { elemWords, esc, playerTag, powerTag, resChips, statTag } from './common.ts';
 import { icon } from './icons.ts';
 
 // A kingdom to vote for, kept to what the choice needs at a glance: its name,
 // combat power on a shield, defenders as pictures, loot, and who has voted for
-// it, outlined while it leads. Each defender's stats wait for the commit step.
+// it with what each vote is worth, outlined while it leads. Each defender's
+// stats wait for the commit step.
 // On the phone it's the button you vote with (`attrs` adds data-vote and the like).
-export function kingdomCard(t: TargetView, i: number, n: number, votes: (number | null)[], names: string[], opts: { tag?: 'div' | 'button'; cls?: string; attrs?: string } = {}): string {
+export function kingdomCard(t: TargetView, i: number, n: number, votes: (number | null)[], power: number[], names: string[], opts: { tag?: 'div' | 'button'; cls?: string; attrs?: string } = {}): string {
   const tag = opts.tag ?? 'div';
-  const lead = leadsVote(votes, i, n);
+  const lead = leadsVote(votes, power, i, n);
   return `<${tag} class="target cand${lead ? ' lead' : ''}${opts.cls ? ` ${opts.cls}` : ''}"${opts.attrs ? ` ${opts.attrs}` : ''}><h2>${esc(t.name)}</h2>
-    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, i, names)}</${tag}>`;
+    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, power, i, names)}</${tag}>`;
 }
 
 // Combat power drawn: the number on a shield, for where it has to read from across the room.
@@ -22,16 +23,22 @@ export function powerShield(n: number, size = 3): string {
   return `<span class="pshield" style="font-size:${size}em" title="combat power">${icon('shield', 1)}<b>${n}</b></span>`;
 }
 
-// Who voted for candidate i, as their tags: votes are public as they're cast.
-export function voters(votes: (number | null)[], i: number, names: string[]): string {
-  const who = votes.flatMap((v, p) => (v === i ? [playerTag(p, names)] : []));
+// Who voted for candidate i, as their tags, each with its vote's power: votes
+// are public as they're cast.
+export function voters(votes: (number | null)[], power: number[], i: number, names: string[]): string {
+  const who = votes.flatMap((v, p) => (v === i ? [voterTag(p, power[p], names)] : []));
   return who.length ? `<div class="voters">${who.join('')}</div>` : '';
 }
 
-// Whether candidate i has the most votes so far (ties all lead: a tie is a
-// coin flip). No one leads before anyone votes.
-export function leadsVote(votes: (number | null)[], i: number, n: number): boolean {
-  const counts = Array.from({ length: n }, (_, c) => votes.filter((v) => v === c).length);
+// A voter and what their vote is worth: "Ada Power 26".
+export function voterTag(p: number, power: number, names: string[]): string {
+  return `<span class="voter">${playerTag(p, names)}${powerTag(power)}</span>`;
+}
+
+// Whether candidate i has the most power voted for it so far (ties all lead:
+// a tie is a coin flip). No one leads before anyone votes.
+export function leadsVote(votes: (number | null)[], power: number[], i: number, n: number): boolean {
+  const counts = Array.from({ length: n }, (_, c) => votes.reduce<number>((s, v, p) => s + (v === c ? power[p] : 0), 0));
   const best = Math.max(...counts);
   return best > 0 && counts[i] === best;
 }

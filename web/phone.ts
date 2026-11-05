@@ -9,7 +9,7 @@ import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Sna
 import {
   ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
-import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
+import { foeStack, kingdomCard, lootLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
@@ -1140,7 +1140,9 @@ function raidView(g: PublicState, me: Me): string {
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragon(id).power, 0);
   if (raid.step === 'vote') {
     const voted = me.myVote !== null || !!me.whyNoVote;
-    return raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names,
+    // What each vote is worth, cast or not: the kingdom with the most power voted for it is raided.
+    const worth = `<h3 class="ask">Each vote counts its power</h3><div class="vote-power">${names.flatMap((_, p) => (raid.voters[p] ? [voterTag(p, raid.votePower[p], names)] : [])).join('')}</div>`;
+    return worth + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names,
       { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
   if (raid.step === 'commit') {

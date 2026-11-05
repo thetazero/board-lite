@@ -182,9 +182,11 @@ test('a beast and perched dragons on one building fight together', () => {
   const a = addDragon(g, 1, 1);
   apply(g, 0, 'end');
   apply(g, 1, `perch ${pasture} ${a.id}`);
-  g.map[pasture].fauna = 'wolf_pack';
   apply(g, 1, 'end');
   toTurnOf(g, 0);
+  // Placed after production, so it can't wander off first.
+  g.map[pasture].fauna = 'wolf_pack';
+  assert.equal(g.dragons.find((x) => x.id === a.id)!.perch, pasture);
   const hunters = [addDragon(g, 0, 3, 'ember_wyrm'), addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3)];
   apply(g, 0, `clear ${pasture} ${hunters.map((d) => d.id).join(' ')}`);
   const hunt = g.log.findLast((e) => e.ev?.k === 'hunt')!.ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;

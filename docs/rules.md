@@ -1,6 +1,6 @@
 # board-lite rules (as the engine plays them)
 
-You are a wizard who raises dragons. Build out from your tower, hatch and feed dragons, raid neutral kingdoms for gold, and be first to **30 points**. All numbers live in `src/data.ts` and are first guesses awaiting playtests.
+You are a wizard who raises dragons. Build out from your tower, hatch and feed dragons, raid neutral kingdoms for gold, and be first to **50 points**. All numbers live in `src/data.ts` and are first guesses awaiting playtests.
 
 **Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
@@ -21,13 +21,13 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player, and the acting player may offer to one player or to anyone: the first to accept an offer to anyone trades. An offer gives or gets something, and you only offer what you have; you can't ask for more gold than the other player has. You may accept an offer only if you both still have what it trades. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
 4. **Raid** (all at once). Repeat once per War Horn played this round. If nobody has a raid-ready dragon, there is no raid.
    - **Combat power** is a rough guide printed on every dragon and kingdom: √(health × average damage a combat round), a kingdom's being its defenders' added up. Raiders whose powers add up past a kingdom's usually win, but it ignores elements and targeting, so it can mislead.
-   - **Vote**: everyone with a raid-ready dragon votes for one of the kingdoms, in the open: everyone sees each vote as it's cast. If you have no raid-ready dragon, you don't vote. Ties are a coin flip. Easy kingdoms give almost nothing; hard ones a lot.
+   - **Vote**: everyone with a raid-ready dragon votes for one of the kingdoms, in the open: everyone sees each vote as it's cast. Your vote counts your raid-ready dragons' combat power, summed, and the kingdom with the most power voted for it is raided. If you have no raid-ready dragon, you don't vote. Ties are a coin flip. Easy kingdoms give almost nothing; hard ones a lot.
    - **Commit**: everyone publicly sends raid-ready dragons (hatched, not knocked out, not perched) and can change their mind until they say ready. When everyone is ready, commitments lock.
    - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and the hits a dragon takes stay on it while it heals. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
    - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Then each defender hits random dragons. Every hit, either way, follows the **element wheel**: a hit from an element that beats what it hits deals double damage. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting, rounded down. What's left over is handed out 1 at a time, the most power first (equal powers in this round's turn order), carrying on from one resource to the next: 3 equal players splitting 2 livestock and 2 gold get 1 livestock, 1 livestock, then 1 gold, and the first player gets the last gold. After every raid, each kingdom that didn't fall adds 1 gold to its loot, and the one that fell goes back to its printed loot.
 
-**End of round.** Anyone holding more than 7 cards discards down to 7, choosing which; you can't discard at any other time. If anyone has 30 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
+**End of round.** Anyone holding more than 7 cards discards down to 7, choosing which; you can't discard at any other time. If anyone has 50 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
@@ -62,8 +62,8 @@ Dragons are worth no points; they count toward Strongest Dragon Army.
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): 2 each. Each goes adjacent to at least one of what its card names: a monument (a tower is one), a crystal field hex, an ocean hex or a trade building. No other building is worth points: not the tower, not its floors.
 - Secret Hoard cards: 2 each while in hand (hidden until the end).
 - Great beasts: 4 each to whoever slays it, for good.
-- Titles, 6 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Titles, 7 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
 
 ## Cards
 
-Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost, tower floor. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 18 buildings across the 7 classes, most of which count what's adjacent, and 3 upgrades (Workshop, Nesting Grounds, Trade Charter). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, Wolf Call, Rouse the Bear, and 15 dragons (a base dragon named for its element, like the Fire Dragon, and 2 special dragons per element).
+Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost, tower floor. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 18 buildings across the 7 classes, most of which count what's adjacent, and 2 upgrades (Workshop, Nesting Grounds). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, Wolf Call, Rouse the Bear, and 15 dragons (a base dragon named for its element, like the Fire Dragon, and 2 special dragons per element).

@@ -169,9 +169,28 @@ test('only a player with a raid-ready dragon votes, and one without is told why'
   assert.equal(seatState(g, 0).whyNoVote, null);
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 2');
-  // Both voters voted: a coin flip picks the target, without waiting on P3.
+  // Both voters voted: the target is picked without waiting on P3.
   assert.equal(g.raid!.step, 'commit');
   assert.deepEqual(waitingOn(g), [0, 1]);
+});
+
+test("each vote counts its voter's raid-ready power, and the most power wins", () => {
+  const g = newGame(3, 5);
+  hatchAll(g);
+  // P1 has the strongest dragon; P2 and P3 have hatchlings, and P3 a knocked-out adult too, which doesn't count.
+  for (const d of g.dragons) d.stage = d.owner === 0 ? 3 : 1;
+  const extra = { ...g.dragons.find((d) => d.owner === 2)!, id: 'd999', stage: 3, damage: 999 };
+  g.dragons.push(extra);
+  advanceToRaidVote(g);
+  const power = [0, 1, 2].map((p) => g.dragons.filter((d) => d.owner === p && canRaid(d)).reduce((s, d) => s + dragonPower(d), 0));
+  assert.deepEqual(publicState(g).raid!.votePower, power);
+  assert.ok(power[0] > power[1] + power[2], 'the adult outweighs the two hatchlings');
+  apply(g, 1, 'vote 2');
+  apply(g, 2, 'vote 2');
+  apply(g, 0, 'vote 1');
+  // Two votes for the second kingdom, but the one vote for the first is worth more.
+  assert.equal(g.raid!.target, g.raid!.candidates[0]);
+  assert.ok(playerView(g, 1, 1000).includes(`(power ${power[0]})`));
 });
 
 test('everyone starts with an egg, and a raid nobody can fight is skipped', () => {
@@ -534,13 +553,21 @@ test('a fight replays from its events: the hits add up to the result', () => {
       fights++;
       const units = e.ev.units.map((u) => u.hp);
       const fighting = new Set(e.ev.ds);
+      // Each dragon's health as the fight starts, so the replay can start a hurt one hurt (#311).
+      const hps = e.ev.hps!;
+      assert.equal(hps.length, e.ev.ds.length);
+      const hp = new Map(e.ev.ds.map((id, n) => [id, hps[n]]));
       let j = i + 1;
       for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
         for (const h of c.hits) {
           if (h.by === 'dragon') {
             units[h.u] = Math.max(0, units[h.u] - h.dmg);
             assert.equal(h.down, units[h.u] === 0);
-          } else if (h.down) fighting.delete(h.d);
+          } else {
+            hp.set(h.d, Math.max(0, hp.get(h.d)! - h.dmg));
+            assert.equal(h.down, hp.get(h.d) === 0);
+            if (h.down) fighting.delete(h.d);
+          }
         }
       }
       const end = g.log[j].ev;
@@ -551,6 +578,25 @@ test('a fight replays from its events: the hits add up to the result', () => {
     }
   }
   assert.ok(fights > 10);
+});
+
+test('a hurt dragon starts its fight hurt: the fight event carries its health', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 9 },
+    { id: 'd2', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, 'commit d1'); apply(g, 1, 'commit d2');
+  apply(g, 0, 'ready'); apply(g, 1, 'ready');
+  apply(g, 0, 'fight'); apply(g, 1, 'fight');
+  const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+  assert.ok(fight.k === 'fight');
+  const full = DRAGONS.fire_whelp.stages[2].hp;
+  assert.deepEqual(fight.hps, [full - 9, DRAGONS.ice_whelp.stages[2].hp]);
 });
 
 test('a knocked-out dragon cannot fight until a fed production heals it, then fights hurt', () => {

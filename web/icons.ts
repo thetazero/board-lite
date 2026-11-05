@@ -383,7 +383,7 @@ const ICONS: Record<string, Facet[]> = {
 export const ICON_NAMES = Object.keys(ICONS);
 
 const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
-  workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
+  workshop: 'Workshop', nesting_grounds: 'Nesting Grounds',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
@@ -811,15 +811,3 @@ ICONS.workshop = [
 ];
 // Nesting grounds' nest, with eggs in it.
 ICONS.nesting_grounds = moved(NEST(0, 2.4), 0, 0, 1.55);
-// A trade charter: a scroll between its rolled ends, a red wax seal.
-ICONS.trade_charter = [
-  ['#f3ead7', P([[-7, -6.4], [7, -6.4], [7, 6.4], [-7, 6.4]])],
-  ['#ddd0b2', P([[-7, -6.4], [-7, 6.4], [-5.6, 6.4], [-5.6, -6.4]])],
-  ['#e3d6b8', P([[-9, -8.6], [9, -8.6], [9, -6], [-9, -6]])],
-  ['#b9a982', P([[-9, -6], [9, -6], [9, -5.2], [-9, -5.2]])],
-  ['#e3d6b8', P([[-9, 6], [9, 6], [9, 8.6], [-9, 8.6]])],
-  ['#b9a982', P([[-9, 8.6], [9, 8.6], [9, 9.4], [-9, 9.4]])],
-  ...[-3, -0.6, 1.8].map((y): Facet => ['#8a7a66', P([[-4.4, y], [4.6, y], [4.6, y + 1], [-4.4, y + 1]])]),
-  ['#e5484d', P(Array.from({ length: 8 }, (_, i) => { const [x, y] = polar(2.6, 22.5 + i * 45); return [x + 4.2, y + 3.4] as [number, number]; }))],
-  ['#a33236', P(Array.from({ length: 8 }, (_, i) => { const [x, y] = polar(1.3, 22.5 + i * 45); return [x + 4.2, y + 3.4] as [number, number]; }))],
-];

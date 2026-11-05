@@ -64,7 +64,7 @@ ${table(['Name', 'Kind', 'Deck', 'Copies', 'Cost', 'Does', 'Points'], rows)}`;
 }
 
 function goldMakers(): string[] {
-  return [...Object.values(BUILDINGS), ...Object.values(UPGRADES)].filter((c) => c.makes?.gold).map((c) => `${c.name}s`);
+  return Object.values(BUILDINGS).filter((c) => c.makes?.gold).map((c) => `${c.name}s`);
 }
 
 function production(): string {
@@ -86,12 +86,13 @@ function neighbourCards(): string {
   const cards = Object.values(BUILDINGS).filter((b) => b.per);
   const terrains = new Set<string>(TERRAINS);
   const rows = cards.map((b) => {
-    const counted = terrains.has(b.per!) ? `${TERRAIN_NOUN[b.per as keyof typeof TERRAIN_NOUN]}es` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
+    const noun = b.per === 'production' ? 'production building' : CLASS_NAMES[b.per as BuildingClass];
+    const counted = terrains.has(b.per!) ? `${TERRAIN_NOUN[b.per as keyof typeof TERRAIN_NOUN]}es` : `${noun.replace(/y$/, 'ie')}s (${b.perOwn ? 'your own' : "anyone's"})${b.perMax ? `, up to ${b.perMax}` : ''}`;
     return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), `${cost(b.makes!)} a round`];
   });
   return `## Building cards that count their neighbours
 
-Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building).
+Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them unless the card says yours (the tower is a monument and a dragon building).
 
 ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 }
@@ -278,7 +279,6 @@ function demand(): string {
     const s: string[] = [];
     if (TUNING.towerProduction[r]) s.push(`tower ${TUNING.towerProduction[r]}`);
     for (const b of Object.values(BUILDINGS)) if (b.produces?.resource === r || b.makes?.[r]) s.push(b.name);
-    for (const u of Object.values(UPGRADES)) if (u.makes?.[r]) s.push(u.name);
     const loot = Object.values(TARGETS).filter((t) => t.loot[r]).length;
     if (loot) s.push(`raid loot (${loot} of ${Object.keys(TARGETS).length} kingdoms)`);
     if (Object.values(FAUNA).some((f) => f.loot[r])) s.push('clearing fauna');
