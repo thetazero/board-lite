@@ -130,7 +130,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Lots of variety: "I want lots of fun variety."
   - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: one per resource (stone, timber, crystal and livestock buildings, each holding its basic building: quarry, lumber camp, crystal mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (port: a better bank rate; market). No defense buildings (see Raids).
+- Building classes so far: one per resource (stone, timber, crystal and livestock buildings, each holding its basic building: quarry, lumber camp, crystal mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (ports: 2:1 at the bank for one basic resource each; market). No defense buildings (see Raids).
 
 ### Special projects
 
@@ -211,7 +211,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 ## Trading
 
 - Players trade with each other (resources and cards).
-- Bank trades at 4:1, like Catan; ports improve the rate.
+- Bank trades at 4:1, like Catan. A port trades one basic resource at 2:1: a Stone, Timber, Crystal and Livestock Port, one card each, built on a harbor (#277). They replaced the generic 3:1 Port so players get good at turning one resource into others and have a reason to buy it from the table. The owner: "sure we can replace the generic 3:1 with specifics"; no gold port, "gold is not a basic resource".
 - Trades between players are binding once confirmed.
 
 ## Map generation

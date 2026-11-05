@@ -1354,7 +1354,8 @@ function fishery(): THREE.Group {
 }
 
 // Buildings that turn to face the sea.
-const SEAWARD = new Set(['port', 'driftwood_yard', 'fishery', 'lighthouse']);
+const PORTS = ['stone_port', 'timber_port', 'crystal_port', 'livestock_port'];
+const SEAWARD = new Set([...PORTS, 'driftwood_yard', 'fishery', 'lighthouse']);
 
 // Where a building's dragons sit, in the building's own frame.
 interface Perch { x: number; y: number; z: number; face: number }
@@ -1370,6 +1371,7 @@ const NESTING_PERCHES: Perch[] = [{ x: -0.42, y: 0, z: 0.52, face: 1.7 }, { x: -
 
 function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Group; offset: [number, number] } {
   const pc = PLAYER_COLORS[b.owner];
+  if (PORTS.includes(b.type)) return { model: port(), offset: [0, 0] };
   switch (b.type) {
     case 'tower': return { model: tower(pc, b.floors), offset: [-0.15, -0.2] };
     case 'quarry': return { model: quarry(), offset: [0, 0] };
@@ -1378,7 +1380,6 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
     case 'pasture': return { model: pasture(), offset: [0, 0] };
     case 'roost': return { model: roost(), offset: [0, 0] };
     case 'hatchery': return { model: hatchery(), offset: [0, 0] };
-    case 'port': return { model: port(), offset: [0, 0] };
     case 'market': return { model: market(), offset: [0, 0] };
     case 'monument': return { model: monument(), offset: [0, 0] };
     case 'standing_stones': return { model: standingStones(), offset: [0, 0] };

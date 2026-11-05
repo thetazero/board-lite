@@ -335,10 +335,12 @@ export function dragonCapacity(g: Game, p: number): number {
   return cap;
 }
 
-export function bankRate(g: Game, p: number): number {
-  let rate = TUNING.bankRate;
-  for (const { def } of placed(g, p)) rate = Math.min(rate, def.bankRate ?? rate);
-  return rate;
+// What you give the bank for 1 of another resource, per resource you give:
+// 4, or a port's rate for its own resource.
+export function bankRates(g: Game, p: number): Record<Resource, number> {
+  const rates = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.bankRate])) as Record<Resource, number>;
+  for (const { def } of placed(g, p)) if (def.bankRate) rates[def.bankRate.resource] = Math.min(rates[def.bankRate.resource], def.bankRate.rate);
+  return rates;
 }
 
 function growthPerRound(g: Game, p: number): number {
@@ -1184,7 +1186,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const times = args[2] ? Number(args[2]) : 1;
       if (give === get) fail(`Trade two different resources.`);
       if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
-      const rate = bankRate(g, p);
+      const rate = bankRates(g, p)[give];
       pay(pl, { [give]: rate * times });
       gain(pl, { [get]: times });
       return log(g, `${pname(p)} trades ${rate * times} ${give} to the bank for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });

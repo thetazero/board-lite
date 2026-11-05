@@ -288,7 +288,7 @@ function most(g: Game, p: number, not = ''): string {
 // The production cards (building art, batch 2).
 const PRODUCTION_CARDS = ['cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
 // The dragon, trade and monument cards and the upgrades (building art, batch 3).
-const CIVIC_CARDS = ['hatchery', 'port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds', 'trade_charter'];
+const CIVIC_CARDS = ['hatchery', 'stone_port', 'market', 'tower_floor', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'workshop', 'nesting_grounds', 'trade_charter'];
 
 // ---------- the scenes ----------
 // The hand-3p scene's cards: kept, choose a dragon (two ways), choose a hex, choose a building.
@@ -386,14 +386,19 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // A port on the harbor nearest a tower, that tower's player's.
+    // A Timber Port on the harbor nearest the tower of the player whose turn it is.
     setup: (g) => {
-      const near = (k: string) => Math.min(...g.towers.map((t) => dist(k, t)));
-      const k = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => near(a) - near(b) || a.localeCompare(b))[0];
-      const owner = g.towers.findIndex((t) => dist(k, t) === near(k));
-      g.buildings[k] = { type: 'port', owner, upgrade: null, floors: 0 };
+      const owner = g.turn;
+      const k = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => dist(a, g.towers[owner]) - dist(b, g.towers[owner]) || a.localeCompare(b))[0];
+      g.players[owner].resources.timber = Math.max(g.players[owner].resources.timber, 6);
+      g.buildings[k] = { type: 'timber_port', owner, upgrade: null, floors: 0 };
     },
-    shots: () => [{ file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' }],
+    shots: (g) => {
+      return [
+        { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
+        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get gold"]'] },
+      ];
+    },
   },
   {
     // Every building on every board, side by side: each player's tower (one
@@ -473,7 +478,7 @@ export const SCENES: Scene[] = [
         .sort((a, b) => dist(a, g.towers[p]) - dist(b, g.towers[p]) || a.localeCompare(b))[0];
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
-        [['port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        [['crystal_port', (k) => g.map[k].terrain === 'harbor', 'trade_charter'], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
         [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, 'trade_charter'], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
@@ -488,6 +493,7 @@ export const SCENES: Scene[] = [
       { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the four upgrades (staged)', client: 'phone', seat: g!.turn },
+      { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
     ],
   },
   {
@@ -730,7 +736,7 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 1,
+    seed: 2, // seed 1's game ends at a round's end, with no moment between
     // The first moment anyone has the points to win: the round plays on to its end.
     until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
     shots: (g) => {

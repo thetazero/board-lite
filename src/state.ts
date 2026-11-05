@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRate, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRates, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -114,7 +114,7 @@ export interface PublicState {
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
-  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
+  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRates: Record<Resource, number> }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -164,7 +164,7 @@ export interface SeatState {
   resources: Record<Resource, number>;
   hiddenPoints: number;
   totalPoints: number;
-  bankRate: number;
+  bankRates: Record<Resource, number>; // what you give the bank, per resource
   dragonsHoused: number;
   dragonCapacity: number;
   // What a round brings in, per resource: production minus what the dragons
@@ -270,7 +270,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
+      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRates: bankRates(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
@@ -388,7 +388,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     resources: { ...pl.resources },
     hiddenPoints: s.hidden,
     totalPoints: s.total,
-    bankRate: bankRate(g, p),
+    bankRates: bankRates(g, p),
     dragonsHoused: housed,
     dragonCapacity: dragonCapacity(g, p),
     income,

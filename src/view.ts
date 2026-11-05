@@ -8,6 +8,11 @@ import type { CardView, DragonView, EventView, FaunaView, HexView, PublicState, 
 
 const P = (p: number) => `P${p + 1}`;
 const resText = (r: Res) => Object.entries(r).filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing';
+// "4:1" or "4:1, 2:1 for stone": the usual rate, then any port's.
+const rateText = (rates: Record<string, number>) => {
+  const usual = Math.max(...Object.values(rates));
+  return [`${usual}:1`, ...Object.entries(rates).filter(([, n]) => n < usual).map(([r, n]) => `${n}:1 for ${r}`)].join(', ');
+};
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'C', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
@@ -15,7 +20,7 @@ const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley
 const BUILDING_CODE: Record<string, string> = {
   tower: 'TW', quarry: 'qu', lumber_camp: 'lc', crystal_mine: 'cm', pasture: 'pa', roost: 'ro',
   cliff_works: 'cw', stonemason: 'sm', woodcutter: 'wc', sawmill: 'sw', driftwood_yard: 'dy', ley_spire: 'cs', gem_cutter: 'gc', smelter: 'se',
-  shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', port: 'po', market: 'mk',
+  shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', stone_port: 'sp', timber_port: 'tp', crystal_port: 'cp', livestock_port: 'lp', market: 'mk',
   monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
 const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
@@ -145,7 +150,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
-    out.push(`bank <give resource> <get resource> [times]   (your rate: ${you.bankRate}:1)`);
+    out.push(`bank <give resource> <get resource> [times]   (your rates: ${rateText(you.bankRates)})`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
     for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);
     out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
@@ -231,7 +236,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you gain (production minus what your dragons eat): ${amounts(you.income)}.`);
-  out.push(`Bank rate ${you.bankRate}:1. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
+  out.push(`Bank rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);
   for (const c of you.hand) out.push(`  ${cardText(c)}`);

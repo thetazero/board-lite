@@ -911,16 +911,20 @@ function stepper(side: 'give' | 'get', r: string, n: number, max: number): strin
 
 // The bank, on your turn: give your bank rate of one resource for 1 of another.
 function bankView(me: Me): string {
+  const rate = me.bankRates[bank.give as 'stone'];
   // The bank's Trade: what you give has to be there, and differ from what you gain.
   const bankWhy = bank.give === bank.get ? 'You give and gain the same resource: choose another.'
-    : me.resources[bank.give as 'stone'] < me.bankRate * bank.times ? `You can't afford ${me.bankRate * bank.times} ${bank.give}.` : null;
+    : me.resources[bank.give as 'stone'] < rate * bank.times ? `You can't afford ${rate * bank.times} ${bank.give}.` : null;
   // Pick a resource by tapping its icon.
-  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
+  // A resource a port trades better wears its rate, on the Give side.
+  const usual = Math.max(...Object.values(me.bankRates));
+  const tag = (side: string, r: string) => (side === 'give' && me.bankRates[r as 'stone'] < usual ? `<span class="rate">${me.bankRates[r as 'stone']}:1</span>` : '');
+  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}${tag(side, r) ? `, ${me.bankRates[r]}:1` : ''}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}${tag(side, r)}</button>`).join('')}</div>`;
   return `<section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Gain</span>${pick('get', bank.get)}</div>
       <div class="bank"><span class="steplabel">Times</span><span class="stepper"><button data-btimes="-1" aria-label="Trade 1 time fewer">−</button><b>${bank.times}</b><button data-btimes="1" aria-label="Trade 1 time more">+</button></span>
-        ${btn(`Trade <span class="chip">${me.bankRate * bank.times}${resIcon(bank.give, 1.25)}</span>→<span class="chip">${bank.times}${resIcon(bank.get, 1.25)}</span>`, 'id="bankgo"', bankWhy, 'primary')}</div>${whyLine(bankWhy)}</section>`;
+        ${btn(`Trade <span class="chip">${rate * bank.times}${resIcon(bank.give, 1.25)}</span>→<span class="chip">${bank.times}${resIcon(bank.get, 1.25)}</span>`, 'id="bankgo"', bankWhy, 'primary')}</div>${whyLine(bankWhy)}</section>`;
 }
 
 function tradeView(g: PublicState, me: Me): string {

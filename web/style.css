@@ -688,7 +688,8 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .proj button { margin-left: auto; }
 .proj.dim b { opacity: .5; }
 .elembtn { outline: 2px solid var(--ec); outline-offset: -3px; }
-.iconbtn { padding: .3em .5em; line-height: 0; }
+.iconbtn { padding: .3em .5em; line-height: 0; position: relative; }
+.iconbtn .rate { position: absolute; right: -.35em; bottom: -.45em; font-size: .7rem; line-height: 1; font-weight: 800; padding: .12em .3em; border-radius: .6em; background: var(--ink); color: var(--paper); }
 .respick { display: flex; gap: .3em; flex-wrap: wrap; }
 .bankrow { display: flex; align-items: center; gap: .6em; margin-bottom: .4em; }
 .bankrow > span { min-width: 2.4em; font-weight: 700; }
