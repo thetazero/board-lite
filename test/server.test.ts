@@ -11,8 +11,8 @@ import { apply, newGame, waitingOn } from '../src/engine.ts';
 import { Room, RoomError } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
-import type { Snapshot } from '../src/state.ts';
-import { TUNING } from '../src/data.ts';
+import type { Rulebook, Snapshot } from '../src/state.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, TARGETS, TUNING, UPGRADES } from '../src/data.ts';
 import { POINTS_TO_WIN } from '../web/common.ts';
 import { scenesOf } from '../web/scenes.ts';
 
@@ -558,6 +558,23 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     child.kill();
   } finally {
     server.closeAllConnections();
+    server.close();
+  }
+});
+
+test("the phone's rulebook holds every building, card, beast and kingdom", async () => {
+  const { server } = startServer(0, { dir });
+  await new Promise((r) => server.once('listening', r));
+  try {
+    const r = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/rulebook`);
+    const book = (await r.json()) as Rulebook;
+    assert.deepEqual(book.buildings.map((b) => b.key).sort(), Object.keys(BUILDINGS).sort());
+    assert.deepEqual(book.upgrades.map((u) => u.key), Object.keys(UPGRADES));
+    assert.deepEqual(book.actions.map((a) => a.key), Object.keys(ACTIONS));
+    assert.deepEqual(book.dragons.map((d) => d.key), Object.keys(DRAGONS));
+    assert.deepEqual([...book.fauna, ...book.greatBeasts].map((f) => f.key), [...Object.keys(FAUNA), ...Object.keys(BEASTS)]);
+    assert.deepEqual(book.kingdoms.map((k) => k.key), Object.keys(TARGETS));
+  } finally {
     server.close();
   }
 });

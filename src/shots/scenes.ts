@@ -1295,6 +1295,12 @@ export const SCENES: Scene[] = [
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
       { file: 'phone-wheel-3p', caption: 'Phone: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], sizes: true },
+      ...(['board', 'buildings', 'beasts', 'dragons', 'kingdoms', 'cards'] as const).map((t): Shot => ({
+        file: `phone-rules-${t}-3p`, caption: `Phone: the rulebook, from Rules in the header, at its ${t} tab`, client: 'phone', seat: 2,
+        clicks: ['#book', `[data-booktab="${t}"]`], waitFor: t === 'kingdoms' || t === 'cards' ? '.bookpage .bentry, .bookpage .bking' : '.bookpage img.bpic', sizes: t === 'board',
+      })),
+      { file: 'phone-rules-marks-3p', caption: 'Phone: the rulebook, further down its board tab: borders and marks on the board', client: 'phone', seat: 2, clicks: ['#book'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = document.querySelectorAll('.bookpage .bhead')[1].offsetTop - document.querySelector('.bookpage').offsetTop` },
+      { file: 'phone-rules-upgrades-3p', caption: 'Phone: the rulebook, at the end of its buildings tab: the upgrades', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = 1e6` },
       { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
       { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },
       { file: 'phone-join-seats-3p', caption: "Phone: the room's address mid-game: tap your name to take your seat back", client: 'phone', waitFor: '.seats', sizes: true },

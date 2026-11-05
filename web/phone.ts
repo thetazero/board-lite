@@ -11,6 +11,7 @@ import {
 import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
+import { bookSheet, loadBook, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -52,6 +53,7 @@ let sending = false;
 let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
 let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
+let bookTab: BookTab | null = null; // the rulebook, from Rules in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
 // A new screen tucks it again, if no card can be played there either.
@@ -516,6 +518,7 @@ function header(g: PublicState, me: Me): string {
       <header class="me">
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
+        <button id="book" class="ghost bookbtn" aria-expanded="${!!bookTab}">Rules</button>
         <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${wheelOpen}">${wheelMark(g)}</button>
         <button id="menu" class="ghost menubtn" aria-label="Menu" aria-expanded="${menu}">⋯</button>
       </header>
@@ -659,7 +662,7 @@ function render() {
   const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
-  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : bookTab ? bookSheet(bookTab) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
@@ -1604,12 +1607,32 @@ function wire(g: PublicState, me: Me) {
   on('menu', () => {
     menu = !menu;
     wheelOpen = false;
+    bookTab = null;
     render();
   });
   on('wheel', () => {
     wheelOpen = !wheelOpen;
     menu = false;
+    bookTab = null;
     render();
+  });
+  // The rulebook lies over whatever the screen is, and closes back to it.
+  on('book', () => {
+    bookTab = bookTab ? null : 'board';
+    menu = wheelOpen = false;
+    render();
+    if (bookTab) loadBook(me.seat, () => bookTab && render());
+  });
+  for (const id of ['bookclose', 'bookdone']) {
+    on(id, () => {
+      bookTab = null;
+      render();
+    });
+  }
+  bind('[data-booktab]', (el) => {
+    bookTab = el.dataset.booktab as BookTab;
+    render();
+    app.querySelector('.bookpage')?.scrollTo(0, 0);
   });
   for (const id of ['wheelclose', 'wheeldone']) {
     on(id, () => {
