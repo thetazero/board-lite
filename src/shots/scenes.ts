@@ -386,16 +386,17 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // A Timber Port on the harbor nearest the tower of the player whose turn it is.
+    // The four ports, on the four harbors nearest the tower of the player whose
+    // turn it is: the Timber Port nearest, so their bank shows timber at 2:1.
     setup: (g) => {
       const owner = g.turn;
-      const k = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => dist(a, g.towers[owner]) - dist(b, g.towers[owner]) || a.localeCompare(b))[0];
+      const ks = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => dist(a, g.towers[owner]) - dist(b, g.towers[owner]) || a.localeCompare(b));
       g.players[owner].resources.timber = Math.max(g.players[owner].resources.timber, 6);
-      g.buildings[k] = { type: 'timber_port', owner, upgrade: null, floors: 0 };
+      ['timber_port', 'stone_port', 'crystal_port', 'livestock_port'].forEach((type, i) => ks[i] && (g.buildings[ks[i]] = { type, owner, upgrade: null, floors: 0 }));
     },
     shots: (g) => {
       return [
-        { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
+        { file: 'tv-port-4p', caption: 'TV: the four ports on the coast, facing the sea, each with a pile of what it trades', client: 'tv' },
         { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
@@ -1306,6 +1307,7 @@ export const SCENES: Scene[] = [
         clicks: ['#book', `[data-booktab="${t}"]`], waitFor: t === 'kingdoms' || t === 'cards' ? '.bookpage .bentry, .bookpage .bking' : '.bookpage img.bpic', sizes: t === 'board',
       })),
       { file: 'phone-rules-marks-3p', caption: 'Phone: the rulebook, further down its board tab: borders and marks on the board', client: 'phone', seat: 2, clicks: ['#book'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = document.querySelectorAll('.bookpage .bhead')[1].offsetTop - document.querySelector('.bookpage').offsetTop` },
+      { file: 'phone-rules-trade-3p', caption: 'Phone: the rulebook, at the trade buildings on its buildings tab: the four ports', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `const p = document.querySelector('.bookpage'); p.scrollTop = [...p.querySelectorAll('.bhead')].find((h) => h.textContent === 'Trade buildings').offsetTop - p.offsetTop` },
       { file: 'phone-rules-upgrades-3p', caption: 'Phone: the rulebook, at the end of its buildings tab: the upgrades', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = 1e6` },
       { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
       { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },

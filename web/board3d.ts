@@ -973,19 +973,57 @@ function hatchery(): THREE.Group {
   return g;
 }
 
-// A port, built facing the sea (+z): a red-roofed warehouse, crates of the
-// goods under its awning, a pier out over the water and a boat moored by it.
-function port(): THREE.Group {
+// A port, built facing the sea (+z): a red-roofed warehouse, a big pile of
+// the one resource it trades under its awning (cut stone blocks, a log pile,
+// violet crystals or sheep, as on that resource's basic building), so the
+// four ports tell apart at a glance; a crate of it on the pier out over the
+// water and a boat moored by it.
+const PORT_GOODS: Record<string, string> = { stone: TRADE_GOODS[0], timber: TRADE_GOODS[1], crystal: TRADE_GOODS[2], livestock: TRADE_GOODS[3] };
+function portPile(r: string): THREE.Group {
+  const g = new THREE.Group();
+  if (r === 'stone') {
+    const s = 0.17;
+    const pile: [number, number, number][] = [[-0.17, 0, 0.04], [0, 0, 0.04], [0.17, 0, 0.04], [-0.085, 0, -0.13], [0.085, 0, -0.13], [-0.085, 1, -0.03], [0.085, 1, -0.03], [0, 2, -0.04]];
+    for (const [x, lvl, z] of pile) g.add(stoneBlock(s, [x, s * 0.4 + lvl * s * 0.8, z], (x * 7) % 0.2, lvl === 2 ? '#e4e6ea' : STONE_BLOCK));
+  } else if (r === 'timber') {
+    // End-on to the room, so the pale cut ends show.
+    const rr = 0.08, len = 0.34;
+    const pile: [number, number][] = [[-0.16, 0], [0, 0], [0.16, 0], [-0.08, 1], [0.08, 1], [0, 2]];
+    for (const [x, lvl] of pile) g.add(timberLog(len, rr, [x, rr + lvl * rr * 1.7, -0.04], Math.PI / 2));
+  } else if (r === 'crystal') {
+    // A heap of big crystals on a low rock.
+    g.add(part(new THREE.DodecahedronGeometry(0.2, 0), '#8c8073', { at: [0, 0.06, -0.04], scale: [1.3, 0.5, 1] }));
+    for (const [x, z, h, tilt, lean] of [[0, -0.06, 0.38, 0, 0], [-0.16, 0, 0.28, -0.5, 0.1], [0.16, 0.02, 0.3, 0.5, -0.1], [0.04, 0.12, 0.22, 0.2, 0.5], [-0.06, -0.2, 0.24, -0.1, -0.4]]) {
+      const c = crystal(h, CRYSTAL);
+      c.position.set(x, 0.14 + h * 0.55, z);
+      c.rotation.set(lean, 0, tilt);
+      g.add(c);
+    }
+  } else {
+    // Sheep penned on the quay, waiting for the boat.
+    for (const [x, z, a] of [[-0.14, 0.06, 0.4], [0.14, 0.02, 2.6], [0, -0.16, -0.9]]) {
+      const sh = sheep();
+      sh.scale.setScalar(1.35);
+      sh.position.set(x, 0, z);
+      sh.rotation.y = a;
+      g.add(sh);
+    }
+    for (const x of [-0.3, 0.3]) g.add(part(box(0.035, 0.18, 0.035), WOOD, { at: [x, 0.09, 0.2] }));
+    for (const y of [0.08, 0.15]) g.add(part(box(0.62, 0.03, 0.02), mix(WOOD, WALL, 0.3), { at: [0, y, 0.2], crease: false }));
+  }
+  return g;
+}
+function port(r: string): THREE.Group {
   const g = new THREE.Group();
   const shed = cottage(0.46, 0.32, 0.3, WALL, TRADE_RED);
   shed.position.set(-0.18, 0, -0.32);
   g.add(shed);
   g.add(awning(0.46, 0.18, 4, 0.27, -0.08).translateX(-0.18));
-  TRADE_GOODS.forEach((c, i) => g.add(crate(c, 0.11, [-0.36 + (i % 3) * 0.13, i < 3 ? 0 : 0.11, 0.04 + (i < 3 ? 0 : -0.01)], (i * 0.3) % 0.4)));
+  g.add(portPile(r).translateX(-0.2).translateZ(0.12));
   // The pier: planks on posts, running out past the hex's edge.
   g.add(part(box(0.22, 0.04, 1.05), WOOD, { at: [0.24, 0.1, 0.35] }));
   for (const z of [0, 0.35, 0.7]) for (const x of [0.14, 0.34]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
-  g.add(crate(TRADE_GOODS[4], 0.1, [0.24, 0.12, 0.5], 0.4));
+  g.add(crate(PORT_GOODS[r] ?? TRADE_GOODS[4], 0.1, [0.24, 0.12, 0.5], 0.4));
   const boat = new THREE.Group();
   boat.add(part(cyl(0.12, 0.06, 0.4, 4), WOOD, { at: [0, 0, 0], rot: [Math.PI / 2, Math.PI / 4, 0], scale: [1, 1, 0.55] }));
   boat.add(part(box(0.02, 0.5, 0.02), DARK, { at: [0, 0.27, 0], crease: false }));
@@ -1373,7 +1411,7 @@ const NESTING_PERCHES: Perch[] = [{ x: -0.42, y: 0, z: 0.52, face: 1.7 }, { x: -
 
 function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Group; offset: [number, number] } {
   const pc = PLAYER_COLORS[b.owner];
-  if (PORTS.includes(b.type)) return { model: port(), offset: [0, 0] };
+  if (PORTS.includes(b.type)) return { model: port(b.type.replace('_port', '')), offset: [0, 0] };
   switch (b.type) {
     case 'tower': return { model: tower(pc, b.floors), offset: [-0.15, -0.2] };
     case 'quarry': return { model: quarry(), offset: [0, 0] };
