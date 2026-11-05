@@ -574,16 +574,21 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
-      for (const p of g.players.keys()) arm(g, p, [2]);
+      const order = turnOrder(g);
+      // The first seat has an adult dragon and a young one, so its vote is
+      // worth more than a single young dragon's.
+      for (const p of g.players.keys()) arm(g, p, p === order[0] ? [3, 2] : [2]);
       // The last seat's only dragon was knocked out clearing a beast this
       // turn, so that player doesn't vote.
-      const last = turnOrder(g).at(-1)!;
+      const last = order.at(-1)!;
       for (const d of g.dragons) if (d.owner === last) d.damage = DRAGONS[d.key].stages[d.stage - 1].hp;
       toVote(g);
-      vote(g, byPower(g)[0], turnOrder(g).slice(0, 2));
+      // Two votes, split: the one worth more power leads.
+      vote(g, byPower(g)[1], [order[0]]);
+      vote(g, byPower(g)[0], [order[1]]);
     },
     shots: (g) => [
-      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted, one has no vote', client: 'tv', sizes: true },
+      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted, split, the one worth more power leads; one has no vote', client: 'tv', sizes: true },
       { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => waitingOn(g!).includes(p)), sizes: true },
       { file: 'phone-raid-voted-5p', caption: 'Phone: voted, waiting', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] !== null) },
       { file: 'phone-raid-no-vote-5p', caption: 'Phone: no raid-ready dragon, so no vote', client: 'phone', seat: turnOrder(g!).at(-1)! },

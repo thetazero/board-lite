@@ -8,7 +8,7 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
-import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
+import { foeStack, kingdomCard, lootLine, unitIcon, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
@@ -380,8 +380,8 @@ function renderRaid(g: PublicState) {
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
-      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names)).join('')}</div>
-      <div class="status">${names.flatMap((_, p) => (raid.voters[p] ? [`${playerTag(p, names)} ${check(raid.votes[p] !== null)}`] : [])).join(' ')}</div>`;
+      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names)).join('')}</div>
+      <div class="status">${names.flatMap((_, p) => (raid.voters[p] ? [`${voterTag(p, raid.votePower[p], names)} ${check(raid.votes[p] !== null)}`] : [])).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
     // Each player's dragons that could go, the sent ones lit; a roost for
     // anyone keeping theirs home; a tick once they're ready.

@@ -169,9 +169,28 @@ test('only a player with a raid-ready dragon votes, and one without is told why'
   assert.equal(seatState(g, 0).whyNoVote, null);
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 2');
-  // Both voters voted: a coin flip picks the target, without waiting on P3.
+  // Both voters voted: the target is picked without waiting on P3.
   assert.equal(g.raid!.step, 'commit');
   assert.deepEqual(waitingOn(g), [0, 1]);
+});
+
+test("each vote counts its voter's raid-ready power, and the most power wins", () => {
+  const g = newGame(3, 5);
+  hatchAll(g);
+  // P1 has the strongest dragon; P2 and P3 have hatchlings, and P3 a knocked-out adult too, which doesn't count.
+  for (const d of g.dragons) d.stage = d.owner === 0 ? 3 : 1;
+  const extra = { ...g.dragons.find((d) => d.owner === 2)!, id: 'd999', stage: 3, damage: 999 };
+  g.dragons.push(extra);
+  advanceToRaidVote(g);
+  const power = [0, 1, 2].map((p) => g.dragons.filter((d) => d.owner === p && canRaid(d)).reduce((s, d) => s + dragonPower(d), 0));
+  assert.deepEqual(publicState(g).raid!.votePower, power);
+  assert.ok(power[0] > power[1] + power[2], 'the adult outweighs the two hatchlings');
+  apply(g, 1, 'vote 2');
+  apply(g, 2, 'vote 2');
+  apply(g, 0, 'vote 1');
+  // Two votes for the second kingdom, but the one vote for the first is worth more.
+  assert.equal(g.raid!.target, g.raid!.candidates[0]);
+  assert.ok(playerView(g, 1, 1000).includes(`(power ${power[0]})`));
 });
 
 test('everyone starts with an egg, and a raid nobody can fight is skipped', () => {

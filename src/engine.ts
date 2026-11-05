@@ -736,14 +736,20 @@ export function canVote(g: Game, p: number): boolean {
 
 export const NO_VOTE = "You have no raid-ready dragon, so you don't vote.";
 
+// What a player's vote is worth: the combat power of their raid-ready
+// dragons, summed (what they could send to the target). 0 for no vote.
+export function votePower(g: Game, p: number): number {
+  return eligibleDragons(g, p).reduce((s, d) => s + dragonPower(d), 0);
+}
+
 function resolveVote(g: Game) {
   const raid = g.raid!;
-  const counts = raid.candidates.map((_, i) => raid.votes.filter((v) => v === i).length);
+  const counts = raid.candidates.map((_, i) => raid.votes.reduce<number>((s, v, p) => s + (v === i ? votePower(g, p) : 0), 0));
   const best = Math.max(...counts);
   const tied = raid.candidates.filter((_, i) => counts[i] === best);
   raid.target = tied.length > 1 ? pick(g.rng, tied) : tied[0];
   const target: GameEvent = { k: 'target', t: raid.target, name: TARGETS[raid.target].name, votes: counts, coin: tied.length > 1 };
-  log(g, `Votes: ${raid.votes.flatMap((v, p) => (v === null ? [] : [`${pname(p)}→${TARGETS[raid.candidates[v]].name}`])).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
+  log(g, `Votes: ${raid.votes.flatMap((v, p) => (v === null ? [] : [`${pname(p)} (power ${votePower(g, p)})→${TARGETS[raid.candidates[v]].name}`])).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
   log(g, `The raid target is ${TARGETS[raid.target].name}${tied.length > 1 ? ' (tie broken by a coin flip)' : ''}.`, target);
   raid.step = 'commit';
   for (let p = 0; p < g.players.length; p++) raid.ready[p] = eligibleDragons(g, p).length === 0;
