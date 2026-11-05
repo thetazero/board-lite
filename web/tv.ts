@@ -264,7 +264,7 @@ function renderGame(g: PublicState) {
         <div class="dragons">${dragons}</div>
       </div>`;
   });
-  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} <b>${iconText(esc(o.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(o.get))}</b> ${playerTag(o.to, names)}</li>`).join('');
+  const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} <b>${iconText(esc(o.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(o.get))}</b> ${o.to === null ? '<b>Anyone</b>' : playerTag(o.to, names)}</li>`).join('');
   // Each title: everyone's count in their colour, the holder's ringed, and the
   // count it takes to hold it at all.
   const titles = g.titles.map((t) => `<li>${icon(TITLE_ICON[t.key], 1.3)}<b>${esc(t.name)}</b>

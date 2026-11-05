@@ -113,9 +113,9 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   const out: string[] = [];
   const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
   if (g.phase === 'action') {
-    for (const o of g.offers.filter((x) => x.to === you.seat)) {
+    for (const o of g.offers.filter((x) => (x.to === null ? x.from !== you.seat && !x.passed.includes(you.seat) : x.to === you.seat))) {
       const why = you.cantAccept[o.id];
-      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get})${why ? ` ${why}` : ''}`);
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? '; to anyone, the first to accept trades' : ''})${why ? ` ${why}` : ''}`);
     }
     if (!you.myTurn) {
       out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn you may only trade with ${P(g.turn)})`);
@@ -150,8 +150,8 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
-    out.push(`bank <give resource> <get resource> [times]   (stone, timber, crystal or livestock, not gold; your rates: ${rateText(you.bankRates)})`);
-    out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
+    out.push(`merchants <give resource> <get resource> [times]   (stone, timber, crystal or livestock, not gold; your rates: ${rateText(you.bankRates)})`);
+    out.push(`offer <player|anyone> give <items> get <items>   (items: "2 stone", card ids like "c12"; to anyone: the first to accept trades)`);
     for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);
     out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
     return out;
@@ -237,7 +237,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you gain (production minus what your dragons eat): ${amounts(you.income)}.`);
-  out.push(`Bank rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
+  out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);
   for (const c of you.hand) out.push(`  ${cardText(c)}`);
@@ -268,7 +268,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   if (g.offers.length) {
     out.push('');
     out.push('== Open offers ==');
-    for (const o of g.offers) out.push(`  ${o.id}: ${P(o.from)} offers ${P(o.to)} ${o.give} for ${o.get}`);
+    for (const o of g.offers) out.push(`  ${o.id}: ${P(o.from)} offers ${o.to === null ? 'anyone' : P(o.to)} ${o.give} for ${o.get}${o.passed.length ? `; declined by ${o.passed.map(P).join(', ')}` : ''}`);
   }
   out.push('');
   out.push(`== Recent events ==`);
