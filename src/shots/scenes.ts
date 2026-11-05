@@ -720,6 +720,21 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'last-round-4p',
+    players: 4,
+    seed: 1,
+    // The first moment anyone has the points to win: the round plays on to its end.
+    until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
+    shots: (g) => {
+      const top = g!.players.findIndex((_, p) => score(g!, p).public >= TUNING.pointsToWin);
+      return [
+        { file: 'tv-last-round-4p', caption: 'TV: someone has the points to win, so this round is the last', client: 'tv' },
+        { file: 'phone-last-round-4p', caption: 'Phone: someone else has the points to win', client: 'phone', seat: (top + 1) % 4 },
+        { file: 'phone-last-round-mine-4p', caption: 'Phone: you have the points to win', client: 'phone', seat: top },
+      ];
+    },
+  },
+  {
     name: 'over-4p',
     players: 4,
     seed: 1,

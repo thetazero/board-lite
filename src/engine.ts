@@ -442,7 +442,8 @@ function updateTitles(g: Game) {
 }
 
 export interface Score {
-  buildings: number;
+  buildings: number; // every building's points, monuments included
+  monuments: number; // the monument cards' share of those
   titles: number;
   beasts: number; // great beasts slain
   hidden: number;
@@ -451,13 +452,16 @@ export interface Score {
 }
 
 export function score(g: Game, p: number): Score {
-  let buildings = 0;
-  for (const [k] of ownedBuildings(g, p)) buildings += buildingPoints(g, k);
+  let buildings = 0, monuments = 0;
+  for (const [k, b] of ownedBuildings(g, p)) {
+    buildings += buildingPoints(g, k);
+    if (b.type !== 'tower' && BUILDINGS[b.type].class === 'monument') monuments += buildingPoints(g, k);
+  }
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
   const hidden = g.players[p].hand.reduce((s, c) => s + (ACTIONS[c.key]?.effect === 'hidden_point' ? ACTIONS[c.key].amount ?? 0 : 0), 0);
   const beasts = Object.entries(g.slain).filter(([, by]) => by === p).reduce((s, [k]) => s + BEASTS[k].points, 0);
   const pub = buildings + titles + beasts;
-  return { buildings, titles, beasts, hidden, public: pub, total: pub + hidden };
+  return { buildings, monuments, titles, beasts, hidden, public: pub, total: pub + hidden };
 }
 
 // ---------- setup ----------

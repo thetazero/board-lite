@@ -6,7 +6,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -237,6 +237,7 @@ function renderGame(g: PublicState) {
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
           <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
+        ${g.phase === 'over' ? '' : pointsTrack(p, g.pointsToWin)}
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
       </div>`;
@@ -267,6 +268,7 @@ function renderGame(g: PublicState) {
   // the feed and the titles take the bottom corners. Open trade offers sit
   // over the top of the board while they're open.
   const half = Math.ceil(n / 2);
+  const last = lastRoundHtml(g, names);
   app.innerHTML = `
     <div class="board">
       <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
@@ -274,7 +276,7 @@ function renderGame(g: PublicState) {
       <header class="topbar">
         <span class="round">Round ${bannerTop?.round ?? g.round}</span>
         ${phaseTrack(g)}
-        <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
+        ${last ? `<span class="goal last">${last}</span>` : `<span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>`}
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText(`${g.titlePoints} points`)}</span></h3><ul>${titles}</ul>
