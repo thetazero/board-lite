@@ -461,7 +461,7 @@ test('building cards count their neighbours; point buildings must go beside what
   g.players[0].hand.push({ id: 'cmo', deck: 'building', key: 'monument' });
   assert.ok(away, "a free hex beside the Cliff Works and away from any monument");
   assert.throws(() => apply(g, 0, `build cmo ${away}`), RuleError);
-  const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k] && !g.map[k].fauna)!;
   apply(g, 0, `build cmo ${next}`);
   assert.equal(buildingPoints(g, next), BUILDINGS.monument.points);
 });
@@ -805,6 +805,38 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   }
   assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
   assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
+});
+
+test('a wandering beast moves to the open hex adjacent to the fewest other beasts', () => {
+  const g = newGame(2, 7);
+  for (const k of Object.keys(g.map)) if (!BEASTS[g.map[k].fauna ?? '']) delete g.map[k].fauna;
+  for (const d of g.dragons) d.stage = 0;
+  g.dragons.forEach((d) => (d.growth = -1000));
+  const openHex = (k: string) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower';
+  const crowd = (n: string, self: string) => neighbors(n).filter((m) => m !== self && g.map[m]?.fauna).length;
+  // Only great beasts are left, and they never move: a wolf pack beside one has
+  // open hexes next to it and open hexes away from it.
+  const counts = (k: string) => neighbors(k).filter(openHex).map((n) => crowd(n, k));
+  let at = Object.keys(g.map).sort().find((k) => openHex(k) && new Set(counts(k)).size > 1)!;
+  assert.ok(at, 'a hex with crowded and uncrowded open neighbours');
+  g.map[at].fauna = 'wolf_pack';
+  let moves = 0;
+  for (let i = 0; i < 40 && g.phase !== 'over'; i++) {
+    const least = Math.min(...counts(at));
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) {
+      const pl = g.players[p];
+      apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
+    }
+    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    if (now !== at) {
+      moves++;
+      assert.equal(crowd(now, now), least, `${at} to ${now} goes where the fewest beasts are`);
+    }
+    at = now;
+  }
+  assert.ok(moves > 0);
 });
 
 test('each option a seat is offered says why it is off, in the words a refused command uses', () => {

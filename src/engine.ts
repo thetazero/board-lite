@@ -970,8 +970,9 @@ export function faunaLoot(g: Game, k: string): Bundle {
 }
 
 // In production, each beast of the fauna (not a great beast) may move to a
-// random adjacent land hex with no tower or beast, taking its card-sent mark
-// with it.
+// random adjacent land hex with no tower or beast, among those adjacent to the
+// fewest other beasts, taking its card-sent mark with it. So beasts tend to
+// spread out (#273), though one may still end up beside another.
 function wander(g: Game) {
   const open = new Set(faunaHexes(g));
   for (const k of faunaOnMap(g)) {
@@ -979,7 +980,9 @@ function wander(g: Game) {
     if (BEASTS[f] || roll(g.rng, TUNING.faunaWanderOdds) !== 1) continue;
     const to = neighbors(k).filter((n) => open.has(n));
     if (!to.length) continue;
-    const n = pick(g.rng, to);
+    const crowd = (n: string) => neighbors(n).filter((m) => m !== k && g.map[m]?.fauna).length;
+    const least = Math.min(...to.map(crowd));
+    const n = pick(g.rng, to.filter((m) => crowd(m) === least));
     g.map[n].fauna = f;
     if (g.map[k].sent) g.map[n].sent = true;
     delete g.map[k].fauna;
