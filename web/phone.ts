@@ -215,7 +215,10 @@ function onSnapshot(s: Snapshot) {
   }
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
-  if (s.lobby.remote) table.show(code);
+  if (s.lobby.remote) {
+    table.show(code);
+    table.hold(s.scene > 0);
+  }
   noteOffers(s.game, s.seat);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
@@ -389,31 +392,50 @@ function invite(c: string): string {
 // The TV's page for the room, in a frame over this page, kept loaded (and
 // hidden) for the whole game so its cutscenes are queued as they happen. The
 // switch sits by the talk bar in both views. While a cutscene plays (the round's
-// dice, a raid's or a beast's fight) the frame tells this page, and the phone
-// cuts to the table and back after, unless the player switched by hand.
+// dice, a raid's or a beast's fight) the frame tells this page, and so does the
+// server's snapshot (its `scene`); the phone cuts to the table and back after,
+// unless the player switched by hand. While the server's scene plays, You is
+// off: there's nothing to do there, and it would only say to watch the table.
 const table = (() => {
   let wrap: HTMLElement | null = null;
   let sw: HTMLElement | null = null;
   let room = '';
   let on = false;
   let auto = false; // showing the table because a cutscene cut to it
+  let framed = false; // the frame says its cutscene is playing
+  let held = false; // the server says a scene is playing: there's nothing to do on the You side
   const set = (v: boolean) => {
     on = v;
     document.body.classList.toggle('table-on', v);
     sw?.querySelectorAll<HTMLElement>('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === v)));
     wrap?.setAttribute('aria-hidden', String(!v));
   };
-  addEventListener('message', (e) => {
-    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
-    if (e.data.on && !on) {
+  // Cut to the table while either says a scene plays, and back once neither does.
+  const update = () => {
+    if (!wrap) return;
+    const you = sw?.querySelector<HTMLButtonElement>('[data-view="you"]');
+    if (you) you.disabled = held;
+    if ((framed || held) && !on) {
       auto = true;
       set(true);
-    } else if (!e.data.on && auto) {
+    } else if (!framed && !held && auto) {
       auto = false;
       set(false);
     }
+  };
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
+    framed = !!e.data.on;
+    update();
   });
   return {
+    // The server's word on whether a scene plays: a phone joining mid-scene,
+    // or one whose frame missed it, still cuts to the table rather than saying
+    // to watch it.
+    hold(v: boolean) {
+      held = v;
+      update();
+    },
     show(c: string) {
       if (wrap && room === c) return;
       this.hide();
@@ -433,13 +455,14 @@ const table = (() => {
       document.body.append(wrap, sw);
       document.body.classList.add('remote');
       set(false);
+      update();
     },
     hide() {
       wrap?.remove();
       sw?.remove();
       wrap = sw = null;
       room = '';
-      auto = false;
+      on = auto = framed = held = false;
       document.body.classList.remove('remote', 'table-on');
     },
   };

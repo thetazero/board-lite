@@ -1413,7 +1413,11 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 }],
+    shots: () => [
+      { file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 },
+      // You, tapped while the fight plays: the phone stays on the table, never "Watch the table" (#294).
+      { file: 'phone-remote-fight-you-3p', caption: 'No TV: You tapped mid-fight: the table stays, You is off till the fight ends', client: 'phone', seat: 1, live: true, run: `setTimeout(() => document.querySelector('[data-view="you"]').click(), 1000)`, waitFor: '.viewswitch', waitMs: 1800 },
+    ],
   },
   {
     name: 'remote-fight-end-3p',
