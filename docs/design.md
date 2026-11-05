@@ -50,7 +50,7 @@ Playtests showed that refusing to trade and taking land first were the only ways
 - Clearing fauna "its not a raid but uses the same combat system". Anyone can clear any fauna ("anyone"), and clearing pays "some livestock? (food)", scaled by how strong the beast is.
 - "you can chose to fight fauna or raid (but maybe this is a dragon level choice)… maybe you can go half half": each dragon either fights fauna or raids in a round, never both, so a player can split their dragons.
 - New fauna comes only from action cards: "card only for now". The board doesn't respawn it.
-- Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies; 8 and 4 since the action deck doubled in #201). A beast a card sent gives no loot, so placing one never hands a rival a prize.
+- Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies; 8 and 4 since the action deck doubled in #201). A beast a card sent gives no loot, so placing one never hands a rival a prize. Since #231 each card is named for the beast it places: Rouse the Bear places the Cave Bear, Wake the Basilisk the Basilisk (Wolf Call is gone; no card places wolves).
 - Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
 
 ### Perching dragons
@@ -60,7 +60,7 @@ The owner (2026-11-04, #217): "what yorue missing is a very interesting dynamic,
 - On your turn a dragon may perch on a rival's building instead of raiding or clearing. While one perches there, the building makes nothing, as under a beast. It stays until its owner recalls it or it's driven off.
 - Anyone can attack perched dragons, in the same fight as fauna. Several dragons may perch on one building, from different players too, and they fight together.
 - Perched dragons take damage and heal as anywhere else: "no insta heal like fauna because they are not fauna". A hurt one keeps blocking while it heals.
-- It sits alongside Wolf Call and Rouse the Bear ("alongside"): a rule added without one cut, the owner's call.
+- It sits alongside Rouse the Bear and Wake the Basilisk ("alongside"): a rule added without one cut, the owner's call.
 - Nothing can block the wizard tower, neither dragons nor fauna, "to avoid softlock".
 
 Filled in provisionally (reasoning in the PR for #217): a dragon perches only if it's raid-ready, and a recalled one may raid that round if it's unhurt; a perched dragon is driven off by being knocked out, and goes home; clearing a hex fights everything holding it at once (a beast that wandered onto a perched building fights beside the dragons there); your own perched dragons are never your foes, so you can't clear a hex where only yours perch; a perched building keeps its points and dragon room, as under a beast.
@@ -252,7 +252,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - One upgrade per building; the tower counts as a monument and a dragon building.
 - The special project is a base egg of any element, at double the base dragon card.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
-- Healing: every dragon heals a fixed amount at production (7 health, in `src/data.ts`), and one that was still hurt when production began (or went hungry) sits out that round's raids, so it misses a raid round per 7 damage, rounded up. Only hunger stops growth, as the upkeep rule above says. Dragons never die: at 0 health they are knocked out and heal at home. (Changed in #65 from healing fully each round.)
+- Healing: every fed dragon that is hurt heals a fixed amount at production (7 health, in `src/data.ts`), and one that was still hurt when production began (or went hungry) sits out that round's raids, so it misses a raid round per 7 damage, rounded up. The owner (#234): "dragons should not grow while they are healing up... and should not heal while out of food": a hurt dragon heals instead of growing, and a hungry one does neither. Dragons never die: at 0 health they are knocked out and heal at home. (Changed in #65 from healing fully each round.)
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
 - Combat power is √(health × average damage a combat round), rounded; a side's is the sum (Lanchester's square law makes these add). Loot is split in proportion to it, rounded down per player, and the remainder goes to the player with the most power standing. Loot grows with the square of a kingdom's power. (#65)

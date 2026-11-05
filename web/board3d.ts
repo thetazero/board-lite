@@ -721,21 +721,36 @@ function caveBear(): THREE.Group {
   return g;
 }
 
-const SCALE_GREEN = '#5aa84c', SCALE_DARK = '#3a7a33', CREST = '#e5484d';
+// The Basilisk, king of serpents: a long snake, coiled flat on the ground,
+// its head raised a little and crowned in gold, a forked tongue out. No
+// wings, no legs, no spines down its back, so it never reads as a dragon
+// (#231).
+const SCALE_GREEN = '#6f8a2c', SCALE_DARK = '#46591b', BELLY = '#d8cf8a', CROWN = '#e9b84a';
 function basilisk(): THREE.Group {
-  // A coil on the ground, its neck rising from the front, the head looking out;
-  // the crest, red fins down the back of the head and neck.
-  const neck = joint([0.11, 0.11, 0],
-    part(cyl(0.065, 0.09, 0.42, 5), SCALE_GREEN, { at: [0.2, 0.3, 0], rot: [0, 0, -0.45] }),
-    part(box(0.2, 0.1, 0.13), SCALE_GREEN, { at: [0.33, 0.52, 0], rot: [0, 0, -0.15] }),
-    part(cone(0.07, 0.16, 4), SCALE_DARK, { at: [0.48, 0.49, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.15] }),
-    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, 0.066], glow: 0.8, crease: false }),
-    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.38, 0.56, -0.066], glow: 0.8, crease: false }),
-    ...[[0.3, 0.6, 0.16], [0.22, 0.5, 0.13], [0.15, 0.38, 0.11]].map(([x, y, h]) => part(cone(0.05, h, 3), CREST, { at: [x, y + h / 2, 0], rot: [0, 0, 0.5], scale: [1, 1, 0.35] })),
+  // The neck rises low from the front of the coil, the head flat and wedge-shaped.
+  const neck = joint([0.14, 0.1, 0],
+    part(cyl(0.055, 0.075, 0.3, 5), SCALE_GREEN, { at: [0.22, 0.22, 0], rot: [0, 0, -0.7] }),
+    part(box(0.2, 0.07, 0.14), SCALE_GREEN, { at: [0.37, 0.33, 0], rot: [0, 0, -0.05] }),
+    part(cone(0.07, 0.12, 4), SCALE_DARK, { at: [0.5, 0.32, 0], rot: [Math.PI / 4, 0, -Math.PI / 2], scale: [1, 1, 0.6] }),
+    part(box(0.16, 0.025, 0.1), BELLY, { at: [0.38, 0.29, 0], crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.42, 0.36, 0.07], glow: 0.8, crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2d200', { at: [0.42, 0.36, -0.07], glow: 0.8, crease: false }),
+    // The crown: a gold band with five points.
+    part(cyl(0.065, 0.065, 0.035, 6), CROWN, { at: [0.33, 0.385, 0], glow: 0.2, crease: false }),
+    ...[0, 1, 2, 3, 4].map((i) => {
+      const a = (i / 5) * Math.PI * 2;
+      return part(cone(0.02, 0.07, 3), CROWN, { at: [0.33 + Math.cos(a) * 0.05, 0.435, Math.sin(a) * 0.05], glow: 0.2, crease: false });
+    }),
+    // The forked tongue.
+    part(box(0.07, 0.008, 0.012), '#d23a3a', { at: [0.6, 0.31, 0.012], rot: [0, 0.3, 0], crease: false }),
+    part(box(0.07, 0.008, 0.012), '#d23a3a', { at: [0.6, 0.31, -0.012], rot: [0, -0.3, 0], crease: false }),
   );
+  // Three coils on the ground, the tail tapering out of the last.
   const body = group(
-    part(new THREE.TorusGeometry(0.24, 0.085, 4, 10, Math.PI * 1.7), SCALE_DARK, { at: [-0.08, 0.09, 0], rot: [Math.PI / 2, 0, 0.6] }),
-    part(new THREE.TorusGeometry(0.13, 0.07, 4, 8, Math.PI * 1.6), SCALE_GREEN, { at: [-0.08, 0.2, 0], rot: [Math.PI / 2, 0, 2.2] }),
+    part(new THREE.TorusGeometry(0.28, 0.07, 4, 12, Math.PI * 1.8), SCALE_DARK, { at: [-0.06, 0.07, 0], rot: [Math.PI / 2, 0, 0.6] }),
+    part(new THREE.TorusGeometry(0.18, 0.065, 4, 10, Math.PI * 1.8), SCALE_GREEN, { at: [-0.06, 0.15, 0], rot: [Math.PI / 2, 0, 2.4] }),
+    part(new THREE.TorusGeometry(0.09, 0.055, 4, 8, Math.PI * 1.6), SCALE_DARK, { at: [-0.06, 0.22, 0], rot: [Math.PI / 2, 0, 4.1] }),
+    part(cone(0.05, 0.22, 4), SCALE_DARK, { at: [-0.3, 0.05, -0.28], rot: [Math.PI / 2, 0, 0.9] }),
     neck,
   );
   const g = group(body);
