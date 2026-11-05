@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -42,13 +42,11 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't heal or grow either, a hunted one fought fauna
   canRaid: boolean;
   perch: string | null; // the rival's building it perches on
   weak: string[]; // the elements that beat it on the element wheel, as for every fighter
-  backIn: number | null; // hurt: the round it can raid again
   power: number; // combat power (0 for an egg)
-  status: string;
+  status: 'ready' | 'egg' | 'perched' | 'out'; // out: knocked out, at 0 health, until it heals
   targeting: string;
   attack: string;
   key: string; // its card, for the card's art
@@ -192,11 +190,11 @@ const stageViews = (def: DragonDef): DragonStageView[] => def.stages.map((st) =>
 function dragonView(g: Game, d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
-  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.perch ? 'perched' : d.resting === 'hungry' ? 'hungry' : d.resting === 'hunted' ? 'hunted' : 'hurt';
+  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.perch ? 'perched' : 'out';
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
-    growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
-    canRaid: canRaid(d), perch: d.perch ?? null, weak: ELEMENT_WEAK[def.element], backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0,
+    canRaid: canRaid(d), perch: d.perch ?? null, weak: ELEMENT_WEAK[def.element], power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
     key: d.key, stages: stageViews(def),
   };
 }
@@ -345,7 +343,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
   }
   if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!, {}), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
-    const ids = mine.filter((d) => d.damage > 0 || d.resting === 'hurt').map((d) => d.id);
+    const ids = mine.filter((d) => d.damage > 0).map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };
   }
   return { ...base, text: a.text, needs: 'none' };

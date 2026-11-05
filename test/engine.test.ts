@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -322,9 +322,9 @@ test('dragons are worth no points; Strongest Dragon Army goes to the most combat
   keepAll(g);
   g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 0 };
   g.dragons = [];
-  const add = (owner: number, stage: number) => g.dragons.push({ id: `d${g.dragons.length + 50}`, owner, key: 'fire_whelp', stage, growth: 0, damage: 0, resting: '' });
-  const adult = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0, resting: '' });
-  const hatchling = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 1, growth: 0, damage: 0, resting: '' });
+  const add = (owner: number, stage: number) => g.dragons.push({ id: `d${g.dragons.length + 50}`, owner, key: 'fire_whelp', stage, growth: 0, damage: 0 });
+  const adult = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 });
+  const hatchling = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 1, growth: 0, damage: 0 });
   // 3 adults fall short (the 9 dragon points they were worth fell short of 10); a hatchling more doesn't.
   assert.ok(3 * adult < TUNING.titleMinimum.army && 3 * adult + hatchling >= TUNING.titleMinimum.army);
   for (let i = 0; i < 3; i++) add(0, 3);
@@ -366,25 +366,26 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.equal(g.raid!.step, 'vote');
 });
 
-test('a dragon hurt in a raid heals instead of growing and sits out the next raid', () => {
+test('a hurt dragon heals instead of growing, and still fights', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
-  a.damage = 3; // hurt in this round's raid
+  a.stage = 3; // an adult, so it has the health to take a big hit
+  a.damage = TUNING.healPerRound + 3; // hurt in this round's raid
   g.players[a.owner].resources.livestock = 5;
   const ga = a.growth + a.stage * 10;
   advanceToRaidVote(g);
   while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(g.round, 2);
-  assert.equal(a.damage, 0);
-  assert.equal(a.resting, 'hurt');
+  assert.equal(a.damage, 3);
   assert.equal(a.growth + a.stage * 10, ga, 'a hurt dragon does not grow while it heals');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
+  apply(g, a.owner, `commit ${a.id}`); // hurt, it still raids
+  assert.deepEqual(g.raid!.commits[a.owner], [a.id]);
 });
 
-test('a hungry dragon neither heals, grows nor raids', () => {
+test('a hungry dragon neither heals nor grows, but still fights', () => {
   const g = newGame(2, 7);
   hatchAll(g);
   const a = g.dragons[0];
@@ -396,7 +397,7 @@ test('a hungry dragon neither heals, grows nor raids', () => {
   a.damage = 3;
   while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
-  assert.equal(a.resting, 'hungry');
+  assert.ok(canRaid(a), 'a hungry dragon with health left still fights');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
   assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
@@ -492,30 +493,24 @@ test('a fight replays from its events: the hits add up to the result', () => {
   assert.ok(fights > 10);
 });
 
-test('a hurt dragon heals a little each production and sits out until it is whole', () => {
+test('a knocked-out dragon cannot fight until a fed production heals it, then fights hurt', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
-  a.stage = 3; // an adult, so it has the health to take a big hit
-  const damage = 2 * TUNING.healPerRound + 1;
-  a.damage = damage; // hurt in this round's raid
+  a.stage = 3;
+  const hp = DRAGONS[a.key].stages[2].hp;
+  a.damage = hp; // knocked out in this round's raid
   g.players[a.owner].resources.livestock = 20;
-  const out = Math.ceil(damage / TUNING.healPerRound);
   const passRound = () => {
     for (const pl of g.players) pl.hand = []; // nothing to discard
     advanceToRaidVote(g);
     while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
     while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   };
-  assert.equal(backInRound(g, a), g.round + out + 1);
-  for (let i = 1; i <= out; i++) {
-    passRound();
-    assert.equal(a.damage, Math.max(0, damage - i * TUNING.healPerRound));
-    assert.equal(a.resting, 'hurt', `still out in round ${g.round}`);
-    assert.ok(!canRaid(a));
-  }
+  assert.ok(!canRaid(a));
+  assert.equal(publicState(g).dragons.find((d) => d.id === a.id)!.status, 'out');
   passRound();
-  assert.equal(a.resting, '');
-  assert.ok(canRaid(a), `back in round ${g.round}`);
+  assert.equal(a.damage, hp - TUNING.healPerRound);
+  assert.ok(canRaid(a), `back in round ${g.round}, hurt`);
 });
 
 test('raid loot is split by the combat power still fighting at the end', () => {
@@ -526,11 +521,11 @@ test('raid loot is split by the combat power still fighting at the end', () => {
     keepAll(g);
     while (g.phase === 'action') apply(g, g.turn, 'end');
     g.dragons = [
-      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
-      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0, resting: '' },
-      { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0, resting: '' },
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0 },
       // Stays home, so the next raid has a raider and isn't skipped.
-      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0, resting: '' },
+      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 },
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2; // stop at the next raid's vote, before the next production
@@ -569,14 +564,15 @@ test('loot left over goes out 1 at a time, strongest first, carrying on across r
   assert.deepEqual(splitLoot({ gold: 7 }, [2, 1]), [{ gold: 5 }, { gold: 2 }]);
 });
 
-test('Healing Potion heals a dragon that cleared a hex, which still sits out the raids', () => {
+test('Healing Potion heals a knocked-out dragon, ready to fight', () => {
   const g = newGame(2, 3);
   keepAll(g);
-  g.dragons = [{ id: 'd1', owner: g.turn, key: 'fire_whelp', stage: 2, growth: 0, damage: 3, resting: 'hunted' }];
+  g.dragons = [{ id: 'd1', owner: g.turn, key: 'fire_whelp', stage: 2, growth: 0, damage: DRAGONS.fire_whelp.stages[1].hp }];
+  assert.equal(canRaid(g.dragons[0]), false);
   g.players[g.turn].hand.push({ id: 'cx', deck: 'action', key: 'healing_potion' });
   apply(g, g.turn, 'play cx d1');
   assert.equal(g.dragons[0].damage, 0);
-  assert.equal(canRaid(g.dragons[0]), false, 'it cleared a hex, so it sits out this round');
+  assert.equal(canRaid(g.dragons[0]), true);
 });
 
 test('discard is refused outside the end of the round', () => {
@@ -668,7 +664,7 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
   // Next round: three adult ice dragons, its weakness.
   g.round++;
   g.dragons = g.dragons.filter((x) => x.owner !== 0);
-  for (let i = 0; i < 3; i++) g.dragons.push({ id: `d8${i}`, owner: 0, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0, resting: '' });
+  for (let i = 0; i < 3; i++) g.dragons.push({ id: `d8${i}`, owner: 0, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0 });
   const untitled = () => score(g, 0).total - score(g, 0).titles; // the army title may move too
   const before = untitled();
   apply(g, 0, `clear ${PEAK} d80 d81 d82`);
@@ -705,7 +701,7 @@ test('fauna blocks building on its hex, and a building under it produces nothing
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock);
 });
 
-test('clearing fauna: any player may, the loot is theirs, and those dragons sit out the raids', () => {
+test('clearing fauna: any player may, the loot is theirs, and those dragons can still raid', () => {
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
   g.map[near].fauna = 'wolf_pack'; // on P1's pasture
@@ -721,13 +717,14 @@ test('clearing fauna: any player may, the loot is theirs, and those dragons sit 
   apply(g, 1, `clear ${near} ${d.id}`);
   assert.equal(g.map[near].fauna, undefined);
   assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf_pack.loot.livestock!);
-  assert.equal(d.resting, 'hunted');
+  assert.ok(canRaid(d), 'a dragon that cleared a hex, with health left, can still raid this round');
   assert.throws(() => apply(g, 1, `clear ${near} ${d.id}`), RuleError); // one fight a round
   const ev = g.log.map((e) => e.ev).filter((e) => e?.k === 'cleared');
   assert.ok(ev.some((e) => e?.k === 'cleared' && e.won && e.p === 1));
   apply(g, 1, 'end');
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  assert.throws(() => apply(g, 1, `commit ${d.id}`), RuleError);
+  apply(g, 1, `commit ${d.id}`); // it cleared a hex, and raids the same round
+  assert.deepEqual(g.raid!.commits[1], [d.id]);
 });
 
 test('a lost fight leaves the beast at full health on its hex', () => {

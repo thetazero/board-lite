@@ -36,9 +36,7 @@ export function cardText(c: CardView): string {
 function dragonLine(d: DragonView): string {
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
   const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
-  const healing = `healing, not growing: can raid again from round ${d.backIn}`;
-  const rest = { hungry: 'went hungry: no healing, growth or raids this round', hurt: healing, hunted: `fought on the map: no raids this round${d.hp < d.maxHp ? `; ${healing}` : ''}` };
-  const status = d.canRaid ? 'can raid, clear or perch' : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled${d.hp < d.maxHp ? `; ${d.hp}/${d.maxHp}hp` : ''}` : d.resting ? rest[d.resting] : healing;
+  const status = d.canRaid ? `can raid, clear or perch${d.hp < d.maxHp ? ' (hurt: heals instead of growing)' : ''}` : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled` : 'knocked out: cannot fight until it heals';
   return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
@@ -142,7 +140,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
+      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);

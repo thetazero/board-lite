@@ -1622,7 +1622,7 @@ function schedule(d: DragonEntry): { offset: number; period: number; dur: number
   return { offset: 6 + h * 20, period: 28 + h * 14, dur: d.view.stage === 1 ? 7 : 10 };
 }
 
-const canFly = (d: DragonView) => d.stage > 0 && d.status !== 'hurt' && d.status !== 'hungry' && d.status !== 'perched';
+const canFly = (d: DragonView) => d.status === 'ready';
 
 // ---------- the board ----------
 
@@ -2359,7 +2359,7 @@ export class Board3D {
     if (due && (!canFly(e.view) || e.late)) e.skip = n;
     e.late = false;
     const ft = canFly(e.view) && due && e.skip !== n ? since % s.period : Infinity;
-    const resting = e.view.status === 'hurt' || e.view.status === 'hungry';
+    const resting = e.view.status === 'out';
     if (ft < s.dur) {
       // In the air: take off, circle home, land where it took off from.
       const radius = e.view.stage === 1 ? 1.1 : 1.6 + (e.seed % 5) * 0.12;

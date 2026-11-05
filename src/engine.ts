@@ -27,10 +27,7 @@ export interface Dragon {
   key: string;
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
-  damage: number;
-  // Why the dragon sits out this round's raids: it was hungry (and doesn't
-  // heal or grow) or hurt (and heals instead of growing) at production, or it already fought fauna this round.
-  resting: '' | 'hungry' | 'hurt' | 'hunted';
+  damage: number; // at its stage's health, it's knocked out
   // The rival's building it perches on, if any: that building makes nothing
   // until the dragon is recalled or driven off.
   perch?: string;
@@ -244,8 +241,14 @@ export function foeDef(k: string): UnitDef {
   return UNITS[k] ?? faunaDef(k);
 }
 
+// A dragon fights (raids, clears, perches) whenever it's hatched, has health
+// left, and is home: hurt ones fight with what health they have.
 export function canRaid(d: Dragon): boolean {
-  return d.stage > 0 && !d.resting && d.damage === 0 && !d.perch;
+  return d.stage > 0 && !isKnockedOut(d) && !d.perch;
+}
+
+export function isKnockedOut(d: Dragon): boolean {
+  return d.stage > 0 && d.damage >= stageStats(d)!.hp;
 }
 
 // The dragons perched on hex k.
@@ -257,12 +260,6 @@ export function perchedOn(g: Game, k: string): Dragon[] {
 // stops it. Nothing stops a tower.
 export function blocked(g: Game, k: string): boolean {
   return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
-}
-
-// The round a hurt dragon can raid again: it heals at each production it's
-// fed and sits out every round it starts hurt.
-export function backInRound(g: Game, d: Dragon): number {
-  return g.round + Math.ceil(d.damage / TUNING.healPerRound) + 1;
 }
 
 export function dragonPower(d: Dragon): number {
@@ -476,7 +473,7 @@ export function newGame(players: number, seed: number): Game {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [], choice: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0, resting: '' });
+    g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0 });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins (checked at the end of each round).`, { k: 'begin', players });
   startRound(g);
@@ -514,15 +511,13 @@ function startRound(g: Game) {
   }
   wander(g);
   // Every dragon eats. A fed one heals some if it's hurt, and grows if it
-  // isn't; a hungry one does neither. One that was hungry or hurt sits out
-  // the round's raids.
+  // isn't; a hungry one does neither.
   for (const d of g.dragons) {
     const pl = g.players[d.owner];
     const hurt = d.damage > 0;
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
-    d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
-    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing and sits out this round\'s raids' : 'goes hungry: it doesn\'t heal or grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
+    if (!fed || hurt) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing' : 'goes hungry: it doesn\'t heal or grow'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
     if (hurt) {
       d.damage = Math.max(0, d.damage - TUNING.healPerRound);
@@ -885,8 +880,8 @@ function checkRaidOver(g: Game): boolean {
 // ---------- fauna ----------
 
 // A player's dragons attack what holds hex k, in a raid's combat, to the end:
-// its beast and every rival dragon perched there, together. Each attacker
-// sits out this round's raids. If every defender falls, the beast is gone and
+// its beast and every rival dragon perched there, together. The hits they
+// take stay on them, into the round's raids. If every defender falls, the beast is gone and
 // its loot (and a great beast's points, for good) goes to the player, and the
 // perched dragons are knocked out and go home. If not, the beast stays,
 // healed; perched dragons keep their hits, and stay unless knocked out. A
@@ -898,7 +893,6 @@ function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
     if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: 1 try each round.`);
     g.beastTried[p] = g.round;
   }
-  for (const d of ds) d.resting = 'hunted';
   const perched = rivalsPerched(g, p, k);
   const units: Battle['units'] = [
     ...(f ? [{ key: f, hp: faunaDef(f).hp }] : []),
@@ -1091,7 +1085,7 @@ export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object
 function hatch(g: Game, p: number, dragonKey: string, project = false) {
   const mine = g.dragons.filter((d) => d.owner === p).length;
   if (mine >= dragonCapacity(g, p)) fail(`No room for another dragon (${mine}/${dragonCapacity(g, p)}): build a roost first.`);
-  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0, resting: '' };
+  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0 };
   g.dragons.push(d);
   log(g, `${pname(p)} hatches an egg: ${dragonName(d)} (${d.id}), a ${DRAGONS[dragonKey].element} dragon${project ? ', as a special project' : ''}.`, { k: 'hatch', p, d: d.id, ...(project ? { project } : {}) });
 }
@@ -1193,7 +1187,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const ids = [...new Set(args.slice(1))];
       if (!ids.length) fail(`Send at least one dragon: clear ${k} d1 d4`);
       const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, unhurt, and not sitting out the round or perched).`);
+      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, not knocked out, and not perched).`);
       return clearHex(g, p, k, ds);
     }
     case 'perch': {
@@ -1203,7 +1197,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const ids = [...new Set(args.slice(1))];
       if (!ids.length) fail(`Send at least one dragon: perch ${k} d1 d4`);
       const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't perch (it must be hatched, unhurt, and not sitting out the round or perched).`);
+      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't perch (it must be hatched, not knocked out, and not perched).`);
       for (const d of ds) d.perch = k;
       const b = g.buildings[k];
       return log(g, `${pname(p)}'s ${ids.join(' ')} ${ids.length === 1 ? 'perches' : 'perch'} on ${pname(b.owner)}'s ${BUILDINGS[b.type].name} at ${k}: it makes nothing while they stay.`, { k: 'perch', p, hex: k, ds: ids, on: b.type, owner: b.owner });
@@ -1270,12 +1264,11 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
+          if (d.damage === 0) fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
-          if (d.resting === 'hurt') d.resting = '';
           ev.d = d.id;
-          what = `heals ${d.id}${canRaid(d) ? ', ready to raid' : ''}`;
+          what = `heals ${d.id}`;
           break;
         }
         case 'send_fauna': {
@@ -1324,7 +1317,7 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
       const ids = args.filter((a) => a !== 'none');
       for (const id of ids) {
         const d = ownDragon(g, p, id);
-        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched and not sitting out the round, and unhurt).`);
+        if (!canRaid(d)) fail(`${id} can't raid (it must be hatched, not knocked out, and not perched).`);
       }
       raid.commits[p] = [...new Set(ids)];
       return log(g, `${pname(p)} commits ${ids.length ? ids.join(' ') : 'nothing'}.`, { k: 'commit', p, ds: raid.commits[p] });

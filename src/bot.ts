@@ -39,7 +39,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
         // Fauna goes next to, or onto, another player's building.
         const theirs = Object.keys(g.buildings).filter((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower' && !g.map[k].fauna);
         if (a.effect === 'send_fauna' && theirs.length) out.push(`play ${c.id} ${pick(rng, theirs)}`);
-        const hurt = mine.filter((d) => d.damage > 0 || d.resting === 'hurt');
+        const hurt = mine.filter((d) => d.damage > 0);
         if (a.effect === 'heal_dragon' && hurt.length) out.push(`play ${c.id} ${pick(rng, hurt).id}`);
       }
     }

@@ -152,14 +152,14 @@ The element wheel, for everything that fights (dragons, defenders, fauna, great 
 ${table(['Element', 'Beats', 'Weak to'], UNIT_ELEMENTS.map((e) => [e, e === 'neutral' ? '—' : ELEMENT_BEATS[e], ELEMENT_WEAK[e].join(', ') || '—']))}`;
 }
 
-// Rounds a dragon with this much damage sits out (it heals at each production).
-const roundsOut = (damage: number) => Math.ceil(damage / TUNING.healPerRound);
+// Fed productions a dragon with this much damage takes to be whole again.
+const roundsToWhole = (damage: number) => Math.ceil(damage / TUNING.healPerRound);
 
 function healing(): string {
   const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
-  const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsOut(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
+  const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsToWhole(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
   const big = Object.values(DRAGONS).reduce((m, d) => (d.stages[2].hp > m.stages[2].hp ? d : m));
-  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production it's fed, instead of growing, and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
+  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production it's fed, instead of growing. It fights with the health it has left; only a knocked-out one (0 health) can't fight, and its next fed production brings it back. From knocked out to whole, a base dragon takes: ${ko} rounds of not growing; the ${big.name}, the toughest adult, ${roundsToWhole(big.stages[2].hp)}.`;
 }
 
 function raids(): string {
@@ -196,7 +196,7 @@ function fauna(): string {
   const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), a.copies]);
   return `## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast. New fauna comes only from cards.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Loot', 'Starts'], unitRows)}
 
@@ -219,7 +219,7 @@ function beasts(): string {
   const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
   return `## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end, and they sit out the round's raids), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 

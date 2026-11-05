@@ -198,8 +198,8 @@ export const TITLE_ICON: Record<string, string> = { army: 'raid', tower: 'tower'
 // did it (their name in their colour), the log's own verb, and the thing
 // itself as the board and the cards show it. Returns '' for events the screen
 // already shows elsewhere: a turn starting is the player panels, an open offer
-// is the offers panel, the raid's steps are its overlay, a dragon sitting out
-// is its tag on its owner's panel, and a beast wandering is the board (the
+// is the offers panel, the raid's steps are its overlay, a dragon healing or
+// going hungry is its health on its owner's panel, and a beast wandering is the board (the
 // feed has no hexes to name; one moving onto a building is said).
 // Old saves without event data fall back to the text.
 export function eventHtml(e: EventView, g: PublicState, names: string[]): string {
@@ -289,7 +289,7 @@ export function dragonChip(d: DragonView, all: DragonView[], round: number): str
   const state = dragonState(d, round);
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
-  return `<div class="dchip" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
+  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
@@ -316,20 +316,13 @@ export function elemWords(es: string[]): string {
   return w.length < 2 ? w.join('') : `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
 }
 
-// Why a dragon sits out, or its health. A healing one says how many rounds
-// until it's healed, in words: a bare "Healing 3" leaves "3 what?" (#161).
-export function dragonState(d: DragonView, round: number): string {
+// Why a dragon can't fight, or its health. A dragon fights whenever it has
+// health left, so the bar is the whole story; only a knocked-out one (no
+// health, greyed) or a perched one (away) says why instead.
+export function dragonState(d: DragonView, _round?: number): string {
   if (d.perch) return `<em class="st-perched">Perched</em>${d.stage ? hpBar(d.hp, d.maxHp) : ''}`;
-  if (d.resting === 'hungry') return '<em class="st-hungry">Hungry</em>';
-  if (d.resting === 'hunted') return `<em class="st-hunted">Fought</em>${hpBar(d.hp, d.maxHp)}`;
-  if (d.backIn !== null && !d.canRaid) return `<em class="st-healing" title="Can raid again from round ${d.backIn}">${healingText(d.backIn - round)}</em>`;
+  if (d.status === 'out') return '<em class="st-out">Knocked out</em>';
   return d.stage ? hpBar(d.hp, d.maxHp) : '';
-}
-
-// "Healed in 3 rounds", counting this round's raids: 1 means it can raid next
-// round. It says "healed", not "raids": a healed dragon raids only if sent.
-export function healingText(n: number): string {
-  return `Healed in ${n} round${n === 1 ? '' : 's'}`;
 }
 
 export function hpBar(hp: number, max: number): string {

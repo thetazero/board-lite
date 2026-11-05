@@ -188,11 +188,11 @@ function doing(g: PublicState, p: number): string {
   return '';
 }
 
-// A dragon on the TV: always its name, then its stage and how it is. A dragon
-// sitting out the round says why instead of showing its (full) health.
+// A dragon on the TV: always its name, then its stage and how it is: its
+// health, or why it can't fight (knocked out, greyed; or perched).
 function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: number): string {
   const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  return `<div class="tvdragon">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
+  return `<div class="tvdragon${d.status === 'out' ? ' out' : ''}">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
 }
 
 // Why a seat isn't a person playing right now.

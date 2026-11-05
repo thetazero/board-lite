@@ -7,7 +7,7 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Game } from '../engine.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
 import { PEAK, nearBeast, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -148,7 +148,7 @@ function toBail(g: Game, raiders: number[]) {
   for (const p of raiders) sendAll(g, p);
   for (const p of g.players.keys()) if (!g.raid!.ready[p]) apply(g, p, 'ready');
 }
-const ready = (d: { stage: number; resting: string; damage: number }) => d.stage > 0 && !d.resting && !d.damage;
+const ready = (d: Dragon) => canRaid(d) && !d.damage;
 
 // Seat p's dragons, replaced by one fresh dragon at each stage given (0 an egg,
 // 3 an adult), each ready to raid; roosts are built beside their land until
@@ -161,7 +161,7 @@ function arm(g: Game, p: number, stages: number[]) {
     g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
   }
   const keys = Object.keys(DRAGONS);
-  stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0, resting: '' }));
+  stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0 }));
 }
 
 // Seat p gets n buildings that roll a die each round (quarries, lumber camps
@@ -536,10 +536,10 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       for (const p of g.players.keys()) arm(g, p, [2]);
-      // The last seat's only dragon cleared a beast this turn, so it sits out
-      // the raid: that player doesn't vote.
+      // The last seat's only dragon was knocked out clearing a beast this
+      // turn, so that player doesn't vote.
       const last = turnOrder(g).at(-1)!;
-      for (const d of g.dragons) if (d.owner === last) d.resting = 'hunted';
+      for (const d of g.dragons) if (d.owner === last) d.damage = DRAGONS[d.key].stages[d.stage - 1].hp;
       toVote(g);
       vote(g, byPower(g)[0], turnOrder(g).slice(0, 2));
     },
@@ -581,8 +581,6 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       const t = g.turn;
       for (const p of g.players.keys()) arm(g, p, [2]);
-      const last = turnOrder(g).at(-1)!;
-      for (const d of g.dragons) if (d.owner === last) d.resting = 'hunted';
       toVote(g);
       vote(g, byPower(g)[0]);
       toBail(g, [t, (t + 1) % 3]);
@@ -1427,18 +1425,18 @@ function wonRaid(g: Game) {
 }
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
-// Player p's dragons, at least young and raid-ready, with this round's lines
-// about them sitting out taken off the log so the feed doesn't contradict them.
+// Player p's dragons, at least young and unhurt, with this round's lines
+// about them healing or going hungry taken off the log so the feed doesn't contradict them.
 function readyDragons(g: Game, p: number) {
   const mine = new Set(g.dragons.filter((x) => x.owner === p).map((d) => d.id));
-  for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), resting: '', damage: 0 });
+  for (const d of g.dragons.filter((x) => x.owner === p)) Object.assign(d, { stage: Math.max(d.stage, 2), damage: 0 });
   g.log = g.log.filter((e) => !(e.ev?.k === 'rest' && mine.has(e.ev.d)));
 }
 
 function beastHunters(g: Game) {
   const p = g.turn;
   g.dragons = g.dragons.filter((d) => d.owner !== p);
-  for (const key of ['frost_wyrm', 'rime_drake', 'ice_whelp']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 3, growth: 0, damage: 0, resting: '' });
+  for (const key of ['frost_wyrm', 'rime_drake', 'ice_whelp']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 3, growth: 0, damage: 0 });
 }
 
 // A building of player q's beside their tower (a Pasture or Lumber Camp on
@@ -1459,7 +1457,7 @@ function perchers(g: Game) {
   const camp = besideTower(g, a, 'lumber_camp');
   g.dragons = [];
   const add = (owner: number, key: string, stage: number, perch?: string, damage = 0) =>
-    g.dragons.push({ id: `d${g.nextId++}`, owner, key, stage, growth: 0, damage, resting: '', ...(perch ? { perch } : {}) });
+    g.dragons.push({ id: `d${g.nextId++}`, owner, key, stage, growth: 0, damage, ...(perch ? { perch } : {}) });
   add(a, 'storm_wyrm', 2, pasture, 5);
   add(b, 'reef_drake', 2, pasture);
   add(p, 'ember_wyrm', 2, camp);
@@ -1475,7 +1473,7 @@ function perchedPasture(g: Game): string {
 
 // The acting player sends every ready dragon against the Thunderbird.
 function huntPeak(g: Game) {
-  const ids = g.dragons.filter((d) => d.owner === g.turn && d.stage > 0 && !d.resting && !d.damage).map((d) => d.id);
+  const ids = g.dragons.filter((d) => d.owner === g.turn && ready(d)).map((d) => d.id);
   apply(g, g.turn, `clear ${PEAK} ${ids.join(' ')}`);
 }
 
@@ -1486,12 +1484,12 @@ function bearHunters(g: Game) {
   const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k] && !g.map[k].fauna)!;
   g.map[open].fauna = 'cave_bear';
   g.dragons = g.dragons.filter((d) => d.owner !== p);
-  for (const key of ['storm_wyrm', 'cinder_drake']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 1, growth: 0, damage: 0, resting: '' });
+  for (const key of ['storm_wyrm', 'cinder_drake']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 1, growth: 0, damage: 0 });
 }
 
 // The acting player sends every ready dragon against the Cave Bear.
 function huntBear(g: Game) {
   const k = Object.keys(g.map).find((x) => g.map[x].fauna === 'cave_bear' && neighbors(g.towers[g.turn]).includes(x))!;
-  const ids = g.dragons.filter((d) => d.owner === g.turn && d.stage > 0 && !d.resting && !d.damage).map((d) => d.id);
+  const ids = g.dragons.filter((d) => d.owner === g.turn && ready(d)).map((d) => d.id);
   apply(g, g.turn, `clear ${k} ${ids.join(' ')}`);
 }

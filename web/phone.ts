@@ -665,7 +665,7 @@ function roost(g: PublicState, me: Me, listed: Set<string>): string {
   return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>` : ''}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
-  return `<button class="dtap" data-dragon="${d.id}" aria-label="${esc(dragonName(d, g.dragons))}: open its card">${dragonChip(d, g.dragons, g.round)}</button>`;
+  return `<button class="dtap${d.status === 'out' ? ' out' : ''}" data-dragon="${d.id}" aria-label="${esc(dragonName(d, g.dragons))}: open its card">${dragonChip(d, g.dragons, g.round)}</button>`;
 }
 
 // ---- action phase ----
@@ -773,7 +773,7 @@ function dragonZoom(g: PublicState, d: DragonView): string {
   const mine = g.dragons.filter((x) => x.owner === d.owner);
   const i = mine.indexOf(d);
   const grow = d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  const resting = d.resting || (d.backIn !== null && !d.canRaid) ? ` ${dragonState(d, g.round)}` : ''; // why it sits out, as the roost says
+  const resting = d.status === 'out' || d.perch ? ` ${dragonState(d)}` : ''; // why it can't fight, as the roost says
   const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${statTag('Health', `${d.hp}/${d.maxHp}`)}` : ''}${resting}`;
   return `<div class="zoom" id="zoom" data-leave="fade">
     <div class="card big k-dragon" data-key="big ${d.id}" style="--kc:${frameColor('dragon', d.element)}">
@@ -805,12 +805,12 @@ function handFan(me: Me, playable: boolean, discarding: boolean, offering = fals
 
 // One of your dragons as an option to tap, the same on every screen that
 // offers dragons: its badge, its name, and under it its stage and `stats`,
-// by default its health, or why it sits out, as the roost says. A dragon
+// by default its health, or why it can't fight, as the roost says. A dragon
 // picked among several (`ticked` given) has a box that ticks when tapped.
 function dragonOption(id: string, attrs: string, stats?: string, ticked?: boolean): string {
   const g = snap!.game!;
   const d = g.dragons.find((x) => x.id === id)!;
-  const now = stats ?? (d.resting || (d.backIn !== null && !d.canRaid) ? dragonState(d, g.round) : d.stage ? statTag('Health', `${d.hp}/${d.maxHp}`) : '');
+  const now = stats ?? (d.status === 'out' || d.perch ? dragonState(d) : d.stage ? statTag('Health', `${d.hp}/${d.maxHp}`) : '');
   const tick = ticked === undefined ? '' : '<i class="tick"></i>';
   return `<button class="dragon pick${ticked ? ' on' : ''}" ${attrs}>${dragonBadge(d, 40)}<span><b>${esc(dragonName(d, g.dragons))}</b><br>${STAGE_LABEL[d.stage]} ${now}</span>${tick}</button>`;
 }
@@ -894,7 +894,7 @@ function huntView(g: PublicState, me: Me): string {
   const beast = h.fauna ? `${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}` : '';
   const ds = perched.map((d) => `<div class="foe"><span class="foe-pic">${dragonBadge(d, 40)}</span><span class="foe-body"><b class="foe-name">${playerTag(d.owner, names)} ${esc(dragonName(d, g.dragons))}</b><span class="foe-stats">${statTag('Health', `${d.hp}/${d.maxHp}`)}${statTag('Attack', esc(d.attack))}</span>${d.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(d.weak)}</span>` : ''}</span></div>`).join('');
   return `<h3 class="huntname">${title}${on}</h3><section class="ptarget">${powerTag(power, 'big')}${beast}${ds ? `<div class="foes">${ds}</div>` : ''}</section>
-    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}` })}`;
+    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? 'You get 1 try each round.' : undefined })}`;
 }
 
 // Choosing dragons to send into a fight, the same on every screen that asks
