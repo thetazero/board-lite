@@ -70,6 +70,10 @@ export const TUNING = {
   specialProjectMultiplier: 2,
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
+  // The starting map is drawn again until the starts with the most and the
+  // fewest usable hexes (a basic building's terrain) within 2 steps of their
+  // tower are at most this many apart (src/map.ts, #303).
+  startLandSlack: 1,
   // In production, each beast of the fauna (not a great beast) has a 1 in this
   // many chance to move to a random adjacent land hex with no tower or beast.
   faunaWanderOdds: 3,

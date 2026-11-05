@@ -103,7 +103,7 @@ function land(): string {
   const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed. The map is drawn again until the towers with the most and the fewest hexes a basic building goes on, within 2 steps, are at most ${TUNING.startLandSlack} apart; which terrain each start has stays random.
 
 ${table(['Terrain', 'For', 'Share of land'], rows)}`;
 }

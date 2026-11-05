@@ -758,7 +758,7 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 3, // seeds 1 and 2 end at a round's end, with no moment between
+    seed: 1, // seeds 2 and 3 end at a round's end, with no moment between
     // The first moment anyone has the points to win: the round plays on to its end.
     until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
     shots: (g) => {

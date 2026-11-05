@@ -1,6 +1,6 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
-import { BEASTS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
+import { BASIC_BUILDINGS, BEASTS, BUILDINGS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
 import { type Rng, next, shuffle } from './rng.ts';
 
 export interface Hex {
@@ -65,7 +65,32 @@ export function ring(d: number): [number, number][] {
   return out;
 }
 
+// Terrain a basic building goes on: the land a start can use.
+const USABLE = new Set(BASIC_BUILDINGS.map((b) => BUILDINGS[b].terrain));
+
+// How many usable hexes lie within 2 steps of each tower.
+export function startLand(hexes: Record<string, Hex>, players: number): number[] {
+  return towerSpots(players).map((t) => {
+    const [tq, tr] = parseKey(t)!;
+    return Object.values(hexes).filter((h) => USABLE.has(h.terrain) && distance(h.q - tq, h.r - tr) <= 2).length;
+  });
+}
+
+// The land is random, so each start has a different mix of terrain to sell,
+// but maps are drawn again until every start has about as much usable land
+// nearby as the others (the best and worst within TUNING.startLandSlack).
 export function generateMap(rng: Rng, players: number): Record<string, Hex> {
+  let hexes: Record<string, Hex>;
+  do hexes = drawLand(rng, players);
+  while (spread(startLand(hexes, players)) > TUNING.startLandSlack);
+  placeBeasts(rng, hexes, players);
+  placeFauna(rng, hexes, players);
+  return hexes;
+}
+
+const spread = (counts: number[]) => Math.max(...counts) - Math.min(...counts);
+
+function drawLand(rng: Rng, players: number): Record<string, Hex> {
   const radius = mapRadius(players);
   const hexes: Record<string, Hex> = {};
   for (let q = -radius - 1; q <= radius + 1; q++) {
@@ -73,8 +98,7 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
       hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : randomTerrain(rng) };
     }
   }
-  // Towers sit on plains; the land around them is as random as the rest, so
-  // players start with different terrain and different things to sell.
+  // Towers sit on plains.
   for (const spot of towerSpots(players)) hexes[spot].terrain = 'plains';
   // One natural harbor on each of the six coasts, somewhere between its
   // corners but not touching a tower: a port is something you build towards.
@@ -86,8 +110,6 @@ export function generateMap(rng: Rng, players: number): Record<string, Hex> {
     const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
     hexes[key(q, r)].terrain = 'harbor';
   }
-  placeBeasts(rng, hexes, players);
-  placeFauna(rng, hexes, players);
   return hexes;
 }
 

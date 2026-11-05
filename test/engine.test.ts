@@ -5,7 +5,7 @@ import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingC
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
-import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '../src/map.ts';
+import { PEAK, distance, generateMap, mapRadius, neighbors, startLand, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
@@ -659,6 +659,25 @@ test('the starting map has fauna, at least 2 steps from every tower, stronger fu
       assert.equal(h.fauna, FAUNA_BY_DISTANCE[Math.min(away - 2, FAUNA_BY_DISTANCE.length - 1)]);
     }
   }
+});
+
+test('every start has about as much usable land within 2 steps, in a different mix', () => {
+  for (let players = 2; players <= 6; players++) {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const g = startingMap(players, seed);
+      const counts = startLand(g.map, players);
+      assert.ok(Math.max(...counts) - Math.min(...counts) <= TUNING.startLandSlack, `${players}p seed ${seed}: ${counts}`);
+      assert.deepEqual(generateMap({ state: seed }, players), g.map, 'the same seed gives the same map');
+    }
+  }
+  // The mix still differs: the starts don't all have the same terrain counts.
+  const g = startingMap(3, 1);
+  const mixes = g.towers.map((t) => {
+    const [tq, tr] = t.split(',').map(Number);
+    const near = Object.values(g.map).filter((h) => distance(h.q - tq, h.r - tr) <= 2);
+    return ['mountain', 'forest', 'ley', 'meadow'].map((terrain) => near.filter((h) => h.terrain === terrain).length).join();
+  });
+  assert.ok(new Set(mixes).size > 1, `mixes ${mixes}`);
 });
 
 test('the great beasts: the Thunderbird on the centre peak, the Leviathan off a harbor, nothing around them', () => {
