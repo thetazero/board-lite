@@ -38,7 +38,9 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **adjacent** | neighbouring, next to, touching | Hexes sharing an edge. The rules' word for what building cards count |
 | **place** (a beast) | put, send | Putting a beast on a hex with Wolf Call or Rouse the Bear |
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
-| **clear** (fauna) | hunt, fight | Sending dragons against a beast on the map |
+| **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
+| **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it makes nothing |
+| **recall** (a perched dragon) | bring back, return, withdraw | Bringing a perched dragon home on your turn |
 | **slay** (a great beast) | kill, defeat | Clearing the Thunderbird or the Leviathan: a great beast is slain, for good |
 | **sit out** | miss, rest, skip | A dragon that can't raid this round |
 | **raid-ready** | fit, able | A hatched, unhurt dragon not sitting out |
@@ -49,7 +51,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **no one** | nobody | No player |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
-| **weak to** / **strong against** (an element) | ×2, ½, resists, shrugs off | A beast or defender that takes double or half damage from an element: "Weak to ice", "Strong against air and lightning" |
+| **weak to** / **strong against** (an element) | ×2, ½, resists, shrugs off | Anything hit (a dragon, defender or beast) that takes double or half damage from an element, by the element chart: "Weak to ice", "Strong against air" |
 | **Health**, **Attack**, **Power** | a heart, swords, a shield | A stat, always said with its name: "Health 10", "Attack 1d6 on 2 targets", "Power 9" |
 | **loot** | prize, reward | What a fight pays, labelled "Loot" beside it |
 | **crystal field** | ley line, ley | The purple terrain crystal comes from, every time. One hex of it is a "crystal field hex" |

@@ -4,7 +4,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
-**Setup.** The land is random and ringed by ocean, with one natural harbor on each coast. Wild **fauna** holds some hexes: wolves 2 steps from the nearest tower, bears 3, a basilisk further out. Two **great beasts**: the Thunderbird on the mountain peak at the centre, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a random base dragon egg. The first player moves 1 seat left each round.
+**Setup.** The land is random and ringed by ocean, with one natural harbor on each coast. Wild **fauna** holds some hexes: wolves 2 steps from the nearest tower, bears 3, a basilisk further out. Two **great beasts**: the Thunderbird on the mountain peak at the centre, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a Fire Dragon egg. The first player moves 1 seat left each round.
 
 ## A round: four phases
 
@@ -14,7 +14,8 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Build** on an empty land hex (no building, no beast) adjacent to one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on crystal field, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor; a monument card goes adjacent to what its card names). Or add a **tower floor** on your tower, no card needed.
    - **Upgrade**: put an upgrade card on one of your buildings of its class. Each building takes 1 upgrade.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
-   - **Clear fauna**: send any of your raid-ready dragons against the beast on any hex. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is empty and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A great beast takes one try per player a round.
+   - **Clear** a hex: send any of your raid-ready dragons against what holds it, its beast and every rival dragon perched there, together. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is empty and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A perched dragon keeps its hits, and one knocked out goes home. A great beast takes one try per player a round.
+   - **Perch**: send any of your raid-ready dragons to perch on a rival's building (not a tower). They stay until you **recall** them on your turn or they're knocked out, and don't raid or clear while there.
    - **Special project** (no card): hatch a base egg of any element, for double the base dragon card's cost.
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. An offer gives or gets something, and you only offer what you have; you can't ask for more gold than the other player has. You may accept an offer only if you both still have what it trades. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
@@ -23,7 +24,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Vote**: everyone secretly votes for one of the kingdoms; ties are a coin flip. Easy kingdoms give almost nothing; hard ones a lot.
    - **Commit**: everyone publicly sends raid-ready dragons (hatched, unhurt, not sitting out) and can change their mind until they say ready. When everyone is ready, commitments lock.
    - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and a dragon that takes a hit sits out raids while it heals. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
-   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
+   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Then each defender hits random dragons. Every hit, either way, follows the **element chart**: what's hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting (rounded down; what's left over goes to the player with the most). After every raid, each kingdom that didn't fall adds 1 gold to its loot, and the one that fell goes back to its printed loot.
 
 **End of round.** Anyone over 7 cards discards down to 7. If anyone has 30 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
@@ -32,7 +33,20 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
-**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and strong against lightning, air and water; the Leviathan is weak to lightning and strong against water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
+**Elements.** Every dragon, defender, beast and great beast has an element: fire, ice, lightning, air, water or neutral. One chart says what each is weak to and strong against, for all of them:
+
+| Element | Weak to | Strong against |
+|---|---|---|
+| fire | water | fire |
+| ice | fire | ice |
+| lightning | ice | lightning |
+| air | ice | air |
+| water | lightning | water |
+| neutral | nothing | nothing |
+
+**Perched dragons.** A building with a dragon perched on it makes nothing, as under a beast. Several dragons may perch on one building, whoever owns them, and they fight together when someone clears it. Perched dragons eat, heal and grow as at home, and a hurt one keeps perching. Nothing stops a tower: no beast or dragon goes on one.
+
+**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is lightning; the Leviathan is water. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
 **Adjacent hexes.** Every building has a class (stone building, timber building, crystal building, livestock building, dragon building, monument or trade building; each basic building that makes a resource is in that resource's class, with the building cards that make the same); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain, built on or not ("each adjacent meadow hex"), or buildings of a class, whoever owns them ("each adjacent livestock building"). The count is always the current one: an adjacent building built later counts too.
 

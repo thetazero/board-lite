@@ -37,8 +37,8 @@ function dragonLine(d: DragonView): string {
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
   const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
   const healing = `healing: can raid again from round ${d.backIn}`;
-  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought fauna: no raids this round${d.hp < d.maxHp ? `; ${healing}` : ''}` };
-  const status = d.canRaid ? 'can raid or fight fauna' : d.stage === 0 ? 'egg, cannot raid' : d.resting ? rest[d.resting] : healing;
+  const rest = { hungry: 'went hungry: no growth or raids this round', hurt: healing, hunted: `fought on the map: no raids this round${d.hp < d.maxHp ? `; ${healing}` : ''}` };
+  const status = d.canRaid ? 'can raid, clear or perch' : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled${d.hp < d.maxHp ? `; ${d.hp}/${d.maxHp}hp` : ''}` : d.resting ? rest[d.resting] : healing;
   return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
@@ -52,6 +52,7 @@ function mapText(g: PublicState): string[] {
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
+  lines.push('Perched dragons show as <ids>: the building there makes nothing while they stay.');
   if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
@@ -60,7 +61,8 @@ function mapText(g: PublicState): string[] {
       const b = h.building;
       const label = b ? `[${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}]` : '';
       const held = h.fauna ? `{${faunaCode(h.fauna.key)}}` : h.held ? '{x}' : '';
-      return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}`;
+      const perched = h.perched.length ? `<${h.perched.map((x) => x.d).join(' ')}>` : '';
+      return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}${perched}`;
     });
     lines.push(`  ${' '.repeat(Math.abs(r) * 4)}${cells.join('  ')}`);
   }
@@ -134,9 +136,15 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       if (b.hexes.length) out.push(`build ${b.key}${b.onTower ? '' : ' <hex>'}   (basic, no card: ${b.text} Costs ${resText(b.cost)}${b.onTower ? '' : `; open hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
     }
     if (you.huntable.length && you.raidReady.length) {
-      const beasts = you.huntable.map((k) => `${k} ${g.map.find((h) => h.k === k)?.fauna?.name ?? 'beast'}`);
-      out.push(`clear <hex> <dragon ids...>   (fight the beast there to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${beasts.join(', ')})`);
+      const foes = you.huntable.map((k) => {
+        const h = g.map.find((x) => x.k === k)!;
+        const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
+        return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
+      });
+      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; those dragons then sit out this round's raids. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
+    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
+    if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
     out.push(`bank <give resource> <get resource> [times]   (your rate: ${you.bankRate}:1)`);
     out.push(`offer <player> give <items> get <items>   (items: "2 stone", card ids like "c12")`);
@@ -239,7 +247,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   });
   out.push(...mapText(g));
   const fauna = g.map.filter((h) => h.fauna).sort((a, b) => (a.k < b.k ? -1 : 1));
-  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna on their turn with "clear <hex> <dragons>"; the loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast.`);
+  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna, or rivals' perched dragons, on their turn with "clear <hex> <dragons>"; a beast's loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast.`);
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
   out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point${g.beasts[0]?.points === 1 ? '' : 's'} for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);

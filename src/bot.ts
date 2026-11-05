@@ -3,7 +3,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  acceptProblem, apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, specialProjectCost,
+  acceptProblem, apply, bankRate, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -50,6 +50,11 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     // With three or more grown dragons ready, now and then try a great beast.
     const beasts = huntable(g, p).filter((k) => BEASTS[g.map[k].fauna!]);
     if (ready.length >= 3 && beasts.length && next(rng) < 0.3) out.push(`clear ${pick(rng, beasts)} ${ready.join(' ')}`);
+    // Now and then, perch a ready dragon on a rival's building, or recall one.
+    const rivals = perchHexes(g, p);
+    if (ready.length && rivals.length && next(rng) < 0.2) out.push(`perch ${pick(rng, rivals)} ${pick(rng, ready)}`);
+    const perched = g.dragons.filter((d) => d.owner === p && d.perch);
+    if (perched.length && next(rng) < 0.3) out.push(`recall ${pick(rng, perched).id}`);
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
     if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);

@@ -7,8 +7,8 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Game } from '../engine.ts';
-import { PEAK, neighbors } from '../map.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Game } from '../engine.ts';
+import { PEAK, nearBeast, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
 import type { Room } from '../server/room.ts';
@@ -1167,7 +1167,7 @@ export const SCENES: Scene[] = [
   },
   {
     // Clearing ordinary fauna (#96): a Cave Bear beside the acting player's
-    // tower and two hatchlings sent against it, lightning (its weakness)
+    // tower and two hatchlings sent against it, lightning
     // and fire. The TV replays the fight as it does a great beast's.
     name: 'fauna-fight-3p',
     players: 3,
@@ -1184,6 +1184,27 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => bearHunters(g),
     shots: () => [{ file: 'tv-fauna-cleared-3p', caption: 'TV: the Cave Bear falls: +4 livestock', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntBear(g2)) }],
+  },
+  {
+    // Perching (#217): two rivals' dragons sit on the acting player's
+    // Pasture, which makes nothing while they're there, and the acting
+    // player has one of their own perched on a rival's Lumber Camp, with three
+    // adults at home to send.
+    name: 'perch-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => perchers(g),
+    shots: (g) => [
+      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, which make nothing", client: 'tv', waitMs: 4800 },
+      { file: 'phone-perch-turn-3p', caption: 'Phone: your turn, with perched dragons to clear, a building to perch on and a dragon to recall', client: 'phone', seat: g!.turn },
+      { file: 'phone-perch-pick-3p', caption: "Phone: choosing a rival's building to perch on", client: 'phone', seat: g!.turn, clicks: ['#perch'] },
+      { file: 'phone-perch-send-3p', caption: 'Phone: choosing dragons to perch there', client: 'phone', seat: g!.turn, clicks: ['#perch', '[data-hex]', '[data-hunter]'] },
+      { file: 'phone-perch-clear-3p', caption: 'Phone: sending dragons against the dragons perched on your Pasture', client: 'phone', seat: g!.turn, clicks: ['#hunt', `[data-hex="${perchedPasture(g!)}"]`, '[data-hunter]'] },
+      { file: 'phone-perch-other-3p', caption: "Phone: a rival's view, their dragon perched on someone else's Pasture", client: 'phone', seat: (g!.turn + 1) % 3 },
+      // Last: the fight changes the game.
+      { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2000, then: (room) => room.mutate((g2) => apply(g2, g2.turn, `clear ${perchedPasture(g2)} ${g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id).join(' ')}`)) },
+    ],
   },
   {
     // Fauna on every terrain and on buildings (#72): a wolf pack, a cave bear
@@ -1411,6 +1432,38 @@ function beastHunters(g: Game) {
   const p = g.turn;
   g.dragons = g.dragons.filter((d) => d.owner !== p);
   for (const key of ['frost_wyrm', 'rime_drake', 'ice_whelp']) g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage: 3, growth: 0, damage: 0, resting: '' });
+}
+
+// A building of player q's beside their tower (a Pasture or Lumber Camp on
+// an open hex made that terrain), built if they have none there yet.
+function besideTower(g: Game, q: number, type: 'pasture' | 'lumber_camp'): string {
+  const mine = neighbors(g.towers[q]).find((k) => g.buildings[k]?.owner === q && g.buildings[k].type === type);
+  if (mine) return mine;
+  const k = neighbors(g.towers[q]).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x))!;
+  delete g.map[k].fauna;
+  g.map[k].terrain = type === 'pasture' ? 'meadow' : 'forest';
+  g.buildings[k] = { type, owner: q, upgrade: null, floors: 0 };
+  return k;
+}
+
+function perchers(g: Game) {
+  const p = g.turn, [a, b] = [(p + 1) % 3, (p + 2) % 3];
+  const pasture = besideTower(g, p, 'pasture');
+  const camp = besideTower(g, a, 'lumber_camp');
+  g.dragons = [];
+  const add = (owner: number, key: string, stage: number, perch?: string, damage = 0) =>
+    g.dragons.push({ id: `d${g.nextId++}`, owner, key, stage, growth: 0, damage, resting: '', ...(perch ? { perch } : {}) });
+  add(a, 'storm_wyrm', 2, pasture, 5);
+  add(b, 'reef_drake', 2, pasture);
+  add(p, 'ember_wyrm', 2, camp);
+  for (const key of ['frost_wyrm', 'fire_whelp', 'bolt_drake']) add(p, key, 3);
+  add(a, 'ice_whelp', 1);
+  add(b, 'air_whelp', 1);
+}
+
+// The acting player's Pasture with rivals perched on it.
+function perchedPasture(g: Game): string {
+  return Object.keys(g.buildings).find((k) => g.buildings[k].owner === g.turn && g.buildings[k].type === 'pasture' && g.dragons.some((d) => d.perch === k && d.owner !== g.turn))!;
 }
 
 // The acting player sends every ready dragon against the Thunderbird.

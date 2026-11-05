@@ -53,6 +53,18 @@ Playtests showed that refusing to trade and taking land first were the only ways
 - Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies; 8 and 4 since the action deck doubled in #201). A beast a card sent gives no loot, so placing one never hands a rival a prize.
 - Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
 
+### Perching dragons
+
+The owner (2026-11-04, #217): "what yorue missing is a very interesting dynamic, if I want to block two tiles I need to split my dragons, but then they can be picked off." Their rules:
+
+- On your turn a dragon may perch on a rival's building instead of raiding or clearing. While one perches there, the building makes nothing, as under a beast. It stays until its owner recalls it or it's driven off.
+- Anyone can attack perched dragons, in the same fight as fauna. Several dragons may perch on one building, from different players too, and they fight together.
+- Perched dragons take damage and heal as anywhere else: "no insta heal like fauna because they are not fauna". A hurt one keeps blocking while it heals.
+- It sits alongside Wolf Call and Rouse the Bear ("alongside"): a rule added without one cut, the owner's call.
+- Nothing can block the wizard tower, neither dragons nor fauna, "to avoid softlock".
+
+Filled in provisionally (reasoning in the PR for #217): a dragon perches only if it's raid-ready, and a recalled one may raid that round if it's unhurt; a perched dragon is driven off by being knocked out, and goes home; clearing a hex fights everything holding it at once (a beast that wandered onto a perched building fights beside the dragons there); your own perched dragons are never your foes, so you can't clear a hex where only yours perch; a perched building keeps its points and dragon room, as under a beast.
+
 ### Great beasts
 
 The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for killing. 1. thunderbird on a mountain at the center of the map (this mountain should have some special modifier) 2. some sea serpent in the ocean". They are the top tier of the fauna.
@@ -169,6 +181,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 - Targeting is simple and automatic; the rule is printed on the dragon card (e.g. lowest health, strongest attacker, random, a unit weak to my element).
 - Dragons and units have health. Dragon health, like its attack stats, depends on life stage; the card lists stats per life stage.
 - Elements: double damage against a unit weak to the attacker's element, half against one strong against it.
+- One element chart for everything that fights (the owner, 2026-11-04, #217): "there should be one list. at the element level, this list is used by anything that has an element, in a shared manner. there is no special dual lane combat system", and a "neutral" element "that is just neutral against everything". Every dragon, defender, beast and great beast has an element, and the chart applies to every hit, whichever side strikes. It was per-unit lists of weaknesses and strengths, and defenders' hits ignored elements. The chart is taken from the elemental creatures: ice is weak to fire; air and lightning to ice; water to lightning; fire to water; each is strong against its own element. Defenders and beasts with no theme are neutral (Militia, Archers, Knights, Wolf Pack, Cave Bear); the Frost Golem is ice, the Storm Griffin air, the Sea Serpent water, the Basilisk fire, the Thunderbird lightning, the Leviathan water.
 - After each round of combat, players get 10 seconds to choose whether to roll to flee. *(Provisionally removed with fleeing, above.)*
 - Healing: healing time scales with health lost, measured in global rounds, and is slow enough that being left in a losing raid stings. The owner (2026-11-03): "I think to make that sting heal times need to be increased (healing rate decreased)".
 - Loot is split among players whose dragons were still fighting at the end, by the combat power each still has fighting. The owner, on the even split: "Also I feel like raiding has a free rider problem, that is un fun? weak players should always just follow the strong one in, and if the strong bails not much happens? wdyt? Like some free rider is good but this feels like a flat dynamic". Their call ("let's try A"): split loot by combat power still standing at the end.
@@ -191,7 +204,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 ## Setup
 
-- Each player starts with a tower hex, some resources, and a starting dragon.
+- Each player starts with a tower hex, some resources, and a Fire Dragon egg. The owner (2026-11-04): every player starts with a Fire Dragon "so nobody has an unfair elemental advantage early" (#217); it was a random base dragon.
 - Tower placement is fixed by player count.
 
 ## Trading
@@ -248,4 +261,4 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.
 - The action card list: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn (extra raid), Secret Hoard (hidden point), plus dragons. Six of the twelve allowed effects.
 - Fauna (provisional, PR for issue #66): three beasts (Wolf Pack, Cave Bear, Basilisk), one per 8 land hexes at the start, none within 1 step of a tower, stronger further from the towers. Clearing happens on your own turn in the action phase, with your own dragons only, and is fought to the end like a raid; the dragons sent sit out that round's raids. A lost fight leaves the beast at full health. "Produces nothing" covers dice and made resources; a building under fauna keeps its points and dragon room. Two fauna cards, one action effect (put a beast on any land hex but a tower): Wolf Call (2 copies) and Rouse the Bear (1 copy), the rarest action cards and among the dearest, gold-heavy. The Basilisk is never sent by a card. (Changed in #139: see "Fauna wanders" above.) Seven of the twelve allowed effects.
-- Great beasts (provisional, PR for issue #67): a great beast holds its own hex and every hex next to it, so one rule covers both "nobody builds on or next to the peak" and the serpent's harbour (no port can be built there, so none works). The sea serpent is the Leviathan, to keep it apart from Tidewatch's Sea Serpent defenders; it sits in the ocean beside a random coast's harbor. The Thunderbird is weak to ice (strong against lightning, air, water), the Leviathan to lightning (strong against water, fire, ice). The peak bonus is +2 to each production building on or next to the peak, a Workshop's worth. One try at a great beast per player per round, across both.
+- Great beasts (provisional, PR for issue #67): a great beast holds its own hex and every hex next to it, so one rule covers both "nobody builds on or next to the peak" and the serpent's harbour (no port can be built there, so none works). The sea serpent is the Leviathan, to keep it apart from Tidewatch's Sea Serpent defenders; it sits in the ocean beside a random coast's harbor. The Thunderbird is weak to ice, the Leviathan to lightning (since #217, as lightning and water on the element chart). The peak bonus is +2 to each production building on or next to the peak, a Workshop's worth. One try at a great beast per player per round, across both.

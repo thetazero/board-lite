@@ -224,6 +224,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${whose(ev.p)} tower ${buildingChip('tower', ev.p)} rises to ${ev.floors} floor${ev.floors === 1 ? '' : 's'}`;
     case 'upgrade': return `${who(ev.p)} adds ${a(ev.name)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
+    case 'perch': {
+      const b = g.map.find((h) => h.k === ev.hex)?.building;
+      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrade ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
+    }
+    case 'recall': return `${who(ev.p)} recalls ${ev.ds.map((id) => dragon(id)).join('')} home`;
     case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
     case 'play': {
       const on = ev.hex ? g.map.find((h) => h.k === ev.hex)?.building : null;
@@ -247,6 +252,8 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
     // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
     case 'cleared': {
+      const home = (ev.home ?? []).map((id) => dragon(id)).join('');
+      if (!ev.fauna) return ev.won ? `${who(ev.p)} drives off ${home} <span class="ok">home</span>` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
       const it = beast(ev.fauna, ev.name);
       const The = it.replace(/^the/, 'The');
       if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
@@ -312,6 +319,7 @@ export function elemWords(es: string[]): string {
 // Why a dragon sits out, or its health. A healing one says how many rounds
 // until it's healed, in words: a bare "Healing 3" leaves "3 what?" (#161).
 export function dragonState(d: DragonView, round: number): string {
+  if (d.perch) return `<em class="st-perched">Perched</em>${d.stage ? hpBar(d.hp, d.maxHp) : ''}`;
   if (d.resting === 'hungry') return '<em class="st-hungry">Hungry</em>';
   if (d.resting === 'hunted') return `<em class="st-hunted">Fought</em>${hpBar(d.hp, d.maxHp)}`;
   if (d.backIn !== null && !d.canRaid) return `<em class="st-healing" title="Can raid again from round ${d.backIn}">${healingText(d.backIn - round)}</em>`;
@@ -431,8 +439,8 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      // Shut down by a beast on it: the building's mark goes grey (the hex's rim keeps its owner).
-      cells.push(`<g transform="translate(${x} ${y})"${h.fauna ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
+      // Shut down by a beast or a perched dragon on it: the building's mark goes grey (the hex's rim keeps its owner).
+      cells.push(`<g transform="translate(${x} ${y})"${h.fauna || h.perched?.length ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
@@ -445,6 +453,9 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
       const [fx, fy, fs] = b ? [x + size * 0.12, y + size * 0.3, size * 0.042] : [x, y, size * (great ? 0.065 : 0.05)];
       cells.push(`<g class="fauna" transform="translate(${fx} ${fy})"><circle r="${fs * 11}" fill="#2b2420" stroke="#efe5cf" stroke-width="${fs * 1.2}" opacity=".9"/><g transform="scale(${fs})">${iconShapes(h.fauna.key)}</g></g>`);
     }
+    // Dragons perched on the building, each a small disc in its element's colour
+    // ringed in its owner's, along the hex's top edge.
+    (h.perched ?? []).forEach((p, i) => cells.push(`<circle cx="${x + (i - (h.perched.length - 1) / 2) * size * 0.34}" cy="${y - size * 0.5}" r="${size * 0.15}" fill="${ELEMENT_COLORS[p.element] ?? '#fff'}" stroke="${PLAYER_COLORS[p.owner]}" stroke-width="${size * 0.07}"/>`));
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
     const label = opts.labels?.[h.k];
     if (label) cells.push(`<g transform="translate(${x} ${y})"><circle r="${size * 0.36}" fill="#fff" stroke="#0009" stroke-width="2"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.42}" font-weight="800" fill="#111">${label}</text></g>`);
