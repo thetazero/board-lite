@@ -663,6 +663,7 @@ button.on:disabled { opacity: 1; }
 .row.big2 > button small { font-size: .7em; font-weight: 600; }
 .row.big2 > button small .chip { margin: 0 .15em; }
 .sent { display: flex; flex-wrap: wrap; align-items: center; gap: .4em; margin-bottom: .6em; padding: .4em .6em; color: var(--text); }
+.sent .sentwho { margin-right: .3em; }
 .stat { display: inline-flex; align-items: baseline; gap: .25em; margin-left: .3em; white-space: nowrap; }
 .stat.power { font-weight: 800; }
 .stat.power.big { font-size: 1.15em; }
