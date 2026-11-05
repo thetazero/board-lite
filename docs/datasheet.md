@@ -224,18 +224,29 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 | Abyss Wyrm | water | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
 | Reef Drake | water | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
 
+The element chart, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: whatever is hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against.
+
+| Element | Weak to | Strong against |
+|---|---|---|
+| fire | water | fire |
+| ice | fire | ice |
+| lightning | ice | lightning |
+| air | ice | air |
+| water | lightning | water |
+| neutral | — | — |
+
 ## Raids
 
 Defenders:
 
-| Unit | Power | Health | Attack (avg) | Strong vs | Weak vs |
-|---|---|---|---|---|---|
-| Militia | 4 | 5 | 1×1d4 (2.5) | — | fire |
-| Archers | 5 | 6 | 1×1d6 (3.5) | — | air |
-| Knights | 7 | 12 | 1×1d8 (4.5) | fire | lightning |
-| Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice, water | fire |
-| Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air, lightning | ice |
-| Sea Serpent | 8 | 14 | 2×1d4 (5) | water, fire | lightning |
+| Unit | Power | Health | Attack (avg) | Element |
+|---|---|---|---|---|
+| Militia | 4 | 5 | 1×1d4 (2.5) | neutral |
+| Archers | 5 | 6 | 1×1d6 (3.5) | neutral |
+| Knights | 7 | 12 | 1×1d8 (4.5) | neutral |
+| Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice |
+| Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air |
+| Sea Serpent | 8 | 14 | 2×1d4 (5) | water |
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
@@ -256,11 +267,11 @@ Healing: a hurt dragon heals 7 health at each production and sits out every roun
 
 Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. New fauna comes only from cards.
 
-| Beast | Health | Attack (avg) | Strong vs | Weak vs | Loot | Starts |
-|---|---|---|---|---|---|---|
-| Wolf Pack | 8 | 1×1d6 (3.5) | — | fire | 2 livestock | 2 steps from the nearest tower |
-| Cave Bear | 16 | 1×1d10 (5.5) | ice | lightning | 4 livestock | 3 steps from the nearest tower |
-| Basilisk | 26 | 2×1d8 (9) | fire, lightning | water, ice | 4 livestock, 2 gold | 4+ steps from the nearest tower |
+| Beast | Health | Attack (avg) | Element | Loot | Starts |
+|---|---|---|---|---|---|
+| Wolf Pack | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
+| Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
+| Basilisk | 26 | 2×1d8 (9) | fire | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 
 On the starting map: one beast per 8 land hexes, none within 1 step of a tower.
 
@@ -275,10 +286,10 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end, and they sit out the round's raids), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round.
 
-| Beast | Health | Attack (avg) | Strong vs | Weak vs | Points | Lives in |
-|---|---|---|---|---|---|---|
-| Thunderbird | 70 | 2×2d8 (18) | lightning, air, water | ice | 4 | the mountain peak at the centre |
-| Leviathan | 80 | 1×3d10 (16.5) | water, fire, ice | lightning | 4 | the ocean beside one harbor |
+| Beast | Health | Attack (avg) | Element | Points | Lives in |
+|---|---|---|---|---|---|
+| Thunderbird | 70 | 2×2d8 (18) | lightning | 4 | the mountain peak at the centre |
+| Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean beside one harbor |
 
 A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 

@@ -1167,7 +1167,7 @@ export const SCENES: Scene[] = [
   },
   {
     // Clearing ordinary fauna (#96): a Cave Bear beside the acting player's
-    // tower and two hatchlings sent against it, lightning (its weakness)
+    // tower and two hatchlings sent against it, lightning
     // and fire. The TV replays the fight as it does a great beast's.
     name: 'fauna-fight-3p',
     players: 3,

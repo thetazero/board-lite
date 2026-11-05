@@ -24,7 +24,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Vote**: everyone secretly votes for one of the kingdoms; ties are a coin flip. Easy kingdoms give almost nothing; hard ones a lot.
    - **Commit**: everyone publicly sends raid-ready dragons (hatched, unhurt, not sitting out) and can change their mind until they say ready. When everyone is ready, commitments lock.
    - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and a dragon that takes a hit sits out raids while it heals. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
-   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Damage is doubled against a defender weak to the dragon's element and halved (at least 1) against one strong against it. Then each defender hits random dragons. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
+   - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Then each defender hits random dragons. Every hit, either way, follows the **element chart**: what's hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting (rounded down; what's left over goes to the player with the most). After every raid, each kingdom that didn't fall adds 1 gold to its loot, and the one that fell goes back to its printed loot.
 
 **End of round.** Anyone over 7 cards discards down to 7. If anyone has 30 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
@@ -33,9 +33,20 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
+**Elements.** Every dragon, defender, beast and great beast has an element: fire, ice, lightning, air, water or neutral. One chart says what each is weak to and strong against, for all of them:
+
+| Element | Weak to | Strong against |
+|---|---|---|
+| fire | water | fire |
+| ice | fire | ice |
+| lightning | ice | lightning |
+| air | ice | air |
+| water | lightning | water |
+| neutral | nothing | nothing |
+
 **Perched dragons.** A building with a dragon perched on it makes nothing, as under a beast. Several dragons may perch on one building, whoever owns them, and they fight together when someone clears it. Perched dragons eat, heal and grow as at home, and a hurt one keeps perching. Nothing stops a tower: no beast or dragon goes on one.
 
-**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and strong against lightning, air and water; the Leviathan is weak to lightning and strong against water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
+**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is lightning; the Leviathan is water. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
 **Adjacent hexes.** Every building has a class (stone building, timber building, crystal building, livestock building, dragon building, monument or trade building; each basic building that makes a resource is in that resource's class, with the building cards that make the same); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain, built on or not ("each adjacent meadow hex"), or buildings of a class, whoever owns them ("each adjacent livestock building"). The count is always the current one: an adjacent building built later counts too.
 

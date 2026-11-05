@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_STRONG, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText } from './engine.ts';
@@ -145,7 +145,11 @@ function dragons(): string {
 
 Each stage: combat power (see Raids), health, targets × dice (average damage a combat round, before elements).
 
-${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}`;
+${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}
+
+The element chart, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: whatever is hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against.
+
+${table(['Element', 'Weak to', 'Strong against'], UNIT_ELEMENTS.map((e) => [e, ELEMENT_WEAK[e].join(', ') || '—', ELEMENT_STRONG[e].join(', ') || '—']))}`;
 }
 
 // Rounds a dragon with this much damage sits out (it heals at each production).
@@ -167,12 +171,12 @@ function raids(): string {
       n1(units.reduce((s, u) => s + avgAttack(u), 0)), cost(t.loot),
     ];
   });
-  const unitRows = Object.values(UNITS).map((u) => [u.name, combatPower(u), u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.strong.join(', ') || '—', u.weak.join(', ') || '—']);
+  const unitRows = Object.values(UNITS).map((u) => [u.name, combatPower(u), u.hp, `${u.targets}×${u.dice}d${u.sides} (${n1(avgAttack(u))})`, u.element]);
   return `## Raids
 
 Defenders:
 
-${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs'], unitRows)}
+${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
@@ -187,14 +191,14 @@ function fauna(): string {
   const unitRows = Object.entries(FAUNA).map(([k, f]) => {
     const at = FAUNA_BY_DISTANCE.indexOf(k);
     const where = at < 0 ? 'cards only' : `${at + 2}${at === FAUNA_BY_DISTANCE.length - 1 ? '+' : ''} steps from the nearest tower`;
-    return [f.name, f.hp, `${f.targets}×${f.dice}d${f.sides} (${n1(avgAttack(f))})`, f.strong.join(', ') || '—', f.weak.join(', ') || '—', cost(f.loot), where];
+    return [f.name, f.hp, `${f.targets}×${f.dice}d${f.sides} (${n1(avgAttack(f))})`, f.element, cost(f.loot), where];
   });
   const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), a.copies]);
   return `## Fauna
 
 Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; those dragons sit out the round's raids, and one that takes a hit sits out the next round's too, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast. New fauna comes only from cards.
 
-${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Loot', 'Starts'], unitRows)}
+${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Loot', 'Starts'], unitRows)}
 
 On the starting map: one beast per ${TUNING.landHexesPerFauna} land hexes, none within 1 step of a tower.
 
@@ -206,7 +210,7 @@ ${table(['Card', 'Sends', 'Cost', 'Copies'], cardRows)}`;
 // The great beasts: their stats, and when a grown dragon can exist.
 function beasts(): string {
   const unitRows = Object.entries(BEASTS).map(([k, b]) => [
-    b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.strong.join(', '), b.weak.join(', '), b.points,
+    b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.element, b.points,
     k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean beside one harbor',
   ]);
   const base = Object.values(DRAGONS).find((d) => d.base)!;
@@ -217,7 +221,7 @@ function beasts(): string {
 
 Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end, and they sit out the round's raids), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
 
-${table(['Beast', 'Health', 'Attack (avg)', 'Strong vs', 'Weak vs', 'Points', 'Lives in'], unitRows)}
+${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 
 A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 

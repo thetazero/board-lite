@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { standInMove } from '../src/bot.ts';
 import { RuleError, apply, canRaid, faunaHexes, newGame, production, waitingOn, type Dragon, type Game } from '../src/engine.ts';
-import { DRAGONS, TUNING } from '../src/data.ts';
+import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_STRONG, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
 import { neighbors } from '../src/map.ts';
@@ -208,4 +208,39 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   assert.ok(seatState(g, 0).huntable.includes(pasture));
   assert.match(view(0), new RegExp(`you can fight: .*${pasture} ${d.id}`));
   assert.ok(h);
+});
+
+test('one element chart for everything that fights; neutral is neutral against everything', () => {
+  for (const x of [...Object.values(UNITS), ...Object.values(FAUNA), ...Object.values(BEASTS)]) assert.ok(UNIT_ELEMENTS.includes(x.element), x.name);
+  for (const d of Object.values(DRAGONS)) assert.ok(UNIT_ELEMENTS.includes(d.element), d.name);
+  assert.deepEqual(ELEMENT_WEAK.neutral, []);
+  assert.deepEqual(ELEMENT_STRONG.neutral, []);
+  for (const e of UNIT_ELEMENTS) {
+    assert.equal(elementalDamage(5, 'neutral', e), 5); // nothing is weak or strong against neutral
+    assert.equal(elementalDamage(5, e, 'neutral'), 5);
+  }
+  for (const e of ELEMENTS) for (const w of ELEMENT_WEAK[e]) assert.equal(elementalDamage(5, w, e), 10);
+  for (const e of ELEMENTS) for (const st of ELEMENT_STRONG[e]) assert.equal(elementalDamage(5, st, e), 2);
+});
+
+// Every hit in a fight between perched fire dragons and the dragons sent at them.
+function fightHits(attacker: string, hunters: number) {
+  const { g, pasture } = perchGame();
+  const fire = addDragon(g, 1, 3);
+  apply(g, 0, 'end');
+  apply(g, 1, `perch ${pasture} ${fire.id}`);
+  apply(g, 1, 'end');
+  toTurnOf(g, 0);
+  const ids = Array.from({ length: hunters }, () => addDragon(g, 0, 3, attacker).id);
+  apply(g, 0, `clear ${pasture} ${ids.join(' ')}`);
+  return g.log.flatMap((e) => (e.ev?.k === 'combat' ? e.ev.hits : []));
+}
+
+test('the chart works both ways when dragons fight dragons: water doubles on fire, fire doubles on ice', () => {
+  // Water against a perched fire dragon: every hit the water dragons land is doubled.
+  const water = fightHits('water_whelp', 1).filter((h) => h.by === 'dragon');
+  assert.ok(water.length && water.every((h) => h.dmg % 2 === 0), `water on fire: ${water.map((h) => h.dmg)}`);
+  // A perched fire dragon defending against ice: every hit it lands is doubled.
+  const fire = fightHits('ice_whelp', 1).filter((h) => h.by === 'unit');
+  assert.ok(fire.length && fire.every((h) => h.dmg % 2 === 0), `fire on ice: ${fire.map((h) => h.dmg)}`);
 });

@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_STRONG, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -45,6 +45,8 @@ export interface DragonView {
   resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't grow either, a hunted one fought fauna
   canRaid: boolean;
   perch: string | null; // the rival's building it perches on
+  weak: string[]; // from the element chart, as for every fighter
+  strong: string[];
   backIn: number | null; // hurt: the round it can raid again
   power: number; // combat power (0 for an egg)
   status: string;
@@ -62,6 +64,7 @@ export interface UnitView {
   maxHp: number;
   attack: string;
   power: number;
+  element: string; // its weaknesses and strengths come from the element chart
   weak: string[];
   strong: string[];
 }
@@ -193,7 +196,7 @@ function dragonView(g: Game, d: Dragon): DragonView {
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
-    canRaid: canRaid(d), perch: d.perch ?? null, backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    canRaid: canRaid(d), perch: d.perch ?? null, weak: ELEMENT_WEAK[def.element], strong: ELEMENT_STRONG[def.element], backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
     key: d.key, stages: stageViews(def),
   };
 }
@@ -204,7 +207,7 @@ function targetView(g: Game, key: string, hp?: number[]): TargetView {
     key, name: t.name, loot: res(lootOf(g, key)), power: targetPower(key),
     units: t.units.map((u, i) => {
       const x = UNITS[u];
-      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong };
+      return { name: x.name, hp: hp ? hp[i] : x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), element: x.element, weak: ELEMENT_WEAK[x.element], strong: ELEMENT_STRONG[x.element] };
     }),
   };
 }
@@ -212,7 +215,7 @@ function targetView(g: Game, key: string, hp?: number[]): TargetView {
 // A beast, with the loot it gives: a card-sent one gives none.
 export function faunaView(key: string, loot: Bundle = faunaDef(key).loot): FaunaView {
   const x = faunaDef(key);
-  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), weak: x.weak, strong: x.strong, loot: res(loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
+  return { key, name: x.name, hp: x.hp, maxHp: x.hp, attack: attackText(x), power: combatPower(x), element: x.element, weak: ELEMENT_WEAK[x.element], strong: ELEMENT_STRONG[x.element], loot: res(loot), ...(BEASTS[key] ? { points: BEASTS[key].points } : {}) };
 }
 
 function sideText(g: Game, s: TradeSide): string {
@@ -260,7 +263,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
-      key, name: x.name, hex: Object.keys(g.map).find((k) => g.map[k].fauna === key) ?? null, slainBy: g.slain[key] ?? null, points: x.points, hp: x.hp, weak: x.weak,
+      key, name: x.name, hex: Object.keys(g.map).find((k) => g.map[k].fauna === key) ?? null, slainBy: g.slain[key] ?? null, points: x.points, hp: x.hp, weak: ELEMENT_WEAK[x.element],
     })),
     peakBonus: TUNING.peakBonus,
     map: Object.entries(g.map).map(([k, h]) => {

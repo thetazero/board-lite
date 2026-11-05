@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
   type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -750,7 +750,7 @@ interface Battle {
 function unitDef(g: Game, u: Battle['units'][number]): UnitDef {
   if (!u.d) return foeDef(u.key);
   const d = dragonById(g, u.d);
-  return { name: dragonName(d), ...stageStats(d)!, strong: [], weak: [] };
+  return { name: dragonName(d), ...stageStats(d)!, element: DRAGONS[d.key].element };
 }
 
 function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
@@ -763,7 +763,7 @@ function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
     order.sort((x, y) => power(y) - power(x));
   }
   if (rule === 'weak_to_me') {
-    const weak = (i: number) => (unitDef(g, b.units[i]).weak.includes(DRAGONS[d.key].element) ? 0 : 1);
+    const weak = (i: number) => (ELEMENT_WEAK[unitDef(g, b.units[i]).element].includes(DRAGONS[d.key].element) ? 0 : 1);
     order.sort((x, y) => weak(x) - weak(y));
   }
   return order.slice(0, n);
@@ -799,10 +799,7 @@ function combatRound(g: Game, b: Battle, round: number) {
     for (const ui of pickTargets(g, b, d, st.targets)) {
       const u = b.units[ui];
       const def = unitDef(g, u);
-      let dmg = rollAttack(g, st);
-      const el = DRAGONS[d.key].element;
-      if (def.weak.includes(el)) dmg *= 2;
-      else if (def.strong.includes(el)) dmg = Math.max(1, Math.floor(dmg / 2));
+      const dmg = elementalDamage(rollAttack(g, st), DRAGONS[d.key].element, def.element);
       u.hp = Math.max(0, u.hp - dmg);
       if (u.d) defenderHit(g, u);
       lines.push(`${d.id} hits ${def.name} #${ui + 1} for ${dmg}${u.hp === 0 ? ' (defeated)' : ''}`);
@@ -815,7 +812,7 @@ function combatRound(g: Game, b: Battle, round: number) {
     const def = unitDef(g, u);
     for (let t = 0; t < def.targets && b.fighters.length; t++) {
       const d = dragonById(g, pick(g.rng, b.fighters));
-      const dmg = rollAttack(g, def);
+      const dmg = elementalDamage(rollAttack(g, def), def.element, DRAGONS[d.key].element);
       d.damage += dmg;
       const down = knockedOut(b, d);
       lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${down ? ' (knocked out, limps home)' : ''}`);
