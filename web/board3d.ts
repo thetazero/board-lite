@@ -1734,7 +1734,9 @@ const canFly = (d: DragonView) => d.status === 'ready';
 
 // walk: a beast that wandered here from the next hex, walking in from `from`
 // (where it stood, from where it stands now) since `at` on the board's clock.
-interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number } }
+// name: a building's name on the TV (namePlate), shown for a while when it's
+// new and at the start of its owner's turn.
+interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number }; name?: { el: HTMLElement; owner: number } }
 
 // A wandering beast turns to face the next hex, walks there, and turns back
 // to face the room (seconds): an unhurried walk, so it's still going when
@@ -1753,6 +1755,32 @@ const MARK = '#ffe27a';
 // up one after another, this many seconds apart, not all in one frame, so
 // the eye can follow each. At most CASCADE_MAX of them wait their turn.
 const CASCADE_S = 0.3, CASCADE_MAX = 8;
+
+// What each building is, written on the board for a while, never for good: a
+// plate with its name (and its upgrade's) at the front of its hex. It shows
+// while the building is new (FRESH_S, with the gold outline) and, for
+// TURN_NAMES_S, at the start of each turn, on every building of the player
+// whose turn it is. Each round names everyone's buildings in turn; between
+// times the board is only the models.
+const TURN_NAMES_S = 10;
+const NAME_AHEAD = 0.62; // how far in front of the hex's centre, in hex radii: on the plate's front edge
+const NAME_FADE_S = 0.4;
+// A plate's opacity `age` seconds into a showing `dur` long: fades in, holds, fades out.
+const showing = (age: number, dur: number) => (age < 0 || age > dur ? 0 : smooth(0, NAME_FADE_S, age) * (1 - smooth(dur - 1.5, dur, age)));
+
+function namePlate(b: NonNullable<HexView['building']>): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'bname';
+  const name = document.createElement('b');
+  name.textContent = b.name;
+  el.append(name);
+  if (b.upgradeName) {
+    const up = document.createElement('span');
+    up.textContent = b.upgradeName;
+    el.append(up);
+  }
+  return el;
+}
 
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
@@ -1786,6 +1814,11 @@ export class Board3D {
   private decorMoves = new Map<string, { old: THREE.Group; now: THREE.Group; at: number }>();
   private map: HexView[] = [];
   private lastT = -Infinity; // the clock at the last frame drawn
+  private names = document.createElement('div'); // each building's name plate (namePlate)
+  // Whose turn it is and since when, for their buildings' names; and the turn
+  // before, whose names fade out from `end`.
+  private turn: { seat: number | null; at: number } = { seat: null, at: -1e9 };
+  private lastTurn: { seat: number | null; at: number; end: number } = { seat: null, at: -1e9, end: -1e9 };
 
   constructor() {
     this.el = document.createElement('div');
@@ -1795,6 +1828,8 @@ export class Board3D {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.append(this.renderer.domElement);
+    this.names.className = 'building-names';
+    this.el.append(this.names);
     GRAIN ??= paperTexture();
     this.plateMats.forEach((m) => (m.map = GRAIN));
 
@@ -1830,6 +1865,11 @@ export class Board3D {
     const sig = g.map.map((h) => `${h.k}${h.terrain}`).join();
     if (sig !== this.mapSig) this.buildMap(g.map, sig);
     const now = clock();
+    if (highlight !== this.turn.seat) {
+      this.lastTurn = { ...this.turn, end: now };
+      // A TV that opens mid-turn shows the names straight away.
+      this.turn = { seat: highlight, at: this.firstUpdate ? now - NAME_FADE_S : now };
+    }
     const animate = !this.firstUpdate;
     // Each hex with something new gets its turn in the cascade; its scenery
     // makes room in step with it.
@@ -1871,6 +1911,7 @@ export class Board3D {
       if (had?.sig === bsig) continue;
       if (had) {
         this.built.delete(h.k);
+        had.name?.el.remove();
         // A building that's gone folds down; one that changed is replaced by the new one folding up.
         if (!b && animate) this.leave(had.obj, now, 'fold');
         else {
@@ -1884,7 +1925,9 @@ export class Board3D {
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
       const at = fresh ? next(h.k) : -1e9;
-      this.built.set(h.k, { sig: bsig, obj, born: at });
+      const name = b.type === 'tower' ? undefined : { el: namePlate(b), owner: b.owner };
+      if (name) this.names.append(name.el);
+      this.built.set(h.k, { sig: bsig, obj, born: at, name });
       if (fresh) this.mark(h, at);
     }
     this.drawTerritory(g.map);
@@ -2110,6 +2153,7 @@ export class Board3D {
     this.tiles.clear();
     for (const k of [...this.marks.keys()]) this.unmark(k);
     this.built.clear();
+    this.names.replaceChildren();
     this.beasts.clear();
     this.dragons.clear();
     this.leaving = [];
@@ -2405,6 +2449,28 @@ export class Board3D {
     this.lastT = t;
     for (const e of this.dragons.values()) this.animateDragon(e, t, jumped);
     this.renderer.render(this.scene, this.camera);
+    this.placeNames(t);
+  }
+
+  // Each building's name plate, at the front of its hex (towards the room),
+  // while it's new or its owner's turn has just begun.
+  private placeNames(t: number) {
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    const p = new THREE.Vector3();
+    const { turn, lastTurn } = this;
+    for (const b of this.built.values()) {
+      if (!b.name) continue;
+      const fresh = showing(t - b.born - 0.6, FRESH_S - 0.6); // once it has folded up
+      const mine = b.name.owner === turn.seat ? showing(t - turn.at, TURN_NAMES_S) : 0;
+      const was = b.name.owner === lastTurn.seat ? showing(lastTurn.end - lastTurn.at, TURN_NAMES_S) * (1 - smooth(0, NAME_FADE_S, t - lastTurn.end)) : 0;
+      const o = Math.max(fresh, mine, was);
+      const el = b.name.el;
+      el.hidden = o <= 0;
+      if (el.hidden) continue;
+      p.set(b.obj.position.x, GROUND, b.obj.position.z + NAME_AHEAD).project(this.camera);
+      el.style.opacity = String(o);
+      el.style.transform = `translate(${((p.x + 1) / 2) * w}px, ${((1 - p.y) / 2) * h}px) translate(-50%, -50%)`;
+    }
   }
 
   // A dragon each frame: where it would be and how it would stand now (posed),

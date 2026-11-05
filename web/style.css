@@ -906,3 +906,11 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .pchosen p { margin: .1em 0; line-height: 1.35; }
 .pchosen .pchead { font-size: 1.05em; }
 .pchosen .pcafter b { color: var(--accent); }
+
+/* A building's name on the 3D board, at the front of its hex, for a while (board3d.ts namePlate). */
+.building-names { position: absolute; inset: 0; pointer-events: none; overflow: hidden; font-size: clamp(10px, 1.3vh, 18px); }
+.bname { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; padding: .1em .4em .12em; border-radius: .3em; background: var(--sheet); color: var(--ink); box-shadow: 0 .1em 0 var(--paper-edge), 0 .2em .5em #0b081a80; line-height: 1.05; text-align: center; }
+.bname[hidden] { display: none; }
+/* A word a line ("Crystal / Mine"), so a name is no wider than its hex on a full board. */
+.bname > b { font-weight: 800; width: min-content; }
+.bname > span { font-size: .85em; color: #8a6a14; font-weight: 700; }
