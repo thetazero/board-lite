@@ -95,7 +95,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   let target = '';
   for (const e of g.log) {
     const ev = e.ev as GameEvent;
-    if ('name' in ev) { const x = ev as { name: string; b?: string; u?: string; card?: string; fauna?: string; t?: string }; NAMES[x.b ?? x.u ?? x.card ?? x.fauna ?? x.t ?? ''] ??= x.name; }
+    if ('name' in ev) { const x = ev as { name: string; b?: string; u?: string; card?: string; fauna?: string | null; t?: string }; NAMES[x.b ?? x.u ?? x.card ?? x.fauna ?? x.t ?? ''] ??= x.name; }
     switch (ev.k) {
       case 'round': if (ev.n > 1) snap(); break;
       case 'mine': {
@@ -137,10 +137,11 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         r.titles[ev.t] = ev.p;
         s.titles.push({ round: e.round, title: ev.t, p: ev.p });
         break;
-      case 'hunt': (s.fauna[ev.fauna] ??= { tried: zeros(n), cleared: zeros(n) }).tried[ev.p]++; break;
+      // A fight against perched dragons alone counts under 'perched'.
+      case 'hunt': (s.fauna[ev.fauna ?? 'perched'] ??= { tried: zeros(n), cleared: zeros(n) }).tried[ev.p]++; break;
       case 'cleared':
-        if (ev.won) s.fauna[ev.fauna].cleared[ev.p]++;
-        if (ev.won && BEASTS[ev.fauna]) r.slain[ev.fauna] = ev.p;
+        if (ev.won) s.fauna[ev.fauna ?? 'perched'].cleared[ev.p]++;
+        if (ev.won && ev.fauna && BEASTS[ev.fauna]) r.slain[ev.fauna] = ev.p;
         break;
       case 'target': target = ev.t; (s.raids.targets[ev.t] ??= { chosen: 0, fell: 0 }).chosen++; break;
       case 'fight': for (const p of ev.ps) s.raids.joined[p]++; break;

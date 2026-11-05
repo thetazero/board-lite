@@ -5,7 +5,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
-  neighbourCount, onPeak, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
@@ -19,6 +19,7 @@ export interface HexView {
   terrain: string;
   building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
+  perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
   peak?: 'held' | 'free'; // the Thunderbird's peak
   peakZone?: boolean; // on or next to the freed peak: a production building here makes more
@@ -43,6 +44,7 @@ export interface DragonView {
   maxHp: number;
   resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't grow either, a hunted one fought fauna
   canRaid: boolean;
+  perch: string | null; // the rival's building it perches on
   backIn: number | null; // hurt: the round it can raid again
   power: number; // combat power (0 for an egg)
   status: string;
@@ -166,7 +168,9 @@ export interface SeatState {
   basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean; why: string | null }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean; why: string | null };
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
-  huntable: string[]; // hexes of the beasts I may fight now (one try at a great beast a round)
+  huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
+  perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
+  perched: string[]; // my perched dragons, to recall
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   myChoice: 'fight' | 'bail' | null;
@@ -185,11 +189,11 @@ const stageViews = (def: DragonDef): DragonStageView[] => def.stages.map((st) =>
 function dragonView(g: Game, d: Dragon): DragonView {
   const def = DRAGONS[d.key];
   const st = stageStats(d);
-  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.resting === 'hungry' ? 'hungry' : d.resting === 'hunted' ? 'hunted' : 'hurt';
+  const status = canRaid(d) ? 'ready' : d.stage === 0 ? 'egg' : d.perch ? 'perched' : d.resting === 'hungry' ? 'hungry' : d.resting === 'hunted' ? 'hunted' : 'hurt';
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, resting: d.resting,
-    canRaid: canRaid(d), backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    canRaid: canRaid(d), perch: d.perch ?? null, backIn: d.stage > 0 && (d.damage > 0 || d.resting === 'hurt') ? backInRound(g, d) : null, power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
     key: d.key, stages: stageViews(def),
   };
 }
@@ -268,6 +272,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
+        perched: perchedOn(g, k).map((d) => ({ d: d.id, owner: d.owner, element: DRAGONS[d.key].element })),
       };
     }),
     dragons: g.dragons.map((d) => dragonView(g, d)),
@@ -378,6 +383,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
+    perchable: perchHexes(g, p),
+    perched: g.dragons.filter((d) => d.owner === p && d.perch).map((d) => d.id),
     cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     myChoice: raid?.choices[p] ?? null,

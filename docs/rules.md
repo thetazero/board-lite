@@ -4,7 +4,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
-**Setup.** The land is random and ringed by ocean, with one natural harbor on each coast. Wild **fauna** holds some hexes: wolves 2 steps from the nearest tower, bears 3, a basilisk further out. Two **great beasts**: the Thunderbird on the mountain peak at the centre, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a random base dragon egg. The first player moves 1 seat left each round.
+**Setup.** The land is random and ringed by ocean, with one natural harbor on each coast. Wild **fauna** holds some hexes: wolves 2 steps from the nearest tower, bears 3, a basilisk further out. Two **great beasts**: the Thunderbird on the mountain peak at the centre, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a Fire Dragon egg. The first player moves 1 seat left each round.
 
 ## A round: four phases
 
@@ -14,7 +14,8 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Build** on an empty land hex (no building, no beast) adjacent to one of your buildings: a basic building, no card needed (quarry on mountain, lumber camp on forest, crystal mine on crystal field, pasture on meadow, or a roost anywhere), or a building card from your hand (a port needs a harbor; a monument card goes adjacent to what its card names). Or add a **tower floor** on your tower, no card needed.
    - **Upgrade**: put an upgrade card on one of your buildings of its class. Each building takes 1 upgrade.
    - **Play** an action card, or hatch a dragon card as an egg (needs a free roost space).
-   - **Clear fauna**: send any of your raid-ready dragons against the beast on any hex. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is empty and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A great beast takes one try per player a round.
+   - **Clear** a hex: send any of your raid-ready dragons against what holds it, its beast and every rival dragon perched there, together. It's a raid's combat (below), fought to the end. Those dragons sit out this round's raids. If the beast falls, the hex is empty and its loot is yours (a beast a card placed has none); if not, it stays, at full health. A perched dragon keeps its hits, and one knocked out goes home. A great beast takes one try per player a round.
+   - **Perch**: send any of your raid-ready dragons to perch on a rival's building (not a tower). They stay until you **recall** them on your turn or they're knocked out, and don't raid or clear while there.
    - **Special project** (no card): hatch a base egg of any element, for double the base dragon card's cost.
    - **Bank**: trade 4 of one resource for 1 of any other (3:1 with a port).
    - **Trade** with other players: resources and cards. Anyone may offer to the acting player and the acting player may offer to anyone. An offer gives or gets something, and you only offer what you have; you can't ask for more gold than the other player has. You may accept an offer only if you both still have what it trades. Accepted trades are binding. The acting player answers every offer made to them before ending their turn; their own open offers expire when it ends.
@@ -31,6 +32,8 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
 **Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
+
+**Perched dragons.** A building with a dragon perched on it makes nothing, as under a beast. Several dragons may perch on one building, whoever owns them, and they fight together when someone clears it. Perched dragons eat, heal and grow as at home, and a hurt one keeps perching. Nothing stops a tower: no beast or dragon goes on one.
 
 **Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is weak to ice and strong against lightning, air and water; the Leviathan is weak to lightning and strong against water, fire and ice. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 

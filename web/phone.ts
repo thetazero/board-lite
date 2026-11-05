@@ -28,7 +28,8 @@ let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, i
 // Picking a hex: what for (`about`: what's being placed, shown under the map).
 let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string } | null = null;
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
-let hunting: { hex: string; chosen: Set<string> } | null = null;
+// Sending dragons to a hex: to clear what holds it, or to perch on a rival's building.
+let hunting: { hex: string; chosen: Set<string>; perch?: boolean } | null = null;
 let openCard: string | null = null;
 let openDragon: string | null = null; // one of your dragons tapped open: its card
 let selected = new Set<string>(); // discard picks
@@ -671,15 +672,23 @@ function actionView(g: PublicState, me: Me): string {
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
   const t = !me.myTurn && tab === 'more' ? 'none' : tab;
   const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
-  // Fauna anywhere on the map, and dragons fit to fight it: clearing is one tap away.
+  // Fauna or rivals' perched dragons anywhere on the map, and dragons fit to
+  // fight them: clearing is one tap away, and so is perching.
   const beasts = g.map.filter((h) => h.fauna && me.huntable.includes(h.k));
-  const clear = me.myTurn && beasts.length && me.raidReady.length
-    ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} Clear fauna</button>` : '';
+  const clear = me.myTurn && me.huntable.length && me.raidReady.length
+    ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} ${beasts.length === me.huntable.length ? 'Clear fauna' : 'Clear'}</button>` : '';
+  const perch = me.myTurn && me.perchable.length && me.raidReady.length ? '<button id="perch" class="huntbtn">Perch</button>' : '';
+  // Your perched dragons, each with its way home.
+  const recall = me.myTurn ? me.perched.map((id) => {
+    const d = g.dragons.find((x) => x.id === id)!;
+    const b = g.map.find((h) => h.k === d.perch)?.building;
+    return `<div class="proj">${dragonBadge(d, 32)}<span class="what"><b>${esc(dragonName(d, g.dragons))}</b><small>Perched on ${b ? `${playerTag(b.owner, names)}'s ${esc(b.name)}` : d.perch}</small></span><button data-recall="${id}">Recall</button></div>`;
+  }).join('') : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
   // End turn sits above an open panel, so a long one (Build & bank runs past the
   // screen) never pushes it down under the hand.
-  return `${incoming}${mine}${tabs}${clear}${end}${content}`;
+  return `${incoming}${mine}${tabs}${clear}${perch}${recall}${end}${content}`;
 }
 
 // "1 dragon", "2 dragons".
@@ -849,16 +858,31 @@ function tradeView(g: PublicState, me: Me): string {
     </section>`;
 }
 
-// Sending dragons against one beast: the beast drawn as a raid's defenders
-// are, with its loot; your fit dragons to pick from, as for a raid.
+// Sending dragons to one hex. To clear it: what holds it (its beast, drawn as
+// a raid's defenders are, with its loot, and any rivals' dragons perched
+// there); your fit dragons to pick from, as for a raid. To perch: the
+// rival's building they'll sit on.
 function huntView(g: PublicState, me: Me): string {
   const h = g.map.find((x) => x.k === hunting!.hex);
-  if (!h?.fauna) return '';
-  const on = h.building ? ` on ${h.building.owner === me.seat ? 'your' : `${playerTag(h.building.owner, names)}'s`} ${esc(h.building.name)}` : '';
+  if (!h) return '';
+  const whose = (p: number) => (p === me.seat ? 'your' : `${playerTag(p, names)}'s`);
+  const on = h.building ? ` on ${whose(h.building.owner)} ${esc(h.building.name)}` : '';
+  const off = '<button id="huntoff" class="big ghost">Cancel</button>';
+  if (hunting!.perch) {
+    if (!h.building) return '';
+    return `<h3 class="huntname">Perch${on}</h3>
+      ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `The ${esc(h.building.name)} makes nothing while your dragons perch there. They don't raid, and stay until you recall them or they're knocked out.` })}`;
+  }
+  const perched = h.perched.filter((x) => x.owner !== me.seat).map((x) => g.dragons.find((d) => d.id === x.d)!).filter(Boolean);
+  if (!h.fauna && !perched.length) return '';
   // A great beast pays in points, for good; it's 1 try each round, to the end.
-  const great = h.fauna.points !== undefined;
-  return `<h3 class="huntname">${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}${on}</h3><section class="ptarget">${powerTag(h.fauna.power, 'big')}${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}</section>
-    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: '<button id="huntoff" class="big ghost">Cancel</button>', note: `Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}` })}`;
+  const great = h.fauna?.points !== undefined;
+  const power = (h.fauna?.power ?? 0) + perched.reduce((s, d) => s + d.power, 0);
+  const title = h.fauna ? `${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}` : 'Clear the perched dragons';
+  const beast = h.fauna ? `${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}` : '';
+  const ds = perched.map((d) => `<div class="foe"><span class="foe-pic">${dragonBadge(d, 40)}</span><span class="foe-body"><b class="foe-name">${playerTag(d.owner, names)} ${esc(dragonName(d, g.dragons))}</b><span class="foe-stats">${statTag('Health', `${d.hp}/${d.maxHp}`)}${statTag('Attack', esc(d.attack))}</span></span></div>`).join('');
+  return `<h3 class="huntname">${title}${on}</h3><section class="ptarget">${powerTag(power, 'big')}${beast}${ds ? `<div class="foes">${ds}</div>` : ''}</section>
+    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `Dragons you send sit out this round's raids.${great ? ' You get 1 try each round.' : ''}` })}`;
 }
 
 // Choosing dragons to send into a fight, the same on every screen that asks
@@ -1293,15 +1317,25 @@ function wire(g: PublicState, me: Me) {
     const cmd = picking!.command(el.dataset.hex!);
     picking = null;
     // Picking a beast to clear opens the dragon choice; everything else is a command.
-    if (cmd.startsWith('hunt ')) hunting = { hex: el.dataset.hex!, chosen: new Set() };
+    const send2 = /^(hunt|perch) /.exec(cmd);
+    if (send2) hunting = { hex: el.dataset.hex!, chosen: new Set(), perch: send2[1] === 'perch' };
     render();
-    if (!cmd.startsWith('hunt ')) send(cmd);
+    if (!send2) send(cmd);
   }));
   on('hunt', () => {
-    const about = '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is empty and its loot is yours.</p>';
-    picking = { title: 'Choose a beast to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
+    const beastsOnly = me.huntable.every((k) => !snap!.game!.map.find((h) => h.k === k)?.perched.some((x) => x.owner !== me.seat));
+    const about = beastsOnly
+      ? '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is empty and its loot is yours.</p>'
+      : '<p class="hint pabout">Tap a hex, then choose the dragons to send against its beast and any rival dragons perched there. Perched dragons knocked out go home.</p>';
+    picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });
+  on('perch', () => {
+    const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It makes nothing while they stay.</p>";
+    picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about };
+    render();
+  });
+  bind('[data-recall]', (el) => send(`recall ${el.dataset.recall}`));
   bind('[data-hunter]', (el) => {
     const id = el.dataset.hunter!;
     if (hunting!.chosen.has(id)) hunting!.chosen.delete(id);
@@ -1309,7 +1343,7 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   on('huntgo', () => {
-    const cmd = `clear ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
+    const cmd = `${hunting!.perch ? 'perch' : 'clear'} ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
     hunting = null;
     render();
     send(cmd);

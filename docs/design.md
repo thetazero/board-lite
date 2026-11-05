@@ -53,6 +53,18 @@ Playtests showed that refusing to trade and taking land first were the only ways
 - Fauna wanders (#139): in production, each beast that isn't a great beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast. The fauna cards send the stronger beasts (Wolf Call a Cave Bear, Rouse the Bear a Basilisk), cost 1 crystal each, and come more often (4 and 2 copies; 8 and 4 since the action deck doubled in #201). A beast a card sent gives no loot, so placing one never hands a rival a prize.
 - Limits: "you want some of this, you explicitly want a bit of this just like in catan, you just don't want to over do it. these action cards should be rarer and more expensive".
 
+### Perching dragons
+
+The owner (2026-11-04, #217): "what yorue missing is a very interesting dynamic, if I want to block two tiles I need to split my dragons, but then they can be picked off." Their rules:
+
+- On your turn a dragon may perch on a rival's building instead of raiding or clearing. While one perches there, the building makes nothing, as under a beast. It stays until its owner recalls it or it's driven off.
+- Anyone can attack perched dragons, in the same fight as fauna. Several dragons may perch on one building, from different players too, and they fight together.
+- Perched dragons take damage and heal as anywhere else: "no insta heal like fauna because they are not fauna". A hurt one keeps blocking while it heals.
+- It sits alongside Wolf Call and Rouse the Bear ("alongside"): a rule added without one cut, the owner's call.
+- Nothing can block the wizard tower, neither dragons nor fauna, "to avoid softlock".
+
+Filled in provisionally (reasoning in the PR for #217): a dragon perches only if it's raid-ready, and a recalled one may raid that round if it's unhurt; a perched dragon is driven off by being knocked out, and goes home; clearing a hex fights everything holding it at once (a beast that wandered onto a perched building fights beside the dragons there); your own perched dragons are never your foes, so you can't clear a hex where only yours perch; dragons have no elemental weakness against each other; a perched building keeps its points and dragon room, as under a beast.
+
 ### Great beasts
 
 The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for killing. 1. thunderbird on a mountain at the center of the map (this mountain should have some special modifier) 2. some sea serpent in the ocean". They are the top tier of the fauna.
@@ -191,7 +203,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 ## Setup
 
-- Each player starts with a tower hex, some resources, and a starting dragon.
+- Each player starts with a tower hex, some resources, and a Fire Dragon egg. The owner (2026-11-04): every player starts with a Fire Dragon "so nobody has an unfair elemental advantage early" (#217); it was a random base dragon.
 - Tower placement is fixed by player count.
 
 ## Trading

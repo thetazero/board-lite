@@ -458,25 +458,37 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   return battle(g, head, dragons, fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
-// A fight against fauna, a great beast or not: one player's dragons against
-// it, to the end, played out like a raid's, then what they got for it. Every
-// fight in the game gets this replay, so the table sees it happen.
+// A fight for a hex: one player's dragons against what holds it (a beast,
+// great or not, and any rival dragons perched there), to the end, played out
+// like a raid's, then what they got for it. Every fight in the game gets this
+// replay, so the table sees it happen.
 function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh: EventView[]): Banner {
   const ev = fresh[sc.at].ev as Extract<EventView['ev'], { k: 'hunt' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'cleared' }>);
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
   const great = g.beasts.some((b) => b.key === ev.fauna);
-  const outcome = !end ? '' : !end.won ? `<h1>The ${esc(end.name)} <span class="no">holds</span></h1>`
+  const home = (end?.home ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
+  const flown = home ? `<div class="spoils"><span>${home}<span class="arrow">➜</span>${HOME}</span></div>` : '';
+  const The = ev.fauna ? `The ${esc(ev.name)}` : 'The perched dragons';
+  const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
     : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
-    : `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>`;
-  const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${icon(ev.fauna, 1.4)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, '', [{ name: ev.name, hp: ev.hp }], rounds, outcome, undefined, sc.ms);
+    : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
+    : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
+  const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? `${icon(ev.fauna, 1.4)} ${esc(ev.name)}` : 'Perched dragons'}`;
+  // Saves from before perching carry one beast and no units.
+  const units = (ev.units ?? [{ name: ev.name, hp: ev.hp }]).map((u) => {
+    const d = u.d ? g.dragons.find((x) => x.id === u.d) : undefined;
+    return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d };
+  });
+  return battle(g, head, dragons, '', units, rounds, outcome, undefined, sc.ms);
 }
 
-function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
+function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number; max?: number; d?: DragonView }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
   const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(d.maxHp, d.maxHp)}</div>`).join('');
-  const foes = units.map((u, i) => `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
+  const foes = units.map((u, i) => u.d
+    ? `<div class="fighter unit" data-u="${i}" style="--pc:${PLAYER_COLORS[u.d.owner]}">${dragonBadge(u.d, 56)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.max ?? u.hp)}</div>`
+    : `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
   const html = `<div class="result fight">
       <h2>${head}</h2>
       <div class="battle"><div class="bside">${side}${fled}</div><div class="bvs"><small>round</small><b class="cround"></b></div><div class="bside foes">${foes}</div></div>
@@ -486,7 +498,7 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
   const play = (el: HTMLElement) => {
     const hp = new Map<string, [number, number]>();
     dragons.forEach((d) => hp.set(`d${d.id}`, [d.maxHp, d.maxHp]));
-    units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.hp]));
+    units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max ?? u.hp]));
     const box = (key: string) => el.querySelector<HTMLElement>(key[0] === 'u' ? `[data-u="${key.slice(1)}"]` : `[data-d="${key.slice(1)}"]`);
     const battle = el.querySelector<HTMLElement>('.battle')!;
     hits.forEach((h, n) => setTimeout(() => {

@@ -1604,7 +1604,7 @@ function schedule(d: DragonEntry): { offset: number; period: number; dur: number
   return { offset: 6 + h * 20, period: 28 + h * 14, dur: d.view.stage === 1 ? 7 : 10 };
 }
 
-const canFly = (d: DragonView) => d.stage > 0 && d.status !== 'hurt' && d.status !== 'hungry';
+const canFly = (d: DragonView) => d.stage > 0 && d.status !== 'hurt' && d.status !== 'hungry' && d.status !== 'perched';
 
 // ---------- the board ----------
 
@@ -2062,6 +2062,7 @@ export class Board3D {
       const tower = towers.get(owner) ?? list[0]?.home ?? new THREE.Vector3();
       let extra = 0;
       for (const d of mine) {
+        if (d.perch) continue; // away on a rival's building (below)
         const p = free.length ? take(d.stage === 0) : null;
         if (p) want.set(d.id, p);
         else {
@@ -2069,6 +2070,17 @@ export class Board3D {
           want.set(d.id, { pos: new THREE.Vector3(tower.x + Math.cos(a) * 0.62, GROUND, tower.z + Math.sin(a) * 0.62), face: a + Math.PI / 2, home: tower });
         }
       }
+    }
+    // Perched dragons stand on the plate of the rival's building they block,
+    // round its front, facing out, so the table sees who's sitting where.
+    for (const h of g.map) {
+      if (!h.perched?.length) continue;
+      const [x, z] = hexXZ(h.q, h.r);
+      const center = new THREE.Vector3(x, 0, z);
+      h.perched.forEach(({ d: id }, i) => {
+        const a = 0.9 + i * 0.85;
+        want.set(id, { pos: new THREE.Vector3(x + Math.cos(a) * 0.6, GROUND, z + Math.sin(a) * 0.6), face: a + Math.PI / 2, home: center });
+      });
     }
     const seen = new Set<string>();
     for (const d of g.dragons) {

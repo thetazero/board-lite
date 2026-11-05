@@ -31,6 +31,9 @@ export interface Dragon {
   // Why the dragon sits out this round's raids: it was hungry (and doesn't
   // grow) or hurt at production, or it already fought fauna this round.
   resting: '' | 'hungry' | 'hurt' | 'hunted';
+  // The rival's building it perches on, if any: that building makes nothing
+  // until the dragon is recalled or driven off.
+  perch?: string;
 }
 
 export interface Player {
@@ -97,8 +100,14 @@ export type GameEvent =
   | { k: 'upgrade'; p: number; u: string; name: string; on: string; hex: string }
   | { k: 'hatch'; p: number; d: string; project?: boolean }
   | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
-  | { k: 'hunt'; p: number; hex: string; fauna: string; name: string; hp: number; ds: string[] } // a player's dragons attack fauna, at full health
-  | { k: 'cleared'; p: number; hex: string; fauna: string; name: string; won: boolean; gain: Bundle; points?: number }
+  // A player's dragons attack what holds a hex: its beast (at full health)
+  // and the rivals' dragons perched there. `units` are the defenders, the
+  // beast first; a perched dragon's carries its id as `d`. `fauna` and `name`
+  // are the beast's, or null and the first perched dragon's name.
+  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; units: { name: string; hp: number; d?: string }[] }
+  | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
+  | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
+  | { k: 'recall'; p: number; ds: string[] }
   | { k: 'wander'; from: string; to: string; fauna: string; name: string } // a beast of the fauna moves 1 hex, in production
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number }
@@ -235,7 +244,18 @@ export function foeDef(k: string): UnitDef {
 }
 
 export function canRaid(d: Dragon): boolean {
-  return d.stage > 0 && !d.resting && d.damage === 0;
+  return d.stage > 0 && !d.resting && d.damage === 0 && !d.perch;
+}
+
+// The dragons perched on hex k.
+export function perchedOn(g: Game, k: string): Dragon[] {
+  return g.dragons.filter((d) => d.perch === k);
+}
+
+// Is the building on hex k making nothing? A beast or a perched dragon on it
+// stops it. Nothing stops a tower.
+export function blocked(g: Game, k: string): boolean {
+  return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
 }
 
 // The round a hurt dragon can raid again: it heals at each production and
@@ -352,7 +372,7 @@ export function production(g: Game, p: number): Record<Resource, { base: number;
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
   for (const r of RESOURCES) out[r].base += TUNING.towerProduction[r] ?? 0;
   for (const { k, b, def, n } of placed(g, p)) {
-    if (g.map[k]?.fauna) continue; // a building under fauna produces nothing
+    if (blocked(g, k)) continue; // a building under a beast or a perched dragon makes nothing
     const up = b.upgrade ? UPGRADES[b.upgrade] : null;
     if (def.produces) {
       out[def.produces.resource].base += def.produces.base;
@@ -451,12 +471,11 @@ export function newGame(players: number, seed: number): Game {
   };
   g.decks.building = buildDeck(g, 'building');
   g.decks.action = buildDeck(g, 'action');
-  const baseDragons = Object.keys(DRAGONS).filter((k) => DRAGONS[k].base);
   for (let p = 0; p < players; p++) {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [], choice: [] });
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: pick(g.rng, baseDragons), stage: TUNING.startingDragonStage, growth: 0, damage: 0, resting: '' });
+    g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0, resting: '' });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins (checked at the end of each round).`, { k: 'begin', players });
   startRound(g);
@@ -720,9 +739,18 @@ function rollAttack(g: Game, a: Attack): number {
 
 // One fight: dragons against foes (a raid's defenders, or one beast of the
 // fauna). The raid keeps its fight in g.raid; clearing fauna uses its own.
+// A defender is a unit or beast by its key, or a perched dragon (`d`, its id,
+// with `key` its card): it fights with its life stage's stats, and the hits
+// it takes stay on it.
 interface Battle {
-  units: { key: string; hp: number }[];
+  units: { key: string; hp: number; d?: string }[];
   fighters: string[];
+}
+
+function unitDef(g: Game, u: Battle['units'][number]): UnitDef {
+  if (!u.d) return foeDef(u.key);
+  const d = dragonById(g, u.d);
+  return { name: dragonName(d), ...stageStats(d)!, strong: [], weak: [] };
 }
 
 function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
@@ -731,11 +759,11 @@ function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
   let order = shuffle(g.rng, alive.slice());
   if (rule === 'lowest_health') order.sort((x, y) => b.units[x].hp - b.units[y].hp);
   if (rule === 'strongest_attacker') {
-    const power = (i: number) => { const u = foeDef(b.units[i].key); return u.targets * u.dice * (u.sides + 1); };
+    const power = (i: number) => { const u = unitDef(g, b.units[i]); return u.targets * u.dice * (u.sides + 1); };
     order.sort((x, y) => power(y) - power(x));
   }
   if (rule === 'weak_to_me') {
-    const weak = (i: number) => (foeDef(b.units[i].key).weak.includes(DRAGONS[d.key].element) ? 0 : 1);
+    const weak = (i: number) => (unitDef(g, b.units[i]).weak.includes(DRAGONS[d.key].element) ? 0 : 1);
     order.sort((x, y) => weak(x) - weak(y));
   }
   return order.slice(0, n);
@@ -753,6 +781,14 @@ function knockedOut(b: Battle, d: Dragon): boolean {
   return true;
 }
 
+// A perched dragon takes its hits like any other; at 0 health it is knocked
+// out and goes home.
+function defenderHit(g: Game, u: Battle['units'][number]) {
+  const d = dragonById(g, u.d!);
+  d.damage = stageStats(d)!.hp - u.hp;
+  if (u.hp === 0) delete d.perch;
+}
+
 function combatRound(g: Game, b: Battle, round: number) {
   const lines: string[] = [];
   const hits: Hit[] = [];
@@ -762,12 +798,13 @@ function combatRound(g: Game, b: Battle, round: number) {
     const st = stageStats(d)!;
     for (const ui of pickTargets(g, b, d, st.targets)) {
       const u = b.units[ui];
-      const def = foeDef(u.key);
+      const def = unitDef(g, u);
       let dmg = rollAttack(g, st);
       const el = DRAGONS[d.key].element;
       if (def.weak.includes(el)) dmg *= 2;
       else if (def.strong.includes(el)) dmg = Math.max(1, Math.floor(dmg / 2));
       u.hp = Math.max(0, u.hp - dmg);
+      if (u.d) defenderHit(g, u);
       lines.push(`${d.id} hits ${def.name} #${ui + 1} for ${dmg}${u.hp === 0 ? ' (defeated)' : ''}`);
       hits.push({ d: d.id, u: ui, by: 'dragon', dmg, down: u.hp === 0 });
     }
@@ -775,7 +812,7 @@ function combatRound(g: Game, b: Battle, round: number) {
   // Then the defenders.
   for (const [ui, u] of b.units.entries()) {
     if (u.hp <= 0) continue;
-    const def = foeDef(u.key);
+    const def = unitDef(g, u);
     for (let t = 0; t < def.targets && b.fighters.length; t++) {
       const d = dragonById(g, pick(g.rng, b.fighters));
       const dmg = rollAttack(g, def);
@@ -826,35 +863,59 @@ function checkRaidOver(g: Game): boolean {
 
 // ---------- fauna ----------
 
-// A player's dragons attack the beast on hex k, in a raid's combat, to the
-// end. Each sits out this round's raids. If the beast falls, the hex is empty
-// and its loot (and a great beast's points, for good) goes to the player; if
-// not, it stays, healed. A player gets one try at a great beast a round.
-function clearFauna(g: Game, p: number, k: string, ds: Dragon[]) {
-  const f = g.map[k].fauna!;
-  const def = faunaDef(f);
-  const great = BEASTS[f];
+// A player's dragons attack what holds hex k, in a raid's combat, to the end:
+// its beast and every rival dragon perched there, together. Each attacker
+// sits out this round's raids. If every defender falls, the beast is gone and
+// its loot (and a great beast's points, for good) goes to the player, and the
+// perched dragons are knocked out and go home. If not, the beast stays,
+// healed; perched dragons keep their hits, and stay unless knocked out. A
+// player gets one try at a great beast a round.
+function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
+  const f = g.map[k].fauna ?? null;
+  const great = f ? BEASTS[f] : undefined;
   if (great) {
     if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: 1 try each round.`);
     g.beastTried[p] = g.round;
   }
   for (const d of ds) d.resting = 'hunted';
-  const b: Battle = { units: [{ key: f, hp: def.hp }], fighters: ds.map((d) => d.id) };
-  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against the ${def.name} at ${k}.`, { k: 'hunt', p, hex: k, fauna: f, name: def.name, hp: def.hp, ds: [...b.fighters] });
-  for (let round = 1; b.units[0].hp > 0 && b.fighters.length; round++) combatRound(g, b, round);
-  const won = b.units[0].hp <= 0;
-  const loot = faunaLoot(g, k);
-  if (won) {
+  const perched = rivalsPerched(g, p, k);
+  const units: Battle['units'] = [
+    ...(f ? [{ key: f, hp: faunaDef(f).hp }] : []),
+    ...perched.map((d) => ({ key: d.key, hp: stageStats(d)!.hp - d.damage, d: d.id })),
+  ];
+  const b: Battle = { units, fighters: ds.map((d) => d.id) };
+  const name = f ? faunaDef(f).name : dragonName(perched[0]);
+  const foes = [...(f ? [`the ${name}`] : []), ...perched.map((d) => `${pname(d.owner)}'s ${dragonName(d)} (${d.id})`)].join(' and ');
+  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}.`, {
+    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}) })),
+  });
+  for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round);
+  const won = b.units.every((u) => u.hp <= 0);
+  const home = perched.filter((d) => !d.perch).map((d) => d.id);
+  const loot = f ? faunaLoot(g, k) : {};
+  if (won && f) {
     delete g.map[k].fauna;
     delete g.map[k].sent;
     gain(g.players[p], loot);
     if (great) g.slain[f] = p;
   }
-  const prize = great ? `${great.points} point${great.points === 1 ? '' : 's'}, for good` : bundleText(loot);
-  const text = won
-    ? great ? `The ${def.name} is slain. ${pname(p)} scores ${prize}.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}` : `The ${def.name} at ${k} falls.${Object.keys(loot).length ? ` ${pname(p)} gains ${prize}.` : ''}`
-    : `The ${def.name} at ${k} holds. ${pname(p)}'s dragons fall back.`;
-  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name: def.name, won, gain: won ? loot : {}, ...(great && won ? { points: great.points } : {}) });
+  const flown = home.length ? ` ${home.join(' ')} ${home.length === 1 ? 'is' : 'are'} driven off and ${home.length === 1 ? 'goes' : 'go'} home.` : '';
+  let text: string;
+  if (!f) text = won ? `${pname(p)}'s dragons win at ${k}.${flown}` : `The dragons at ${k} hold. ${pname(p)}'s dragons fall back.${flown}`;
+  else if (!won) text = `The ${name} at ${k} holds. ${pname(p)}'s dragons fall back.${flown}`;
+  else if (great) text = `The ${name} is slain. ${pname(p)} scores ${great.points} point${great.points === 1 ? '' : 's'}, for good.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}`;
+  else text = `The ${name} at ${k} falls.${Object.keys(loot).length ? ` ${pname(p)} gains ${bundleText(loot)}.` : ''}${flown}`;
+  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name, won, gain: won ? loot : {}, ...(great && won ? { points: great.points } : {}), ...(home.length ? { home } : {}) });
+}
+
+// The dragons of players other than p perched on hex k: what p fights there.
+export function rivalsPerched(g: Game, p: number, k: string): Dragon[] {
+  return perchedOn(g, k).filter((d) => d.owner !== p);
+}
+
+// Where player p's dragons may perch: any rival's building but a tower.
+export function perchHexes(g: Game, p: number): string[] {
+  return Object.keys(g.buildings).filter((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower').sort();
 }
 
 // What clearing the beast on hex k pays: its loot, or nothing if a card sent it.
@@ -893,10 +954,13 @@ export function faunaOnMap(g: Game): string[] {
   return Object.keys(g.map).filter((k) => g.map[k].fauna).sort();
 }
 
-// The beasts player p may fight now: every fauna, and the great beasts
-// unless they have had their try this round.
+// The hexes player p may clear now: every beast of the fauna, the great
+// beasts unless they have had their try this round, and every hex where a
+// rival's dragon perches.
 export function huntable(g: Game, p: number): string[] {
-  return faunaOnMap(g).filter((k) => !BEASTS[g.map[k].fauna!] || g.beastTried[p] !== g.round);
+  const beasts = faunaOnMap(g).filter((k) => !BEASTS[g.map[k].fauna!] || g.beastTried[p] !== g.round);
+  const perched = [...new Set(g.dragons.filter((d) => d.perch && d.owner !== p).map((d) => d.perch!))];
+  return [...new Set([...beasts, ...perched])].sort();
 }
 
 // ---------- commands ----------
@@ -1104,12 +1168,32 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     case 'clear': {
       const coords = parseKey(args[0] ?? '');
       const k = coords ? key(...coords) : '';
-      if (!g.map[k]?.fauna) fail(`There is no fauna at "${args[0] ?? ''}". Fauna is at: ${faunaOnMap(g).join(' ') || 'nowhere'}.`);
+      if (!g.map[k]?.fauna && !rivalsPerched(g, p, k).length) fail(`There is no beast or rival dragon at "${args[0] ?? ''}". Clear: ${huntable(g, p).join(' ') || 'nowhere'}.`);
       const ids = [...new Set(args.slice(1))];
       if (!ids.length) fail(`Send at least one dragon: clear ${k} d1 d4`);
       const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, unhurt, and not sitting out the round).`);
-      return clearFauna(g, p, k, ds);
+      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, unhurt, and not sitting out the round or perched).`);
+      return clearHex(g, p, k, ds);
+    }
+    case 'perch': {
+      const coords = parseKey(args[0] ?? '');
+      const k = coords ? key(...coords) : '';
+      if (!perchHexes(g, p).includes(k)) fail(`Perch on a rival's building (not a tower), like "perch 2,-1 d3". Rivals' buildings: ${perchHexes(g, p).join(' ') || 'none'}.`);
+      const ids = [...new Set(args.slice(1))];
+      if (!ids.length) fail(`Send at least one dragon: perch ${k} d1 d4`);
+      const ds = ids.map((id) => ownDragon(g, p, id));
+      for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't perch (it must be hatched, unhurt, and not sitting out the round or perched).`);
+      for (const d of ds) d.perch = k;
+      const b = g.buildings[k];
+      return log(g, `${pname(p)}'s ${ids.join(' ')} ${ids.length === 1 ? 'perches' : 'perch'} on ${pname(b.owner)}'s ${BUILDINGS[b.type].name} at ${k}: it makes nothing while they stay.`, { k: 'perch', p, hex: k, ds: ids, on: b.type, owner: b.owner });
+    }
+    case 'recall': {
+      const ids = [...new Set(args)];
+      if (!ids.length) fail(`Recall a perched dragon: recall d3`);
+      const ds = ids.map((id) => ownDragon(g, p, id));
+      for (const d of ds) if (!d.perch) fail(`${d.id} isn't perched.`);
+      for (const d of ds) delete d.perch;
+      return log(g, `${pname(p)} recalls ${ids.join(' ')} home.`, { k: 'recall', p, ds: ids });
     }
     case 'project': {
       const what = args[0] ?? '';
@@ -1165,7 +1249,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.resting === 'hunted') fail(`${d.id} fought fauna this round, so it sits out the raids anyway.`);
+          if (d.resting === 'hunted') fail(`${d.id} fought on the map this round, so it sits out the raids anyway.`);
           if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
@@ -1198,7 +1282,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
     }
   }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, bank, offer, accept, decline, cancel, end.`);
+  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, bank, offer, accept, decline, cancel, end.`);
 }
 
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {
