@@ -1501,6 +1501,8 @@ function wonRaid(g: Game) {
   toVote(g);
   vote(g, byPower(g)[0]);
   toBail(g, [a, b]);
+  // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
+  g.dragons.find((d) => d.id === g.raid!.commits[a][0])!.damage = 8;
   apply(g, b, 'fight');
 }
 
