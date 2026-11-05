@@ -369,21 +369,42 @@ export function onPeak(g: Game, k: string): boolean {
   return g.slain.thunderbird !== undefined && (k === PEAK || neighbors(PEAK).includes(k));
 }
 
+// What the building at hex k makes each round, per resource: a fixed amount
+// plus a list of dice. Only the resources it makes, even 0 of (a card with
+// nothing adjacent). What it would make: a beast or a perched dragon on it
+// stops it (blocked()), which this ignores. The tower is left out: its
+// TUNING.towerProduction is the same for everyone.
+export function buildingMakes(g: Game, k: string): Partial<Record<Resource, { base: number; dice: number[] }>> {
+  const b = g.buildings[k];
+  const out: Partial<Record<Resource, { base: number; dice: number[] }>> = {};
+  if (!b || b.type === 'tower') return out;
+  const def = BUILDINGS[b.type];
+  const n = times(g, k, def);
+  const up = b.upgrade ? UPGRADES[b.upgrade] : null;
+  const at = (r: Resource) => (out[r] ??= { base: 0, dice: [] });
+  if (def.produces) {
+    at(def.produces.resource).base += def.produces.base;
+    at(def.produces.resource).dice.push(def.produces.die);
+  }
+  for (const r of RESOURCES) {
+    if (def.makes?.[r] !== undefined || up?.makes?.[r] !== undefined) at(r).base += (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0);
+  }
+  const made = madeResource(def);
+  if (made && up?.baseBonus) at(made).base += up.baseBonus;
+  if (made && onPeak(g, k)) at(made).base += TUNING.peakBonus;
+  return out;
+}
+
 // Public production: fixed amount plus a list of dice, per resource.
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
   for (const r of RESOURCES) out[r].base += TUNING.towerProduction[r] ?? 0;
-  for (const { k, b, def, n } of placed(g, p)) {
+  for (const { k } of placed(g, p)) {
     if (blocked(g, k)) continue; // a building under a beast or a perched dragon makes nothing
-    const up = b.upgrade ? UPGRADES[b.upgrade] : null;
-    if (def.produces) {
-      out[def.produces.resource].base += def.produces.base;
-      out[def.produces.resource].dice.push(def.produces.die);
+    for (const [r, m] of Object.entries(buildingMakes(g, k)) as [Resource, { base: number; dice: number[] }][]) {
+      out[r].base += m.base;
+      out[r].dice.push(...m.dice);
     }
-    for (const r of RESOURCES) out[r].base += (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0);
-    const made = madeResource(def);
-    if (made && up?.baseBonus) out[made].base += up.baseBonus;
-    if (made && onPeak(g, k)) out[made].base += TUNING.peakBonus;
   }
   return out;
 }

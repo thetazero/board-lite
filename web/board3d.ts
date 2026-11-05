@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import type { DragonView, HexView, PublicState } from '../src/state.ts';
-import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS } from './common.ts';
+import { ELEMENT_COLORS, HOLD_COLORS, PLAYER_COLORS, TERRAIN_COLORS, makesTag } from './common.ts';
 
 declare global {
   interface Window {
@@ -1682,6 +1682,10 @@ export class Board3D {
   private decorMoves = new Map<string, { old: THREE.Group; now: THREE.Group; at: number }>();
   private map: HexView[] = [];
   private lastT = -Infinity; // the clock at the last frame drawn
+  // What each building makes each round, a tag on the front of its hex (#251):
+  // HTML over the canvas, so it reads as crisply as the panels.
+  private tagLayer = document.createElement('div');
+  private tags = new Map<string, { el: HTMLElement; html: string; at: THREE.Vector3; x: number; y: number; shown: boolean }>();
 
   constructor() {
     this.el = document.createElement('div');
@@ -1691,6 +1695,8 @@ export class Board3D {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.append(this.renderer.domElement);
+    this.tagLayer.className = 'btags';
+    this.el.append(this.tagLayer);
     GRAIN ??= paperTexture();
     this.plateMats.forEach((m) => (m.map = GRAIN));
 
@@ -1783,6 +1789,7 @@ export class Board3D {
       this.built.set(h.k, { sig: bsig, obj, born: at });
       if (fresh) this.mark(h, at);
     }
+    this.updateTags(g.map);
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
     // arrives, unless it wandered in from the next hex: then it walks over.
@@ -2162,6 +2169,49 @@ export class Board3D {
 
   // ---------- each frame ----------
 
+  // A tag for each building that makes something, kept in step with the map.
+  private updateTags(map: HexView[]) {
+    const keep = new Set<string>();
+    for (const h of map) {
+      const html = makesTag(h);
+      if (!html) continue;
+      keep.add(h.k);
+      let tag = this.tags.get(h.k);
+      if (!tag) {
+        const [x, z] = hexXZ(h.q, h.r);
+        const el = document.createElement('div');
+        el.className = 'btagat';
+        this.tagLayer.append(el);
+        // The hex's front edge, nearest the room, clear of the building.
+        tag = { el, html: '', at: new THREE.Vector3(x, TOP, z + 0.62), x: NaN, y: NaN, shown: true };
+        this.tags.set(h.k, tag);
+      }
+      if (tag.html !== html) tag.el.innerHTML = tag.html = html;
+    }
+    for (const [k, tag] of this.tags) if (!keep.has(k)) {
+      tag.el.remove();
+      this.tags.delete(k);
+    }
+  }
+
+  // Each tag where its hex is on screen; a new building's once it has
+  // folded up.
+  private placeTags(t: number) {
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    const p = new THREE.Vector3();
+    for (const [k, tag] of this.tags) {
+      p.copy(tag.at).project(this.camera);
+      const x = Math.round((p.x + 1) / 2 * w), y = Math.round((1 - p.y) / 2 * h);
+      if (x !== tag.x || y !== tag.y) {
+        tag.el.style.transform = `translate(${x}px, ${y}px)`;
+        tag.x = x;
+        tag.y = y;
+      }
+      const shown = t - (this.built.get(k)?.born ?? -1e9) > 0.7;
+      if (shown !== tag.shown) tag.el.classList.toggle('hidden', !(tag.shown = shown));
+    }
+  }
+
   private resize() {
     const w = this.el.clientWidth, h = this.el.clientHeight;
     if (!w || !h) return;
@@ -2193,6 +2243,10 @@ export class Board3D {
       else lo = mid;
     }
     fits(hi);
+    // How wide a hex is on screen, which the tags are sized by.
+    const a = new THREE.Vector3(center.x - SQ3 / 2, TOP, center.z).project(this.camera);
+    const b = new THREE.Vector3(center.x + SQ3 / 2, TOP, center.z).project(this.camera);
+    this.tagLayer.style.setProperty('--hexw', `${((b.x - a.x) / 2 * w).toFixed(1)}px`);
   }
 
   // The board clock at a point through the first flight a dragon makes (for screenshots).
@@ -2277,6 +2331,7 @@ export class Board3D {
     const jumped = t < this.lastT || t - this.lastT > 0.5;
     this.lastT = t;
     for (const e of this.dragons.values()) this.animateDragon(e, t, jumped);
+    this.placeTags(t);
     this.renderer.render(this.scene, this.camera);
   }
 

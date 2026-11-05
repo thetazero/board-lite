@@ -260,7 +260,7 @@ function renderGame(g: PublicState) {
     const legend = Object.keys(TERRAIN_COLORS).map((t) => `<span><i style="background:${TERRAIN_COLORS[t]}"></i>${TERRAIN_NAMES[t]}</span>`).join('');
     const bLegend = (['tower', 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'port', 'monument'] as const)
       .map((b) => `<span>${buildingIcon(b, 18, '#ddd')}${b.replace('_', ' ')}</span>`).join('');
-    return `${mapSvg(g.map, { size: 40, highlight })}<div class="legend">${legend}</div><div class="legend">${bLegend}</div>`;
+    return `${mapSvg(g.map, { size: 40, highlight, makes: true })}<div class="legend">${legend}</div><div class="legend">${bLegend}</div>`;
   };
   // The board fills the screen, centred; the player cards stand in the
   // columns either side of it, the first half of the table on the left, and

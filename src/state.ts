@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildingMakes, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -17,7 +17,7 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; makes: { r: Resource; base: number; dice: number[] }[] /* what it makes each round, when nothing stops it: a beast or perched dragon on it does (none for the tower) */ } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
@@ -273,7 +273,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors } : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, makes: Object.entries(buildingMakes(g, k)).map(([r, m]) => ({ r: r as Resource, ...m! })) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
         perched: perchedOn(g, k).map((d) => ({ d: d.id, owner: d.owner, element: DRAGONS[d.key].element })),
       };

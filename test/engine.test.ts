@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, backInRound, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingMakes, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -634,6 +634,15 @@ test('a great beast holds the hexes around it: nothing is built there until it f
   apply(g, 0, `build pasture ${ring}`);
   // A production building next to the freed peak makes more.
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock! + TUNING.peakBonus);
+  // The TV tags each building with what it makes (#251): here, its die and the peak's bonus.
+  g.buildings[ring].upgrade = 'workshop';
+  assert.deepEqual(buildingMakes(g, ring), { livestock: { base: TUNING.peakBonus + 2, dice: [4] } });
+  assert.deepEqual(publicState(g, 0).map.find((h) => h.k === ring)!.building!.makes, [{ r: 'livestock', base: TUNING.peakBonus + 2, dice: [4] }]);
+  assert.deepEqual(buildingMakes(g, g.towers[0]), {}); // the tower's own production is the same for everyone: no tag
+  // A beast on it stops it, but the tag still says what it would make.
+  g.map[ring].fauna = 'wolf_pack';
+  assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock!);
+  assert.deepEqual(buildingMakes(g, ring).livestock?.dice, [4]);
 });
 
 test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {

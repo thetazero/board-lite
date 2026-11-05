@@ -300,6 +300,22 @@ export function incomeText(x: { base: number; dice: number[] }): string {
   return parts.join(' ');
 }
 
+// What one building makes each round, as its card says it: "1d4", "1d4+2", "3".
+export function makesText(m: { base: number; dice: number[] }): string {
+  const dice = [...new Set(m.dice)].sort((a, b) => b - a).map((s) => `${m.dice.filter((d) => d === s).length}d${s}`);
+  return [...dice, ...(m.base || !dice.length ? [String(m.base)] : [])].join('+');
+}
+
+// A building's tag on the board: each resource it makes, its icon and how
+// many. Greyed, with the amount struck through, while a beast or a perched
+// dragon stops it.
+export function makesTag(h: HexView): string {
+  const ms = h.building?.makes ?? [];
+  if (!ms.length) return '';
+  const off = !!h.fauna || h.perched.length > 0;
+  return `<span class="btag${off ? ' off' : ''}">${ms.map((m) => `<span>${icon(m.r, 1.2)}<b>${makesText(m)}</b></span>`).join('')}</span>`;
+}
+
 // Combat power: one rough number per dragon or kingdom; a side's add up.
 export function powerTag(n: number, cls = '', label = 'Power'): string {
   return `<span class="stat power ${cls}" title="combat power">${label} <b>${n}</b></span>`;
@@ -372,6 +388,7 @@ export interface MapOptions {
   highlight?: number | null; // a player whose buildings are emphasised
   coords?: boolean;
   labels?: Record<string, string>; // short text shown on hexes, like a count
+  makes?: boolean; // tag each building with what it makes each round, as the TV's board does
 }
 
 // The map as an SVG string. Selectable hexes carry data-hex for click handlers.
@@ -420,6 +437,20 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     // ringed in its owner's, along the hex's top edge.
     (h.perched ?? []).forEach((p, i) => cells.push(`<circle cx="${x + (i - (h.perched.length - 1) / 2) * size * 0.34}" cy="${y - size * 0.5}" r="${size * 0.15}" fill="${ELEMENT_COLORS[p.element] ?? '#fff'}" stroke="${PLAYER_COLORS[p.owner]}" stroke-width="${size * 0.07}"/>`));
     if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
+    // What the building makes each round, on a tag along the hex's bottom (as makesTag).
+    if (opts.makes && b?.makes.length) {
+      const off = !!h.fauna || h.perched.length > 0;
+      const fs = size * 0.34;
+      const parts = b.makes.map((m) => ({ r: m.r, t: makesText(m) }));
+      const w = parts.reduce((s, x) => s + fs * (1.15 + 0.6 * x.t.length), 0) + fs * 0.4;
+      let cx = x - w / 2 + fs * 0.2;
+      const bits = parts.map((x0) => {
+        const g = `<g transform="translate(${cx + fs * 0.5} ${y + size * 0.64}) scale(${fs / 20})">${iconShapes(x0.r)}</g><text x="${cx + fs * 1.05}" y="${y + size * 0.64}" dy="0.36em" font-size="${fs}" font-weight="800" fill="#2b2228"${off ? ' text-decoration="line-through"' : ''}>${x0.t}</text>`;
+        cx += fs * (1.15 + 0.6 * x0.t.length);
+        return g;
+      });
+      cells.push(`<g${off ? ' style="filter:grayscale(1)" opacity=".8"' : ''}><rect x="${x - w / 2}" y="${y + size * 0.64 - fs * 0.7}" width="${w}" height="${fs * 1.4}" rx="${fs * 0.35}" fill="#f1e7d0" stroke="#0007" stroke-width="1"/>${bits.join('')}</g>`);
+    }
     const label = opts.labels?.[h.k];
     if (label) cells.push(`<g transform="translate(${x} ${y})"><circle r="${size * 0.36}" fill="#fff" stroke="#0009" stroke-width="2"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.42}" font-weight="800" fill="#111">${label}</text></g>`);
     if (opts.coords) cells.push(`<text x="${x}" y="${y + size * 0.82}" text-anchor="middle" font-size="${size * 0.22}" fill="#0009">${h.k}</text>`);
