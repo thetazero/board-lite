@@ -693,6 +693,15 @@ function eligibleDragons(g: Game, p: number): Dragon[] {
   return g.dragons.filter((d) => d.owner === p && canRaid(d));
 }
 
+// Only a player with a raid-ready dragon votes on the target: the others
+// couldn't send anything to it. Nothing changes a dragon during the vote, so
+// this holds from the vote's start to its end.
+export function canVote(g: Game, p: number): boolean {
+  return eligibleDragons(g, p).length > 0;
+}
+
+export const NO_VOTE = "You have no raid-ready dragon, so you don't vote.";
+
 function resolveVote(g: Game) {
   const raid = g.raid!;
   const counts = raid.candidates.map((_, i) => raid.votes.filter((v) => v === i).length);
@@ -700,7 +709,7 @@ function resolveVote(g: Game) {
   const tied = raid.candidates.filter((_, i) => counts[i] === best);
   raid.target = tied.length > 1 ? pick(g.rng, tied) : tied[0];
   const target: GameEvent = { k: 'target', t: raid.target, name: TARGETS[raid.target].name, votes: counts, coin: tied.length > 1 };
-  log(g, `Votes: ${raid.votes.map((v, p) => `${pname(p)}→${TARGETS[raid.candidates[v!]].name}`).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
+  log(g, `Votes: ${raid.votes.flatMap((v, p) => (v === null ? [] : [`${pname(p)}→${TARGETS[raid.candidates[v]].name}`])).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
   log(g, `The raid target is ${TARGETS[raid.target].name}${tied.length > 1 ? ' (tie broken by a coin flip)' : ''}.`, target);
   raid.step = 'commit';
   for (let p = 0; p < g.players.length; p++) raid.ready[p] = eligibleDragons(g, p).length === 0;
@@ -1299,13 +1308,14 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {
   const raid = g.raid!;
   if (raid.step === 'vote') {
+    if (!canVote(g, p)) fail(NO_VOTE);
     if (verb !== 'vote') fail(`Vote for the raid target: vote 1..${raid.candidates.length}.`);
     if (raid.votes[p] !== null) fail(`You already voted.`);
     const i = Number(args[0]) - 1;
     if (!(i >= 0 && i < raid.candidates.length)) fail(`Vote 1..${raid.candidates.length}.`);
     raid.votes[p] = i;
     log(g, `${pname(p)} votes for ${TARGETS[raid.candidates[i]].name}.`, { k: 'voted', p, t: raid.candidates[i] });
-    if (raid.votes.every((v) => v !== null)) resolveVote(g);
+    if (raid.votes.every((v, q) => v !== null || !canVote(g, q))) resolveVote(g);
     return;
   }
   if (raid.step === 'commit') {
@@ -1413,7 +1423,7 @@ export function waitingOn(g: Game): number[] {
   if (g.phase === 'discard') return all.filter((p) => g.players[p].hand.length > TUNING.handCap);
   if (g.phase === 'cards') return all.filter((p) => g.players[p].choice.length);
   const raid = g.raid!;
-  if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null);
+  if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null && canVote(g, p));
   if (raid.step === 'commit') return all.filter((p) => !raid.ready[p]);
   return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
 }

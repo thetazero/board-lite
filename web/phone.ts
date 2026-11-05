@@ -993,8 +993,9 @@ function raidView(g: PublicState, me: Me): string {
   const dragon = (id: string) => g.dragons.find((d) => d.id === id)!;
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragon(id).power, 0);
   if (raid.step === 'vote') {
-    const voted = me.myVote !== null;
-    return raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names,
+    const voted = me.myVote !== null || !!me.whyNoVote;
+    const why = me.whyNoVote ? `<p class="hint">${esc(me.whyNoVote)}</p>` : '';
+    return why + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names,
       { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
   if (raid.step === 'commit') {

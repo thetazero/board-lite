@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -79,6 +79,7 @@ export interface RaidView {
   step: 'vote' | 'commit' | 'bail';
   candidates: TargetView[];
   votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
+  voters: boolean[]; // who votes: only players with a raid-ready dragon
   target: TargetView | null; // units carry current health once the fight starts
   commits: string[][];
   ready: boolean[];
@@ -174,6 +175,7 @@ export interface SeatState {
   perched: string[]; // my perched dragons, to recall
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
+  whyNoVote: string | null; // why you don't vote on the raid target, when you don't
   myChoice: 'fight' | 'bail' | null;
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
@@ -282,6 +284,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       step: raid.step,
       candidates: raid.candidates.map((t) => targetView(g, t)),
       votes: [...raid.votes],
+      voters: Array.from({ length: n }, (_, p) => canVote(g, p)),
       target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
       commits: raid.commits,
       ready: raid.ready,
@@ -388,6 +391,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     perched: g.dragons.filter((d) => d.owner === p && d.perch).map((d) => d.id),
     cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
+    whyNoVote: raid?.step === 'vote' && !canVote(g, p) ? NO_VOTE : null,
     myChoice: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
     talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),

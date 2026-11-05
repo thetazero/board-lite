@@ -357,7 +357,7 @@ function renderRaid(g: PublicState) {
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
       <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names)).join('')}</div>
-      <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.votes[p] !== null)}`).join(' ')}</div>`;
+      <div class="status">${names.flatMap((_, p) => (raid.voters[p] ? [`${playerTag(p, names)} ${check(raid.votes[p] !== null)}`] : [])).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
     // Each player's dragons that could go, the sent ones lit; a roost for
     // anyone keeping theirs home; a tick once they're ready.

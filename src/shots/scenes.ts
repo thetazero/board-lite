@@ -134,9 +134,9 @@ function toVote(g: Game) {
 
 // The raid's targets, weakest first.
 const byPower = (g: Game) => [...g.raid!.candidates].sort((a, b) => targetPower(a) - targetPower(b));
-// Seats in `who` vote for target t (all who haven't voted, by default).
+// Seats in `who` vote for target t (all who haven't voted and have a vote, by default).
 function vote(g: Game, t: string, who = g.players.map((_, p) => p)) {
-  for (const p of who) if (g.raid!.votes[p] === null) apply(g, p, `vote ${g.raid!.candidates.indexOf(t) + 1}`);
+  for (const p of who) if (g.raid?.step === 'vote' && waitingOn(g).includes(p)) apply(g, p, `vote ${g.raid.candidates.indexOf(t) + 1}`);
 }
 // Seat p sends every dragon able to raid, and locks in.
 function sendAll(g: Game, p: number) {
@@ -536,13 +536,18 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       for (const p of g.players.keys()) arm(g, p, [2]);
+      // The last seat's only dragon cleared a beast this turn, so it sits out
+      // the raid: that player doesn't vote.
+      const last = turnOrder(g).at(-1)!;
+      for (const d of g.dragons) if (d.owner === last) d.resting = 'hunted';
       toVote(g);
       vote(g, byPower(g)[0], turnOrder(g).slice(0, 2));
     },
     shots: (g) => [
-      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted', client: 'tv', sizes: true },
-      { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] === null), sizes: true },
+      { file: 'tv-raid-vote-5p', caption: 'TV, raid vote (5 players): two have voted, one has no vote', client: 'tv', sizes: true },
+      { file: 'phone-raid-vote-5p', caption: 'Phone: voting for the target', client: 'phone', seat: seatWhere(g!, (p) => waitingOn(g!).includes(p)), sizes: true },
       { file: 'phone-raid-voted-5p', caption: 'Phone: voted, waiting', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.votes[p] !== null) },
+      { file: 'phone-raid-no-vote-5p', caption: 'Phone: no raid-ready dragon, so no vote', client: 'phone', seat: turnOrder(g!).at(-1)! },
     ],
   },
   {
@@ -576,6 +581,8 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       const t = g.turn;
       for (const p of g.players.keys()) arm(g, p, [2]);
+      const last = turnOrder(g).at(-1)!;
+      for (const d of g.dragons) if (d.owner === last) d.resting = 'hunted';
       toVote(g);
       vote(g, byPower(g)[0]);
       toBail(g, [t, (t + 1) % 3]);

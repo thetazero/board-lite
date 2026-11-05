@@ -88,7 +88,8 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   if (raid.step === 'vote') {
     out.push('Raid: vote for a target. Candidates:');
     raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(t)}`));
-    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)} ${v === null ? 'not yet' : v + 1}`).join(', ')}`);
+    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)} ${v !== null ? v + 1 : raid.voters[q] ? 'not yet' : 'no vote (no raid-ready dragon)'}`).join(', ')}`);
+    if (you?.whyNoVote) out.push(`  ${you.whyNoVote}`);
     return out;
   }
   out.push(`Raid target: ${targetText(raid.target!)}`);
@@ -163,7 +164,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     return out;
   }
   const raid = g.raid;
-  if (raid?.step === 'vote') out.push(`vote <1-${raid.candidates.length}>`);
+  if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
   if (raid?.step === 'commit') {
     out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
     out.push('ready   (lock in your commitment)');

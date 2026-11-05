@@ -154,6 +154,26 @@ test('votes are public as cast; fight-or-bail choices stay secret until revealed
   assert.match(playerView(g, 1, 1000), /falls\.|holds\./);
 });
 
+test('only a player with a raid-ready dragon votes, and one without is told why', () => {
+  const g = newGame(3, 5);
+  g.dragons.filter((d) => d.owner !== 2).forEach((d) => (d.stage = Math.max(d.stage, 1)));
+  assert.ok(!g.dragons.some((d) => d.owner === 2 && canRaid(d)));
+  advanceToRaidVote(g);
+  assert.equal(g.raid!.step, 'vote');
+  assert.deepEqual(waitingOn(g), [0, 1]);
+  assert.deepEqual(publicState(g).raid!.voters, [true, true, false]);
+  assert.throws(() => apply(g, 2, 'vote 1'), /no raid-ready dragon, so you don't vote/);
+  const view = playerView(g, 2, 1000);
+  assert.ok(view.includes("You have no raid-ready dragon, so you don't vote."));
+  assert.ok(!/^\s*vote </m.test(view));
+  assert.equal(seatState(g, 0).whyNoVote, null);
+  apply(g, 0, 'vote 1');
+  apply(g, 1, 'vote 2');
+  // Both voters voted: a coin flip picks the target, without waiting on P3.
+  assert.equal(g.raid!.step, 'commit');
+  assert.deepEqual(waitingOn(g), [0, 1]);
+});
+
 test('everyone starts with an egg, and a raid nobody can fight is skipped', () => {
   const g = newGame(3, 5);
   assert.ok(g.dragons.every((d) => d.stage === TUNING.startingDragonStage));
