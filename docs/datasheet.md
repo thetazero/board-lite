@@ -56,8 +56,8 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Healing Potion | action card | 8 | 9% |
 | War Horn | action card | 6 | 7% |
 | Secret Hoard | action card | 8 | 9% |
-| Wolf Call | action card | 8 | 9% |
-| Rouse the Bear | action card | 4 | 5% |
+| Rouse the Bear | action card | 8 | 9% |
+| Wake the Basilisk | action card | 4 | 5% |
 | Fire Dragon | base dragon | 2 | 2% |
 | Ice Dragon | base dragon | 2 | 2% |
 | Lightning Dragon | base dragon | 2 | 2% |
@@ -114,8 +114,8 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | action | 8 | nothing | Worth 2 points while in your hand. | 2 |
-| Wolf Call | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
-| Rouse the Bear | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Wake the Basilisk | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
 | Ice Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | — |
 | Lightning Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | — |
@@ -279,8 +279,8 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 | Card | Sends | Cost | Copies |
 |---|---|---|---|
-| Wolf Call | Cave Bear | 1 crystal | 8 |
-| Rouse the Bear | Basilisk | 1 crystal | 4 |
+| Rouse the Bear | Cave Bear | 1 crystal | 8 |
+| Wake the Basilisk | Basilisk | 1 crystal | 4 |
 
 ## Great beasts
 

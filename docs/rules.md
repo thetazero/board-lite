@@ -31,7 +31,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
-**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Wolf Call places a Cave Bear, Rouse the Bear a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
+**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Rouse the Bear places a Cave Bear, Wake the Basilisk a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
 **Elements.** Every dragon, defender, beast and great beast has an element: fire, ice, lightning, air, water or neutral. On the element wheel each element beats exactly one other:
 

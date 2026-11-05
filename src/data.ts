@@ -196,8 +196,8 @@ export const ACTIONS: Record<string, ActionDef> = {
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', amount: 2, cost: {}, text: 'Worth 2 points while in your hand.', copies: 8 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
-  wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 8 },
-  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'basilisk', cost: { crystal: 1 }, text: 'Place a Basilisk on any land hex with no tower or beast.', copies: 4 },
+  rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 8 },
+  wake_basilisk: { name: 'Wake the Basilisk', effect: 'send_fauna', fauna: 'basilisk', cost: { crystal: 1 }, text: 'Place a Basilisk on any land hex with no tower or beast.', copies: 4 },
 };
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';

@@ -48,7 +48,7 @@ Action phase, on your turn:
 | `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost`; `build tower_floor` adds a floor to your tower (no hex) |
 | `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
 | `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
-| `play c40 2,-1` | play a fauna card (Wolf Call, Rouse the Bear): put its beast on hex 2,-1 |
+| `play c40 2,-1` | play a fauna card (Rouse the Bear, Wake the Basilisk): put its beast on hex 2,-1 |
 | `clear 2,-1 d3 d7` | send your raid-ready dragons d3 and d7 against what holds 2,-1 (its beast and any rival dragons perched there); they sit out this round's raids |
 | `perch 2,-1 d3` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it makes nothing while d3 stays, and d3 doesn't raid |
 | `recall d3` | bring your perched dragon d3 home |
