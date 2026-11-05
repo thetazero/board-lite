@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRates, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -169,8 +169,9 @@ export interface SeatState {
   dragonCapacity: number;
   // What a round brings in, per resource: production minus what the dragons
   // eat. A fixed amount plus dice, the same every round until something is
-  // built or hatched.
-  income: Record<Resource, { base: number; dice: number[] }>;
+  // built or hatched. blocked: one of your buildings that makes it is shut
+  // down (a beast or a perched dragon on it), so it brings in less than it could.
+  income: Record<Resource, { base: number; dice: number[]; blocked: boolean }>;
   hand: CardView[];
   choice: CardView[]; // building cards drawn this round, to keep one
   handCap: number;
@@ -383,7 +384,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const raid = g.raid;
   const housed = g.dragons.filter((d) => d.owner === p).length;
   const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
-  const income = production(g, p);
+  const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
+  const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, blocked: shut.has(r) }])) as SeatState['income'];
   income.livestock.base -= housed * TUNING.livestockPerDragon;
   return {
     seat: p,

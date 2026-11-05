@@ -545,7 +545,8 @@ function header(g: PublicState, me: Me): string {
   // Each token with what a round brings in under it, upkeep taken off.
   const res = RESOURCES.map((r) => {
     const inc = me.income[r];
-    const sign = inc.base < 0 ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
+    // Red when a beast or a perched dragon shuts down one of your buildings that makes it (#298).
+    const sign = inc.base < 0 || inc.blocked ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
     return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}</small></div>`;
   }).join('');
   // Points held as cards in the hand count too: said in words, so it can't read as a card count.

@@ -1158,6 +1158,11 @@ export const SCENES: Scene[] = [
         frames: [0, 0.2, 0.4, 0.6, 0.9],
       },
       { file: 'phone-fauna-turn-3p', caption: 'Phone: your turn, with fauna to clear', client: 'phone', seat: g!.turn },
+      {
+        // The bear's on this player's building: what it makes reads red in their header (#298).
+        file: 'phone-fauna-blocked-3p', caption: 'Phone: a beast on one of your buildings: what it makes reads red', client: 'phone',
+        seat: g!.buildings[Object.keys(g!.map).find((k) => g!.map[k].fauna === 'cave_bear')!].owner,
+      },
       { file: 'phone-fauna-pick-3p', caption: 'Phone: choosing which beast to clear', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
       { file: 'phone-fauna-send-3p', caption: 'Phone: choosing dragons to send against it', client: 'phone', seat: g!.turn, clicks: ['#hunt', '[data-hex]', '[data-hunter]'] },
       { file: 'phone-fauna-card-3p', caption: 'Phone: a fauna card opened', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
