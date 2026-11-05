@@ -1250,7 +1250,9 @@ function gameOver(g: PublicState, me: Me): string {
 // pick it). A plain tap does what it always did.
 type Grip = { id: string; x0: number; y0: number; x: number; y: number; moved: boolean; lift: { x: number; y: number } | null; top: number; strips: { id: string; left: number; width: number }[]; hold: number };
 let grip: Grip | null = null;
-let swallowClick = 0; // a click until then ends a slide or a hold, not a tap
+let swallowClick = 0; // a click until then ends a swipe, not a tap
+let held = false; // a hold opened a card, and the finger is still down
+let eatClick = 0; // the click that ends a press on the hand, until then: handled when it let go
 let swipe: { x: number; y: number } | null = null; // a finger down on an open card
 const MOVE_PX = 8; // further than this is a slide, not a tap
 const LIFT_PX = 50; // this far up is pulling a card out of the hand
@@ -1310,7 +1312,7 @@ function grab(e: PointerEvent, el: HTMLElement) {
   grip.hold = window.setTimeout(() => {
     // Held still: open the card to read it.
     grip = null;
-    swallowClick = performance.now() + 600;
+    held = true;
     openCard = id;
     render();
   }, HOLD_MS);
@@ -1334,14 +1336,25 @@ addEventListener('pointermove', (e) => {
   }
   showGrip();
 });
+// The press ends here, not in the card's click: the risen card has left the
+// thumb, so its click lands on whatever is under it now, often the next card
+// (#295). A tap is the card pressed, and the click that follows is eaten.
 function letGo(cancel: boolean) {
+  if (held) {
+    held = false;
+    eatClick = performance.now() + 600;
+  }
   const g = grip;
   if (!g) return;
   grip = null;
   clearTimeout(g.hold);
-  if (g.moved) swallowClick = performance.now() + 400;
+  eatClick = performance.now() + 600;
   showGrip();
-  if (g.lift && !cancel && g.y < g.top) pullOut(g.id);
+  if (cancel) return;
+  if (g.lift && g.y < g.top) return pullOut(g.id);
+  const gs = snap?.game;
+  const me = snap?.you;
+  if (!g.moved && gs && me && me.hand.some((c) => c.id === g.id)) tapCard(gs, me, g.id);
 }
 addEventListener('pointerup', (e) => {
   letGo(false);
@@ -1355,6 +1368,13 @@ addEventListener('pointerup', (e) => {
   swallowClick = performance.now() + 400;
   nav.click();
 });
+addEventListener('pointerdown', () => (eatClick = 0), true); // a new press: the last one's click isn't coming
+addEventListener('click', (e) => {
+  if (!e.isTrusted || performance.now() >= eatClick) return;
+  eatClick = 0;
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 addEventListener('pointercancel', () => {
   letGo(true); // the page took the touch to scroll
   swipe = null;
@@ -1473,7 +1493,7 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   bind('[data-card]', (el) => {
-    if (performance.now() < swallowClick) return; // the end of a slide or a hold, not a tap
+    if (performance.now() < swallowClick) return; // the end of a swipe, not a tap
     tapCard(g, me, el.dataset.card!);
   });
   bind('[data-raisehand]', () => {
