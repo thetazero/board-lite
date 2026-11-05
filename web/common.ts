@@ -353,7 +353,7 @@ export function unitIcon(name: string, size = 2): string {
 
 // A kingdom's defenders by kind, drawn: each kind's picture and name with how
 // many there are, then its stats in words: health, attack, and the elements it
-// is weak to (takes double from) or strong against (takes half from). Four
+// is weak to (takes double from, by the element wheel). Four
 // Archers are one picture marked ×4, not four lines.
 export function foeStack(units: UnitView[], size = 2): string {
   const kinds: { u: UnitView; n: number; up: number }[] = [];
@@ -366,7 +366,7 @@ export function foeStack(units: UnitView[], size = 2): string {
       <span class="foe-pic">${unitIcon(u.name, size)}</span>
       <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ${esc(plural(u.name))}` : esc(u.name)}</b>
       <span class="foe-stats">${statTag('Health', u.maxHp)}${statTag('Attack', esc(u.attack))}</span>
-      ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}${u.strong.length ? `<span class="foe-elem strong">Strong against ${elemWords(u.strong)}</span>` : ''}</span>
+      ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}</span>
     </div>`).join('')}</div>`;
 }
 
