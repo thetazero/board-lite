@@ -29,7 +29,7 @@ test("a recap tells the race round by round, ends on the final scores, and lists
   assert.deepEqual(r.race[0], [0, 0, 0, 0]);
   assert.deepEqual(r.race.at(-1), g.players.map((_, p) => score(g, p).total), 'the last row is the final scores, cards in hand too');
   assert.deepEqual(r.standings.map((s) => s.p), standings(g).map((s) => s.p));
-  for (const s of r.standings) assert.equal(s.buildings + s.titles + s.beasts + s.hidden, s.total);
+  for (const s of r.standings) assert.equal(s.buildings + s.titles + s.beasts + s.raids + s.hidden, s.total);
   assert.ok(r.moments.length > 0);
   assert.ok(r.moments.every((m, i) => m.round >= 1 && m.round <= g.round && (i === 0 || r.moments[i - 1].round <= m.round)), 'in round order');
   // A title's holder at each round's end is told once, when it changes.

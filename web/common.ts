@@ -11,7 +11,7 @@ export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as 
 
 // The lobby and the join form show the goal before there's a game to read it from.
 // It must match TUNING.pointsToWin in src/data.ts; test/server.test.ts checks it does.
-export const POINTS_TO_WIN = 30;
+export const POINTS_TO_WIN = 50;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
