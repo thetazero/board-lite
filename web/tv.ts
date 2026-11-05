@@ -6,10 +6,9 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
-  icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
-  fadeAway, foeIcons, leadsVote, powerShield, voters,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
+import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
@@ -325,14 +324,6 @@ function targetCard(t: TargetView): string {
   return `<div class="target"><h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}${lootLine(t.loot, 1.6)}</div>`;
 }
 
-// A kingdom to vote for, kept to what the choice needs from across the room:
-// its name, combat power, defenders as pictures, loot, and who has
-// voted for it, outlined while it leads. Each defender's stats wait for the commit step's card.
-function candidateCard(t: TargetView, i: number, votes: (number | null)[], n: number): string {
-  return `<div class="target cand${leadsVote(votes, i, n) ? ' lead' : ''}"><h2>${esc(t.name)}</h2>
-    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, i, names)}</div>`;
-}
-
 function check(done: boolean): string {
   return done ? '<span class="ok">✔</span>' : '<span class="wait">○</span>'; // not "…", which reads as text cut off
 }
@@ -365,7 +356,7 @@ function renderRaid(g: PublicState) {
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
-      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => candidateCard(t, i, raid.votes, raid.candidates.length)).join('')}</div>
+      <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names)).join('')}</div>
       <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.votes[p] !== null)}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
     // Each player's dragons that could go, the sent ones lit; a roost for

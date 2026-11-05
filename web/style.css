@@ -610,8 +610,8 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
   .zoom > .zoomacts { align-self: end; }
   .zoom > .zoomnav { grid-column: 2; align-self: start; justify-self: center; }
 }
-.choice { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
-.choice b { font-size: 1.15em; }
+.choice:not(.cand) { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
+.choice:not(.cand) b { font-size: 1.15em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
 /* A dragon to send: a box at the row's end that ticks when tapped, so the row reads as a choice. */
 .dragon.pick > span { flex: 1; }
@@ -818,8 +818,8 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .target h2 { font-size: 1.25em; }
 .remote .target .foes { font-size: 1em; }
 .remote .candidates.vote { grid-template-columns: repeat(auto-fill, minmax(min(100%, 19em), 1fr)); gap: .8em; width: 100%; }
-.remote .cand { padding: .7em .9em; font-size: .78em; }
-.remote .cand h2 { font-size: 1.9em; }
+:is(.remote, body.phone) .cand { padding: .7em .9em; font-size: .78em; }
+:is(.remote, body.phone) .cand h2 { font-size: 1.9em; }
 .remote .target .loot { font-size: 1.15em; }
 .remote .target .num { font-size: 1.1em; }
 .remote .status { font-size: 1.1em; }
@@ -865,10 +865,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 @keyframes handout { to { translate: 0 3em; opacity: 0; } }
 /* The phone's open panels come in rather than appear. */
 .pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }
-/* The table view's vote: loot down the right, so a wide card isn't half empty. */
-.remote .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "voters voters"; align-items: center; gap: .3em .8em; }
-.remote .cand h2 { grid-area: name; }
-.remote .cand .cand-fight { grid-area: fight; flex-wrap: nowrap; }
-.remote .cand .loot { grid-area: loot; justify-self: end; flex-direction: column; align-items: flex-end; gap: .1em; }
-.remote .cand .loot .chip { margin-right: 0; }
-.remote .cand .voters { grid-area: voters; }
+/* The vote on a phone-sized card (the table view, the phone): loot down the right, so a wide card isn't half empty. */
+:is(.remote, body.phone) .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "voters voters"; align-items: center; gap: .3em .8em; }
+:is(.remote, body.phone) .cand h2 { grid-area: name; }
+:is(.remote, body.phone) .cand .cand-fight { grid-area: fight; flex-wrap: nowrap; }
+:is(.remote, body.phone) .cand .loot { grid-area: loot; justify-self: end; flex-direction: column; align-items: flex-end; gap: .1em; }
+:is(.remote, body.phone) .cand .loot .chip { margin-right: 0; }
+:is(.remote, body.phone) .cand .voters { grid-area: voters; }

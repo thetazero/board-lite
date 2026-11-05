@@ -115,20 +115,6 @@ export function playerTag(i: number, names: string[]): string {
   return `<span class="ptag" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i] ?? `P${i + 1}`)}</span>`;
 }
 
-// Who voted for candidate i, as their tags: votes are public as they're cast.
-export function voters(votes: (number | null)[], i: number, names: string[]): string {
-  const who = votes.flatMap((v, p) => (v === i ? [playerTag(p, names)] : []));
-  return who.length ? `<div class="voters">${who.join('')}</div>` : '';
-}
-
-// Whether candidate i has the most votes so far (ties all lead: a tie is a
-// coin flip). No one leads before anyone votes.
-export function leadsVote(votes: (number | null)[], i: number, n: number): boolean {
-  const counts = Array.from({ length: n }, (_, c) => votes.filter((v) => v === c).length);
-  const best = Math.max(...counts);
-  return best > 0 && counts[i] === best;
-}
-
 // ---------- icons ----------
 
 export { icon } from './icons.ts';
@@ -319,11 +305,6 @@ export function powerTag(n: number, cls = '', label = 'Power'): string {
   return `<span class="stat power ${cls}" title="combat power">${label} <b>${n}</b></span>`;
 }
 
-// Combat power drawn: the number on a shield, for where it has to read from across the room.
-export function powerShield(n: number, size = 3): string {
-  return `<span class="pshield" style="font-size:${size}em" title="combat power">${icon('shield', 1)}<b>${n}</b></span>`;
-}
-
 // A stat said in words: "Health 10", "Attack 1d6".
 export function statTag(label: string, value: string | number): string {
   return `<span class="stat">${label} <b>${value}</b></span>`;
@@ -361,54 +342,6 @@ export function hpBar(hp: number, max: number): string {
 export function hpFill(hp: number, max: number): { width: string; color: string } {
   const pct = max ? Math.max(0, Math.min(100, (hp / max) * 100)) : 0;
   return { width: `${pct}%`, color: pct > 60 ? '#4cc26e' : pct > 30 ? '#f2b600' : '#e5484d' };
-}
-
-// ---------- the raid's defenders ----------
-
-// A defender's picture, from its name ("Frost Golem" -> the frost_golem icon).
-export function unitIcon(name: string, size = 2): string {
-  return icon(name.toLowerCase().replace(/[^a-z]+/g, '_'), size, 'ricon unit-art');
-}
-
-// A kingdom's defenders by kind, drawn: each kind's picture and name with how
-// many there are, then its stats in words: health, attack, and the elements it
-// is weak to (takes double from, by the element wheel). Four
-// Archers are one picture marked ×4, not four lines.
-export function foeStack(units: UnitView[], size = 2): string {
-  const kinds: { u: UnitView; n: number; up: number }[] = [];
-  for (const u of units) {
-    const k = kinds.find((x) => x.u.name === u.name);
-    if (k) { k.n++; if (u.hp > 0) k.up++; } else kinds.push({ u, n: 1, up: u.hp > 0 ? 1 : 0 });
-  }
-  return `<div class="foes">${kinds.map(({ u, n }) => `
-    <div class="foe">
-      <span class="foe-pic">${unitIcon(u.name, size)}</span>
-      <span class="foe-body"><b class="foe-name">${n > 1 ? `${n} ${esc(plural(u.name))}` : esc(u.name)}</b>
-      <span class="foe-stats">${statTag('Health', u.maxHp)}${statTag('Attack', esc(u.attack))}</span>
-      ${u.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(u.weak)}</span>` : ''}</span>
-    </div>`).join('')}</div>`;
-}
-
-// A kingdom's defenders at a glance: one picture per kind, with how many.
-// For choosing among kingdoms, where combat power already sums up the fight.
-export function foeIcons(units: UnitView[], size = 2): string {
-  const kinds: { name: string; n: number }[] = [];
-  for (const u of units) {
-    const k = kinds.find((x) => x.name === u.name);
-    if (k) k.n++; else kinds.push({ name: u.name, n: 1 });
-  }
-  return `<div class="foeicons">${kinds.map(({ name, n }) => `<span class="foeicon" title="${esc(n > 1 ? `${n} ${plural(name)}` : name)}">${unitIcon(name, size)}${n > 1 ? `<b>×${n}</b>` : ''}</span>`).join('')}</div>`;
-}
-
-// "Frost Golem" -> "Frost Golems"; names already plural ("Archers", "Militia") stay.
-function plural(name: string): string {
-  return /s$|Militia$/.test(name) ? name : `${name}s`;
-}
-
-// What a fight pays, labelled: "Loot 3 timber 2 gold", or the points a great beast is worth.
-export function lootLine(loot: Res, size = 1.3, points?: number): string {
-  const what = points !== undefined ? `<span class="chip">${points}${icon('points', size)}</span>` : resChips(loot, size) || 'none';
-  return `<div class="loot"><span class="loot-label">${points !== undefined ? 'Worth' : 'Loot'}</span>${what}</div>`;
 }
 
 // A rolled die: the same white shape as a die to roll, with what it landed on.
