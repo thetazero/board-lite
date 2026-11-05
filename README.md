@@ -25,4 +25,6 @@ TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `n
 - `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
 - `src/shots/`: staged screenshots of the clients (`npm run shots`)
 
+Design rules between tuning numbers (payback, point efficiency) are tests in `test/design/`, with their own [README](test/design/README.md).
+
 `npm install`, then `npm test` (tests) and `npm run typecheck`. CI runs both, and fails if `npm test` takes over 2 minutes or the whole run over 5 (they take about 40 s and 1 minute there): see `.github/workflows/ci.yml`. `npm test` fails if `docs/datasheet.md` is out of date: after changing `src/data.ts` or the rules, run `npm run datasheet` and commit the result.
