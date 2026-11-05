@@ -56,8 +56,8 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Healing Potion | action card | 8 | 9% |
 | War Horn | action card | 6 | 7% |
 | Secret Hoard | action card | 8 | 9% |
-| Wolf Call | action card | 8 | 9% |
-| Rouse the Bear | action card | 4 | 5% |
+| Rouse the Bear | action card | 8 | 9% |
+| Wake the Basilisk | action card | 4 | 5% |
 | Fire Dragon | base dragon | 2 | 2% |
 | Ice Dragon | base dragon | 2 | 2% |
 | Lightning Dragon | base dragon | 2 | 2% |
@@ -111,11 +111,11 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
-| Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
+| Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round, unless it went hungry or cleared a hex. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | action | 8 | nothing | Worth 2 points while in your hand. | 2 |
-| Wolf Call | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
-| Rouse the Bear | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
+| Rouse the Bear | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
+| Wake the Basilisk | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
 | Ice Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | — |
 | Lightning Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | — |
@@ -250,7 +250,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and the earlier seat on a tie, carrying on from one resource to the next).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
 |---|---|---|---|---|---|
@@ -261,7 +261,7 @@ Kingdoms (all are on the ballot each raid; average damage is the defenders' tota
 | Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold |
 | Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold |
 
-Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
+Healing: a hurt dragon heals 7 health at each production it's fed, instead of growing, and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
 
 ## Fauna
 
@@ -279,8 +279,8 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 | Card | Sends | Cost | Copies |
 |---|---|---|---|
-| Wolf Call | Cave Bear | 1 crystal | 8 |
-| Rouse the Bear | Basilisk | 1 crystal | 4 |
+| Rouse the Bear | Cave Bear | 1 crystal | 8 |
+| Wake the Basilisk | Basilisk | 1 crystal | 4 |
 
 ## Great beasts
 

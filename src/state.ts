@@ -42,7 +42,7 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't grow either, a hunted one fought fauna
+  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't heal or grow either, a hunted one fought fauna
   canRaid: boolean;
   perch: string | null; // the rival's building it perches on
   weak: string[]; // the elements that beat it on the element wheel, as for every fighter
@@ -344,7 +344,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
   }
   if (a.effect === 'send_fauna') return { ...base, text: a.text, fauna: faunaView(a.fauna!, {}), needs: 'hex', hexes: faunaHexes(g) };
   if (a.effect === 'heal_dragon') {
-    const ids = mine.filter((d) => (d.damage > 0 || d.resting === 'hurt') && d.resting !== 'hunted').map((d) => d.id);
+    const ids = mine.filter((d) => d.damage > 0 || d.resting === 'hurt').map((d) => d.id);
     return { ...base, text: a.text, needs: 'dragon', dragons: ids, blocked: ids.length ? null : 'None of your dragons is hurt.' };
   }
   return { ...base, text: a.text, needs: 'none' };

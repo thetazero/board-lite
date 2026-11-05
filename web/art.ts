@@ -611,10 +611,10 @@ const ACTIONS: Record<string, () => string> = {
     + f([[26, 66], [30, 62], [36, 66], [32, 70]], '#e9b84a', 0)
     + `<path d="M98 20 L106 14 M100 30 L110 30 M98 40 L106 46" stroke="#fff1c4" stroke-width="2" stroke-linecap="square"/>`, '#ff7a59'),
   // The fauna cards: the beast they send, big, called up out of the night.
-  wolf_call: () => actionScene(
+  rouse_bear: () => actionScene(
     f(poly(92, 20, 9, 12), '#f6efd8', 0.2) + f(poly(95, 18, 7, 12), '#33285a', 0)
     + `<g transform="translate(60 50) scale(2.2)">${iconShapes('cave_bear')}</g>`, '#9aa0a8'),
-  rouse_bear: () => actionScene(
+  wake_basilisk: () => actionScene(
     f([[26, 76], [34, 40], [60, 26], [86, 40], [94, 76], [80, 76], [76, 48], [60, 40], [44, 48], [40, 76]], '#6d6a63', 0.05)
     + `<g transform="translate(60 54) scale(2.2)">${iconShapes('basilisk')}</g>`, '#c48a52'),
   secret_hoard: () => actionScene(

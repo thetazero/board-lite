@@ -468,9 +468,11 @@ function bind(sel: string, fn: (el: HTMLElement) => unknown) {
 // Every button the phone offers is drawn by `act`, and every choice by
 // `choose`, so each screen says the same things the same way:
 // - A button that's off says why under it, in the "why you can't" words of
-//   docs/wording.md ("You can't afford 4 timber."). The reason comes with the
+//   docs/wording.md ("Build it on your turn."). The reason comes with the
 //   option from the server (a card's or a building's `why`) or, for what only
-//   this phone knows (the lobby, the trade form), is worked out here.
+//   this phone knows (the lobby, the trade form), is worked out here. Not
+//   being able to afford it is the one reason left unsaid: the cost is beside
+//   the greyed button, so the line would only repeat it.
 // - A choice is a prompt naming what to choose ("Choose a resource"), then a
 //   button for each option, each carrying its verb.
 function act(label: string, attrs: string, why: string | null = null, cls = 'primary big'): string {
@@ -481,8 +483,10 @@ function btn(label: string, attrs: string, why: string | null, cls: string): str
   return `<button class="${cls}" ${attrs} ${why ? 'disabled' : ''}>${label}</button>`;
 }
 function whyLine(why: string | null | undefined): string {
-  return why ? `<p class="blocked">${named(why, names, snap?.game?.dragons)}</p>` : '';
+  return why && !CANT_AFFORD.test(why) ? `<p class="blocked">${named(why, names, snap?.game?.dragons)}</p>` : '';
 }
+// The engine's words for a cost you can't pay (src/engine.ts, `afford`).
+const CANT_AFFORD = /^You can't afford /;
 function choose(prompt: string, options: string[], after = ''): string {
   return `<div class="choose"><h3 class="ask">${prompt}</h3><div class="row">${options.join('')}</div>${after}</div>`;
 }
@@ -782,7 +786,8 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
   // A card kept, not played, says so instead of offering a button.
   else if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
   // A card that can't be played now (not your turn, can't afford it, nothing
-  // to play it on) shows its button greyed, and why under it.
+  // to play it on) shows its button greyed, and why under it (unless it's the
+  // cost: its chips show that, the short ones marked).
   else if (c.why || !playable) actions = act(c.verb, '', c.why ?? `${c.verb} it on your turn.`);
   else if (c.needs === 'resource') actions = choose('Choose a resource to gain', RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="primary" data-play="${c.id} ${r}" aria-label="Gain ${r}">Gain ${resIcon(r, 1.6)}</button>`));
   else if (c.needs === 'dragon') actions = choose(`Choose a dragon for the ${esc(c.name)}`, c.dragons.map((id) => dragonOption(id, `data-play="${c.id} ${id}"`)));
