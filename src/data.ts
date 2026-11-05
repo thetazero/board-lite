@@ -96,9 +96,13 @@ export const CLASS_NAMES: Record<BuildingClass, string> = {
 // The tower is a monument (it holds floors) and a dragon building (it houses one).
 export const TOWER_CLASSES: BuildingClass[] = ['monument', 'dragon'];
 
+// The classes that make a basic resource: stone, timber, crystal and livestock buildings.
+export const PRODUCTION_CLASSES: BuildingClass[] = ['quarry', 'lumber', 'mine', 'pasture'];
+
 // What a building's effect counts among its six neighbouring hexes: buildings
-// of a class (whoever owns them), or hexes of a terrain (built on or not).
-export type Counted = BuildingClass | Terrain;
+// of a class (whoever owns them), production buildings (any of the four
+// resource classes), or hexes of a terrain (built on or not).
+export type Counted = BuildingClass | Terrain | 'production';
 
 export interface BuildingDef {
   name: string;
@@ -119,6 +123,8 @@ export interface BuildingDef {
   growthBonus?: number;
   bankRate?: { resource: BasicResource; rate: number }; // a better merchants' rate for one resource you give
   per?: Counted;
+  perOwn?: boolean; // `per` counts only its owner's buildings
+  perMax?: number; // `per` counts at most this many
 }
 
 const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = TERRAIN_NOUN[per]): BuildingDef =>
@@ -158,7 +164,8 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   timber_port: portCard('timber'),
   crystal_port: portCard('crystal'),
   livestock_port: portCard('livestock'),
-  market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
+  // Gold for a strong engine, while raids stay the main source (#305).
+  market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'production', perOwn: true, perMax: 3, text: 'Makes 1 gold each round for each of your adjacent production buildings, up to 3.', copies: 3 },
   // Point cards: a flat 2 points each, built adjacent to what they used to
   // count (#134). About 11 resources and no gold: 50% better at points than a
   // production card (8 resources, 1 point), the owner's call.
@@ -177,14 +184,12 @@ export interface UpgradeDef {
   text: string;
   baseBonus?: number; // more of what the building makes
   dragonCapacity?: number;
-  makes?: Bundle;
   copies: number;
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
   workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, text: 'This stone, timber, crystal or livestock building makes 2 more.', copies: 4 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
-  trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 8, stone: 4 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';

@@ -27,7 +27,7 @@ const pics = new Map<string, string>();
 const TERRAIN_NOUN: Record<string, string> = { mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex' };
 const CLASS_HEAD: Record<string, string> = { quarry: 'Stone buildings', lumber: 'Timber buildings', mine: 'Crystal buildings', pasture: 'Livestock buildings', dragon: 'Dragon buildings', trade: 'Trade buildings', monument: 'Monuments' };
 // What each upgrade is shown on: a building of its class.
-const UPGRADE_ON: Record<string, { building: string; terrain: string }> = { workshop: { building: 'quarry', terrain: 'mountain' }, nesting_grounds: { building: 'roost', terrain: 'plains' }, trade_charter: { building: 'timber_port', terrain: 'harbor' } };
+const UPGRADE_ON: Record<string, { building: string; terrain: string }> = { workshop: { building: 'quarry', terrain: 'mountain' }, nesting_grounds: { building: 'roost', terrain: 'plains' } };
 const ELEMENTS = ['fire', 'ice', 'lightning', 'air', 'water'];
 const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
