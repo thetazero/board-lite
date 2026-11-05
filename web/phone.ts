@@ -746,9 +746,9 @@ function actionView(g: PublicState, me: Me): string {
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
     <div class="offer out">You offer ${playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button></div>`).join('');
-  // Build & bank and Trade open over the table and close again; the hand is always below.
+  // Build and Trade (with the bank) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
-    ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build &amp; bank</button>` : ''}
+    ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
     <button data-tab="trade" class="${tab === 'trade' ? 'on' : ''}">Trade</button></nav>`;
   const t = !me.myTurn && tab === 'more' ? 'none' : tab;
   const content = t === 'more' ? moreView(me) : t === 'trade' ? tradeView(g, me) : '';
@@ -766,7 +766,7 @@ function actionView(g: PublicState, me: Me): string {
   }).join('') : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
-  // End turn sits above an open panel, so a long one (Build & bank runs past the
+  // End turn sits above an open panel, so a long one (Trade, with the bank, runs past the
   // screen) never pushes it down under the hand.
   return `${incoming}${mine}${tabs}${clear}${perch}${recall}${end}${content}`;
 }
@@ -893,24 +893,28 @@ function moreView(me: Me): string {
   // The egg's button opens the choice of its element, as a basic building's opens the choice of its hex.
   const egg = me.eggProject;
   const eggs = eggOpen && !egg.why ? choose('Choose an element for the egg', egg.elements.map((e) => `<button class="elembtn" style="--ec:${ELEMENT_COLORS[e]}" data-egg="${e}">${elemIcon(e, 1.5)} ${e[0].toUpperCase()}${e.slice(1)}</button>`)) : '';
+  return `
+    <section class="panel"><h3>Basic buildings</h3>${basics}</section>
+    <section class="panel"><h3>Special projects</h3>
+      ${row('', 'Base dragon egg', egg.cost, btn('Hatch', 'id="egg"', egg.why, eggOpen && !egg.why ? 'on' : ''), egg.why)}${eggs}</section>`;
+}
+
+function stepper(side: 'give' | 'get', r: string, n: number, max: number): string {
+  return `<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span>`;
+}
+
+// The bank, on your turn: give your bank rate of one resource for 1 of another.
+function bankView(me: Me): string {
   // The bank's Trade: what you give has to be there, and differ from what you gain.
   const bankWhy = bank.give === bank.get ? 'You give and gain the same resource: choose another.'
     : me.resources[bank.give as 'stone'] < me.bankRate * bank.times ? `You can't afford ${me.bankRate * bank.times} ${bank.give}.` : null;
   // Pick a resource by tapping its icon.
   const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}</button>`).join('')}</div>`;
-  return `
-    <section class="panel"><h3>Basic buildings</h3>${basics}</section>
-    <section class="panel"><h3>Special projects</h3>
-      ${row('', 'Base dragon egg', egg.cost, btn('Hatch', 'id="egg"', egg.why, eggOpen && !egg.why ? 'on' : ''), egg.why)}${eggs}</section>
-    <section class="panel"><h3>Bank</h3>
+  return `<section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Gain</span>${pick('get', bank.get)}</div>
       <div class="bank"><span class="steplabel">Times</span><span class="stepper"><button data-btimes="-1" aria-label="Trade 1 time fewer">−</button><b>${bank.times}</b><button data-btimes="1" aria-label="Trade 1 time more">+</button></span>
         ${btn(`Trade <span class="chip">${me.bankRate * bank.times}${resIcon(bank.give, 1.25)}</span>→<span class="chip">${bank.times}${resIcon(bank.get, 1.25)}</span>`, 'id="bankgo"', bankWhy, 'primary')}</div>${whyLine(bankWhy)}</section>`;
-}
-
-function stepper(side: 'give' | 'get', r: string, n: number, max: number): string {
-  return `<span class="stepper"><button data-step="${side} ${r} -1" ${n <= 0 ? 'disabled' : ''}>−</button><b>${n}</b><button data-step="${side} ${r} 1" ${n >= max ? 'disabled' : ''}>+</button></span>`;
 }
 
 function tradeView(g: PublicState, me: Me): string {
@@ -931,7 +935,8 @@ function tradeView(g: PublicState, me: Me): string {
     ? `<p class="tpick">${offered.length ? `${icon('cards', 1.2)} ${offered.map((c) => `<b>${esc(c.name)}</b>`).join(', ')}` : '<small>Tap cards in your hand to offer them too.</small>'}</p>`
     : '';
   const any = Object.values(trade.give).some(Boolean) || trade.cards.size || Object.values(trade.get).some(Boolean);
-  return `
+  // On your turn the bank comes first: it's the shorter form, and the one used most.
+  return `${me.myTurn ? bankView(me) : ''}
     <section class="panel trade">
       <h3>Offer a trade to</h3><div class="row who">${who}</div>
       <div class="tgrid"><span></span><h3>You give</h3><h3>You get</h3>${rows}</div>
