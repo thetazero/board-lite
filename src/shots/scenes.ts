@@ -313,7 +313,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-join-bad-code', caption: 'Phone: joining with a code no room has', client: 'phone', path: '/', fill: { code: 'QQQQ', name: 'Dax' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
       { file: 'phone-join-name-taken', caption: 'Phone: joining with a name already taken', client: 'phone', fill: { name: 'ada' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
       { file: 'phone-join-blank-name', caption: 'Phone: joining with only spaces for a name (empty is stopped by the browser first)', client: 'phone', fill: { name: '   ' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
-      { file: 'tv-guest-start', caption: "TV: a second screen on the room's address (no host token) taps Start", client: 'tv', guest: true, clicks: ['#start'], waitFor: '.toast' },
+      { file: 'tv-guest-lobby', caption: "TV: a second screen on the room's address (no host token): no buttons, it says who starts", client: 'tv', guest: true },
     ],
   },
   {
@@ -816,7 +816,7 @@ export const SCENES: Scene[] = [
     shots: () => [
       { file: 'tv-resume-3p', caption: 'TV: a saved game hosted again, every seat open', client: 'tv' },
       { file: 'phone-resume-open', caption: "Phone: the room's address for a resumed game: take an open seat with a name", client: 'phone', waitFor: '.seats' },
-      { file: 'phone-resume-join', caption: 'Phone: joining a resumed game takes an open seat', client: 'phone', fill: { name: 'Ada' }, clicks: ['#join button[type=submit]'], waitFor: '.mehead' },
+      { file: 'phone-resume-join', caption: 'Phone: joining a resumed game takes an open seat, and waits in the lobby for the rest', client: 'phone', fill: { name: 'Ada' }, clicks: ['#join button[type=submit]'], waitFor: '.plobby' },
     ],
   },
 

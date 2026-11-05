@@ -425,6 +425,7 @@ export type SeatKind = 'player' | 'bot' | 'open';
 export interface Lobby {
   code: string;
   started: boolean;
+  seating: boolean; // a saved game hosted again, waiting in the lobby until every seat is taken
   // standIn: a bot makes this player's moves (they quit: left, or they're away).
   seats: { name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean }[];
   minPlayers: number;

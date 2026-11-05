@@ -6,7 +6,7 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
@@ -115,7 +115,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
         ${known ? `<p class="roomline">Room <b>${esc(room!.lobby.code)}</b></p><input id="code" type="hidden" value="${esc(room!.lobby.code)}">`
-          : `<label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(c)}" required></label>`}
+          : `<label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="4 letters" value="${esc(c)}" required></label>`}
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <button class="primary big" type="submit">Join</button>
         <p class="error">${esc(err)}</p>
@@ -207,7 +207,8 @@ function onSnapshot(s: Snapshot) {
   const prev = snap;
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
-  if (!s.game) {
+  // Before the game, and while a saved game hosted again takes its seats, the phone shows the lobby.
+  if (!s.game || s.lobby.seating) {
     if (s.seat < 0) return leaveToJoin('You were removed from the lobby.');
     seenHand = new Set(); // watching from the lobby: the first hand is dealt in
     return renderLobby();
@@ -323,27 +324,41 @@ function leaveToJoin(msg: string) {
 
 // ---------- lobby ----------
 
+// The lobby: who's at the table. The first player starts the game and adds or
+// removes bots (as the TV does); everyone else waits for them. A saved game
+// hosted again comes back here until every seat is taken.
 function renderLobby() {
   const l = snap!.lobby;
   const me = seatIndex();
-  const first = me === 0;
+  const host = me === 0;
   const pc = PLAYER_COLORS[me] ?? '#888';
+  const open = l.seats.filter((s) => s.kind === 'open').length;
+  const first = firstPlayer(l);
+  const seat = (s: Snapshot['lobby']['seats'][number], i: number) => s.kind === 'open'
+    ? `<li class="open" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>Open seat</span></li>`
+    : `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
+      ${host && i !== me ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
+  const hint = l.seating ? `The game goes on once every seat is taken${host ? ' (a bot can take one)' : ''}.`
+    : host ? '' : `${first ? esc(first) : 'The first player'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
   morph(app, screen('lobby', `
     <div class="plobby" style="--pc:${pc}">
       <div class="hero">${tableScene([pc])}</div>
-      <h1>You're in, ${esc(l.seats[me]?.name ?? '')}!</h1>
-      <p class="muted">Room <b>${esc(l.code)}</b></p>
-      ${l.remote ? invite(l.code) : ''}
-      <ul class="seatlist">${l.seats.map((s, i) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}</li>`).join('')}</ul>
-      ${first ? `${act('Start game', 'id="start"', l.seats.length >= l.minPlayers ? null : `You need ${l.minPlayers} players: add a bot.`)}
-        ${act('Add a bot', 'id="bot"', l.seats.length >= l.maxPlayers ? `The table is full: ${l.maxPlayers} players.` : null, '')}`
-      : `<p class="hint">${l.remote ? 'The first player starts the game.' : 'The first player or the TV starts the game.'}</p>`}
-      <button id="leave" class="ghost">Leave</button>
+      <div class="lobbybody">
+        <h1>You're in, ${esc(l.seats[me]?.name ?? '')}</h1>
+        <p class="muted">Room <b>${esc(l.code)}</b>${l.seating ? `: ${open > 1 ? `${open} open seats` : 'one open seat'}` : ''}</p>
+        ${l.remote ? invite(l.code) : ''}
+        <ul class="seatlist">${l.seats.map(seat).join('')}</ul>
+        ${host && !l.seating ? act('Start game', 'id="start"', l.seats.length >= l.minPlayers ? null : `You need ${l.minPlayers} players: add a bot.`) : ''}
+        ${host ? act('Add a bot', 'id="bot"', l.seating ? null : l.seats.length >= l.maxPlayers ? `The table is full: ${l.maxPlayers} players.` : null, '') : ''}
+        ${hint ? `<p class="hint">${hint}</p>` : ''}
+        <button id="leave" class="ghost">Leave</button>
+      </div>
     </div>`));
-  if (first) {
+  if (host) {
     on('bot', () => post(`/api/rooms/${code}/bot`, { token }));
-    on('start', () => post(`/api/rooms/${code}/start`, { token }));
+    if (!l.seating) on('start', () => post(`/api/rooms/${code}/start`, { token }));
+    app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token, seat: Number(b.dataset.remove) }).catch(toast)));
   }
   on('leave', async () => {
     await post(`/api/rooms/${code}/leave`, { token });

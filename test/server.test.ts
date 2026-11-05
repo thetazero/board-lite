@@ -332,7 +332,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${made.code.toLowerCase()}/join`, { name: 'Ada' })).status, 400, 'codes are case-insensitive; names unique');
     assert.equal((await post('/api/rooms/ZZZZ/join', { name: 'X' })).status, 400);
     assert.equal((await post(`/api/rooms/${made.code}/start`, { token: ada })).status, 200);
-    rooms.get(made.code)!.seats[1].kind = 'open'; // keep the game still while we look at it
+    Object.assign(rooms.get(made.code)!.seats[1], { kind: 'player', connected: 1 }); // a person at their phone, not a bot: keep the game still while we look at it
 
     // Server-sent events: the first message is the current snapshot.
     const ctrl = new AbortController();
@@ -356,8 +356,8 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     const g = rooms.get(made.code)!.game!;
     apply(g, 1, `keep ${g.players[1].choice[0].id}`);
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end' })).status, 200);
-    // Mid-game: a bot for someone away (not an open seat), and quitting.
-    assert.match((await post(`/api/rooms/${made.code}/standin`, { token: ada, seat: 1 })).body.error, /No such player/);
+    // Mid-game: a bot for someone away (not someone at their phone), and quitting.
+    assert.match((await post(`/api/rooms/${made.code}/standin`, { token: ada, seat: 1 })).body.error, /is back/);
     assert.equal((await post(`/api/rooms/${made.code}/quit`, { token: ada })).status, 200);
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'say hi' })).status, 400, 'the seat is no longer theirs');
     assert.equal((await post(`/api/rooms/${made.code}/join`, { name: 'ADA' })).status, 200, 'taken back by name');
@@ -439,17 +439,27 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
 
 test('a saved game with no seats file can be hosted; players claim its open seats', () => {
   const file = join(dir, 'hosted.json');
-  const g = newGame(2, 4);
-  for (const p of [0, 1]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  const g = newGame(3, 4);
+  for (const p of [0, 1, 2]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
   save(file, g);
-  const room = new Room('HOST', { file });
-  assert.deepEqual(room.seats.map((s) => s.kind), ['open', 'open']);
+  const room = new Room('HOST', { file, botDelayMs: 60000 });
+  assert.deepEqual(room.seats.map((s) => s.kind), ['open', 'open', 'open']);
+  assert.equal(room.lobby().seating, true, 'back in the lobby until every seat is taken');
   const ada = room.join('Ada');
   assert.equal(room.seats.indexOf(ada), 0);
+  assert.throws(() => room.command(ada.token, 'end'), /once every seat is taken/, 'the game waits for the open seat');
+  // Leaving, or removing someone, gives the seat back while the game waits.
+  const bram = room.join('Bram');
+  room.leave(room.seats.indexOf(bram));
+  assert.deepEqual(room.seats.map((s) => s.kind), ['player', 'open', 'open']);
+  // A bot can take an open seat; once every seat is taken, the game goes on.
+  room.join('Bram');
+  room.addBot();
+  assert.equal(room.lobby().seating, false);
   room.command(ada.token, 'end');
   assert.equal(load(file).turn, 1, 'moves are saved to the same file');
-  room.join('Bram');
   assert.throws(() => room.join('Cora'), /every seat is taken/);
+  assert.throws(() => room.leave(2), /has started/);
   room.close();
 });
 

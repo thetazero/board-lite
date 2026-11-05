@@ -10,7 +10,7 @@ import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '.
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
-  const lobby = { code: 'TEST', started: true, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+  const lobby = { code: 'TEST', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
   return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
 }
 
