@@ -261,7 +261,7 @@ Kingdoms (all are on the ballot each raid; average damage is the defenders' tota
 | Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold |
 | Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold |
 
-Healing: a hurt dragon heals 7 health at each production and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
+Healing: a hurt dragon heals 7 health at each production it's fed, instead of growing, and sits out every round's raids until it is whole, so it misses one raid round per 7 damage, rounded up. Knocked out (0 health), a base dragon is out: hatchling 1, young 2, adult 3 rounds; the Frost Wyrm, the toughest adult, 5.
 
 ## Fauna
 

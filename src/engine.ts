@@ -29,7 +29,7 @@ export interface Dragon {
   growth: number;
   damage: number;
   // Why the dragon sits out this round's raids: it was hungry (and doesn't
-  // grow) or hurt at production, or it already fought fauna this round.
+  // heal or grow) or hurt (and heals instead of growing) at production, or it already fought fauna this round.
   resting: '' | 'hungry' | 'hurt' | 'hunted';
   // The rival's building it perches on, if any: that building makes nothing
   // until the dragon is recalled or driven off.
@@ -258,8 +258,8 @@ export function blocked(g: Game, k: string): boolean {
   return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
 }
 
-// The round a hurt dragon can raid again: it heals at each production and
-// sits out every round it starts hurt.
+// The round a hurt dragon can raid again: it heals at each production it's
+// fed and sits out every round it starts hurt.
 export function backInRound(g: Game, d: Dragon): number {
   return g.round + Math.ceil(d.damage / TUNING.healPerRound) + 1;
 }
@@ -512,17 +512,21 @@ function startRound(g: Game) {
     log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
   }
   wander(g);
-  // Every dragon eats, and a hurt one heals some. One that was hungry or hurt
-  // sits out the round's raids; only hunger stops it growing.
+  // Every dragon eats. A fed one heals some if it's hurt, and grows if it
+  // isn't; a hungry one does neither. One that was hungry or hurt sits out
+  // the round's raids.
   for (const d of g.dragons) {
     const pl = g.players[d.owner];
     const hurt = d.damage > 0;
-    d.damage = Math.max(0, d.damage - TUNING.healPerRound);
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
     d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
-    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing and sits out this round\'s raids' : 'goes hungry: it doesn\'t grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
+    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing and sits out this round\'s raids' : 'goes hungry: it doesn\'t heal or grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
+    if (hurt) {
+      d.damage = Math.max(0, d.damage - TUNING.healPerRound);
+      continue;
+    }
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;

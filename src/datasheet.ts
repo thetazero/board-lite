@@ -159,7 +159,7 @@ function healing(): string {
   const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
   const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsOut(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
   const big = Object.values(DRAGONS).reduce((m, d) => (d.stages[2].hp > m.stages[2].hp ? d : m));
-  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
+  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production it's fed, instead of growing, and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
 }
 
 function raids(): string {

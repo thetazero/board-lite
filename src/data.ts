@@ -56,8 +56,9 @@ export const TUNING = {
   // were (#134). The hoard's was a Monument's gold when Monuments cost gold
   // (#109).
   titleMinimum: { army: 55, tower: 4, hoard: 20 },
-  // A hurt dragon heals this much health at each production and sits out
-  // raids until it is whole, so a big hit costs several rounds.
+  // A hurt dragon heals this much health at each production it's fed,
+  // instead of growing, and sits out raids until it is whole, so a big hit
+  // costs several rounds.
   healPerRound: 7,
   towerDragonCapacity: 1,
   // Each player's starting base dragon begins at this life stage (0 egg).

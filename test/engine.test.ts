@@ -346,7 +346,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.equal(g.raid!.step, 'vote');
 });
 
-test('a dragon hurt in a raid heals and grows but sits out the next raid', () => {
+test('a dragon hurt in a raid heals instead of growing and sits out the next raid', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
   a.damage = 3; // hurt in this round's raid
@@ -358,13 +358,13 @@ test('a dragon hurt in a raid heals and grows but sits out the next raid', () =>
   assert.equal(g.round, 2);
   assert.equal(a.damage, 0);
   assert.equal(a.resting, 'hurt');
-  assert.ok(a.growth + a.stage * 10 > ga, 'a hurt dragon still grows');
+  assert.equal(a.growth + a.stage * 10, ga, 'a hurt dragon does not grow while it heals');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
   assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
 });
 
-test('a hungry dragon neither grows nor raids', () => {
+test('a hungry dragon neither heals, grows nor raids', () => {
   const g = newGame(2, 7);
   hatchAll(g);
   const a = g.dragons[0];
@@ -373,10 +373,12 @@ test('a hungry dragon neither grows nor raids', () => {
   // Dragons eat in hatching order: one hatched earlier eats the tower's only livestock.
   g.dragons.unshift({ ...a, id: 'd99' });
   g.players[a.owner].resources.livestock = 0;
+  a.damage = 3;
   while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(a.resting, 'hungry');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
+  assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
 
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
