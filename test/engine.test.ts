@@ -733,3 +733,27 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
   assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
 });
+
+test('each option a seat is offered says why it is off, in the words a refused command uses', () => {
+  const g = newGame(2, 11);
+  keepAll(g);
+  const p = g.turn, other = 1 - p;
+  rich(g, p);
+  rich(g, other);
+  g.players[p].hand = [{ id: 'c900', deck: 'building', key: 'monument' }];
+  g.players[other].hand = [{ id: 'c901', deck: 'building', key: 'monument' }];
+  // Yours to play now: no reason.
+  assert.equal(seatState(g, p).hand[0].why, null);
+  assert.equal(seatState(g, p).hand[0].verb, 'Build');
+  // Off your turn, the card's own verb says when.
+  assert.equal(seatState(g, other).hand[0].why, 'Build it on your turn.');
+  // Short of a resource: the error playing it would give.
+  g.players[p].resources.stone = 0;
+  const why = seatState(g, p).hand[0].why!;
+  assert.match(why, /^You can't afford .*stone.*\.$/);
+  assert.throws(() => apply(g, p, `build c900 ${seatState(g, p).hand[0].hexes[0]}`), new RegExp(why.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  // A basic building with nowhere to go, and the egg with no room, say so.
+  const s = seatState(g, p);
+  for (const b of s.basics) assert.equal(b.why === null, b.affordable && (b.onTower || b.hexes.length > 0), b.key);
+  assert.equal(s.eggProject.why === null, s.eggProject.affordable && s.eggProject.room);
+});

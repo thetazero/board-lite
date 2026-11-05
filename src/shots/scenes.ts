@@ -338,6 +338,17 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // The egg can be afforded, so Hatch opens the choice of its element.
+    name: 'egg-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => { Object.keys(g.players[g.turn].resources).forEach((r) => (g.players[g.turn].resources[r as 'gold'] = 12)); },
+    shots: (g) => [
+      { file: 'phone-egg-element-3p', caption: "Phone: the base dragon egg's Hatch tapped, choosing its element", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '#egg'], sizes: true },
+    ],
+  },
+  {
     name: 'keep-3p',
     players: 3,
     seed: 1,
@@ -515,6 +526,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-every-card', caption: 'Phone: one of every card in the deck (staged, not a real hand)', client: 'phone', seat: g!.turn },
       { file: 'phone-card-open-dragon', caption: 'Phone: a dragon card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-dragon'] },
       { file: 'phone-card-open-action', caption: 'Phone: an action card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-action'] },
+      { file: 'phone-card-open-windfall', caption: 'Phone: Windfall tapped open, choosing the resource to gain', client: 'phone', seat: g!.turn, clicks: [card(g!.players[g!.turn].hand.find((c) => c.key === 'windfall')!.id)] },
     ],
   },
   {
