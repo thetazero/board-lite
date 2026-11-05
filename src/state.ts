@@ -168,11 +168,12 @@ export interface SeatState {
   bankRates: Record<BasicResource, number>; // what you give the merchants, per basic resource (never gold)
   dragonsHoused: number;
   dragonCapacity: number;
-  // What a round brings in, per resource: production minus what the dragons
-  // eat. A fixed amount plus dice, the same every round until something is
-  // built or hatched. blocked: one of your buildings that makes it is shut
-  // down (a beast or a perched dragon on it), so it brings in less than it could.
-  income: Record<Resource, { base: number; dice: number[]; blocked: boolean }>;
+  // What a round brings in, per resource: a fixed amount plus dice, the same
+  // every round until something is built or hatched. eat: what your dragons
+  // eat of it each round (livestock only), kept apart from what's made (#309).
+  // blocked: one of your buildings that makes it is shut down (a beast or a
+  // perched dragon on it), so it brings in less than it could.
+  income: Record<Resource, { base: number; dice: number[]; eat: number; blocked: boolean }>;
   hand: CardView[];
   choice: CardView[]; // building cards drawn this round, to keep one
   handCap: number;
@@ -387,8 +388,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const housed = g.dragons.filter((d) => d.owner === p).length;
   const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
   const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
-  const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, blocked: shut.has(r) }])) as SeatState['income'];
-  income.livestock.base -= housed * TUNING.livestockPerDragon;
+  const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, eat: 0, blocked: shut.has(r) }])) as SeatState['income'];
+  income.livestock.eat = housed * TUNING.livestockPerDragon;
   return {
     seat: p,
     resources: { ...pl.resources },

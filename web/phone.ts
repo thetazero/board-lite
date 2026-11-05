@@ -549,12 +549,14 @@ function choose(prompt: string, options: string[], after = ''): string {
 }
 
 function header(g: PublicState, me: Me): string {
-  // Each token with what a round brings in under it, upkeep taken off.
+  // Each token with what a round brings in under it, and what your dragons eat.
   const res = RESOURCES.map((r) => {
     const inc = me.income[r];
     // Red when a beast or a perched dragon shuts down one of your buildings that makes it (#298).
     const sign = inc.base < 0 || inc.blocked ? ' minus' : inc.base || inc.dice.length ? '' : ' none';
-    return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}</small></div>`;
+    // What your dragons eat, after what's made, in red with the dragon icon (#309).
+    const eat = inc.eat ? ` <span class="eat" title="your dragons eat this each round">−${inc.eat}${icon('dragon', 1.3)}</span>` : '';
+    return `<div class="res${me.resources[r] ? '' : ' zero'}"><div>${resIcon(r, 1.9)}<b>${me.resources[r]}</b></div><small class="inc${sign}" title="each round">${iconText(incomeText(inc), 1)}${eat}</small></div>`;
   }).join('');
   // Points held as cards in the hand count too: said in words, so it can't read as a card count.
   const hidden = me.hiddenPoints ? `<small class="hiddenpts" title="Secret Hoard cards in your hand, counted in the total">${me.hiddenPoints}${icon('points', 0.9)} in hand</small>` : '';

@@ -6,7 +6,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -14,7 +14,7 @@ import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
 import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
-import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, hitStep, madeOf, prodSpin, prodStep, scenesOf, type Scene } from './scenes.ts';
+import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -436,19 +436,30 @@ function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
 function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   const made = rolls.map((x) => {
     const ev = x.ev as Extract<EventView['ev'], { k: 'produce' }>;
-    return { p: ev.p, got: ev.got, rows: madeOf(ev).map((r) => {
+    const eat = eatOf(ev);
+    // What their dragons eat comes off the livestock row (#309), so that row
+    // shows even when they make no livestock.
+    const rs = eat && !madeOf(ev).includes('livestock') ? [...madeOf(ev), 'livestock' as const] : madeOf(ev);
+    return { p: ev.p, got: ev.got, eat, rows: rs.map((r) => {
       const dice = (x.dice ?? []).filter((d) => d.resource === r);
-      return { r, dice, base: ev.got[r]! - dice.reduce((s, d) => s + d.value, 0), total: ev.got[r]! };
+      const got = ev.got[r] ?? 0;
+      const eats = r === 'livestock' ? eat : 0;
+      return { r, dice, eats, base: got - dice.reduce((s, d) => s + d.value, 0), total: got - eats };
     }) };
   });
-  const all = made.reduce((s, m) => s + m.rows.length, 0);
+  const all = rolls.reduce((s, x) => s + prodRowsOf(x.ev), 0);
   const step = prodStep(all), spin = prodSpin(all);
+  // A row: what's made, then what the dragons eat of it, in red with the dragon
+  // icon ("1 + d4 − 1🐉 = 2"), then what's left.
   const row = (x: (typeof made)[number]['rows'][number]) => {
-    const parts = [x.base ? `<b class="base">${x.base}</b>` : '', ...x.dice.map((d) => dieFace(d.sides, d.value, 'rolling'))].filter(Boolean);
-    return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${parts.join('<i>+</i>')}</span>${x.dice.length ? `<span class="eq"><i>=</i><b>${x.total}</b></span>` : ''}</li>`;
+    const parts = [x.base || !x.dice.length ? `<b class="base">${x.base}</b>` : '', ...x.dice.map((d) => dieFace(d.sides, d.value, 'rolling'))].filter(Boolean);
+    const eat = x.eats ? `<i>−</i><span class="eat" title="your dragons eat this"><b>${x.eats}</b>${icon('dragon', 1.4)}</span>` : '';
+    const total = x.total < 0 ? `−${-x.total}` : x.total;
+    return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${parts.join('<i>+</i>')}${eat}</span>${x.dice.length || x.eats ? `<span class="eq"><i>=</i><b>${total}</b></span>` : ''}</li>`;
   };
-  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${gainChips(m.got, 1.4)}</div></section>`).join('');
-  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${gainChips(m.got, 1.4)}</span></li>`).join('');
+  const net = (m: (typeof made)[number]) => netChips({ ...m.got, livestock: (m.got.livestock ?? 0) - m.eat }, 1.4);
+  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${net(m)}</div></section>`).join('');
+  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${net(m)}</span></li>`).join('');
   const play = (el: HTMLElement) => {
     const at = (t: number, f: () => void) => setTimeout(f, t);
     const cardEls = el.querySelectorAll<HTMLElement>('.production .pturn');

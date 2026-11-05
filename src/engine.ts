@@ -87,7 +87,7 @@ export interface Hit { d: string; u: number; by: 'dragon' | 'unit'; dmg: number;
 // TV and phones draw these instead.
 export type GameEvent =
   | { k: 'round'; n: number }
-  | { k: 'produce'; p: number; got: Bundle }
+  | { k: 'produce'; p: number; got: Bundle; eat?: number } // eat: livestock their dragons eat right after (absent in old saves)
   | { k: 'rest'; d: string; why: 'hungry' | 'hurt' }
   | { k: 'grow'; d: string; stage: number }
   | { k: 'draw'; p: number; n: number }
@@ -545,6 +545,7 @@ function startRound(g: Game) {
   g.round++;
   log(g, `=== Round ${g.round} ===`, { k: 'round', n: g.round });
   // 1. Production, in turn order.
+  const fedIds = new Set<string>();
   for (const p of turnOrder(g)) {
     const prod = production(g, p);
     const got: Bundle = {};
@@ -558,16 +559,25 @@ function startRound(g: Game) {
       }
     }
     gain(g.players[p], got);
-    log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
+    // Then their dragons eat, each while there's livestock left (#309): said
+    // with what they made, so the table sees the livestock go. Nothing in
+    // between (beasts wandering) touches resources, so eating here is the
+    // same as eating after.
+    let eat = 0;
+    for (const d of g.dragons.filter((x) => x.owner === p)) {
+      if (g.players[p].resources.livestock < TUNING.livestockPerDragon) break;
+      g.players[p].resources.livestock -= TUNING.livestockPerDragon;
+      eat += TUNING.livestockPerDragon;
+      fedIds.add(d.id);
+    }
+    log(g, `${pname(p)} produces ${bundleText(got)}.${eat ? ` ${pname(p)}'s dragons eat ${eat} livestock.` : ''}`, { k: 'produce', p, got, eat }, { dice });
   }
   wander(g);
-  // Every dragon eats. A fed one heals some if it's hurt, and grows if it
-  // isn't; a hungry one does neither.
+  // A fed dragon heals some if it's hurt, and grows if it isn't; a hungry one
+  // does neither.
   for (const d of g.dragons) {
-    const pl = g.players[d.owner];
     const hurt = d.damage > 0;
-    const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
-    if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
+    const fed = fedIds.has(d.id);
     if (!fed || hurt) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing' : 'goes hungry: it doesn\'t heal or grow'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
     if (hurt) {

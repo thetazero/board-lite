@@ -63,7 +63,7 @@ Spelling is American ("harbor", "color"), to match the terrain and code names th
 
 ## Icons
 
-Few icons, for the things the game names over and over: the five resources and points (the owner, 2026-11-03: "use icons for core resources, there should not be that many icons"). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
+Few icons, for the things the game names over and over: the five resources, points, and a dragon for what your dragons eat beside the livestock they eat it from ("1 − 1🐉") (the owner, 2026-11-03: "use icons for core resources, there should not be that many icons"; 2026-11-05, on the dragons' livestock: "it should be on same row with a dragon icon"). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
 
 ## Checks before you add text
 
@@ -72,7 +72,7 @@ Few icons, for the things the game names over and over: the five resources and p
 - Is there an "it" or "they" whose thing isn't named nearby?
 - Is there a number written as a word, or a term from the "Not" column above?
 - Does the TV say the same thing the phone says, in the same words?
-- Is an icon standing for a word that isn't a resource or points? Write the word.
+- Is an icon standing for a word that isn't a resource, points or the dragons eating? Write the word.
 
 ## Sources
 

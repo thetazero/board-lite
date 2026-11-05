@@ -461,6 +461,26 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
 
+test('production says what the dragons eat apart from what is made, and so does the income', () => {
+  const g = newGame(2, 7);
+  const p = 0;
+  // Two dragons and only the tower's livestock left: both eat, from what's in stock too.
+  g.dragons.push({ ...g.dragons.find((d) => d.owner === p)!, id: 'd98' });
+  g.players[p].resources.livestock = 5;
+  const inc = seatState(g, p).income.livestock;
+  assert.equal(inc.base, TUNING.towerProduction.livestock ?? 0, 'the income is what is made');
+  assert.equal(inc.eat, 2 * TUNING.livestockPerDragon, 'and what the dragons eat, apart');
+  hatchAll(g);
+  advanceToRaidVote(g);
+  g.players[p].resources.livestock = 5;
+  const from = g.log.length;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
+  assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
+  assert.match(playerView(g, p), /livestock \d+ \(your dragons eat 2\)/);
+});
+
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
   const g = newGame(2, 7);
   keepAll(g);
