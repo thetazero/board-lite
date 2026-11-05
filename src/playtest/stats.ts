@@ -20,7 +20,7 @@ import { type Game, type GameEvent, score } from '../engine.ts';
 
 type Count = Record<string, number[]>; // key -> per seat
 
-export interface SeatPoints { buildings: number; titles: number; beasts: number; public: number }
+export interface SeatPoints { buildings: number; titles: number; beasts: number; raids: number; public: number }
 export interface GameStats {
   game: string;
   commit?: string; // the code it was played on, from results.json
@@ -85,11 +85,11 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     players: g.players.map((pl) => ({ ...pl, hand: [] })),
     buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrade: null, floors: 0 }])),
     dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => ({ ...d, stage: 0 })),
-    titles: { army: null, tower: null, hoard: null }, slain: {},
+    titles: { army: null, tower: null, hoard: null }, slain: {}, raidPoints: g.players.map(() => 0),
   };
   const dragon = (id: string) => r.dragons.find((d) => d.id === id)!;
   const snap = () => {
-    s.points.push(g.players.map((_, p) => { const x = score(r, p); return { buildings: x.buildings, titles: x.titles, beasts: x.beasts, public: x.public }; }));
+    s.points.push(g.players.map((_, p) => { const x = score(r, p); return { buildings: x.buildings, titles: x.titles, beasts: x.beasts, raids: x.raids, public: x.public }; }));
     for (const [t, h] of Object.entries(r.titles)) if (h !== null) bump(s.titleRounds, t, h, n);
   };
   let target = '';
@@ -148,6 +148,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'bail': s.raids.bailed[ev.p]++; break;
       case 'raidEnd':
         if (ev.won) s.raids.targets[target].fell++;
+        if (ev.scorer !== undefined) r.raidPoints[ev.scorer] += ev.points ?? 0;
         ev.winners.forEach((p, i) => {
           if (ev.won) s.raids.fell[p]++;
           if (Object.values(ev.shares[i] ?? {}).some((x) => x! > 0)) s.raids.loot[p]++;
@@ -178,7 +179,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   // The rebuilt end state against the saved one.
   g.players.forEach((_, p) => {
     const want = score(g, p), got = s.points.at(-1)![p];
-    for (const k of ['buildings', 'titles', 'beasts'] as const) {
+    for (const k of ['buildings', 'titles', 'beasts', 'raids'] as const) {
       if (want[k] !== got[k]) s.check.push(`P${p + 1} ${k}: rebuilt from the log ${got[k]}, the saved board ${want[k]}`);
     }
   });
@@ -320,7 +321,7 @@ function modelRolls(games: GameStats[]): ModelRoll[] {
   const maxR = Math.max(0, ...games.map((s) => s.rounds));
   const roundN: Record<string, number[]> = {};
   for (const s of games) s.seats.forEach((st, p) => {
-    const m = (out[st.model] ??= { model: st.model, seatGames: 0, wins: 0, src: { buildings: 0, titles: 0, beasts: 0, public: 0 }, hidden: 0, final: 0, byRound: zeros(maxR), n: {} });
+    const m = (out[st.model] ??= { model: st.model, seatGames: 0, wins: 0, src: { buildings: 0, titles: 0, beasts: 0, raids: 0, public: 0 }, hidden: 0, final: 0, byRound: zeros(maxR), n: {} });
     const rn = (roundN[st.model] ??= zeros(maxR));
     m.seatGames++;
     if (s.winner === p) m.wins++;

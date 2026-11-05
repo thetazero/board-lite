@@ -253,13 +253,15 @@ function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)
 }
 
 // Seat p reaches the points to win (shown, not hidden): their buildings worth
-// the most points, placed where they can go, until they do.
+// the most points, placed where they can go, then, once there's no room,
+// points from kingdoms taken, until they do.
 function pointsToWin(g: Game, p: number) {
   const worth = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].points && !BUILDINGS[k].onTower).sort((a, b) => BUILDINGS[b].points! - BUILDINGS[a].points! || (a < b ? -1 : 1));
   for (let i = 0; score(g, p).public < TUNING.pointsToWin; i++) {
     const at = worth.flatMap((type) => buildableHexes(g, p, type).sort().slice(0, 1).map((k) => ({ type, k })))[0];
-    if (!at || i > 50) throw new Error('pointsToWin: no room');
-    g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
+    if (i > 50) throw new Error('pointsToWin: no room');
+    if (at) g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
+    else g.raidPoints[p] += TUNING.pointsToWin - score(g, p).public;
   }
 }
 
@@ -626,6 +628,45 @@ export const SCENES: Scene[] = [
         { file: 'phone-raid-dragon-4p', caption: 'Phone, raid: a dragon in the roost tapped open', client: 'phone', seat: choosing, clicks: ['.roost [data-dragon]'] },
       ];
     },
+  },
+  {
+    // A raid on a kingdom that scores: what it's worth, and who leads for its points.
+    name: 'points-commit-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, p === t ? [3, 3, 3] : p === (t + 1) % 4 ? [3, 3] : [2]);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      sendAll(g, t);
+    },
+    shots: (g) => {
+      const choosing = seatWhere(g!, (p) => !g!.raid!.ready[p] && seatState(g!, p).raidReady.length >= 2);
+      return [
+        { file: 'tv-points-commit-4p', caption: 'TV, raid commitments on Cinderkeep: worth 1 point, and who leads for it', client: 'tv' },
+        { file: 'phone-points-commit-4p', caption: 'Phone: committing dragons against a kingdom that scores', client: 'phone', seat: choosing },
+      ];
+    },
+  },
+  {
+    // Cinderkeep falls: the raider with the most power standing scores its point.
+    name: 'points-result-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = turnOrder(g);
+      for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      toBail(g, [a, b]);
+      apply(g, b, 'fight');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-points-result-3p', caption: 'TV: Cinderkeep falls, and the most power standing scores its point', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
     name: 'bail-3p',

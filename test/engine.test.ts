@@ -661,6 +661,41 @@ test('raid loot is split by the combat power still fighting at the end', () => {
   assert.ok(shared > 0, 'some raids should be shared');
 });
 
+test('a scoring kingdom gives its points to the most power still fighting, ties in turn order', () => {
+  let scored = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    hatchAll(g);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    // Five adults each: who has the most standing at the end varies by seed.
+    g.dragons = [
+      ...['d1', 'd2', 'd3', 'd4', 'd5'].map((id) => ({ id, owner: 0, key: 'ember_wyrm', stage: 3, growth: 0, damage: 0 })),
+      ...['d6', 'd7', 'd8', 'd9', 'd10'].map((id) => ({ id, owner: 1, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0 })),
+      { id: 'd11', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 }, // stays home
+    ];
+    g.raid!.candidates = ['cinderkeep'];
+    g.raidsLeft = 2;
+    const before = [score(g, 0).raids, score(g, 1).raids];
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    apply(g, 0, 'commit d1 d2 d3 d4 d5'); apply(g, 1, 'commit d6 d7 d8 d9 d10');
+    apply(g, 0, 'ready'); apply(g, 1, 'ready');
+    apply(g, 0, 'fight'); apply(g, 1, 'fight');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd') continue;
+    const after = [score(g, 0).raids, score(g, 1).raids];
+    if (!end.won) { assert.deepEqual(after, before, 'a kingdom that holds scores nothing'); continue; }
+    const best = Math.max(...end.power);
+    const expected = turnOrder(g).find((p) => end.winners.includes(p) && end.power[end.winners.indexOf(p)] === best);
+    assert.equal(end.scorer, expected);
+    assert.equal(end.points, TARGETS.cinderkeep.points);
+    for (const p of [0, 1]) assert.equal(after[p] - before[p], p === expected ? TARGETS.cinderkeep.points : 0);
+    assert.equal(score(g, expected!).raids, TARGETS.cinderkeep.points);
+    scored++;
+  }
+  assert.ok(scored > 0, 'some raids should fall');
+});
+
 test('loot left over goes out 1 at a time, strongest first, carrying on across resources', () => {
   // 3 equal winners, 2 livestock and 2 gold: P1 and P2 take a livestock, P3 and P1 a gold.
   assert.deepEqual(splitLoot({ livestock: 2, gold: 2 }, [5, 5, 5]), [{ livestock: 1, gold: 1 }, { livestock: 1 }, { gold: 1 }]);

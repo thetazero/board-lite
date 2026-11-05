@@ -18,7 +18,8 @@ function tags(ps: number[], names: string[]): string {
 export function momentHtml(m: Moment, names: string[]): string {
   if (m.k === 'title') return `${playerTag(m.p, names)} takes <b>${esc(m.name)}</b>`;
   if (m.k === 'beast') return `${playerTag(m.p, names)} slays the <b>${esc(m.name)}</b> <span class="gain">+${m.points}${icon('points', 1)}</span>`;
-  return `<b>${esc(m.name)}</b> falls to ${tags(m.ps, names)}`;
+  const scored = m.scorer !== undefined ? `: ${playerTag(m.scorer, names)} <span class="gain">+${m.points}${icon('points', 1)}</span>` : '';
+  return `<b>${esc(m.name)}</b> falls to ${tags(m.ps, names)}${scored}`;
 }
 
 // Who a moment is about, for its marks on the race.
@@ -87,6 +88,7 @@ const PARTS = [
   { key: 'buildings', cls: 'buildings', label: 'Buildings' },
   { key: 'titles', cls: 'titles', label: 'Titles' },
   { key: 'beasts', cls: 'beasts', label: 'Great beasts' },
+  { key: 'raids', cls: 'kingdoms', label: 'Kingdoms' },
   { key: 'hidden', cls: 'hand', label: 'In hand' },
 ] as const;
 

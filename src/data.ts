@@ -333,6 +333,10 @@ export const UNITS: Record<string, UnitDef> = {
   frost_golem: { name: 'Frost Golem', hp: 16, targets: 1, dice: 1, sides: 6, element: 'ice' },
   storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, element: 'air' },
   sea_serpent: { name: 'Sea Serpent', hp: 14, targets: 2, dice: 1, sides: 4, element: 'water' },
+  // The two point-scoring kingdoms' leaders (#321): each one unit worth about
+  // two thirds of its kingdom's power, so taking one costs casualties.
+  fire_giant: { name: 'Fire Giant', hp: 96, targets: 2, dice: 2, sides: 12, element: 'fire' },
+  titan: { name: 'Titan', hp: 160, targets: 2, dice: 3, sides: 12, element: 'lightning' },
 };
 
 // Aggressive fauna: wild beasts on the map. A hex with fauna can't be built
@@ -378,13 +382,14 @@ export interface TargetDef {
   name: string;
   units: string[];
   loot: Bundle;
+  points?: number; // scored by the raider with the most power standing when it falls
 }
 
 export const TARGETS: Record<string, TargetDef> = {
   // A ladder of combat power (in brackets; a base adult dragon is 17), with
   // loot that grows with its square, about power² ÷ 18 in value: easy kingdoms
-  // give little, hard ones a lot. Per point of power sent, the hardest pays
-  // about three times the easiest. Brindle's one gold is the only gold a
+  // give little, hard ones a lot. Per point of power sent, Tidewatch pays
+  // about three times Brindle. Brindle's one gold is the only gold a
   // young dragon can win alone (#80). This is printed loot: each kingdom adds
   // 1 gold after every raid it doesn't fall in (the engine's hoard, #99).
   brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, gold: 1 } }, // 8
@@ -393,6 +398,11 @@ export const TARGETS: Record<string, TargetDef> = {
   knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 10, stone: 4 } }, // 28
   stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 17 } }, // 35
   tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 27, livestock: 4 } }, // 45
+  // The top two (#321) also score points, every time they fall, for the
+  // raider with the most combat power still fighting at the end: a way for
+  // late dragons to win the game that needs no land. Loot keeps to the curve.
+  cinderkeep: { name: 'Cinderkeep', units: ['fire_giant', 'knights', 'knights', 'knights'], loot: { gold: 62, crystal: 16, livestock: 16 }, points: 1 }, // 71
+  titans_throne: { name: "Titan's Throne", units: ['titan', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'knights', 'knights', 'knights'], loot: { gold: 190, stone: 18, timber: 18, crystal: 17 }, points: 2 }, // 121
 };
 
 export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => s + combatPower(UNITS[u]), 0);

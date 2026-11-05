@@ -73,7 +73,7 @@ function mapText(g: PublicState): string[] {
 }
 
 export function targetText(t: TargetView): string {
-  return `${t.name} — combat power ${t.power}; defenders: ${t.units.map((u) => `${u.name} (${unitStats(u)})`).join(', ')}; loot ${resText(t.loot)} (split by the combat power each player still has fighting at the end)`;
+  return `${t.name} — combat power ${t.power}; defenders: ${t.units.map((u) => `${u.name} (${unitStats(u)})`).join(', ')}; loot ${resText(t.loot)} (split by the combat power each player still has fighting at the end)${t.points ? `; worth ${t.points} point${t.points === 1 ? '' : 's'} each time it falls, to the player with the most combat power still fighting at the end` : ''}`;
 }
 
 export function faunaText(f: FaunaView): string {
@@ -231,7 +231,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
   });
   const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
   if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);
@@ -263,7 +263,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
   out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point${g.beasts[0]?.points === 1 ? '' : 's'} for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
-  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (power ${t.power}) ${resText(t.loot)}`).join('; ')}.`);
+  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (power ${t.power}) ${resText(t.loot)}${t.points ? `, worth ${t.points} point${t.points === 1 ? '' : 's'}` : ''}`).join('; ')}.`);
   if (g.raid) {
     out.push('');
     out.push(...raidText(g, you));
