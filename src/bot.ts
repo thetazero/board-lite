@@ -4,7 +4,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
   acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
-  upgradeTargets, waitingOn, RuleError, type Game,
+  score, upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
 import { neighbors } from './map.ts';
@@ -110,6 +110,26 @@ export function playOut(g: Game, rng: Rng, maxSteps = 20000): number {
   let steps = 0;
   while (g.phase !== 'over' && steps++ < maxSteps) botStep(g, rng);
   return steps;
+}
+
+// Bot games can stall short of the points to win: the board fills up before
+// anyone gets there. Tests and screenshots need games that end whatever the
+// tuning, so if no one has won by round `by`, the target drops to the
+// leader's points (never above the real one) and that round's end ends the
+// game. `step` makes one move. The tuning is put back after; this returns the
+// target the game ended on.
+export function playToEnd(g: Game, step: () => void, by = 40, maxSteps = 30000): number {
+  const target = TUNING.pointsToWin;
+  let ended = target;
+  try {
+    for (let steps = 0; g.phase !== 'over' && steps < maxSteps; steps++) {
+      if (g.round >= by) TUNING.pointsToWin = ended = Math.min(target, Math.max(1, ...g.players.map((_, p) => score(g, p).total)));
+      step();
+    }
+  } finally {
+    TUNING.pointsToWin = target;
+  }
+  return ended;
 }
 
 // The move made for a seat whose player has gone (quit, or away while the
