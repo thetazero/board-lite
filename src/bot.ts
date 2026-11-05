@@ -1,7 +1,7 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
   acceptProblem, apply, bankRates, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
@@ -64,8 +64,9 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
       if (hexes.length && canAfford(pl, BUILDINGS[b].cost)) out.push(`build ${b} ${pick(rng, hexes)}`);
     }
     const rates = bankRates(g, p);
-    const rich = RESOURCES.filter((r) => pl.resources[r] >= rates[r] + 2);
-    if (rich.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, RESOURCES.filter((r) => !rich.includes(r)).concat(['gold']))}`);
+    const rich = BASIC_RESOURCES.filter((r) => pl.resources[r] >= rates[r] + 2);
+    const poor = BASIC_RESOURCES.filter((r) => !rich.includes(r));
+    if (rich.length && poor.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, poor)}`);
     out.push('end');
     return out;
   }

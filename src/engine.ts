@@ -2,8 +2,8 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
-  type Attack, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
+  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
+  type Attack, type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
@@ -336,9 +336,10 @@ export function dragonCapacity(g: Game, p: number): number {
 }
 
 // What you give the bank for 1 of another resource, per resource you give:
-// 4, or a port's rate for its own resource.
-export function bankRates(g: Game, p: number): Record<Resource, number> {
-  const rates = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.bankRate])) as Record<Resource, number>;
+// 4, or a port's rate for its own resource. The bank trades basic resources
+// only, never gold (#279).
+export function bankRates(g: Game, p: number): Record<BasicResource, number> {
+  const rates = Object.fromEntries(BASIC_RESOURCES.map((r) => [r, TUNING.bankRate])) as Record<BasicResource, number>;
   for (const { def } of placed(g, p)) if (def.bankRate) rates[def.bankRate.resource] = Math.min(rates[def.bankRate.resource], def.bankRate.rate);
   return rates;
 }
@@ -1184,9 +1185,10 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     case 'bank': {
       const give = parseResource(args[0]), get = parseResource(args[1]);
       const times = args[2] ? Number(args[2]) : 1;
+      if (give === 'gold' || get === 'gold') fail(`The bank doesn't trade gold.`);
       if (give === get) fail(`Trade two different resources.`);
       if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
-      const rate = bankRates(g, p)[give];
+      const rate = bankRates(g, p)[give as BasicResource];
       pay(pl, { [give]: rate * times });
       gain(pl, { [get]: times });
       return log(g, `${pname(p)} trades ${rate * times} ${give} to the bank for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });

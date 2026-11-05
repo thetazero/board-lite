@@ -191,7 +191,9 @@ test('illegal moves are refused without changing the game', () => {
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
   assert.throws(() => apply(g, 0, 'build c999 0,0'), RuleError);
-  assert.throws(() => apply(g, 0, 'bank stone gold 2'), RuleError); // can't afford 8 stone
+  assert.throws(() => apply(g, 0, 'bank stone timber 2'), RuleError); // can't afford 8 stone
+  assert.throws(() => apply(g, 0, 'bank stone gold'), RuleError); // the bank doesn't trade gold
+  assert.throws(() => apply(g, 0, 'bank gold stone'), RuleError);
   assert.throws(() => apply(g, 0, 'dance'), RuleError);
   assert.equal(JSON.stringify(g), before);
 });
@@ -282,11 +284,12 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   apply(g, 0, `build cport ${harbor}`);
   assert.equal(g.buildings[harbor].type, 'stone_port');
   // 2:1 for stone only; everything else stays 4:1.
-  assert.deepEqual(bankRates(g, 0), { stone: 2, timber: 4, crystal: 4, livestock: 4, gold: 4 });
-  g.players[0].resources = { stone: 2, timber: 4, crystal: 0, livestock: 0, gold: 0 };
-  apply(g, 0, 'bank stone gold');
+  assert.deepEqual(bankRates(g, 0), { stone: 2, timber: 4, crystal: 4, livestock: 4 }); // no gold: the bank doesn't trade it
+  g.players[0].resources = { stone: 2, timber: 4, crystal: 0, livestock: 0, gold: 8 };
+  apply(g, 0, 'bank stone livestock');
   apply(g, 0, 'bank timber crystal');
-  assert.deepEqual(g.players[0].resources, { stone: 0, timber: 0, crystal: 1, livestock: 0, gold: 1 });
+  assert.throws(() => apply(g, 0, 'bank gold stone 2'), RuleError);
+  assert.deepEqual(g.players[0].resources, { stone: 0, timber: 0, crystal: 1, livestock: 1, gold: 8 });
 });
 
 test('a title needs its minimum as well as the lead', () => {
