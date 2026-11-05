@@ -12,13 +12,15 @@ import type { Moment, Recap } from './state.ts';
 export function buildRecap(g: Game, names: string[], id: string, ended: Date): Recap {
   const order = standings(g);
   const moments: Moment[] = [];
-  // Titles: the holder at the end of each round, against the round before.
+  // Titles: the holder at the end of each round, against the last holder told
+  // (a title nobody holds for a while, then back to the same player, isn't news).
   const held: Record<Title, number | null> = { army: null, tower: null, hoard: null };
   let roundTitles: Partial<Record<Title, number | null>> = {};
   let round = 0;
   const closeRound = () => {
     for (const [t, p] of Object.entries(roundTitles) as [Title, number | null][]) {
-      if (p !== held[t] && p !== null) moments.push({ round, k: 'title', t, name: TITLE_NAMES[t], p });
+      if (p === null || p === held[t]) continue;
+      moments.push({ round, k: 'title', t, name: TITLE_NAMES[t], p });
       held[t] = p;
     }
     roundTitles = {};
