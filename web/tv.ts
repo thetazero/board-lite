@@ -6,7 +6,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -14,7 +14,7 @@ import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
 import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
-import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, hitStep, madeOf, prodSpin, prodStep, scenesOf, type Scene } from './scenes.ts';
+import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -436,19 +436,23 @@ function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
 function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   const made = rolls.map((x) => {
     const ev = x.ev as Extract<EventView['ev'], { k: 'produce' }>;
-    return { p: ev.p, got: ev.got, rows: madeOf(ev).map((r) => {
+    return { p: ev.p, got: ev.got, eat: eatOf(ev), rows: madeOf(ev).map((r) => {
       const dice = (x.dice ?? []).filter((d) => d.resource === r);
       return { r, dice, base: ev.got[r]! - dice.reduce((s, d) => s + d.value, 0), total: ev.got[r]! };
     }) };
   });
-  const all = made.reduce((s, m) => s + m.rows.length, 0);
+  const all = rolls.reduce((s, x) => s + prodRowsOf(x.ev), 0);
   const step = prodStep(all), spin = prodSpin(all);
   const row = (x: (typeof made)[number]['rows'][number]) => {
     const parts = [x.base ? `<b class="base">${x.base}</b>` : '', ...x.dice.map((d) => dieFace(d.sides, d.value, 'rolling'))].filter(Boolean);
     return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${parts.join('<i>+</i>')}</span>${x.dice.length ? `<span class="eq"><i>=</i><b>${x.total}</b></span>` : ''}</li>`;
   };
-  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${gainChips(m.got, 1.4)}</div></section>`).join('');
-  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${gainChips(m.got, 1.4)}</span></li>`).join('');
+  // Their dragons eat after, in a row of its own in red, so what the buildings
+  // make and what the dragons eat both show (#309); the total is what's left.
+  const eatRow = (n: number) => (n ? `<li class="prow eat">${resIcon('livestock', 1.5)}<span class="parts"><b class="base">−${n}</b></span><span class="what">Dragons eat</span></li>` : '');
+  const net = (m: (typeof made)[number]) => netChips({ ...m.got, livestock: (m.got.livestock ?? 0) - m.eat }, 1.4);
+  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}${eatRow(m.eat)}</ul><div class="ptotal">${net(m)}</div></section>`).join('');
+  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${net(m)}</span></li>`).join('');
   const play = (el: HTMLElement) => {
     const at = (t: number, f: () => void) => setTimeout(f, t);
     const cardEls = el.querySelectorAll<HTMLElement>('.production .pturn');

@@ -234,6 +234,12 @@ export function gainChips(b: Res, size = 1.25): string {
   return RESOURCES.filter((r) => (b[r] ?? 0) > 0).map((r) => `<span class="chip">+${b[r]}${resIcon(r, size)}</span>`).join('');
 }
 
+// The same with losses too, in red: "+3 stone −1 livestock". A resource that
+// comes out even isn't shown; all even is "+0".
+export function netChips(b: Res, size = 1.25): string {
+  return RESOURCES.filter((r) => b[r]).map((r) => (b[r]! > 0 ? `<span class="chip">+${b[r]}${resIcon(r, size)}</span>` : `<span class="chip minus">−${-b[r]!}${resIcon(r, size)}</span>`)).join('') || '<span class="chip">+0</span>';
+}
+
 // A building as it sits on the map: its owner's disc with the building's mark,
 // and the upgrade's badge when it carries one.
 export function buildingChip(type: string, owner: number, upgrade: string | null = null, size = 26, cls?: string): string {

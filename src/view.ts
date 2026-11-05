@@ -45,8 +45,8 @@ function dragonLine(d: DragonView): string {
   return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
-function amounts(x: Record<string, { base: number; dice: number[] }>): string {
-  return Object.entries(x).filter(([, v]) => v.base || v.dice.length).map(([r, v]) => `${r} ${v.base}${v.dice.map((d) => `+d${d}`).join('')}`).join(', ') || 'nothing';
+function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
+  return Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat).map(([r, v]) => `${r} ${v.base}${v.dice.map((d) => `+d${d}`).join('')}${v.eat ? ` (your dragons eat ${v.eat})` : ''}`).join(', ') || 'nothing';
 }
 
 function mapText(g: PublicState): string[] {
@@ -236,7 +236,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('');
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
-  out.push(`Each round you gain (production minus what your dragons eat): ${amounts(you.income)}.`);
+  out.push(`Each round you make: ${amounts(you.income)}.`);
   out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);

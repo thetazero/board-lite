@@ -324,6 +324,8 @@ q::after { content: close-quote; }
 .production .base { min-width: 1em; text-align: center; }
 .production .eq { opacity: 0; transition: opacity .25s ease-out; }
 .production .prow.landed .eq { opacity: 1; }
+.production .prow.eat, .production .chip.minus { color: var(--bad); }
+.production .prow.eat .what { font-size: .6em; font-weight: 700; }
 .production .ptotal { margin-top: .3em; padding-top: .3em; border-top: 2px solid color-mix(in srgb, var(--pc) 45%, transparent); opacity: 0; transition: opacity .3s ease-out; }
 .production .ptotal.up { opacity: 1; }
 .production .psum { align-self: center; }
@@ -580,7 +582,7 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 .me .pts { font-weight: 800; font-size: 1.3em; margin-left: auto; display: inline-flex; align-items: center; gap: .25em; }
 .resbar { display: grid; grid-template-columns: repeat(5, 1fr); background: #0000000d; border-top: 1px dashed var(--paper-edge); padding: .4em .3em; text-align: center; }
 .res { display: flex; align-items: center; justify-content: center; gap: .2em; }
-.res { flex-direction: column; gap: 0; }
+.res { flex-direction: column; gap: 0; justify-content: flex-start; }
 .res > div { display: flex; align-items: center; gap: .2em; }
 .res b { font-size: 1.4em; }
 .res.zero > div { opacity: .45; }
