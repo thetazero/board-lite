@@ -342,8 +342,13 @@ function placed(g: Game, p: number): { k: string; b: Building; def: BuildingDef;
   return ownedBuildings(g, p).filter(([, b]) => b.type !== 'tower').map(([k, b]) => ({ k, b, def: BUILDINGS[b.type], n: times(g, k, BUILDINGS[b.type]) }));
 }
 
+// The dragons a tower houses: its own, plus each floor's.
+function towerHouses(floors: number): number {
+  return TUNING.towerDragonCapacity + floors * (BUILDINGS.tower_floor.dragonCapacity ?? 0);
+}
+
 export function dragonCapacity(g: Game, p: number): number {
-  let cap = TUNING.towerDragonCapacity;
+  let cap = towerHouses(g.buildings[g.towers[p]]?.floors ?? 0);
   for (const { def, n } of placed(g, p)) cap += (def.dragonCapacity ?? 0) * n;
   for (const [, b] of ownedBuildings(g, p)) if (b.upgrade) cap += UPGRADES[b.upgrade].dragonCapacity ?? 0;
   return cap;
@@ -407,7 +412,7 @@ export function buildingYield(g: Game, k: string, upgrade: string | null = g.bui
   };
   if (b.type === 'tower') {
     for (const r of RESOURCES) add(r, TUNING.towerProduction[r] ?? 0);
-    return { makes, houses: TUNING.towerDragonCapacity + (up?.dragonCapacity ?? 0), points: 0 };
+    return { makes, houses: towerHouses(b.floors) + (up?.dragonCapacity ?? 0), points: 0 };
   }
   const def = BUILDINGS[b.type];
   const n = times(g, k, def);

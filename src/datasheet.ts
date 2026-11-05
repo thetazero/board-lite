@@ -134,7 +134,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
-Titles: ${TUNING.titlePoints} points each, for most combat power across your dragons (at least ${TUNING.titleMinimum.army}; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
+Titles: ${TUNING.titlePoints} points each, for most combat power across your dragons (at least ${TUNING.titleMinimum.army}; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth no other points (each houses ${BUILDINGS.tower_floor.dragonCapacity} more dragon); gold held is worth points only through Largest Hoard.`;
 }
 
 function dragons(): string {
