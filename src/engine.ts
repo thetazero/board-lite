@@ -70,6 +70,7 @@ export interface Raid {
 export interface Die {
   sides: number;
   value: number;
+  resource?: Resource; // what a production die rolls for
 }
 
 export interface LogEntry {
@@ -505,7 +506,7 @@ function startRound(g: Game) {
       got[r] = prod[r].base;
       for (const sides of prod[r].dice) {
         const value = roll(g.rng, sides);
-        dice.push({ sides, value });
+        dice.push({ sides, value, resource: r });
         got[r]! += value;
       }
     }

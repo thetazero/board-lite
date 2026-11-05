@@ -314,7 +314,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 1 && g.phase === 'action',
     shots: (g) => [
-      { file: 'tv-opening-production-2p', caption: 'TV, round 1 (2 players): the round opens (no dice to roll yet)', client: 'tv', waitMs: 600 },
+      { file: 'tv-opening-production-2p', caption: "TV, round 1 (2 players): production, the first player's tower only (no dice to roll yet)", client: 'tv', waitFor: '#overlay .production .pturn.on .ptotal.up', hold: true, waitMs: 500 },
       { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-opening-waiting-2p', caption: "Phone, round 1: someone else's turn", client: 'phone', seat: (g!.turn + 1) % 2 },
       { file: 'phone-reconnecting', caption: 'Phone: the connection to the server dropped', client: 'phone', seat: g!.turn, offline: true },
@@ -661,7 +661,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitFor: '#overlay .production li.up:nth-child(3)', hold: true }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round's production, one player at a time: the second player's resources, dice landed, and their total", client: 'tv', live: true, waitFor: '#overlay .production .pturn.on:nth-child(2) .ptotal.up', hold: true, waitMs: 500 }],
   },
   {
     name: 'production-done-6p',
@@ -674,7 +674,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
+    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: production ends with everyone's totals together (6 players)", client: 'tv', live: true, waitFor: '#overlay .production .psum.on', hold: true, waitMs: 500 }],
   },
   {
     name: 'late-6p',

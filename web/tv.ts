@@ -6,13 +6,13 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
-import { FIGHT_LEAD_MS, ROLL_LEAD_MS, ROLL_SPIN_MS, ROLL_STAGGER_MS, hitStep, scenesOf, type Scene } from './scenes.ts';
+import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, hitStep, madeOf, prodSpin, prodStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -401,32 +401,60 @@ function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
   return { html: `<div class="result"><h1>${eventHtml(fresh[sc.at], g, names)}</h1></div>`, ms: sc.ms, top: { round: fresh[sc.at].round, phase: 'Raid' } };
 }
 
-// A new round's production, as the table would roll it: everyone's dice
-// tumbling, each player's a moment after the last's, and landing. Only the
-// rolls: what they bring in is each player's own business, on their phone.
-// A round nobody rolls in still opens with its number, briefly.
+// A new round's production, one player at a time (#230), so someone watching
+// can tell what each roll is for: the player's card lists what they make, one
+// resource at a time (its icon, the fixed amount, that resource's dice tumbling
+// and landing, the total), then their total. At the end, everyone's totals
+// together. Every card and the summary share one place on the sheet, so the
+// sheet is its final size from the start and nothing moves. The timings are
+// scenes.ts's, which the server holds the phones for.
+// A round nobody makes anything in still opens with its number, briefly.
 function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
-  const rows = rolls.map((x) => {
-    const p = (x.ev as Extract<EventView['ev'], { k: 'produce' }>).p;
-    return `<li style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="dice">${x.dice!.map((d) => dieFace(d.sides, d.value, 'rolling')).join('')}</span></li>`;
-  }).join('');
-  const play = (el: HTMLElement) => {
-    el.querySelectorAll<HTMLElement>('.production li').forEach((li, k) => setTimeout(() => {
-      li.classList.add('up');
-      // Spin the dice for a moment, then land on what they rolled.
-      const dice = li.querySelectorAll<HTMLElement>('.die.rolling');
-      const finals = Array.from(dice, (d) => d.querySelector('b')!.textContent);
-      const spin = setInterval(() => dice.forEach((d) => (d.querySelector('b')!.textContent = String(1 + Math.floor(Math.random() * Number(d.dataset.sides))))), 70);
-      setTimeout(() => {
-        clearInterval(spin);
-        dice.forEach((d, i) => {
-          d.querySelector('b')!.textContent = finals[i];
-          d.classList.remove('rolling');
-        });
-      }, ROLL_SPIN_MS);
-    }, ROLL_LEAD_MS + k * ROLL_STAGGER_MS));
+  const made = rolls.map((x) => {
+    const ev = x.ev as Extract<EventView['ev'], { k: 'produce' }>;
+    return { p: ev.p, got: ev.got, rows: madeOf(ev).map((r) => {
+      const dice = (x.dice ?? []).filter((d) => d.resource === r);
+      return { r, dice, base: ev.got[r]! - dice.reduce((s, d) => s + d.value, 0), total: ev.got[r]! };
+    }) };
+  });
+  const all = made.reduce((s, m) => s + m.rows.length, 0);
+  const step = prodStep(all), spin = prodSpin(all);
+  const row = (x: (typeof made)[number]['rows'][number]) => {
+    const parts = [x.base ? `<b class="base">${x.base}</b>` : '', ...x.dice.map((d) => dieFace(d.sides, d.value, 'rolling'))].filter(Boolean);
+    return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${parts.join('<i>+</i>')}</span>${x.dice.length ? `<span class="eq"><i>=</i><b>${x.total}</b></span>` : ''}</li>`;
   };
-  return { html: `<div class="production"><h1>Round ${round}</h1>${rows ? `<ul>${rows}</ul>` : ''}</div>`, ms, play, top: { round, phase: 'Production' } };
+  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${gainChips(m.got, 1.4)}</div></section>`).join('');
+  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${gainChips(m.got, 1.4)}</span></li>`).join('');
+  const play = (el: HTMLElement) => {
+    const at = (t: number, f: () => void) => setTimeout(f, t);
+    const cardEls = el.querySelectorAll<HTMLElement>('.production .pturn');
+    let t = PROD_LEAD_MS;
+    cardEls.forEach((card, k) => {
+      at(t, () => { cardEls[k - 1]?.classList.remove('on'); card.classList.add('on'); });
+      t += PROD_PLAYER_IN_MS;
+      card.querySelectorAll<HTMLElement>('.prow').forEach((li) => {
+        at(t, () => {
+          li.classList.add('up');
+          // Spin the dice for a moment, then land on what they rolled.
+          const dice = li.querySelectorAll<HTMLElement>('.die.rolling');
+          if (!dice.length) return li.classList.add('landed');
+          const finals = Array.from(dice, (d) => d.querySelector('b')!.textContent);
+          const tumble = setInterval(() => dice.forEach((d) => (d.querySelector('b')!.textContent = String(1 + Math.floor(Math.random() * Number(d.dataset.sides))))), 70);
+          at(spin, () => {
+            clearInterval(tumble);
+            dice.forEach((d, i) => { d.querySelector('b')!.textContent = finals[i]; d.classList.remove('rolling'); });
+            li.classList.add('landed');
+          });
+        });
+        t += step;
+      });
+      at(t, () => card.querySelector('.ptotal')!.classList.add('up'));
+      t += PROD_TOTAL_MS;
+    });
+    at(t, () => { cardEls[cardEls.length - 1]?.classList.remove('on'); el.querySelector('.production .psum')?.classList.add('on'); });
+  };
+  const body = made.length ? `<h2>Production</h2><div class="pstage">${cards}<ul class="psum">${sum}</ul></div>` : '';
+  return { html: `<div class="production"><h1>Round ${round}</h1>${body}</div>`, ms, play, top: { round, phase: 'Production' } };
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow: the
