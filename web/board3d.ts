@@ -1465,9 +1465,9 @@ function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry 
 }
 function plate(upgrade: string | null, ground: string): THREE.Group {
   const g = new THREE.Group();
-  g.add(part(cyl(0.9, 0.9, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
+  g.add(part(cyl(0.76, 0.76, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
   if (upgrade) {
-    g.add(part(hexRing(0.78, 0.7, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
+    g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
     const mark = bake(upgradeMark(upgrade));
     mark.scale.setScalar(1.6);
     mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
@@ -1477,35 +1477,88 @@ function plate(upgrade: string | null, ground: string): THREE.Group {
 }
 
 // A player's territory, the hexes their buildings stand on, bordered in their
-// colour: a band just inside each edge where the next hex isn't theirs, so
-// their hexes read as one region, and two players' regions side by side each
-// keep their own line.
-const BORDER_R = 0.965, BORDER_W = 0.17; // the band, from the tile's edge in (as a corner radius)
-function territoryGeometry(hexes: [number, number][]): THREE.BufferGeometry | null {
+// colour: one paper strip, lying on the folded tiles, right along the edge of
+// the region. It runs inside each edge where the next hex isn't theirs, joins
+// at every corner (and across the fold where the region turns from one hex to
+// the next), and where two players' regions meet their strips touch on the
+// edge, so the border is one line in two colours.
+const BORDER_W = 0.15, BORDER_T = 0.035; // the strip's width (in from the hex's edge) and its paper thickness
+function territoryGeometry(hexes: { k: string; q: number; r: number }[]): THREE.BufferGeometry | null {
+  const peakH = TILE_H + TILE_LIFT, midH = TILE_H + TILE_LIFT * 0.45, R = 0.965;
   const key = (x: number, z: number) => `${Math.round(x * 10)},${Math.round(z * 10)}`;
-  const mine = new Set(hexes.map(([x, z]) => key(x, z)));
-  const corner = (x: number, z: number, i: number, r: number) => {
-    const a = (Math.PI / 180) * (60 * i - 30);
-    return new THREE.Vector2(x + r * Math.cos(a), -(z + r * Math.sin(a)));
+  const at = new Map(hexes.map((h) => {
+    const [x, z] = hexXZ(h.q, h.r);
+    return [key(x, z), { x, z, lift: (rng(`tile${h.k}`)() - 0.5) * 0.02 }] as const; // the tile's own lift, as buildMap sets it
+  }));
+  // The height of a hex's folded top at a point (dx, dz) from its middle,
+  // carried on past its edge to the true hex boundary.
+  const surface = (lift: number, dx: number, dz: number) => {
+    const r = Math.hypot(dx, dz);
+    if (r < 1e-6) return peakH + lift;
+    const a = Math.atan2(dz, dx);
+    const off = Math.atan2(Math.sin(a - Math.round(a / (Math.PI / 3)) * (Math.PI / 3)), Math.cos(a - Math.round(a / (Math.PI / 3)) * (Math.PI / 3))); // from the nearest edge middle
+    const edgeR = (R * Math.cos(Math.PI / 6)) / Math.cos(off);
+    const edgeH = midH + (TILE_H - midH) * (Math.abs(Math.tan(off)) / Math.tan(Math.PI / 6));
+    return lift + peakH + (r / edgeR) * (edgeH - peakH) + 0.004;
   };
-  const parts: THREE.BufferGeometry[] = [];
-  for (const [x, z] of hexes) {
+  const pos: number[] = [];
+  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+    const up = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).y >= 0;
+    for (const v of up ? [a, b, c] : [a, c, b]) pos.push(v.x, v.y, v.z);
+  };
+  // A strip piece over the ground points `outer` and `inner` (same length),
+  // given its height on the paper: its top, and the sides along its inner edge
+  // and its outer edge, down to the tile.
+  const strip = (outer: THREE.Vector3[], inner: THREE.Vector3[]) => {
+    const top = (v: THREE.Vector3) => v.clone().setY(v.y + BORDER_T);
+    const low = (v: THREE.Vector3) => v.clone().setY(v.y - 0.03);
+    for (let i = 0; i + 1 < outer.length; i++) {
+      const [o0, o1, i0, i1] = [outer[i], outer[i + 1], inner[i], inner[i + 1]];
+      tri(top(o0), top(o1), top(i1));
+      tri(top(o0), top(i1), top(i0));
+      for (const [p, q] of [[o0, o1], [i0, i1]]) {
+        const side = [top(p), top(q), low(q), low(p)];
+        pos.push(...[side[0], side[2], side[1], side[0], side[3], side[2]].flatMap((v) => [v.x, v.y, v.z]));
+      }
+    }
+  };
+  const ground = (c: { x: number; z: number; lift: number }, r: number, deg: number) => {
+    const a = (Math.PI / 180) * deg;
+    const dx = r * Math.cos(a), dz = r * Math.sin(a);
+    return new THREE.Vector3(c.x + dx, surface(c.lift, dx, dz), c.z + dz);
+  };
+  const inR = 1 - BORDER_W / Math.cos(Math.PI / 6); // the inner edge, as a corner radius
+  for (const c of at.values()) {
+    const next = (i: number) => {
+      const a = (Math.PI / 3) * i;
+      return at.get(key(c.x + SQ3 * Math.cos(a), c.z + SQ3 * Math.sin(a)));
+    };
     for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 180) * 60 * i; // the edge from corner i to i + 1 faces this way
-      if (mine.has(key(x + SQ3 * Math.cos(a), z + SQ3 * Math.sin(a)))) continue;
-      const shape = new THREE.Shape([corner(x, z, i, BORDER_R), corner(x, z, i + 1, BORDER_R), corner(x, z, i + 1, BORDER_R - BORDER_W), corner(x, z, i, BORDER_R - BORDER_W)]);
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: PLATE_H * 1.5, bevelEnabled: false });
-      geo.rotateX(-Math.PI / 2);
-      parts.push(geo.toNonIndexed());
+      if (next(i)) continue;
+      // The edge from corner i (at 60i - 30 degrees) to corner i + 1, through its middle.
+      const degs = [60 * i - 30, 60 * i, 60 * i + 30];
+      const rs = [1, Math.cos(Math.PI / 6), 1];
+      strip(degs.map((d, j) => ground(c, rs[j], d)), degs.map((d, j) => ground(c, rs[j] * inR, d)));
+      // The region turns into the next hex at corner i + 1: the gap between
+      // this strip's end and that hex's, across their shared edge, filled in.
+      const b = next(i + 1);
+      if (b) {
+        const v = ground(c, 1, 60 * i + 30);
+        const mine = ground(c, inR, 60 * i + 30);
+        const dx = v.x - b.x, dz = v.z - b.z;
+        const theirs = new THREE.Vector3(b.x + dx * inR, surface(b.lift, dx * inR, dz * inR), b.z + dz * inR);
+        tri(v.clone().setY(v.y + BORDER_T), mine.clone().setY(mine.y + BORDER_T), theirs.clone().setY(theirs.y + BORDER_T));
+        const side = [mine, theirs].map((p) => [p.clone().setY(p.y + BORDER_T), p.clone().setY(p.y - 0.03)]);
+        pos.push(...[side[0][0], side[1][1], side[1][0], side[0][0], side[0][1], side[1][1]].flatMap((p) => [p.x, p.y, p.z]));
+      }
     }
   }
-  if (!parts.length) return null;
-  const merged = new THREE.BufferGeometry();
-  for (const [name, size] of [['position', 3], ['normal', 3], ['uv', 2]] as const) {
-    merged.setAttribute(name, new THREE.Float32BufferAttribute(parts.flatMap((g) => Array.from(g.getAttribute(name).array as Float32Array)), size));
-  }
-  parts.forEach((g) => g.dispose());
-  return merged;
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from({ length: pos.length / 3 }, (_, i) => [pos[i * 3] * 0.5, pos[i * 3 + 2] * 0.5]).flat(), 2));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ---------- dragons ----------
@@ -1880,14 +1933,13 @@ export class Board3D {
       this.territory.remove(c);
       dispose(c);
     }
-    const byOwner = new Map<number, [number, number][]>();
-    for (const h of map) if (h.building) byOwner.set(h.building.owner, [...(byOwner.get(h.building.owner) ?? []), hexXZ(h.q, h.r)]);
+    const byOwner = new Map<number, HexView[]>();
+    for (const h of map) if (h.building) byOwner.set(h.building.owner, [...(byOwner.get(h.building.owner) ?? []), h]);
     for (const [owner, hexes] of byOwner) {
       const geo = territoryGeometry(hexes);
       if (!geo) continue;
       const m = new THREE.Mesh(geo, this.plateMats[owner]);
-      m.position.y = TOP;
-      m.receiveShadow = true;
+      m.castShadow = m.receiveShadow = true;
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), CREASE));
       this.territory.add(m);
     }
