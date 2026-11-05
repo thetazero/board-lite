@@ -1,5 +1,5 @@
 // The TV's scenes: the moments the whole table looks up together (a round's
-// production roll, a fight replayed, a raid nobody joined). The TV plays them
+// production, a fight replayed, a raid nobody joined). The TV plays them
 // (tv.ts) and the server holds everyone's next decision until they're over
 // (src/server/room.ts), so the TV and the phones are always on the same
 // moment. Both read the scenes and their lengths from here.
@@ -9,7 +9,7 @@ import type { GameEvent } from '../src/engine.ts';
 export interface SceneEvent { round: number; ev?: GameEvent; dice?: unknown[] }
 
 export type Scene =
-  | { kind: 'roll'; at: number; rolls: number[]; ms: number } // at: the round event; rolls: the produce events with dice
+  | { kind: 'roll'; at: number; rolls: number[]; ms: number } // at: the round event; rolls: the produce events of players who make anything
   | { kind: 'fight'; at: number; combat: number[]; end: number | null; ms: number } // a raid's fight; end: its raidEnd
   | { kind: 'hunt'; at: number; combat: number[]; end: number | null; ms: number } // a fight against fauna; end: its cleared
   | { kind: 'noRaid'; at: number; ms: number };
@@ -19,12 +19,31 @@ export type Scene =
 // look up. So nothing important happens in a scene's first beat, and its
 // result stays up long enough to read after looking up late.
 
-// A beat to look up, then each player's dice tumble a moment after the last's
-// and land; then the table reads them.
-export const ROLL_LEAD_MS = 900;
-export const ROLL_STAGGER_MS = 400;
-export const ROLL_SPIN_MS = 1200;
-const rollMs = (n: number) => (n ? ROLL_LEAD_MS + (n - 1) * ROLL_STAGGER_MS + ROLL_SPIN_MS + 3000 : 2200);
+// A round's production, one player at a time (#230): a beat to look up, then
+// each player's card comes in and lists what they make, one resource at a
+// time: the fixed amount, then that resource's dice tumbling and landing, then
+// the total. Then the player's total, held a moment, and the next player. At
+// the end, everyone's totals together, long enough to read after looking up
+// late. A big table has many rows, so each row's step shrinks to keep every
+// row together within PROD_ROWS_MAX_MS.
+export const PROD_LEAD_MS = 900;
+export const PROD_PLAYER_IN_MS = 450;
+export const PROD_ROW_MS = 900;
+export const PROD_ROWS_MAX_MS = 10000;
+export const PROD_TOTAL_MS = 1000;
+export const PROD_END_MS = 3500;
+export const prodStep = (rows: number) => Math.min(PROD_ROW_MS, PROD_ROWS_MAX_MS / Math.max(1, rows));
+// How long a row's dice tumble before they land: most of the row's step.
+export const prodSpin = (rows: number) => Math.round(prodStep(rows) * 0.65);
+// rows: for each player who makes anything, how many resources they make.
+export const prodMs = (rows: number[]) => {
+  if (!rows.length) return 2200; // nothing made: the round's number, briefly
+  const all = rows.reduce((a, b) => a + b, 0);
+  return PROD_LEAD_MS + rows.length * (PROD_PLAYER_IN_MS + PROD_TOTAL_MS) + all * prodStep(all) + PROD_END_MS;
+};
+// The resources a produce event's player makes something of, in order.
+const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
+export const madeOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? RESOURCES.filter((r) => (ev.got[r] ?? 0) > 0) : []);
 
 // A fight: a beat to look up and see who's there, the hits (at most 6 s of
 // them), then the outcome long enough to read.
@@ -52,8 +71,8 @@ export function scenesOf(events: SceneEvent[]): Scene[] {
   events.forEach((e, at) => {
     const ev = e.ev;
     if (ev?.k === 'round') {
-      const rolls = events.flatMap((x, j) => (j > at && x.round === e.round && x.ev?.k === 'produce' && x.dice?.length ? [j] : []));
-      out.push({ kind: 'roll', at, rolls, ms: rollMs(rolls.length) });
+      const rolls = events.flatMap((x, j) => (j > at && x.round === e.round && madeOf(x.ev).length ? [j] : []));
+      out.push({ kind: 'roll', at, rolls, ms: prodMs(rolls.map((j) => madeOf(events[j].ev).length)) });
     } else if (ev?.k === 'fight') {
       const f = fightOf(at, 'raidEnd');
       out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat)) });

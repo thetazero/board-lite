@@ -70,6 +70,7 @@ export interface Raid {
 export interface Die {
   sides: number;
   value: number;
+  resource?: Resource; // what a production die rolls for
 }
 
 export interface LogEntry {
@@ -368,21 +369,51 @@ export function onPeak(g: Game, k: string): boolean {
   return g.slain.thunderbird !== undefined && (k === PEAK || neighbors(PEAK).includes(k));
 }
 
+// What one building does each round, wherever it stands: what it makes (a
+// fixed amount plus dice, per resource, only those it makes), how many dragons
+// it houses, and its points. Given an upgrade, as it would be with that one
+// instead (what placing an upgrade card shows before you confirm). It ignores
+// a beast or a perched dragon on it: that stops the making, not the building.
+export interface BuildingYield {
+  makes: Partial<Record<Resource, { base: number; dice: number[] }>>;
+  houses: number;
+  points: number;
+}
+
+export function buildingYield(g: Game, k: string, upgrade: string | null = g.buildings[k].upgrade): BuildingYield {
+  const b = g.buildings[k];
+  const up = upgrade ? UPGRADES[upgrade] : null;
+  const makes: BuildingYield['makes'] = {};
+  const add = (r: Resource, base: number, die?: number) => {
+    if (!base && !die) return;
+    const m = (makes[r] ??= { base: 0, dice: [] });
+    m.base += base;
+    if (die) m.dice.push(die);
+  };
+  if (b.type === 'tower') {
+    for (const r of RESOURCES) add(r, TUNING.towerProduction[r] ?? 0);
+    for (const r of RESOURCES) add(r, up?.makes?.[r] ?? 0);
+    return { makes, houses: TUNING.towerDragonCapacity + (up?.dragonCapacity ?? 0), points: 0 };
+  }
+  const def = BUILDINGS[b.type];
+  const n = times(g, k, def);
+  if (def.produces) add(def.produces.resource, def.produces.base, def.produces.die);
+  for (const r of RESOURCES) add(r, (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0));
+  const made = madeResource(def);
+  if (made && up?.baseBonus) add(made, up.baseBonus);
+  if (made && onPeak(g, k)) add(made, TUNING.peakBonus);
+  return { makes, houses: (def.dragonCapacity ?? 0) * n + (up?.dragonCapacity ?? 0), points: buildingPoints(g, k) };
+}
+
 // Public production: fixed amount plus a list of dice, per resource.
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
-  for (const r of RESOURCES) out[r].base += TUNING.towerProduction[r] ?? 0;
-  for (const { k, b, def, n } of placed(g, p)) {
+  for (const [k] of ownedBuildings(g, p)) {
     if (blocked(g, k)) continue; // a building under a beast or a perched dragon makes nothing
-    const up = b.upgrade ? UPGRADES[b.upgrade] : null;
-    if (def.produces) {
-      out[def.produces.resource].base += def.produces.base;
-      out[def.produces.resource].dice.push(def.produces.die);
+    for (const [r, m] of Object.entries(buildingYield(g, k).makes) as [Resource, { base: number; dice: number[] }][]) {
+      out[r].base += m.base;
+      out[r].dice.push(...m.dice);
     }
-    for (const r of RESOURCES) out[r].base += (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0);
-    const made = madeResource(def);
-    if (made && up?.baseBonus) out[made].base += up.baseBonus;
-    if (made && onPeak(g, k)) out[made].base += TUNING.peakBonus;
   }
   return out;
 }
@@ -505,7 +536,7 @@ function startRound(g: Game) {
       got[r] = prod[r].base;
       for (const sides of prod[r].dice) {
         const value = roll(g.rng, sides);
-        dice.push({ sides, value });
+        dice.push({ sides, value, resource: r });
         got[r]! += value;
       }
     }

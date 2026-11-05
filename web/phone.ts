@@ -27,7 +27,12 @@ let stop: (() => void) | null = null;
 // UI state that lives only on this phone (not in the game).
 let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
 // Picking a hex: what for (`about`: what's being placed, shown under the map).
-let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string } | null = null;
+// With `confirm`, a tap only picks the hex: what it does shows under the map
+// (`detail`), and the confirm button (`verb`) carries out the command.
+let picking: {
+  title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string;
+  confirm?: { verb: string; detail: (hex: string) => string }; picked?: string;
+} | null = null;
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
 // Sending dragons to a hex: to clear what holds it, or to perch on a rival's building.
 let hunting: { hex: string; chosen: Set<string>; perch?: boolean } | null = null;
@@ -48,6 +53,10 @@ let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
 let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
+// The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
+// A new screen tucks it again, if no card can be played there either.
+let handUp: string | null = null;
+let screenKey = ''; // the key of the screen shown now
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
 let seenHand: Set<string> | null = null;
@@ -274,7 +283,7 @@ function offerNotice(text: string) {
 }
 
 function renderWatch(me: Me) {
-  document.body.classList.remove('has-hand', 'raiding', 'hand-below');
+  document.body.classList.remove('has-hand', 'hand-tucked', 'hand-below');
   morph(app, screen('watch', `<div class="watchtv" style="--pc:${PLAYER_COLORS[me.seat]}"><span class="pname">${esc(me.name)}</span><h1>${snap?.lobby.remote ? 'Watch the table' : 'Watch the TV'}</h1></div>`));
 }
 
@@ -305,7 +314,7 @@ function leaveToJoin(msg: string) {
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
-  document.body.classList.remove('has-hand', 'hand-below', 'raiding');
+  document.body.classList.remove('has-hand', 'hand-below', 'hand-tucked');
   document.body.style.removeProperty('--hs');
   renderJoin('', undefined, msg);
 }
@@ -632,17 +641,27 @@ function render() {
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : dragonOpen ? dragonZoom(g, dragonOpen) : '';
-  // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
-  const dock = !choosing && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
-  document.body.classList.toggle('has-hand', !!dock);
-  document.body.classList.toggle('raiding', g.phase === 'raid');
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
   const key = picking ? `pick ${picking.title}` : choosing ? 'hunt' : g.phase === 'over' ? 'over'
     : g.phase === 'raid' ? `raid ${g.round} ${g.raidsLeft} ${g.raid?.step}` : g.phase === 'action' ? `action ${me.myTurn}` : `${g.phase} ${me.deciding} ${me.choice.length > 0}`;
+  // The hand is held along the bottom edge when its cards can be used: played on your
+  // turn, discarded, offered in a trade. Otherwise (others' turns, the raid, keeping a
+  // card) it's tucked down, only the tops of the cards showing: tap it to raise it.
+  const playable = me.myTurn && g.phase === 'action';
+  const discarding = g.phase === 'discard' && me.deciding;
+  const offering = tradeOpen(g, me);
+  screenKey = key;
+  const tucked = !playable && !discarding && !offering && handUp !== key;
+  const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
+  document.body.classList.toggle('has-hand', !!dock);
+  document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
   morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
+  // A raised hand no card can be played from goes back down at a tap on the page above it.
+  const scr = app.querySelector<HTMLElement>('.screen');
+  if (scr) scr.onpointerdown = dock && !tucked && handUp === key && !playable && !discarding && !offering ? () => { handUp = null; render(); } : null;
 }
 
 // What the phone is asking or showing, as one screen: a new one (your turn,
@@ -670,8 +689,13 @@ function fitHand() {
   document.body.classList.remove('hand-below');
   if (!fan || !main) return document.body.style.removeProperty('--hs');
   const em = parseFloat(getComputedStyle(document.body).fontSize);
+  const top0 = main.getBoundingClientRect().bottom + scrollY;
+  if (fan.classList.contains('tucked')) { // only its tops showing: it never grows, and goes after a long page too
+    document.body.style.removeProperty('--hs');
+    return document.body.classList.toggle('hand-below', innerHeight - top0 - 3.9 * em - 3.6 * em < 0);
+  }
   const width = Math.min(innerWidth, 34 * em);
-  const top = main.getBoundingClientRect().bottom + scrollY; // where the page's content ends
+  const top = top0; // where the page's content ends
   const room = innerHeight - top - 3.9 * em - 0.6 * em; // down to the talk bar, a little air above the cards
   const byHeight = room / (9.4 * em);
   const byWidth = (0.42 * width) / (6.6 * 0.78 * em);
@@ -835,7 +859,8 @@ function dragonZoom(g: PublicState, d: DragonView): string {
 
 // The hand, held like real cards: fanned along the bottom edge of the screen,
 // overlapping when there are many. On your turn the cards you can play now glow.
-function handFan(me: Me, playable: boolean, discarding: boolean, offering = false): string {
+// Tucked, it sits low with only the tops of the cards showing, and a tap raises it.
+function handFan(me: Me, playable: boolean, discarding: boolean, offering = false, tucked = false): string {
   const n = me.hand.length;
   if (!n) return '<div class="handfan empty" id="hand"></div>';
   const mid = (n - 1) / 2;
@@ -847,7 +872,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean, offering = fals
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
     return cardFace(c, me, playable, `${pos}${gripStyle(c.id)}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}${gripClass(c.id)}`);
   }).join('');
-  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" id="hand" data-leave="down" style="--n:${n}">${cards}</div>`;
+  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}${tucked ? ' tucked' : ''}" id="hand" data-leave="down" style="--n:${n}"${tucked ? ' data-raisehand role="button" aria-label="Show your hand"' : ''}>${cards}</div>`;
 }
 
 // One of your dragons as an option to tap, the same on every screen that
@@ -970,10 +995,51 @@ function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o
 // map takes all the height the rest leaves (fitMap), so it isn't a small map
 // up top with a third of the screen empty under it.
 function hexPicker(g: PublicState): string {
-  return `<section class="picker"><h3>${esc(picking!.title)}</h3>
-    <div class="pmap">${mapSvg(g.map, { size: MAP_SIZE, selectable: picking!.hexes, labels: picking!.labels })}</div>
-    ${picking!.about}
-    <button id="cancelpick" class="ghost big">Cancel</button></section>`;
+  const p = picking!;
+  const map = `<div class="pmap">${mapSvg(g.map, { size: MAP_SIZE, selectable: p.hexes, labels: p.labels, picked: p.picked })}</div>`;
+  const cancel = '<button id="cancelpick" class="ghost big">Cancel</button>';
+  if (!p.confirm) return `<section class="picker"><h3>${esc(p.title)}</h3>${map}${p.about}${cancel}</section>`;
+  // The box keeps its place before a tap, so the map doesn't move under the finger.
+  if (p.picked && !p.hexes.includes(p.picked)) p.picked = undefined;
+  const detail = p.picked ? p.confirm.detail(p.picked) : `<p class="hint">Tap a ${p.title.startsWith('Choose a building') ? 'building' : 'hex'} to see what it makes.</p>`;
+  return `<section class="picker"><h3>${esc(p.title)}</h3>${map}<div class="pchosen">${detail}</div>
+    <div class="row big2"><button id="confirmpick" class="primary big" ${p.picked ? '' : 'disabled'}>${esc(p.confirm.verb)}</button>${cancel}</div>
+    ${p.about}</section>`;
+}
+
+type Does = NonNullable<PublicState['map'][number]['building']>['does'];
+// "2 + 1d4 stone": a fixed amount and dice, as the cards write them.
+function amountText(r: string, m: { base: number; dice: number[] }): string {
+  const parts = m.base ? [String(m.base)] : [];
+  for (const s of [...new Set(m.dice)].sort((a, b) => b - a)) parts.push(`${m.dice.filter((d) => d === s).length}d${s}`);
+  return `${parts.join(' + ')} ${r}`;
+}
+// What a building does each round, in the cards' words, a sentence each:
+// "Makes 1d4 stone each round.", "Worth 1 point."
+function doesLines(d: Does): string[] {
+  const out: string[] = [];
+  const made = RESOURCES.filter((r) => d.makes[r]).map((r) => amountText(r, d.makes[r]!));
+  if (made.length) out.push(`Makes ${made.join(', ')} each round.`);
+  if (d.houses) out.push(`Houses ${d.houses} dragon${d.houses > 1 ? 's' : ''}.`);
+  if (d.note) out.push(d.note);
+  if (d.points) out.push(`Worth ${d.points} point${d.points > 1 ? 's' : ''}.`);
+  return out.length ? out : ['Makes nothing.'];
+}
+const said = (lines: string[]) => iconText(esc(lines.join(' ')));
+// The hex picked for a beast or an upgrade: whose building it is, what it does
+// now, and (for an upgrade) what changes with it.
+function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: string; after: Does }): string {
+  const h = g.map.find((x) => x.k === k)!;
+  const b = h.building;
+  if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
+  const whose = b.owner === me.seat ? 'Your' : `${playerTag(b.owner, names)}'s`;
+  const stopped = h.fauna ? `<p class="hint">Makes nothing while the ${esc(h.fauna.name)} holds it.</p>`
+    : h.perched.length ? '<p class="hint">Makes nothing while a dragon perches on it.</p>' : '';
+  const head = `<p class="pchead">${whose} <b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}</p>`;
+  const now = doesLines(b.does);
+  const more = upgrade ? doesLines(upgrade.after).filter((x) => !now.includes(x)) : [];
+  const after = more.length ? `<p class="pcafter"><b>With the ${esc(upgrade!.name)}:</b> ${said(more)}</p>` : '';
+  return `${head}<p>${said(now)}</p>${after}${stopped}`;
 }
 
 // What a pick is for, under the map: the card (or basic building) being placed,
@@ -1171,7 +1237,12 @@ function pickHexFor(c: CardView) {
   const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
   const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
   const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
-  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about };
+  // Placing a beast or an upgrade shows what the hex does before it's final (#246).
+  const now = () => ({ g: snap!.game!, me: snap!.you! });
+  const after = (k: string) => (now().me.hand.find((x) => x.id === c.id) ?? c).after?.[k];
+  const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: c.name, after: after(k)! }) }
+    : c.fauna ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k) } : undefined;
+  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about, confirm };
   openCard = null;
   render();
 }
@@ -1354,7 +1425,11 @@ function wire(g: PublicState, me: Me) {
     if (performance.now() < swallowClick) return; // the end of a slide or a hold, not a tap
     tapCard(g, me, el.dataset.card!);
   });
-  app.querySelectorAll<HTMLElement>('.handfan [data-card]').forEach((el) => {
+  bind('[data-raisehand]', () => {
+    handUp = screenKey;
+    render();
+  });
+  app.querySelectorAll<HTMLElement>('.handfan:not(.tucked) [data-card]').forEach((el) => {
     el.onpointerdown = (e) => grab(e, el);
     el.oncontextmenu = (e) => e.preventDefault(); // holding a card opens it, not the browser's menu
   });
@@ -1383,6 +1458,10 @@ function wire(g: PublicState, me: Me) {
     send(`project ${el.dataset.egg}`);
   });
   app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => {
+    if (picking!.confirm) {
+      picking!.picked = el.dataset.hex!;
+      return render();
+    }
     const cmd = picking!.command(el.dataset.hex!);
     picking = null;
     // Picking a beast to clear opens the dragon choice; everything else is a command.
@@ -1391,6 +1470,12 @@ function wire(g: PublicState, me: Me) {
     render();
     if (!send2) send(cmd);
   }));
+  on('confirmpick', () => {
+    const cmd = picking!.command(picking!.picked!);
+    picking = null;
+    render();
+    send(cmd);
+  });
   on('hunt', () => {
     const beastsOnly = me.huntable.every((k) => !snap!.game!.map.find((h) => h.k === k)?.perched.some((x) => x.owner !== me.seat));
     const about = beastsOnly
