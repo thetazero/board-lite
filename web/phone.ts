@@ -6,8 +6,9 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, foeStack, hpBar, icon, lootLine, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
+import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
@@ -45,6 +46,7 @@ let sending = false;
 // hasn't caught up yet. Null once the server shows the same.
 let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
+let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
@@ -505,6 +507,7 @@ function header(g: PublicState, me: Me): string {
       <header class="me">
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
+        <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${wheelOpen}">${wheelMark(g)}</button>
         <button id="menu" class="ghost menubtn" aria-label="Menu" aria-expanded="${menu}">⋯</button>
       </header>
       <div class="resbar">${res}</div>
@@ -553,6 +556,51 @@ function menuSheet(): string {
     <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
 }
 
+// The element wheel in order, each element followed by the one it beats:
+// water, fire, ice, air, lightning. From the server, so it is the engine's.
+function wheelOrder(g: PublicState): string[] {
+  const beats = g.elementBeats;
+  const start = 'water' in beats ? 'water' : Object.keys(beats)[0];
+  const order = [start];
+  for (let e = beats[start]; e && e !== start && order.length < 10; e = beats[e]) order.push(e);
+  return order;
+}
+// A point on the wheel: element i of n, clockwise from the top, round 0,0.
+function wheelAt(i: number, n: number, r: number): [number, number] {
+  const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+  return [r * Math.cos(a), r * Math.sin(a)];
+}
+
+// The header's mark for the wheel: a dot of each element's colour in a ring,
+// always on screen, so the wheel is one tap away.
+function wheelMark(g: PublicState): string {
+  const es = wheelOrder(g);
+  const dots = es.map((e, i) => { const [x, y] = wheelAt(i, es.length, 6); return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${ELEMENT_COLORS[e]}"/>`; }).join('');
+  return `<svg viewBox="-10 -10 20 20" aria-hidden="true"><circle r="6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>${dots}</svg>`;
+}
+
+// The element wheel, opened from the header: each element with an arrow to
+// the one it beats, neutral in the middle (no arrows: it beats nothing and
+// nothing beats it), and the rule in one line (docs/rules.md, "Elements").
+function wheelSheet(g: PublicState): string {
+  const es = wheelOrder(g);
+  const n = es.length, R = 36, gap = 13;
+  const arrows = es.map((_, i) => {
+    const [x1, y1] = wheelAt(i, n, R), [x2, y2] = wheelAt(i + 1, n, R);
+    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
+    const ux = dx / d, uy = dy / d;
+    return `<line x1="${(x1 + ux * gap).toFixed(2)}" y1="${(y1 + uy * gap).toFixed(2)}" x2="${(x2 - ux * gap).toFixed(2)}" y2="${(y2 - uy * gap).toFixed(2)}" marker-end="url(#wheelhead)"/>`;
+  }).join('');
+  const nodes = es.map((e, i) => {
+    const [x, y] = wheelAt(i, n, R);
+    return `<span class="wnode" style="left:${50 + x}%;top:${50 + y}%;--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 2)}<b>${e[0].toUpperCase()}${e.slice(1)}</b></span>`;
+  }).join('') + `<span class="wnode" style="left:50%;top:50%">${elemIcon('neutral', 2)}<b>Neutral</b></span>`;
+  return `<div class="menuback" id="wheelclose"></div><div class="menu wheelsheet"><h3>Element wheel</h3>
+    <div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>
+    <p class="wheelrule">Double damage where the arrow points.</p>
+    <div class="row"><button id="wheeldone">Close</button></div></div>`;
+}
+
 // The table waits on someone whose phone is gone (closed, asleep, out of
 // Wi-Fi): anyone may let a bot play for them, so the game doesn't stall. Their
 // phone coming back hands the seat back to them.
@@ -575,8 +623,12 @@ function render() {
   else if (g.phase === 'raid') body = raidView(g, me);
   else if (g.phase === 'cards') body = me.choice.length ? keepView(me) : '';
   else body = actionView(g, me);
-  // Your dragons are on every screen of the game, so their cards are always a tap away.
-  const den = !picking && g.phase !== 'over' ? roost(g, me) : '';
+  // Your dragons are on every screen of the game, so their cards are always a tap away,
+  // but each only once: a dragon the screen lists below (to send, or sent) isn't in the roost too.
+  const listed = choosing && body ? me.raidReady
+    : g.phase === 'raid' && g.raid?.step === 'commit' ? me.raidReady
+    : g.phase === 'raid' && g.raid?.step === 'bail' ? g.raid.commits[me.seat] : [];
+  const den = !picking && g.phase !== 'over' ? roost(g, me, new Set(listed)) : '';
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : dragonOpen ? dragonZoom(g, dragonOpen) : '';
@@ -587,7 +639,7 @@ function render() {
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
   const key = picking ? `pick ${picking.title}` : choosing ? 'hunt' : g.phase === 'over' ? 'over'
     : g.phase === 'raid' ? `raid ${g.round} ${g.raidsLeft} ${g.raid?.step}` : g.phase === 'action' ? `action ${me.myTurn}` : `${g.phase} ${me.deciding} ${me.choice.length > 0}`;
-  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : ''}`);
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
@@ -647,14 +699,16 @@ function tradeOpen(g: PublicState, me: Me): boolean {
 
 // Your dragons at home, then the room left for more: one empty nest with the
 // count in words, so the row doesn't fill with unlabelled baskets.
-// Tapping a dragon opens its card.
+// Tapping a dragon opens its card. Dragons the screen lists below are left
+// out; with none left, so is the roost.
 const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
   <path d="M-10 -1 Q0 3 10 -1 L8 5 Q0 10 -8 5 Z" fill="#8a5a32"/><path d="M-10 -1 Q0 -5 10 -1 Q0 3 -10 -1 Z" fill="#3b2a1c"/>
   <path d="M-9 1 L7 4 M-8 4 L9 1 M-6 6.5 L6 6" stroke="#c48a52" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`;
-function roost(g: PublicState, me: Me): string {
-  const mine = g.dragons.filter((d) => d.owner === me.seat);
-  const empty = Math.max(0, me.dragonCapacity - mine.length);
-  if (!mine.length && !empty) return '';
+function roost(g: PublicState, me: Me, listed: Set<string>): string {
+  const all = g.dragons.filter((d) => d.owner === me.seat);
+  const mine = all.filter((d) => !listed.has(d.id));
+  const empty = Math.max(0, me.dragonCapacity - all.length);
+  if (!mine.length && (!empty || mine.length < all.length)) return '';
   return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>` : ''}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
@@ -987,8 +1041,8 @@ function raidView(g: PublicState, me: Me): string {
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragon(id).power, 0);
   if (raid.step === 'vote') {
     const voted = me.myVote !== null;
-    return `${raid.candidates.map((t, i) => `
-      <button class="choice${me.myVote === i ? ' on' : ''}" data-vote="${i + 1}" ${voted ? 'disabled' : ''}><b>${i + 1}. ${esc(t.name)} ${powerTag(t.power, 'big')}</b>${foeStack(t.units, 1.7)}${lootLine(t.loot, 1.3)}</button>`).join('')}`;
+    return raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, names,
+      { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
   if (raid.step === 'commit') {
     if (!me.raidReady.length) return targetPanel(raid.target!); // nobody fit to go: the roost above shows why
@@ -1000,13 +1054,18 @@ function raidView(g: PublicState, me: Me): string {
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
       ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.commits[p]))}</div>`] : [])).join('');
-    if (!mine.length) return `${targetPanel(raid.target!)}${others ? `<div class="allies">${others}</div>` : ''}`;
+    // Under the kingdom, the dragons sent against it: yours first, under "You", then each other player's.
+    const sentHead = `<h3 class="ask">Dragons sent</h3>`;
+    if (!mine.length) return `${targetPanel(raid.target!)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
-    return `${targetPanel(raid.target!)}
-      <div class="sent">${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
-      ${others ? `<div class="allies">${others}</div>` : ''}
-      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
+    // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
+    const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
+    const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
+    return `${targetPanel(raid.target!)}${sentHead}
+      <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
+      ${others ? `<div class="allies">${others}</div>` : ''}${split}
+      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>
       <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
   }
   return '';
@@ -1450,8 +1509,20 @@ function wire(g: PublicState, me: Me) {
   });
   on('menu', () => {
     menu = !menu;
+    wheelOpen = false;
     render();
   });
+  on('wheel', () => {
+    wheelOpen = !wheelOpen;
+    menu = false;
+    render();
+  });
+  for (const id of ['wheelclose', 'wheeldone']) {
+    on(id, () => {
+      wheelOpen = false;
+      render();
+    });
+  }
   for (const id of ['menuclose', 'menucancel']) {
     on(id, () => {
       menu = false;

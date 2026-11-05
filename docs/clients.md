@@ -30,6 +30,7 @@ board-lite is running on port 8080.
 
 **Nobody stalls the table:**
 
+- **Element wheel:** the ring of colored dots by your points on the phone shows which element beats which.
 - **Quit:** **⋯** next to your name → **Quit game**. A bot plays your seat; tap your name at the room's address to come back.
 - **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The seat goes back to them when their phone returns.
 

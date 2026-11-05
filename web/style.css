@@ -330,6 +330,24 @@ q::after { content: close-quote; }
 .target { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .8em 1.2em; text-align: left; min-width: 24em; position: relative; }
 .target h2 { margin: 0 0 .4em; font-size: 1.6em; }
 .target .num { position: absolute; top: -.5em; left: -.5em; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: #111; font-weight: 900; font-size: 1.4em; display: flex; align-items: center; justify-content: center; }
+.voters { display: flex; flex-wrap: wrap; gap: .3em; margin-top: .5em; }
+.voters .ptag { background: var(--pc); color: #111 !important; font-weight: 800; padding: .1em .55em; border-radius: 1em; }
+.target .voters { font-size: 1.5em; }
+.candidates.vote { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 21em)); gap: 1.6em 2em; }
+.cand { display: flex; flex-direction: column; align-items: flex-start; gap: .5em; min-width: 0; padding: .9em 1.3em 1em; }
+.cand h2 { margin: 0; font-size: 1.9em; line-height: 1.1; }
+.cand-fight { display: flex; align-items: center; gap: .3em 1.2em; flex-wrap: wrap; }
+.pshield { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; flex: none; }
+.pshield svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pshield b { position: relative; font-size: .36em; font-weight: 900; color: #fff; margin-top: -.15em; text-shadow: 0 .05em .1em #0006; }
+.cand.lead, .choice.lead { outline: .25em solid var(--accent); outline-offset: .2em; }
+.foeicons { display: flex; flex-wrap: wrap; gap: .2em .9em; align-items: center; }
+.foeicon { display: inline-flex; align-items: center; gap: .15em; }
+.foeicon b { font-size: 1.5em; font-weight: 900; }
+.cand .loot { font-size: 1.4em; margin-top: 0; gap: .1em .2em; }
+.cand .loot .chip { margin-right: .5em; }
+.cand .loot .loot-label { margin-right: .4em; }
+.cand .voters { margin-top: auto; padding-top: .3em; }
 .weak { color: var(--good); }
 .loot { margin-top: .5em; font-size: 1.2em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .3em; }
 .loot-label { font-size: .75em; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: .2em; }
@@ -607,8 +625,8 @@ body.phone.hand-below.has-hand { padding-bottom: 3.6em; }
   .zoom > .zoomacts { align-self: end; }
   .zoom > .zoomnav { grid-column: 2; align-self: start; justify-self: center; }
 }
-.choice { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
-.choice b { font-size: 1.15em; }
+.choice:not(.cand) { display: flex; flex-direction: column; align-items: flex-start; gap: .2em; text-align: left; width: 100%; padding: .7em .9em; }
+.choice:not(.cand) b { font-size: 1.15em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
 /* A dragon to send: a box at the row's end that ticks when tapped, so the row reads as a choice. */
 .dragon.pick > span { flex: 1; }
@@ -678,6 +696,7 @@ button.on:disabled { opacity: 1; }
 .row.big2 > button small { font-size: .7em; font-weight: 600; }
 .row.big2 > button small .chip { margin: 0 .15em; }
 .sent { display: flex; flex-wrap: wrap; align-items: center; gap: .4em; margin-bottom: .6em; padding: .4em .6em; color: var(--text); }
+.sent .sentwho { margin-right: .3em; }
 .stat { display: inline-flex; align-items: baseline; gap: .25em; margin-left: .3em; white-space: nowrap; }
 .stat.power { font-weight: 800; }
 .stat.power.big { font-size: 1.15em; }
@@ -728,6 +747,14 @@ button.on:disabled { opacity: 1; }
 .seatlist .seatbtn .tag { margin-left: auto; font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* The menu under your name: out of the way, but always there. */
 .me .menubtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-size: 1.3em; line-height: 1; padding: .05em .35em .2em; margin: 0 -.5em 0 .3em; }
+/* The element wheel: a ring of element dots beside your points, one tap from the whole wheel. */
+.me .wheelbtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; line-height: 0; padding: .15em; margin: 0 0 0 .4em; }
+.me .wheelbtn svg { width: 1.6em; height: 1.6em; display: block; }
+.wheelsheet .wheel { position: relative; width: min(16em, 70vw); aspect-ratio: 1; margin: .2em auto .6em; color: var(--ink-soft); }
+.wheelsheet .wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wheelsheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.wheelsheet .wnode b { font-size: .85em; color: var(--ink); }
+.wheelsheet .wheelrule { color: var(--ink); font-weight: 600; }
 .menuback { position: fixed; inset: 0; background: #0008; z-index: 40; }
 .menu { position: fixed; top: .6em; left: .6em; right: .6em; max-width: 26em; margin: 0 auto; z-index: 41; background: var(--grain), var(--sheet); --text: var(--ink); color: var(--ink); border-radius: 4px; box-shadow: var(--lift); padding: .8em 1em 1em; }
 .menu h3 { margin: 0 0 .3em; font-family: var(--serif); }
@@ -813,6 +840,9 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .target { min-width: 0; width: 100%; padding: .6em .8em; }
 .remote .target h2 { font-size: 1.25em; }
 .remote .target .foes { font-size: 1em; }
+.remote .candidates.vote { grid-template-columns: repeat(auto-fill, minmax(min(100%, 19em), 1fr)); gap: .8em; width: 100%; }
+:is(.remote, body.phone) .cand { padding: .7em .9em; font-size: .78em; }
+:is(.remote, body.phone) .cand h2 { font-size: 1.9em; }
 .remote .target .loot { font-size: 1.15em; }
 .remote .target .num { font-size: 1.1em; }
 .remote .status { font-size: 1.1em; }
@@ -858,3 +888,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 @keyframes handout { to { translate: 0 3em; opacity: 0; } }
 /* The phone's open panels come in rather than appear. */
 .pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }
+/* The vote on a phone-sized card (the table view, the phone): loot down the right, so a wide card isn't half empty. */
+:is(.remote, body.phone) .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "voters voters"; align-items: center; gap: .3em .8em; }
+:is(.remote, body.phone) .cand h2 { grid-area: name; }
+:is(.remote, body.phone) .cand .cand-fight { grid-area: fight; flex-wrap: nowrap; }
+:is(.remote, body.phone) .cand .loot { grid-area: loot; justify-self: end; flex-direction: column; align-items: flex-end; gap: .1em; }
+:is(.remote, body.phone) .cand .loot .chip { margin-right: 0; }
+:is(.remote, body.phone) .cand .voters { grid-area: voters; }

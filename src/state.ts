@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, backInRound, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -78,7 +78,7 @@ export interface TargetView {
 export interface RaidView {
   step: 'vote' | 'commit' | 'bail';
   candidates: TargetView[];
-  voted: boolean[];
+  votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   target: TargetView | null; // units carry current health once the fight starts
   commits: string[][];
   ready: boolean[];
@@ -103,6 +103,7 @@ export interface PublicState {
   turnOrder: number[];
   pointsToWin: number;
   titlePoints: number; // what each title is worth
+  elementBeats: Record<string, string>; // the element wheel: what each element beats
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   waitingOn: number[];
   players: { publicPoints: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
@@ -253,6 +254,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     turnOrder: turnOrder(g),
     pointsToWin: TUNING.pointsToWin,
     titlePoints: TUNING.titlePoints,
+    elementBeats: ELEMENT_BEATS,
     faunaWanderOdds: TUNING.faunaWanderOdds,
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
@@ -281,7 +283,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     raid: raid && {
       step: raid.step,
       candidates: raid.candidates.map((t) => targetView(g, t)),
-      voted: raid.votes.map((v) => v !== null),
+      votes: [...raid.votes],
       target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
       commits: raid.commits,
       ready: raid.ready,

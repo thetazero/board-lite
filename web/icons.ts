@@ -134,6 +134,13 @@ const ICONS: Record<string, Facet[]> = {
   sword: sword(0),
   // Two swords crossed: a raid.
   raid: [...sword(-38), ...sword(38)],
+  // Combat power: a heater shield folded down the middle, a lighter rim on top.
+  shield: [
+    ['#8a9bb5', P([[0, -9], [-8.5, -7.5], [-8.5, 0], [-6, 5.5], [0, 10]])],
+    ['#5f7190', P([[0, -9], [8.5, -7.5], [8.5, 0], [6, 5.5], [0, 10]])],
+    ['#a9b8cd', P([[0, -9], [-8.5, -7.5], [-7, -6.2], [0, -7.5]])],
+    ['#7a8ba6', P([[0, -9], [8.5, -7.5], [7, -6.2], [0, -7.5]])],
+  ],
   // A folded speech bubble: table talk.
   talk: [
     ['#f3efe4', P([[-8.5, -6], [-5, -8.5], [5, -8.5], [8.5, -6], [8.5, 1.5], [0, 1.5]])],
@@ -198,6 +205,11 @@ const ICONS: Record<string, Facet[]> = {
     ['#5aa8ff', P([[-6, 1], [0, 1.5], [0, 9], [-4.5, 6.5]])],
     ['#1f6fd6', P([[6, 1], [4.5, 6.5], [0, 9], [0, 1.5]])],
     ['#d9eeff', P([[-3.5, 0], [-2, -3.5], [-1.6, 0.4]])],
+  ],
+  // Neutral: a plain grey paper disc, folded flat: no element.
+  neutral: [
+    ...bevel(8, 9, 5.5, 22.5, '#e4e0d8', '#b8b3a9', '#8a857c'),
+    ['#cbc6bc', P(Array.from({ length: 8 }, (_, i) => polar(5.5, 22.5 + 45 * i)))],
   ],
   // Dice: white paper shapes, one per kind of die (a square d6, a diamond d8,
   // a triangle d4). With pips, a die still to roll ("2" and a d6 is 2d6); the
@@ -357,7 +369,7 @@ const ICONS: Record<string, Facet[]> = {
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
