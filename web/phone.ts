@@ -571,8 +571,12 @@ function render() {
   else if (g.phase === 'raid') body = raidView(g, me);
   else if (g.phase === 'cards') body = me.choice.length ? keepView(me) : '';
   else body = actionView(g, me);
-  // Your dragons are on every screen of the game, so their cards are always a tap away.
-  const den = !picking && g.phase !== 'over' ? roost(g, me) : '';
+  // Your dragons are on every screen of the game, so their cards are always a tap away,
+  // but each only once: a dragon the screen lists below (to send, or sent) isn't in the roost too.
+  const listed = choosing && body ? me.raidReady
+    : g.phase === 'raid' && g.raid?.step === 'commit' ? me.raidReady
+    : g.phase === 'raid' && g.raid?.step === 'bail' ? g.raid.commits[me.seat] : [];
+  const den = !picking && g.phase !== 'over' ? roost(g, me, new Set(listed)) : '';
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : dragonOpen ? dragonZoom(g, dragonOpen) : '';
@@ -643,14 +647,16 @@ function tradeOpen(g: PublicState, me: Me): boolean {
 
 // Your dragons at home, then the room left for more: one empty nest with the
 // count in words, so the row doesn't fill with unlabelled baskets.
-// Tapping a dragon opens its card.
+// Tapping a dragon opens its card. Dragons the screen lists below are left
+// out; with none left, so is the roost.
 const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
   <path d="M-10 -1 Q0 3 10 -1 L8 5 Q0 10 -8 5 Z" fill="#8a5a32"/><path d="M-10 -1 Q0 -5 10 -1 Q0 3 -10 -1 Z" fill="#3b2a1c"/>
   <path d="M-9 1 L7 4 M-8 4 L9 1 M-6 6.5 L6 6" stroke="#c48a52" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`;
-function roost(g: PublicState, me: Me): string {
-  const mine = g.dragons.filter((d) => d.owner === me.seat);
-  const empty = Math.max(0, me.dragonCapacity - mine.length);
-  if (!mine.length && !empty) return '';
+function roost(g: PublicState, me: Me, listed: Set<string>): string {
+  const all = g.dragons.filter((d) => d.owner === me.seat);
+  const mine = all.filter((d) => !listed.has(d.id));
+  const empty = Math.max(0, me.dragonCapacity - all.length);
+  if (!mine.length && (!empty || mine.length < all.length)) return '';
   return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>` : ''}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
@@ -995,13 +1001,18 @@ function raidView(g: PublicState, me: Me): string {
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
       ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.commits[p]))}</div>`] : [])).join('');
-    if (!mine.length) return `${targetPanel(raid.target!)}${others ? `<div class="allies">${others}</div>` : ''}`;
+    // Under the kingdom, the dragons sent against it: yours first, under "You", then each other player's.
+    const sentHead = `<h3 class="ask">Dragons sent</h3>`;
+    if (!mine.length) return `${targetPanel(raid.target!)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
-    return `${targetPanel(raid.target!)}
-      <div class="sent">${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
-      ${others ? `<div class="allies">${others}</div>` : ''}
-      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight<small>${resChips(raid.target!.loot, 1.1)}</small></button>
+    // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
+    const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
+    const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
+    return `${targetPanel(raid.target!)}${sentHead}
+      <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
+      ${others ? `<div class="allies">${others}</div>` : ''}${split}
+      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>
       <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
   }
   return '';
