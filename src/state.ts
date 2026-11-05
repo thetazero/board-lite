@@ -164,7 +164,7 @@ export interface SeatState {
   resources: Record<Resource, number>;
   hiddenPoints: number;
   totalPoints: number;
-  bankRates: Record<BasicResource, number>; // what you give the bank, per basic resource (never gold)
+  bankRates: Record<BasicResource, number>; // what you give the merchants, per basic resource (never gold)
   dragonsHoused: number;
   dragonCapacity: number;
   // What a round brings in, per resource: production minus what the dragons
