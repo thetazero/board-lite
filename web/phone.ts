@@ -27,7 +27,12 @@ let stop: (() => void) | null = null;
 // UI state that lives only on this phone (not in the game).
 let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
 // Picking a hex: what for (`about`: what's being placed, shown under the map).
-let picking: { title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string } | null = null;
+// With `confirm`, a tap only picks the hex: what it does shows under the map
+// (`detail`), and the confirm button (`verb`) carries out the command.
+let picking: {
+  title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string;
+  confirm?: { verb: string; detail: (hex: string) => string }; picked?: string;
+} | null = null;
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
 // Sending dragons to a hex: to clear what holds it, or to perch on a rival's building.
 let hunting: { hex: string; chosen: Set<string>; perch?: boolean } | null = null;
@@ -965,10 +970,51 @@ function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o
 // map takes all the height the rest leaves (fitMap), so it isn't a small map
 // up top with a third of the screen empty under it.
 function hexPicker(g: PublicState): string {
-  return `<section class="picker"><h3>${esc(picking!.title)}</h3>
-    <div class="pmap">${mapSvg(g.map, { size: MAP_SIZE, selectable: picking!.hexes, labels: picking!.labels })}</div>
-    ${picking!.about}
-    <button id="cancelpick" class="ghost big">Cancel</button></section>`;
+  const p = picking!;
+  const map = `<div class="pmap">${mapSvg(g.map, { size: MAP_SIZE, selectable: p.hexes, labels: p.labels, picked: p.picked })}</div>`;
+  const cancel = '<button id="cancelpick" class="ghost big">Cancel</button>';
+  if (!p.confirm) return `<section class="picker"><h3>${esc(p.title)}</h3>${map}${p.about}${cancel}</section>`;
+  // The box keeps its place before a tap, so the map doesn't move under the finger.
+  if (p.picked && !p.hexes.includes(p.picked)) p.picked = undefined;
+  const detail = p.picked ? p.confirm.detail(p.picked) : `<p class="hint">Tap a ${p.title.startsWith('Choose a building') ? 'building' : 'hex'} to see what it makes.</p>`;
+  return `<section class="picker"><h3>${esc(p.title)}</h3>${map}<div class="pchosen">${detail}</div>
+    <div class="row big2"><button id="confirmpick" class="primary big" ${p.picked ? '' : 'disabled'}>${esc(p.confirm.verb)}</button>${cancel}</div>
+    ${p.about}</section>`;
+}
+
+type Does = NonNullable<PublicState['map'][number]['building']>['does'];
+// "2 + 1d4 stone": a fixed amount and dice, as the cards write them.
+function amountText(r: string, m: { base: number; dice: number[] }): string {
+  const parts = m.base ? [String(m.base)] : [];
+  for (const s of [...new Set(m.dice)].sort((a, b) => b - a)) parts.push(`${m.dice.filter((d) => d === s).length}d${s}`);
+  return `${parts.join(' + ')} ${r}`;
+}
+// What a building does each round, in the cards' words, a sentence each:
+// "Makes 1d4 stone each round.", "Worth 1 point."
+function doesLines(d: Does): string[] {
+  const out: string[] = [];
+  const made = RESOURCES.filter((r) => d.makes[r]).map((r) => amountText(r, d.makes[r]!));
+  if (made.length) out.push(`Makes ${made.join(', ')} each round.`);
+  if (d.houses) out.push(`Houses ${d.houses} dragon${d.houses > 1 ? 's' : ''}.`);
+  if (d.note) out.push(d.note);
+  if (d.points) out.push(`Worth ${d.points} point${d.points > 1 ? 's' : ''}.`);
+  return out.length ? out : ['Makes nothing.'];
+}
+const said = (lines: string[]) => iconText(esc(lines.join(' ')));
+// The hex picked for a beast or an upgrade: whose building it is, what it does
+// now, and (for an upgrade) what changes with it.
+function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: string; after: Does }): string {
+  const h = g.map.find((x) => x.k === k)!;
+  const b = h.building;
+  if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
+  const whose = b.owner === me.seat ? 'Your' : `${playerTag(b.owner, names)}'s`;
+  const stopped = h.fauna ? `<p class="hint">Makes nothing while the ${esc(h.fauna.name)} holds it.</p>`
+    : h.perched.length ? '<p class="hint">Makes nothing while a dragon perches on it.</p>' : '';
+  const head = `<p class="pchead">${whose} <b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}</p>`;
+  const now = doesLines(b.does);
+  const more = upgrade ? doesLines(upgrade.after).filter((x) => !now.includes(x)) : [];
+  const after = more.length ? `<p class="pcafter"><b>With the ${esc(upgrade!.name)}:</b> ${said(more)}</p>` : '';
+  return `${head}<p>${said(now)}</p>${after}${stopped}`;
 }
 
 // What a pick is for, under the map: the card (or basic building) being placed,
@@ -1166,7 +1212,12 @@ function pickHexFor(c: CardView) {
   const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
   const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
   const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
-  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about };
+  // Placing a beast or an upgrade shows what the hex does before it's final (#246).
+  const now = () => ({ g: snap!.game!, me: snap!.you! });
+  const after = (k: string) => (now().me.hand.find((x) => x.id === c.id) ?? c).after?.[k];
+  const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: c.name, after: after(k)! }) }
+    : c.fauna ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k) } : undefined;
+  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about, confirm };
   openCard = null;
   render();
 }
@@ -1378,6 +1429,10 @@ function wire(g: PublicState, me: Me) {
     send(`project ${el.dataset.egg}`);
   });
   app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => {
+    if (picking!.confirm) {
+      picking!.picked = el.dataset.hex!;
+      return render();
+    }
     const cmd = picking!.command(el.dataset.hex!);
     picking = null;
     // Picking a beast to clear opens the dragon choice; everything else is a command.
@@ -1386,6 +1441,12 @@ function wire(g: PublicState, me: Me) {
     render();
     if (!send2) send(cmd);
   }));
+  on('confirmpick', () => {
+    const cmd = picking!.command(picking!.picked!);
+    picking = null;
+    render();
+    send(cmd);
+  });
   on('hunt', () => {
     const beastsOnly = me.huntable.every((k) => !snap!.game!.map.find((h) => h.k === k)?.perched.some((x) => x.owner !== me.seat));
     const about = beastsOnly
