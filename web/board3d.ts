@@ -671,37 +671,41 @@ interface BeastRig {
 }
 
 const WOLF = '#9aa0a8', WOLF_DARK = '#5d626c', WOLF_LIGHT = '#e4e1da';
+// One wolf, side-on: long legs, a raised head with a pointed snout and two
+// upright ears, and a bushy tail hanging down behind. (Three small wolves
+// with tails curled up over their backs read as a scorpion on the TV, #241.)
 function wolf(phase: number): BeastRig {
-  const head = joint([0.2, 0.28, 0],
-    part(cone(0.085, 0.24, 4), WOLF, { at: [0.3, 0.29, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.3] }),
-    part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, 0.045], rot: [0, 0, -0.2] }),
-    part(cone(0.035, 0.1, 3), WOLF_DARK, { at: [0.22, 0.4, -0.045], rot: [0, 0, -0.2] }),
-    part(box(0.03, 0.02, 0.03), '#f2c230', { at: [0.27, 0.33, 0.05], glow: 0.6, crease: false }),
+  const head = joint([0.2, 0.38, 0],
+    part(box(0.15, 0.13, 0.16), WOLF, { at: [0.28, 0.45, 0], rot: [0, 0, 0.1] }),
+    part(cone(0.055, 0.2, 4), WOLF_LIGHT, { at: [0.44, 0.42, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.15] }),
+    part(box(0.04, 0.04, 0.045), DARK, { at: [0.54, 0.4, 0], crease: false }),
+    part(cone(0.05, 0.15, 3), WOLF_DARK, { at: [0.25, 0.57, 0.06], rot: [0.35, 0, 0.15] }),
+    part(cone(0.05, 0.15, 3), WOLF_DARK, { at: [0.25, 0.57, -0.06], rot: [-0.35, 0, 0.15] }),
+    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, 0.065], glow: 0.6, crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, -0.065], glow: 0.6, crease: false }),
   );
-  const tail = joint([-0.17, 0.26, 0], part(cone(0.04, 0.22, 4), WOLF_DARK, { at: [-0.25, 0.25, 0], rot: [0, 0, 1.1] }));
-  const legs = [[0.13, 0.05], [0.13, -0.05], [-0.13, 0.05], [-0.13, -0.05]].map(([x, z]) => joint([x, 0.15, z], part(box(0.045, 0.15, 0.045), WOLF_DARK, { at: [x, 0.075, z], crease: false })));
+  // Long and bushy, out behind and sloping down from the rump.
+  const tail = joint([-0.21, 0.34, 0],
+    part(new THREE.DodecahedronGeometry(0.065, 0), WOLF_DARK, { at: [-0.37, 0.25, 0], rot: [0, 0, 0.5], scale: [2.8, 1, 1] }),
+  );
+  const legs = [[0.15, 0.05], [0.15, -0.05], [-0.15, 0.05], [-0.15, -0.05]].map(([x, z]) =>
+    joint([x, 0.26, z], part(box(0.05, 0.26, 0.05), WOLF_DARK, { at: [x, 0.13, z], crease: false })));
   const body = group(
-    part(box(0.36, 0.15, 0.15), WOLF, { at: [0, 0.21, 0] }),
-    part(box(0.13, 0.17, 0.17), WOLF_LIGHT, { at: [0.14, 0.22, 0], rot: [0, 0, 0.25] }),
+    part(box(0.42, 0.14, 0.12), WOLF, { at: [-0.02, 0.32, 0] }),
+    // The ruff: a pale, deeper chest at the front.
+    part(box(0.14, 0.2, 0.16), WOLF_LIGHT, { at: [0.14, 0.33, 0], rot: [0, 0, 0.2] }),
     head, tail, ...legs,
   );
   return { kind: 'wolf', body, head, tail, legs, phase };
 }
 
-// A pack: three wolves, the leader in front, each moving on its own.
+// The Wolf Pack: one wolf, big enough to read from the TV.
 function wolfPack(): THREE.Group {
-  const g = new THREE.Group();
-  const rigs: BeastRig[] = [];
-  for (const [x, z, spin, s, ph] of [[0.12, 0, 0, 1.1, 0], [-0.2, 0.24, 0.35, 0.9, 2.1], [-0.22, -0.22, -0.3, 0.9, 4.3]]) {
-    const w = wolf(ph);
-    const at = group(w.body);
-    at.position.set(x, 0, z);
-    at.rotation.y = spin;
-    at.scale.setScalar(s);
-    g.add(at);
-    rigs.push(w);
-  }
-  g.userData.rigs = rigs;
+  const w = wolf(0);
+  const big = group(w.body);
+  big.scale.setScalar(1.25); // the board sets the outer group's scale
+  const g = group(big);
+  g.userData.rigs = [w];
   return g;
 }
 
