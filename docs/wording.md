@@ -36,7 +36,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **make** (a building) | produce, yield, give | What a building brings in each round: "Makes 1d6 stone each round." (The phase is still called **production**.) |
 | **each round** | a round, per round, every round | How often |
 | **adjacent** | neighbouring, next to, touching | Hexes sharing an edge. The rules' word for what building cards count |
-| **place** (a beast) | put, send | Putting a beast on a hex with Wolf Call or Rouse the Bear |
+| **place** (a beast) | put, send | Putting a beast on a hex with Rouse the Bear or Wake the Basilisk |
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
 | **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
 | **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it makes nothing |
