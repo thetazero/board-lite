@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, backInRound, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -498,7 +498,7 @@ test('a hurt dragon heals a little each production and sits out until it is whol
   assert.ok(canRaid(a), `back in round ${g.round}`);
 });
 
-test('raid loot is split by the combat power still fighting at the end, the rest to the strongest', () => {
+test('raid loot is split by the combat power still fighting at the end', () => {
   let shared = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
@@ -527,20 +527,42 @@ test('raid loot is split by the combat power still fighting at the end, the rest
     assert.equal(loot.gold, TARGETS.archers_hold.loot.gold! + hoard.archers_hold);
     // The kingdom that fell is back to its printed loot; every other one adds 1 gold.
     for (const t of Object.keys(TARGETS)) assert.equal(g.hoard[t], t === 'archers_hold' ? 0 : hoard[t] + 1, t);
-    const total = end.power.reduce((s, x) => s + x, 0);
-    const top = end.winners[end.power.indexOf(Math.max(...end.power))];
+    const power = g.players.map((_, p) => { const i = end.winners.indexOf(p); return i < 0 ? 0 : end.power[i]; });
+    const shares = splitLoot(loot, power);
     for (const r of RESOURCES) {
       if (!loot[r]) continue;
       const got: number[] = end.winners.map((p) => g.players[p].resources[r] - before[p][r]);
       assert.equal(got.reduce((s, x) => s + x, 0), loot[r], 'none of the loot is lost');
-      end.winners.forEach((p, i) => {
-        const fair = Math.floor((loot[r]! * end.power[i]) / total);
-        assert.equal(got[i], p === top ? loot[r]! - end.power.reduce((s, x, j) => (j === i ? s : s + Math.floor((loot[r]! * x) / total)), 0) : fair);
-      });
+      end.winners.forEach((p, i) => assert.equal(got[i], shares[p][r] ?? 0));
     }
     if (end.winners.length === 2) shared++;
   }
   assert.ok(shared > 0, 'some raids should be shared');
+});
+
+test('loot left over goes out 1 at a time, strongest first, carrying on across resources', () => {
+  // 3 equal winners, 2 livestock and 2 gold: P1 and P2 take a livestock, P3 and P1 a gold.
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 2 }, [5, 5, 5]), [{ livestock: 1, gold: 1 }, { livestock: 1 }, { gold: 1 }]);
+  // Strongest first, equal powers in seat order; a player not fighting gets nothing.
+  assert.deepEqual(splitLoot({ stone: 1, gold: 1 }, [3, 0, 7, 3]), [{ gold: 1 }, {}, { stone: 1 }, {}]);
+  // Shares in proportion come first, then the leftover: 7 gold at 2:1 is 4 and 2, then 1 to the stronger.
+  assert.deepEqual(splitLoot({ gold: 7 }, [2, 1]), [{ gold: 5 }, { gold: 2 }]);
+});
+
+test('Healing Potion heals a dragon that cleared a hex, which still sits out the raids', () => {
+  const g = newGame(2, 3);
+  keepAll(g);
+  g.dragons = [{ id: 'd1', owner: g.turn, key: 'fire_whelp', stage: 2, growth: 0, damage: 3, resting: 'hunted' }];
+  g.players[g.turn].hand.push({ id: 'cx', deck: 'action', key: 'healing_potion' });
+  apply(g, g.turn, 'play cx d1');
+  assert.equal(g.dragons[0].damage, 0);
+  assert.equal(canRaid(g.dragons[0]), false, 'it cleared a hex, so it sits out this round');
+});
+
+test('discard is refused outside the end of the round', () => {
+  const g = newGame(2, 3);
+  keepAll(g);
+  assert.throws(() => apply(g, g.turn, 'discard c1'), /end of the round/);
 });
 
 test('combat power: dragons and kingdoms carry one number, and a side adds up', () => {

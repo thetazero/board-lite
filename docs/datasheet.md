@@ -111,7 +111,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
-| Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round. | — |
+| Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. It can raid this round, unless it went hungry or cleared a hex. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | action | 8 | nothing | Worth 2 points while in your hand. | 2 |
 | Rouse the Bear | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
@@ -250,7 +250,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and the earlier seat on a tie, carrying on from one resource to the next).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
 |---|---|---|---|---|---|
