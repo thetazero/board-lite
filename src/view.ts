@@ -89,9 +89,12 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   const raid = g.raid!;
   const out: string[] = [];
   if (raid.step === 'vote') {
-    out.push('Raid: vote for a target. Candidates:');
-    raid.candidates.forEach((t, i) => out.push(`  ${i + 1}. ${targetText(t)}`));
-    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)} ${v !== null ? v + 1 : raid.voters[q] ? 'not yet' : 'no vote (no raid-ready dragon)'}`).join(', ')}`);
+    out.push("Raid: vote for a target. Each vote counts its voter's power (their raid-ready dragons' combat power, summed); the most power wins. Candidates:");
+    raid.candidates.forEach((t, i) => {
+      const got = raid.votes.reduce<number>((s, v, q) => s + (v === i ? raid.votePower[q] : 0), 0);
+      out.push(`  ${i + 1}. ${targetText(t)}${got ? `; votes worth ${got} power` : ''}`);
+    });
+    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)}${raid.voters[q] ? ` (power ${raid.votePower[q]})` : ''} ${v !== null ? v + 1 : raid.voters[q] ? 'not yet' : 'no vote (no raid-ready dragon)'}`).join(', ')}`);
     if (you?.whyNoVote) out.push(`  ${you.whyNoVote}`);
     return out;
   }
