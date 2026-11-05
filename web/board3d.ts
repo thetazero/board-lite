@@ -110,6 +110,8 @@ function paperTexture(): THREE.Texture {
 }
 
 let GRAIN: THREE.Texture | null = null;
+// A land hex's paper: its terrain's colour, a little paled.
+const tileColor = (terrain: string) => mix(TERRAIN_COLORS[terrain], '#f4ecd8', 0.12);
 const MATS = new Map<string, THREE.MeshLambertMaterial>();
 const CREASE = new THREE.LineBasicMaterial({ color: 0x2a1d12, transparent: true, opacity: 0.22 });
 
@@ -479,7 +481,7 @@ function tower(pc: string, floors: number): THREE.Group {
 // How a building shows its class: it carries its class's goods (cut stone
 // blocks, a log pile, violet crystals, white sheep, a dragon's nest) in its
 // class's paper colours, the same as its icon (icons.ts). Its owner is the
-// plate under it, never its own paper, except the tower. Buildings of one
+// border round it, never its own paper, except the tower. Buildings of one
 // class are relatives: different structures carrying the same goods.
 const STONE_BLOCK = '#d3d6db';
 const CRYSTAL = '#b98cff';
@@ -1449,23 +1451,123 @@ function upgradeMark(key: string): THREE.Group {
   return g;
 }
 
-// The owner's coloured card under a building; an upgrade puts a gold rim round
-// it and its mark (upgradeMark) at the front corner.
-function plate(owner: number, upgrade: string | null, mats: THREE.MeshLambertMaterial[]): THREE.Group {
+// What a building stands on: a card in its hex's own terrain colour, so the
+// terrain still reads. Its owner shows as their territory's border round it
+// (territoryGeometry). An upgrade puts a gold rim on the card and its mark
+// (upgradeMark) at the front corner.
+function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry {
+  const corners = (r: number) => Array.from({ length: 6 }, (_, i) => new THREE.Vector2(Math.sin((i * Math.PI) / 3) * r, Math.cos((i * Math.PI) / 3) * r));
+  const shape = new THREE.Shape(corners(outer));
+  shape.holes.push(new THREE.Path(corners(inner).reverse()));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2); // lie flat, its depth going up
+  return geo;
+}
+function plate(upgrade: string | null, ground: string): THREE.Group {
   const g = new THREE.Group();
-  if (upgrade) g.add(part(cyl(0.87, 0.88, PLATE_H * 0.8, 6), GOLD, { at: [0, TOP + PLATE_H * 0.4 - 0.005, 0] }));
-  const m = new THREE.Mesh(cyl(upgrade ? 0.78 : 0.84, upgrade ? 0.79 : 0.85, PLATE_H, 6), mats[owner]);
-  m.position.y = TOP + PLATE_H / 2;
-  m.receiveShadow = true;
-  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), CREASE));
-  g.add(m);
+  g.add(part(cyl(0.76, 0.76, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
   if (upgrade) {
+    g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
     const mark = bake(upgradeMark(upgrade));
     mark.scale.setScalar(1.6);
     mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
     g.add(mark);
   }
   return g;
+}
+
+// A player's territory, the hexes their buildings stand on, bordered in their
+// colour: one paper strip, lying on the folded tiles, right along the edge of
+// the region. It runs inside each edge where the next hex isn't theirs, joins
+// at every corner (and across the fold where the region turns from one hex to
+// the next), and where two players' regions meet their strips touch on the
+// edge, so the border is one line in two colours.
+const BORDER_W = 0.15, BORDER_T = 0.035; // the strip's width (in from the hex's edge) and its paper thickness
+function territoryGeometry(hexes: { k: string; q: number; r: number }[]): THREE.BufferGeometry | null {
+  const peakH = TILE_H + TILE_LIFT, midH = TILE_H + TILE_LIFT * 0.45, R = 0.965;
+  const key = (x: number, z: number) => `${Math.round(x * 10)},${Math.round(z * 10)}`;
+  const at = new Map(hexes.map((h) => {
+    const [x, z] = hexXZ(h.q, h.r);
+    return [key(x, z), { x, z, lift: (rng(`tile${h.k}`)() - 0.5) * 0.02 }] as const; // the tile's own lift, as buildMap sets it
+  }));
+  // The height of a hex's folded top at a point (dx, dz) from its middle,
+  // carried on past its edge to the true hex boundary.
+  const surface = (lift: number, dx: number, dz: number) => {
+    const r = Math.hypot(dx, dz);
+    if (r < 1e-6) return peakH + lift;
+    const a = Math.atan2(dz, dx);
+    const off = Math.atan2(Math.sin(a - Math.round(a / (Math.PI / 3)) * (Math.PI / 3)), Math.cos(a - Math.round(a / (Math.PI / 3)) * (Math.PI / 3))); // from the nearest edge middle
+    const edgeR = (R * Math.cos(Math.PI / 6)) / Math.cos(off);
+    const edgeH = midH + (TILE_H - midH) * (Math.abs(Math.tan(off)) / Math.tan(Math.PI / 6));
+    return lift + peakH + (r / edgeR) * (edgeH - peakH) + 0.004;
+  };
+  const pos: number[] = [];
+  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+    const up = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).y >= 0;
+    for (const v of up ? [a, b, c] : [a, c, b]) pos.push(v.x, v.y, v.z);
+  };
+  // A strip piece over the ground points `outer` and `inner` (same length),
+  // given its height on the paper: its top, and the sides along its inner edge
+  // and its outer edge, down to the tile.
+  const strip = (outer: THREE.Vector3[], inner: THREE.Vector3[]) => {
+    const top = (v: THREE.Vector3) => v.clone().setY(v.y + BORDER_T);
+    const low = (v: THREE.Vector3) => v.clone().setY(v.y - 0.03);
+    for (let i = 0; i + 1 < outer.length; i++) {
+      const [o0, o1, i0, i1] = [outer[i], outer[i + 1], inner[i], inner[i + 1]];
+      tri(top(o0), top(o1), top(i1));
+      tri(top(o0), top(i1), top(i0));
+      for (const [p, q] of [[o0, o1], [i0, i1]]) {
+        const side = [top(p), top(q), low(q), low(p)];
+        pos.push(...[side[0], side[2], side[1], side[0], side[3], side[2]].flatMap((v) => [v.x, v.y, v.z]));
+      }
+    }
+  };
+  const ground = (c: { x: number; z: number; lift: number }, r: number, deg: number) => {
+    const a = (Math.PI / 180) * deg;
+    const dx = r * Math.cos(a), dz = r * Math.sin(a);
+    return new THREE.Vector3(c.x + dx, surface(c.lift, dx, dz), c.z + dz);
+  };
+  const inR = 1 - BORDER_W / Math.cos(Math.PI / 6); // the inner edge, as a corner radius
+  for (const c of at.values()) {
+    const next = (i: number) => {
+      const a = (Math.PI / 3) * i;
+      return at.get(key(c.x + SQ3 * Math.cos(a), c.z + SQ3 * Math.sin(a)));
+    };
+    for (let i = 0; i < 6; i++) {
+      if (next(i)) continue;
+      // The edge from corner i (at 60i - 30 degrees) to corner i + 1, through its middle.
+      const degs = [60 * i - 30, 60 * i, 60 * i + 30];
+      const rs = [1, Math.cos(Math.PI / 6), 1];
+      strip(degs.map((d, j) => ground(c, rs[j], d)), degs.map((d, j) => ground(c, rs[j] * inR, d)));
+      // The region turns into the next hex at corner i + 1: the gap between
+      // this strip's end and that hex's, across their shared edge, filled in,
+      const b = next(i + 1);
+      if (b) {
+        const v = ground(c, 1, 60 * i + 30);
+        const mine = ground(c, inR, 60 * i + 30);
+        const dx = v.x - b.x, dz = v.z - b.z;
+        const theirs = new THREE.Vector3(b.x + dx * inR, surface(b.lift, dx * inR, dz * inR), b.z + dz * inR);
+        // Mitred: the inner edges meet on the seam, the strip's width away from both edges.
+        const mx = (c.x + b.x) / 2 - v.x, mz = (c.z + b.z) / 2 - v.z, ml = Math.hypot(mx, mz);
+        const d = BORDER_W / Math.cos(Math.PI / 6);
+        const px = v.x + (mx / ml) * d - c.x, pz = v.z + (mz / ml) * d - c.z;
+        const miter = new THREE.Vector3(c.x + px, surface(c.lift, px, pz), c.z + pz);
+        const up = (p: THREE.Vector3) => p.clone().setY(p.y + BORDER_T);
+        tri(up(v), up(mine), up(miter));
+        tri(up(v), up(miter), up(theirs));
+        for (const [p, q] of [[mine, miter], [miter, theirs]]) {
+          const side = [up(p), up(q), q.clone().setY(q.y - 0.03), p.clone().setY(p.y - 0.03)];
+          pos.push(...[side[0], side[2], side[1], side[0], side[3], side[2]].flatMap((x) => [x.x, x.y, x.z]));
+        }
+      }
+    }
+  }
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from({ length: pos.length / 3 }, (_, i) => [pos[i * 3] * 0.5, pos[i * 3 + 2] * 0.5]).flat(), 2));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ---------- dragons ----------
@@ -1640,7 +1742,7 @@ interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: TH
 const WALK_TURN = 0.7, WALK_GO = 3.4;
 
 // What just changed on the board stays marked for a while: a glowing gold
-// outline round its hex (round the building's plate, which is in its owner's
+// outline round its hex (round the building's border, which is in its owner's
 // colour), pulsing gently and fading out after FRESH_S seconds.
 // The table is often looking at their phones when it happens; whoever looks
 // up late still sees what's new.
@@ -1666,6 +1768,8 @@ export class Board3D {
   private tiles = new Map<string, { hex: HexView; decorSig: string }>();
   private decor = new THREE.Group(); // everything growing on the map, merged
   private built = new Map<string, Built>();
+  private territory = new THREE.Group(); // every player's territory border
+  private territorySig = '';
   private beasts = new Map<string, Built>(); // fauna, by hex
   private dragons = new Map<string, DragonEntry>();
   private plateMats = PLAYER_COLORS.map((c) => new THREE.MeshLambertMaterial({ color: c, map: null, flatShading: true }));
@@ -1775,7 +1879,7 @@ export class Board3D {
         }
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
+      const obj = this.placed(this.buildingGroup(b, h.terrain, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too
       // (a beast arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
@@ -1783,6 +1887,7 @@ export class Board3D {
       this.built.set(h.k, { sig: bsig, obj, born: at });
       if (fresh) this.mark(h, at);
     }
+    this.drawTerritory(g.map);
     // Fauna: on its dark lair in the middle of an open hex, or out in front
     // of the building it shuts down. It folds up like a building when it
     // arrives, unless it wandered in from the next hex: then it walks over.
@@ -1826,6 +1931,28 @@ export class Board3D {
     }
     this.placeDragons(g, animate, now);
     this.firstUpdate = false;
+  }
+
+  // Each player's territory border, redrawn when whose buildings are where changes.
+  private drawTerritory(map: HexView[]) {
+    const sig = map.filter((h) => h.building).map((h) => `${h.k}:${h.building!.owner}`).join();
+    if (sig === this.territorySig) return;
+    this.territorySig = sig;
+    for (const c of [...this.territory.children]) {
+      this.territory.remove(c);
+      dispose(c);
+    }
+    const byOwner = new Map<number, HexView[]>();
+    for (const h of map) if (h.building) byOwner.set(h.building.owner, [...(byOwner.get(h.building.owner) ?? []), h]);
+    for (const [owner, hexes] of byOwner) {
+      const geo = territoryGeometry(hexes);
+      if (!geo) continue;
+      const m = new THREE.Mesh(geo, this.plateMats[owner]);
+      m.castShadow = m.receiveShadow = true;
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), CREASE));
+      this.territory.add(m);
+    }
+    if (!this.territory.parent) this.world.add(this.territory);
   }
 
   private mark(h: HexView, now: number) {
@@ -1903,11 +2030,11 @@ export class Board3D {
     return dx || dz ? Math.atan2(dx, dz) : 0;
   }
 
-  private buildingGroup(b: NonNullable<HexView['building']>, facing: number, shut: boolean): THREE.Group {
-    const g = plate(b.owner, b.upgrade, this.plateMats);
+  private buildingGroup(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
+    const g = plate(b.upgrade, tileColor(terrain));
     const { model: parts, offset } = buildingModel(b);
     const model = bake(parts);
-    // Shut down by a beast: the building goes to dull grey paper (its plate
+    // Shut down by a beast: the building goes to dull grey paper (its border
     // keeps its owner's colour) and sits back, so the beast in front is whole.
     if (shut) {
       model.traverse((o) => {
@@ -1997,7 +2124,7 @@ export class Board3D {
       }
       const r = rng(`tile${h.k}`);
       const [x, z] = hexXZ(h.q, h.r);
-      const color = mix(TERRAIN_COLORS[h.terrain], '#f4ecd8', 0.12);
+      const color = tileColor(h.terrain);
       const at: [number, number, number] = [x, (r() - 0.5) * 0.02, z];
       tiles.add(part(geo.top, color, { at }), part(geo.sides, mix(color, '#fbf6ea', 0.6), { at, crease: false }));
       this.tiles.set(h.k, { hex: h, decorSig: '-' });
@@ -2265,7 +2392,7 @@ export class Board3D {
       const fade = Math.max(0, Math.min(1, age / 0.4)) * (1 - smooth(FRESH_S - 3, FRESH_S, age));
       (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * (0.8 + 0.2 * Math.cos(age * 3.5));
     }
-    // The acting player's plates glow gently.
+    // The acting player's territory border glows gently.
     this.plateMats.forEach((m, i) => {
       const on = this.highlight === i;
       m.emissive.set(on ? PLAYER_COLORS[i] : '#000');

@@ -391,7 +391,7 @@ export function icon(name: string, size = 1.25, cls = 'ricon'): string {
 // it carries its class's goods (cut stone blocks for a quarry, a log pile for a
 // lumber camp, violet crystals for a mine, white sheep for a pasture, a nest for
 // a dragon building) in its class's paper colours. Its owner shows round it
-// (the disc on the phone's map, the plate on the TV's), never on it, except the
+// (the disc on the phone's map, the border on the TV's), never on it, except the
 // tower: a player's home is their colour.
 
 const hex2rgb = (c: string) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
