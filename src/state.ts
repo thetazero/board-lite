@@ -78,7 +78,7 @@ export interface TargetView {
 export interface RaidView {
   step: 'vote' | 'commit' | 'bail';
   candidates: TargetView[];
-  voted: boolean[];
+  votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   target: TargetView | null; // units carry current health once the fight starts
   commits: string[][];
   ready: boolean[];
@@ -281,7 +281,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     raid: raid && {
       step: raid.step,
       candidates: raid.candidates.map((t) => targetView(g, t)),
-      voted: raid.votes.map((v) => v !== null),
+      votes: [...raid.votes],
       target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
       commits: raid.commits,
       ready: raid.ready,

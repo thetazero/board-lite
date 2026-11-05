@@ -130,14 +130,14 @@ test('a view shows only your own hand and resources', () => {
   }
 });
 
-test('votes and fight-or-bail choices stay secret until revealed', () => {
+test('votes are public as cast; fight-or-bail choices stay secret until revealed', () => {
   const g = newGame(2, 3);
   hatchAll(g);
   advanceToRaidVote(g);
   apply(g, 0, 'vote 2');
-  const v1 = playerView(g, 1, 1000);
-  assert.ok(!v1.includes('You vote'));
-  assert.ok(v1.includes('P1 has voted'));
+  const name = TARGETS[g.raid!.candidates[1]].name;
+  assert.ok(playerView(g, 1, 1000).includes(`P1 votes for ${name}`));
+  assert.deepEqual(publicState(g).raid!.votes, [1, null]);
   apply(g, 1, 'vote 2');
   apply(g, 0, `commit ${g.dragons[0].id}`);
   apply(g, 0, 'ready');

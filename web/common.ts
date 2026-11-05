@@ -115,6 +115,12 @@ export function playerTag(i: number, names: string[]): string {
   return `<span class="ptag" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i] ?? `P${i + 1}`)}</span>`;
 }
 
+// Who voted for candidate i, as their tags: votes are public as they're cast.
+export function voters(votes: (number | null)[], i: number, names: string[]): string {
+  const who = votes.flatMap((v, p) => (v === i ? [playerTag(p, names)] : []));
+  return who.length ? `<div class="voters">${who.join('')}</div>` : '';
+}
+
 // ---------- icons ----------
 
 export { icon } from './icons.ts';

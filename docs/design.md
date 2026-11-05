@@ -254,7 +254,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
 - Healing: every dragon heals a fixed amount at production (7 health, in `src/data.ts`), and one that was still hurt when production began (or went hungry) sits out that round's raids, so it misses a raid round per 7 damage, rounded up. Only hunger stops growth, as the upkeep rule above says. Dragons never die: at 0 health they are knocked out and heal at home. (Changed in #65 from healing fully each round.)
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
-- Raid votes are secret until everyone has voted, and every player votes. A player with no raid-ready dragon skips the commit step.
+- Raid votes are public as they're cast, and every player votes. (Changed in #238 from secret until everyone had voted.) A player with no raid-ready dragon skips the commit step.
 - Combat power is √(health × average damage a combat round), rounded; a side's is the sum (Lanchester's square law makes these add). Loot is split in proportion to it, rounded down per player, and the remainder goes to the player with the most power standing. Loot grows with the square of a kingdom's power. (#65)
 - The bank sells gold at the normal rate.
 - Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
