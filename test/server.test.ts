@@ -85,12 +85,12 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   const r1 = g.log.filter((e) => e.round === 1 && !e.to);
   assert.ok(r1.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'unable'));
   assert.deepEqual(scenesOf(r1).map((s) => s.kind), ['roll'], 'only the opening roll');
-  // Round 2 has begun, and its roll is on the TV: the phones wait for it.
+  // Round 2 has begun, and its production is on the TV: the phones wait for it.
   const left = room.snapshot(seats[0].token).scene;
-  assert.ok(left > 0 && left < 4000, `the roll takes ${left} ms`);
+  assert.ok(left > 0 && left < 20000, `production takes ${left} ms`);
   const t0 = Date.now();
   const p = waitingOn(g)[0];
-  const r = await room.wait(seats[p].token, 10000);
+  const r = await room.wait(seats[p].token, left + 5000);
   assert.equal(r.code, 0);
   assert.ok(Date.now() - t0 >= left - 50, 'wait returns only once the scene is over');
   assert.equal(room.snapshot(seats[p].token).scene, 0);

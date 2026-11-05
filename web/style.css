@@ -283,18 +283,29 @@ q::after { content: close-quote; }
   clip-path: polygon(0 0, calc(100% - 2.2em) 0, 100% 2.2em, 100% 100%, 0 100%); }
 .production::before, .result::before, .endbox::before { content: ''; position: absolute; z-index: 2; top: 0; right: 0; width: 2.2em; height: 2.2em; background: linear-gradient(225deg, transparent 50%, var(--paper-edge) 50%, #e1d2b2 75%); box-shadow: -.1em .1em .25em #0004; }
 .production h1, .result h1, .endbox h1 { margin: .2em 0 .6em; font-size: 2.3em; }
-.production ul { list-style: none; padding: 0; text-align: left; font-size: 2.2em; }
-.production li { display: flex; align-items: center; gap: .6em; margin: .35em 0; }
-.production li > b:first-child { min-width: 6em; }
 .production { max-width: 92vw; }
 .production h2 { margin: -.5em 0 .3em; font-size: 1.5em; color: var(--muted); font-family: var(--serif); }
-.production .dice { display: flex; flex-wrap: wrap; gap: .1em .9em; }
-/* A die and the resource it rolls for, side by side. */
-.production .roll { display: inline-flex; align-items: center; }
-.production .roll .ricon { margin-left: -.15em; }
-/* Everyone rolls at once, each player's dice a moment after the last's, lit in their colour. */
-.production li { opacity: 0; translate: -1.5em 0; transition: opacity .35s ease-out, translate .35s ease-out; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
-.production li.up { opacity: 1; translate: none; }
+.production ul { list-style: none; padding: 0; margin: 0; text-align: left; }
+/* One player at a time, then everyone's totals: all in one place on the sheet
+   (one grid cell), so the sheet is its final size from the start. */
+.production .pstage { display: grid; font-size: 2.2em; }
+.production .pstage > * { grid-area: 1 / 1; opacity: 0; translate: -1em 0; transition: opacity .35s ease-out, translate .35s ease-out; }
+.production .pstage > .on { opacity: 1; translate: none; }
+.production .pturn { padding: .2em .6em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
+.production .who { font-size: 1.15em; margin-bottom: .15em; }
+/* A resource's row: its icon, the fixed amount, its dice, then the total once they land. */
+.production .prow { display: flex; align-items: center; gap: .5em; min-height: 2.6em; opacity: 0; translate: -.8em 0; transition: opacity .3s ease-out, translate .3s ease-out; }
+.production .prow.up { opacity: 1; translate: none; }
+.production .parts { display: inline-flex; align-items: center; gap: .1em; }
+.production .parts > i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
+.production .base { min-width: 1em; text-align: center; }
+.production .eq { opacity: 0; transition: opacity .25s ease-out; }
+.production .prow.landed .eq { opacity: 1; }
+.production .ptotal { margin-top: .3em; padding-top: .3em; border-top: 2px solid color-mix(in srgb, var(--pc) 45%, transparent); opacity: 0; transition: opacity .3s ease-out; }
+.production .ptotal.up { opacity: 1; }
+.production .psum { align-self: center; }
+.production .psum li { display: flex; align-items: center; gap: .6em; margin: .3em 0; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
+.production .psum li > .ptag { min-width: 4.5em; }
 .endbox { padding: 0 0 1.2em; overflow: hidden; min-width: 44em; }
 .endbox svg.scene { display: block; width: 100%; height: 13em; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }
@@ -794,8 +805,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote :is(.production, .result, .endbox) { min-width: 0; width: 100%; padding: .8em .9em; }
 .remote .endbox { padding: 0 0 1em; }
 .remote :is(.production, .result, .endbox) h1 { font-size: 1.6em; }
-.remote .production ul { font-size: 1.3em; }
-.remote .production li > b:first-child { min-width: 4.5em; }
+.remote .production .pstage { font-size: 1.3em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }
