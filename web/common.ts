@@ -115,6 +115,49 @@ export function playerTag(i: number, names: string[]): string {
   return `<span class="ptag" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i] ?? `P${i + 1}`)}</span>`;
 }
 
+// ---------- points ----------
+
+type PlayerPoints = PublicState['players'][number];
+
+// Where a player's public points come from, one part per source, in the
+// order the rules list them. Sources worth nothing yet are left out.
+function pointParts(p: PlayerPoints): { label: string; n: number }[] {
+  return [
+    { label: 'Buildings', n: p.buildings - p.monuments },
+    { label: 'Monuments', n: p.monuments },
+    { label: 'Titles', n: p.titles },
+    { label: 'Great beasts', n: p.beasts },
+  ].filter((x) => x.n > 0);
+}
+
+// A player's points as a track to the goal, one segment per source, with the
+// sources named under it: how close they are to winning, and why.
+export function pointsTrack(p: PlayerPoints, goal: number): string {
+  const parts = pointParts(p);
+  const segs = parts.map((x, k) => `<i class="s${k}" style="width:${(Math.min(x.n, goal) / goal) * 100}%"></i>`).join('');
+  const words = parts.map((x, k) => `<span><i class="s${k}"></i>${x.label} <b>${x.n}</b></span>`).join('');
+  return `<div class="ptrack${p.publicPoints >= goal ? ' full' : ''}"><div class="pbar">${segs}</div>${words ? `<div class="pwhy">${words}</div>` : ''}</div>`;
+}
+
+// Once anyone has the points to win, the game ends at the end of this round:
+// the table is told as soon as it happens, not when the round ends. A phone
+// also counts its own hidden points (`me`, with its total).
+export function lastRoundHtml(g: PublicState, names: string[], me?: { seat: number; total: number }): string {
+  if (g.phase === 'over') return '';
+  const goal = g.pointsToWin;
+  const who = g.players.map((p, i) => ({ i, n: i === me?.seat ? me.total : p.publicPoints })).filter((x) => x.n >= goal);
+  if (!who.length) return '';
+  const pts = (n: number) => `${n} points`;
+  if (who.length > 1) {
+    const tags = who.map((x, k) => (x.i === me?.seat ? (k ? 'you' : 'You') : playerTag(x.i, names)));
+    return `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more, so this is the last round.`;
+  }
+  const [x] = who;
+  if (x.i !== me?.seat) return `${playerTag(x.i, names)} has ${pts(x.n)}, so this is the last round.`;
+  const hidden = g.players[x.i].publicPoints < goal ? ' with the cards in your hand' : '';
+  return `You have ${pts(x.n)}${hidden}, so this is the last round.`;
+}
+
 // ---------- icons ----------
 
 export { icon } from './icons.ts';
