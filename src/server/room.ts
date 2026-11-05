@@ -9,12 +9,13 @@
 // each seat's token), so after a restart the room comes back under its own
 // code and every phone, the TV and each CLI player reconnect to their own seat.
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
+import { buildRecap } from '../recap.ts';
 import { publicState, seatState, visibleEvents, type EventView, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { load, save, withLock } from '../store.ts';
 import { scenesMs, scenesOf } from '../../web/scenes.ts';
@@ -23,6 +24,12 @@ export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
 export const AWAY_MS = 60000; // a seat with no phone or CLI request for this long is away
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
+// Each finished game's recap (src/recap.ts), kept after its room is gone so
+// its link still opens. The file name is the recap's id.
+export const RECAPS_DIR = join(homedir(), '.cache', 'board-lite', 'recaps');
+
+/** Where recaps go: beside the rooms when they have their own folder (tests), else RECAPS_DIR. */
+export const recapsDir = (opts: { dir?: string; recaps?: string }) => opts.recaps ?? (opts.dir ? join(opts.dir, 'recaps') : RECAPS_DIR);
 
 export interface Seat {
   name: string;
@@ -63,6 +70,9 @@ export interface RoomOptions {
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
   awayMs?: number; // defaults to AWAY_MS (tests shorten it)
   remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
+  recaps?: string; // where finished games' recaps go (recapsDir)
+  now?: () => number; // the clock a recap is dated by (the screenshots fix it)
+  recapId?: string; // and its id (the screenshots fix it too, so the QR code is the same each run)
 }
 
 // What the seats file keeps: enough for every client to reconnect as before.
@@ -166,6 +176,28 @@ export class Room {
 
   get game(): Game | null {
     return this.cached;
+  }
+
+  // The recap's id: from the room's secret host token, so it's the same after
+  // a restart, a new room's is new, and no one can guess another game's.
+  get recapId(): string {
+    return this.opts.recapId ?? createHash('sha256').update(`recap:${this.hostToken}`).digest('hex').slice(0, 12);
+  }
+
+  get recapFile(): string {
+    return join(recapsDir(this.opts), `${this.recapId}.json`);
+  }
+
+  // Once the game is over, its recap is written (once).
+  private saveRecap() {
+    const g = this.cached;
+    if (g?.phase !== 'over' || existsSync(this.recapFile)) return;
+    try {
+      mkdirSync(recapsDir(this.opts), { recursive: true });
+      save(this.recapFile, buildRecap(g, this.seats.map((s) => s.name), this.recapId, new Date(this.opts.now?.() ?? Date.now())));
+    } catch (e) {
+      console.error(`Room ${this.code}: could not save the recap:`, e);
+    }
   }
 
   // The only way the room changes the game: through the engine, then saved.
@@ -506,6 +538,7 @@ export class Room {
       seat: p,
       game: g ? publicState(g) : null,
       scene: this.sceneLeft(),
+      recap: g?.phase === 'over' && existsSync(this.recapFile) ? this.recapId : null,
       you: g && p >= 0 && this.seats[p].kind === 'player' ? { ...seatState(g, p), name: this.seats[p].name } : null,
     };
   }
@@ -534,6 +567,7 @@ export class Room {
   changed() {
     this.lastActive = Date.now();
     this.saveSeats();
+    this.saveRecap(); // once the game is over (also one that ended before recaps were kept)
     this.tick();
     for (const fn of this.listeners) fn();
   }

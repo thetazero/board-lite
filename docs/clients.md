@@ -38,6 +38,12 @@ The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for
 
 **Restarts:** the server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change. After a restart, `npm run serve` hosts every room from the last 6 hours again, and everyone reconnects to their own seat. `npm run serve -- --game <file>` hosts one saved game.
 
+## After the game
+
+When the game ends in front of the TV, it plays a short summary (about half a minute): the points race drawn a round at a time, with the titles taken, great beasts slain and kingdoms that fell, then where everyone's points came from. **Skip** jumps to the final scores. They come with a QR code to the game's **recap page** (`/recap/<id>`), the same story to keep or share on a phone; **Watch again** plays the summary again.
+
+The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/recap.ts` when the game ends), so its link still opens after the table starts a new game and the old room is gone. The page (`web/recap.html`) draws everything from that file: to put recaps on a website later, host the page and the files, and point the TV's QR code there.
+
 ## Playing with no TV
 
 On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others. One phone and a few bots is a whole game.
