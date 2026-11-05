@@ -376,6 +376,17 @@ export function foeStack(units: UnitView[], size = 2): string {
     </div>`).join('')}</div>`;
 }
 
+// A kingdom's defenders at a glance: one picture per kind, with how many.
+// For choosing among kingdoms, where combat power already sums up the fight.
+export function foeIcons(units: UnitView[], size = 2): string {
+  const kinds: { name: string; n: number }[] = [];
+  for (const u of units) {
+    const k = kinds.find((x) => x.name === u.name);
+    if (k) k.n++; else kinds.push({ name: u.name, n: 1 });
+  }
+  return `<div class="foeicons">${kinds.map(({ name, n }) => `<span class="foeicon" title="${esc(n > 1 ? `${n} ${plural(name)}` : name)}">${unitIcon(name, size)}${n > 1 ? `<b>×${n}</b>` : ''}</span>`).join('')}</div>`;
+}
+
 // "Frost Golem" -> "Frost Golems"; names already plural ("Archers", "Militia") stay.
 function plural(name: string): string {
   return /s$|Militia$/.test(name) ? name : `${name}s`;
