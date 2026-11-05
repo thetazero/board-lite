@@ -367,12 +367,13 @@ export function madeResource(def: BuildingDef): Resource | null {
 }
 
 // Points a building at hex k is worth: a flat number, never multiplied by
-// what's adjacent. Production buildings and point cards (monuments) are worth
-// points; the tower and its floors are not.
-export function buildingPoints(g: Game, k: string): number {
+// what's adjacent, plus its upgrade's. Production buildings, point cards
+// (monuments) and a Workshop are worth points; the tower and its floors are not.
+export function buildingPoints(g: Game, k: string, upgrade: string | null = g.buildings[k].upgrade): number {
   const b = g.buildings[k];
-  if (b.type === 'tower') return 0;
-  return BUILDINGS[b.type].points ?? 0;
+  const up = upgrade ? UPGRADES[upgrade]?.points ?? 0 : 0;
+  if (b.type === 'tower') return up;
+  return (BUILDINGS[b.type].points ?? 0) + up;
 }
 
 // Is hex k on or next to the peak, once the Thunderbird has fallen?
@@ -412,7 +413,7 @@ export function buildingYield(g: Game, k: string, upgrade: string | null = g.bui
   const made = madeResource(def);
   if (made && up?.baseBonus) add(made, up.baseBonus);
   if (made && onPeak(g, k)) add(made, TUNING.peakBonus);
-  return { makes, houses: (def.dragonCapacity ?? 0) * n + (up?.dragonCapacity ?? 0), points: buildingPoints(g, k) };
+  return { makes, houses: (def.dragonCapacity ?? 0) * n + (up?.dragonCapacity ?? 0), points: buildingPoints(g, k, upgrade) };
 }
 
 // Public production: fixed amount plus a list of dice, per resource.

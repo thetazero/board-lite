@@ -52,7 +52,7 @@ function costs(): string {
   const row = (c: { name: string; copies?: number; cost: Bundle }, does: string, points: string) => [c.name, kindOf(c), deckOf(c), c.copies ?? '—', cost(c.cost), does, points];
   const rows: (string | number)[][] = [
     ...Object.values(BUILDINGS).map((b) => row(b, b.beside ? `${b.text} Build adjacent to ${besideText(b.beside)}.` : b.text, pts(b.points))),
-    ...Object.values(UPGRADES).map((u) => row(u, u.text, '—')),
+    ...Object.values(UPGRADES).map((u) => row(u, u.text, pts(u.points))),
     ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? String(a.amount) : '—')),
     ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, '—')),
   ];

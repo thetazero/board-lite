@@ -59,6 +59,7 @@ water → fire → ice → air → lightning → water
 Dragons are worth no points; they count toward Strongest Dragon Army.
 
 - Production buildings: 1 each, every stone, timber, crystal and livestock building, basic or card.
+- Workshops: 1 each, on top of the building's.
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): 2 each. Each goes adjacent to at least one of what its card names: a monument (a tower is one), a crystal field hex, an ocean hex or a trade building. No other building is worth points: not the tower, not its floors.
 - Secret Hoard cards: 2 each while in hand (hidden until the end).
 - Great beasts: 4 each to whoever slays it, for good.

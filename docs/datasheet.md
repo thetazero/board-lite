@@ -110,7 +110,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
 | Lighthouse | building card | building | 2 | 7 stone, 4 timber | Worth 2 points. Build adjacent to an ocean hex. | 2 |
 | Guildhall | building card | building | 1 | 5 stone, 6 timber | Worth 2 points. Build adjacent to a trade building. | 2 |
-| Workshop | upgrade | building | 4 | 4 stone, 4 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more. | — |
+| Workshop | upgrade | building | 4 | 4 stone, 4 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more; worth 1 point. | 1 |
 | Nesting Grounds | upgrade | building | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
