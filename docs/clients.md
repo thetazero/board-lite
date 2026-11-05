@@ -49,7 +49,7 @@ The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/rec
 
 On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others. One phone and a few bots is a whole game.
 
-Each phone gets a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end.
+Each phone gets a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet.
 
 ## Playing from the command line
 
