@@ -35,8 +35,7 @@ export const PROD_END_MS = 3500;
 export const prodStep = (rows: number) => Math.min(PROD_ROW_MS, PROD_ROWS_MAX_MS / Math.max(1, rows));
 // How long a row's dice tumble before they land: most of the row's step.
 export const prodSpin = (rows: number) => Math.round(prodStep(rows) * 0.65);
-// rows: for each player who makes anything, how many resources they make
-// (and 1 more if their dragons eat).
+// rows: for each player who makes or eats anything, how many rows they show.
 export const prodMs = (rows: number[]) => {
   if (!rows.length) return 2200; // nothing made: the round's number, briefly
   const all = rows.reduce((a, b) => a + b, 0);
@@ -45,10 +44,10 @@ export const prodMs = (rows: number[]) => {
 // The resources a produce event's player makes something of, in order.
 const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 export const madeOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? RESOURCES.filter((r) => (ev.got[r] ?? 0) > 0) : []);
-// A produce event's rows on the TV: one per resource made, and one for the
-// livestock their dragons eat, if they eat any (#309).
+// A produce event's rows on the TV: one per resource made. What their dragons
+// eat comes off the livestock row, which shows even if they make none (#309).
 export const eatOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? (ev.eat ?? 0) : 0);
-export const prodRowsOf = (ev: GameEvent | undefined) => madeOf(ev).length + (eatOf(ev) ? 1 : 0);
+export const prodRowsOf = (ev: GameEvent | undefined) => madeOf(ev).length + (eatOf(ev) && !madeOf(ev).includes('livestock') ? 1 : 0);
 
 // A fight: a beat to look up and see who's there, the hits (at most 6 s of
 // them), then the outcome long enough to read.

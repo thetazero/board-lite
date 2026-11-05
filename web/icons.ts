@@ -121,6 +121,19 @@ const ICONS: Record<string, Facet[]> = {
     ['#c79314', P([[0, -3.3], [2.2, 0], [0, 3.3], [-2.2, 0]])],
     ['#fff0bd', P([[0, -3.3], [-2.2, 0], [0, 0]])],
   ],
+  // A dragon: a folded red head in profile, facing right, with two horns and a
+  // gold eye. Stands for "your dragons" where a number is theirs (what they eat).
+  dragon: [
+    ['#7a2418', P([[-6, -3.5], [-9.5, -9], [-3.5, -5.2]])],
+    ['#e0664a', P([[-3.5, -5.2], [-5, -9.5], [-0.5, -5]])],
+    ['#a8331f', P([[-7.5, 2], [-3, 4.5], [-1, 9.5], [-6.5, 9.5]])],
+    ['#c84a32', P([[-6, -3.5], [-2, -1], [2, 0.5], [-3, 4.5], [-7.5, 2]])],
+    ['#f08a6a', P([[-6, -3.5], [-0.5, -5], [4.5, -3], [-2, -1]])],
+    ['#e0664a', P([[4.5, -3], [9.5, -1.5], [9.5, 0.5], [2, 0.5], [-2, -1]])],
+    ['#8c2a1a', P([[-3, 4.5], [2, 0.5], [9.5, 0.5], [8, 2.8], [1, 4.8]])],
+    ['#ffd24a', P([[-1.8, -3.2], [1, -3.6], [-0.2, -2]])],
+    ['#5a1a10', P([[7.4, -1.6], [8.6, -1.2], [7.6, -0.7]])],
+  ],
   // Victory points: a folded paper star.
   points: star(5, 9.5, 4, '#fff6dc', '#e2c58c'),
   // Cards in hand: two cards fanned, one corner folded.
@@ -369,7 +382,7 @@ const ICONS: Record<string, Facet[]> = {
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds', trade_charter: 'Trade Charter',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
