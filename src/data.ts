@@ -21,7 +21,7 @@ export const TERRAIN_NOUN: Record<Terrain, string> = {
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
 
 export const TUNING = {
-  pointsToWin: 20,
+  pointsToWin: 30,
   handCap: 7,
   // Each round a player draws this many building cards and keeps one.
   buildingCardsDrawn: 2,
@@ -32,11 +32,11 @@ export const TUNING = {
   bankRate: 4,
   livestockPerDragon: 1,
   // Dragons are worth no points; they count toward Strongest Dragon Army.
-  titlePoints: 3,
+  titlePoints: 6,
   // A title needs at least this much: dragons' combat power, tower floors,
   // gold. The army's is about 3 adults and a hatchling, as 10 dragon points
-  // were (#134). The hoard's is a Monument's gold: keep it for the title or
-  // spend it on one (#109).
+  // were (#134). The hoard's was a Monument's gold when Monuments cost gold
+  // (#109).
   titleMinimum: { army: 55, tower: 4, hoard: 20 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
@@ -88,7 +88,8 @@ export interface BuildingDef {
   // hexes that match it, counted fresh whenever it matters.
   produces?: { resource: Resource; base: number; die: number }; // a die rolled each round
   makes?: Bundle; // each round, no dice
-  points?: number;
+  points?: number; // flat, never multiplied by `per`
+  beside?: Counted; // must be built adjacent to at least one of these
   dragonCapacity?: number;
   growthBonus?: number;
   bankRate?: number;
@@ -96,16 +97,16 @@ export interface BuildingDef {
 }
 
 const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrain, cost: Bundle, copies: number, noun = TERRAIN_NOUN[per]): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${noun}.` });
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, points: 1, text: `Makes 1 ${r} each round for each adjacent ${noun}; worth 1 point.` });
 const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
-  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}.` });
+  ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, points: 1, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}; worth 1 point.` });
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
-  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
-  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
-  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
-  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 stone each round; worth 1 point.' },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 timber each round; worth 1 point.' },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 crystal each round; worth 1 point.' },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 livestock each round; worth 1 point.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 4, timber: 4 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // Worth no points itself: floors count only toward Tallest Tower, a side
   // quest and a sink for raid gold (#98).
@@ -125,15 +126,13 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 6, timber: 6, crystal: 6 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
-  // Point cards: the only buildings worth points, and dear (#98). Raid gold is
-  // meant to come in big numbers, so a point costs a lot of it, and at the
-  // bank's 4:1 a point can't be had cheaply from surplus.
-  monument: { name: 'Monument', class: 'monument', cost: { stone: 8, timber: 6, gold: 20 }, points: 1, per: 'monument', text: 'Worth 1 point for each adjacent monument.', copies: 2 },
-  // They count only what can't be bought without limit: terrain, or classes
-  // that hold no basic building (monuments, trade buildings).
-  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 6, crystal: 6, gold: 20 }, points: 1, per: 'ley', text: 'Worth 1 point for each adjacent crystal field hex.', copies: 2 },
-  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 10, timber: 6, gold: 20 }, points: 1, per: 'ocean', text: 'Worth 1 point for each adjacent ocean hex.', copies: 2 },
-  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 6, timber: 6, gold: 20 }, points: 1, per: 'trade', text: 'Worth 1 point for each adjacent trade building.', copies: 1 },
+  // Point cards: a flat 2 points each, built adjacent to what they used to
+  // count (#134). About 11 resources and no gold: 50% better at points than a
+  // production card (8 resources, 1 point), the owner's call.
+  monument: { name: 'Monument', class: 'monument', cost: { stone: 6, timber: 5 }, points: 2, beside: 'monument', text: 'Worth 2 points.', copies: 2 },
+  standing_stones: { name: 'Standing Stones', class: 'monument', cost: { stone: 5, crystal: 6 }, points: 2, beside: 'ley', text: 'Worth 2 points.', copies: 2 },
+  lighthouse: { name: 'Lighthouse', class: 'monument', cost: { stone: 7, timber: 4 }, points: 2, beside: 'ocean', text: 'Worth 2 points.', copies: 2 },
+  guildhall: { name: 'Guildhall', class: 'monument', cost: { stone: 5, timber: 6 }, points: 2, beside: 'trade', text: 'Worth 2 points.', copies: 1 },
 };
 
 export const BASIC_BUILDINGS = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].basic);
@@ -160,7 +159,7 @@ export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal
 export interface ActionDef {
   name: string;
   effect: ActionEffect;
-  amount?: number;
+  amount?: number; // hidden_point: its points
   fauna?: string; // send_fauna: which beast, a FAUNA key
   cost: Bundle;
   text: string;
@@ -175,7 +174,7 @@ export const ACTIONS: Record<string, ActionDef> = {
   growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 10 },
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons. It can raid this round.', copies: 8 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 6 },
-  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', cost: {}, text: 'Worth 1 point while in your hand.', copies: 8 },
+  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', amount: 2, cost: {}, text: 'Worth 2 points while in your hand.', copies: 8 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
   wolf_call: { name: 'Wolf Call', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 8 },
@@ -324,9 +323,9 @@ export interface BeastDef extends FaunaDef {
 
 export const BEASTS: Record<string, BeastDef> = {
   // On the mountain at the centre of the map.
-  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, strong: ['lightning', 'air', 'water'], weak: ['ice'], loot: {}, points: 2 },
+  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, strong: ['lightning', 'air', 'water'], weak: ['ice'], loot: {}, points: 4 },
   // In the ocean off one coast, beside its harbor.
-  leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, strong: ['water', 'fire', 'ice'], weak: ['lightning'], loot: {}, points: 2 },
+  leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, strong: ['water', 'fire', 'ice'], weak: ['lightning'], loot: {}, points: 4 },
 };
 
 // A beast on the map: one of the fauna, or a great beast.

@@ -10,7 +10,7 @@ import {
   ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
-import { bundleText } from './engine.ts';
+import { besideText, bundleText } from './engine.ts';
 import { mapRadius } from './map.ts';
 
 
@@ -51,9 +51,9 @@ function costs(): string {
   const pts = (n?: number) => (n ? String(n) : '—');
   const row = (c: { name: string; copies?: number; cost: Bundle }, does: string, points: string) => [c.name, kindOf(c), deckOf(c), c.copies ?? '—', cost(c.cost), does, points];
   const rows: (string | number)[][] = [
-    ...Object.values(BUILDINGS).map((b) => row(b, b.text, b.per && b.points ? `${b.points} each` : pts(b.points))),
+    ...Object.values(BUILDINGS).map((b) => row(b, b.beside ? `${b.text} Build adjacent to ${besideText(b.beside)}.` : b.text, pts(b.points))),
     ...Object.values(UPGRADES).map((u) => row(u, u.text, '—')),
-    ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? '1' : '—')),
+    ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? String(a.amount) : '—')),
     ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, '—')),
   ];
   return `## Costs
@@ -87,7 +87,7 @@ function neighbourCards(): string {
   const terrains = new Set<string>(TERRAINS);
   const rows = cards.map((b) => {
     const counted = terrains.has(b.per!) ? `${TERRAIN_NOUN[b.per as keyof typeof TERRAIN_NOUN]}es` : `${CLASS_NAMES[b.per as BuildingClass].replace(/y$/, 'ie')}s (anyone's)`;
-    return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), b.makes ? `${cost(b.makes)} a round` : `${b.points} point`];
+    return [b.name, CLASS_NAMES[b.class], counted, cost(b.cost), `${cost(b.makes!)} a round`];
   });
   return `## Building cards that count their neighbours
 
@@ -117,12 +117,10 @@ type PointSource = { name: string; pays: Bundle; shown: string; points: number; 
 function pointSources(): PointSource[] {
   const out: PointSource[] = [];
   for (const b of Object.values(BUILDINGS).filter((b) => b.points)) {
-    // Neighbour-counting monuments, at 2 neighbours (see the table above).
-    const pts = b.points! * (b.per ? 2 : 1);
-    out.push({ name: b.per ? `${b.name}, 2 neighbours` : b.name, pays: b.cost, shown: cost(b.cost), points: pts, ready: 'now' });
+    out.push({ name: b.beside ? `${b.name}, adjacent to ${besideText(b.beside)}` : b.name, pays: b.cost, shown: cost(b.cost), points: b.points!, ready: b.makes || b.produces ? 'now, and makes resources' : 'now' });
   }
   for (const a of Object.values(ACTIONS).filter((a) => a.effect === 'hidden_point')) {
-    out.push({ name: `${a.name} (action card)`, pays: a.cost, shown: cost(a.cost), points: 1, ready: 'now, uses a hand slot' });
+    out.push({ name: `${a.name} (action card)`, pays: a.cost, shown: cost(a.cost), points: a.amount!, ready: 'now, uses a hand slot' });
   }
   return out;
 }
@@ -131,7 +129,7 @@ function points(): string {
   const rows = pointSources().map((s) => [s.name, s.shown, s.points, perPoint(s.pays, s.points), s.ready]);
   return `## Points
 
-Every way to buy points. Neighbour-counting monuments are shown at 2 neighbours. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts).
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
