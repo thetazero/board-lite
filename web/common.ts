@@ -372,6 +372,7 @@ export interface MapOptions {
   highlight?: number | null; // a player whose buildings are emphasised
   coords?: boolean;
   labels?: Record<string, string>; // short text shown on hexes, like a count
+  picked?: string | null; // the hex tapped, waiting for its confirm: ringed solid
 }
 
 // The map as an SVG string. Selectable hexes carry data-hex for click handlers.
@@ -419,7 +420,8 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     // Dragons perched on the building, each a small disc in its element's colour
     // ringed in its owner's, along the hex's top edge.
     (h.perched ?? []).forEach((p, i) => cells.push(`<circle cx="${x + (i - (h.perched.length - 1) / 2) * size * 0.34}" cy="${y - size * 0.5}" r="${size * 0.15}" fill="${ELEMENT_COLORS[p.element] ?? '#fff'}" stroke="${PLAYER_COLORS[p.owner]}" stroke-width="${size * 0.07}"/>`));
-    if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
+    if (h.k === opts.picked) cells.push(`<polygon points="${hexPoints(x, y, size * 0.84)}" fill="none" stroke="#fff" stroke-width="${size * 0.16}"/><polygon points="${hexPoints(x, y, size * 0.84)}" fill="none" stroke="#111" stroke-width="${size * 0.05}"/>`);
+    else if (sel.has(h.k)) cells.push(`<polygon points="${hexPoints(x, y, size * 0.8)}" fill="none" stroke="#fff" stroke-width="${size * 0.08}" stroke-dasharray="${size * 0.2} ${size * 0.12}" class="pulse"/>`);
     const label = opts.labels?.[h.k];
     if (label) cells.push(`<g transform="translate(${x} ${y})"><circle r="${size * 0.36}" fill="#fff" stroke="#0009" stroke-width="2"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.42}" font-weight="800" fill="#111">${label}</text></g>`);
     if (opts.coords) cells.push(`<text x="${x}" y="${y + size * 0.82}" text-anchor="middle" font-size="${size * 0.22}" fill="#0009">${h.k}</text>`);
