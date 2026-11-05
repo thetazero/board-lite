@@ -830,3 +830,23 @@ test('each option a seat is offered says why it is off, in the words a refused c
   for (const b of s.basics) assert.equal(b.why === null, b.affordable && (b.onTower || b.hexes.length > 0), b.key);
   assert.equal(s.eggProject.why === null, s.eggProject.affordable && s.eggProject.room);
 });
+
+// What the phone shows before placing an upgrade or a beast (#246): what each
+// building makes, and what an upgrade would change, from the same numbers
+// production adds up.
+test('a building card shows what it makes now and with the upgrade', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const k = neighbors(g.towers[0]).find((n) => g.map[n].terrain === 'mountain' && !g.map[n].fauna)
+    ?? neighbors(g.towers[0]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna)!;
+  g.buildings[k] = { type: 'quarry', owner: 0, upgrade: null, floors: 0 };
+  g.players[0].hand.push({ id: 'cw', deck: 'building', key: 'workshop' });
+  const hex = publicState(g, 10).map.find((h) => h.k === k)!;
+  assert.deepEqual(hex.building!.does, { makes: { stone: { base: 0, dice: [4] } }, houses: 0, points: 1 });
+  const card = seatState(g, 0).hand.find((c) => c.id === 'cw')!;
+  assert.deepEqual(card.after![k].makes, { stone: { base: 2, dice: [4] } });
+  // The tower makes its own income and houses its dragon.
+  const tower = publicState(g, 10).map.find((h) => h.k === g.towers[0])!.building!.does;
+  assert.equal(tower.houses, TUNING.towerDragonCapacity);
+  assert.deepEqual(production(g, 0).stone, { base: (TUNING.towerProduction.stone ?? 0), dice: [4] });
+});

@@ -2,11 +2,11 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRate, besideText, buildingClass, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRate, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
-  type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
+  type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
 
@@ -17,12 +17,20 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
   peak?: 'held' | 'free'; // the Thunderbird's peak
   peakZone?: boolean; // on or next to the freed peak: a production building here makes more
+}
+
+// What a building does each round on its hex (engine's buildingYield), with,
+// for a building whose effect is none of those (the Hatchery, a Port), its
+// card's words. What the phone shows for a hex before a beast or an upgrade
+// goes on it.
+export interface BuildingDoes extends BuildingYield {
+  note?: string;
 }
 
 export interface FaunaView extends UnitView {
@@ -102,6 +110,7 @@ export interface PublicState {
   turnOrder: number[];
   pointsToWin: number;
   titlePoints: number; // what each title is worth
+  elementBeats: Record<string, string>; // the element wheel: what each element beats
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   waitingOn: number[];
   players: { publicPoints: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
@@ -145,6 +154,7 @@ export interface CardView {
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
   fauna?: FaunaView; // fauna cards: the beast it sends
+  after?: Record<string, BuildingDoes>; // upgrade cards: what each of `hexes` would do with it
   dragon?: { growth: number; targeting: string; stages: DragonStageView[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
@@ -253,6 +263,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     turnOrder: turnOrder(g),
     pointsToWin: TUNING.pointsToWin,
     titlePoints: TUNING.titlePoints,
+    elementBeats: ELEMENT_BEATS,
     faunaWanderOdds: TUNING.faunaWanderOdds,
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
@@ -271,7 +282,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors } : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
         perched: perchedOn(g, k).map((d) => ({ d: d.id, owner: d.owner, element: DRAGONS[d.key].element })),
       };
@@ -300,6 +311,13 @@ export function publicState(g: Game, logLines = 60): PublicState {
   };
 }
 
+function buildingDoes(g: Game, k: string, upgrade?: string): BuildingDoes {
+  const b = g.buildings[k];
+  const def = b.type === 'tower' ? null : BUILDINGS[b.type];
+  const note = def && (def.growthBonus || def.bankRate) ? def.text : undefined;
+  return { ...buildingYield(g, k, upgrade), ...(note ? { note } : {}) };
+}
+
 // A card as a seat sees it, with what playing it now needs and, if it can't
 // be played now, why.
 function cardView(g: Game, p: number, c: Card): CardView {
@@ -324,7 +342,8 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
     const hexes = upgradeTargets(g, p, c.key);
-    return { ...base, text: u.text, needs: 'hex', hexes, blocked: hexes.length ? null : `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.` };
+    const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, c.key)]));
+    return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.` };
   }
   if (kind === 'dragon') {
     const d = DRAGONS[c.key];

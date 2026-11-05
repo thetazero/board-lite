@@ -314,7 +314,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 1 && g.phase === 'action',
     shots: (g) => [
-      { file: 'tv-opening-production-2p', caption: 'TV, round 1 (2 players): the round opens (no dice to roll yet)', client: 'tv', waitMs: 600 },
+      { file: 'tv-opening-production-2p', caption: "TV, round 1 (2 players): production, the first player's tower only (no dice to roll yet)", client: 'tv', waitFor: '#overlay .production .pturn.on .ptotal.up', hold: true, waitMs: 500 },
       { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-opening-waiting-2p', caption: "Phone, round 1: someone else's turn", client: 'phone', seat: (g!.turn + 1) % 2 },
       { file: 'phone-reconnecting', caption: 'Phone: the connection to the server dropped', client: 'phone', seat: g!.turn, offline: true },
@@ -331,7 +331,8 @@ export const SCENES: Scene[] = [
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-bank-3p', caption: 'Phone: basic buildings, the egg project and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
-      { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-card]'] },
+      { file: 'phone-hand-raised-3p', caption: "Phone: the tucked hand tapped on someone else's turn, raised to look at", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]'] },
+      { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]', '[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
       { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
       { file: 'phone-join-started', caption: "Phone: the room's address for a game that has started, everyone at their seat", client: 'phone', waitFor: '.seats' },
@@ -666,7 +667,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round opens with everyone's production roll, the dice still tumbling", client: 'tv', live: true, waitFor: '#overlay .production li.up:nth-child(3)', hold: true }],
+    shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round's production, one player at a time: the second player's resources, dice landed, and their total", client: 'tv', live: true, waitFor: '#overlay .production .pturn.on:nth-child(2) .ptotal.up', hold: true, waitMs: 500 }],
   },
   {
     name: 'production-done-6p',
@@ -679,7 +680,7 @@ export const SCENES: Scene[] = [
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
-    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: every player's production roll has landed (6 players)", client: 'tv', live: true, waitFor: '#overlay .production li.up:last-child:not(:has(.rolling))', hold: true }],
+    shots: () => [{ file: 'tv-production-done-6p', caption: "TV: production ends with everyone's totals together (6 players)", client: 'tv', live: true, waitFor: '#overlay .production .psum.on', hold: true, waitMs: 500 }],
   },
   {
     name: 'late-6p',
@@ -848,6 +849,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-monument', caption: 'Phone: Monument tapped open', clicks: [card(id('monument'))] },
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
+        { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: what it makes now and with it, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
         { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=more]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
@@ -1126,6 +1128,10 @@ export const SCENES: Scene[] = [
       { file: 'phone-fauna-send-3p', caption: 'Phone: choosing dragons to send against it', client: 'phone', seat: g!.turn, clicks: ['#hunt', '[data-hex]', '[data-hunter]'] },
       { file: 'phone-fauna-card-3p', caption: 'Phone: a fauna card opened', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
       { file: 'phone-fauna-where-3p', caption: 'Phone: choosing where to send the Cave Bear', client: 'phone', seat: g!.turn, clicks: [card('c901'), '[data-pickhex]'] },
+      {
+        file: 'phone-fauna-where-picked-3p', caption: "Phone: a rival's building tapped for the Basilisk: what it makes, then Place", client: 'phone', seat: g!.turn,
+        clicks: [card('c901'), '[data-pickhex]', `[data-hex="${seatState(g!, g!.turn).hand.find((c) => c.id === 'c901')!.hexes.find((k) => g!.buildings[k] && g!.buildings[k].owner !== g!.turn && g!.buildings[k].type !== 'roost')}"]`],
+      },
     ],
   },
   {
@@ -1260,6 +1266,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
+      { file: 'phone-wheel-3p', caption: 'Phone: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], sizes: true },
       { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
       { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },
       { file: 'phone-join-seats-3p', caption: "Phone: the room's address mid-game: tap your name to take your seat back", client: 'phone', waitFor: '.seats', sizes: true },
