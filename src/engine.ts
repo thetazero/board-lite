@@ -204,6 +204,7 @@ export function canAfford(pl: Player, cost: Bundle): boolean {
 
 // Why a player can't pay a cost, or null if they can: the same words as the
 // error, so the phone's greyed button and a refused command say one thing.
+// web/phone.ts matches these words to leave the line out under a greyed button.
 export function afford(pl: Player, cost: Bundle): string | null {
   return canAfford(pl, cost) ? null : `You can't afford ${bundleText(cost)}.`;
 }
