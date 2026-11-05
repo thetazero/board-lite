@@ -314,7 +314,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 1 && g.phase === 'action',
     shots: (g) => [
-      { file: 'tv-opening-production-2p', caption: 'TV, round 1 (2 players): the round opens with production (no dice to roll yet, only the tower)', client: 'tv', waitMs: 600 },
+      { file: 'tv-opening-production-2p', caption: "TV, round 1 (2 players): production, the first player's tower only (no dice to roll yet)", client: 'tv', waitFor: '#overlay .production .pturn.on .ptotal.up', hold: true, waitMs: 500 },
       { file: 'phone-opening-hand-2p', caption: 'Phone, round 1: the first hand, on your turn', client: 'phone', seat: g!.turn, sizes: true },
       { file: 'phone-opening-waiting-2p', caption: "Phone, round 1: someone else's turn", client: 'phone', seat: (g!.turn + 1) % 2 },
       { file: 'phone-reconnecting', caption: 'Phone: the connection to the server dropped', client: 'phone', seat: g!.turn, offline: true },
