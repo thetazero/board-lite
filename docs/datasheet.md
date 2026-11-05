@@ -88,7 +88,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Crystal Mine | basic building | none | — | 4 stone, 4 timber, 3 livestock | Makes 1d4 crystal each round; worth 1 point. | 1 |
 | Pasture | basic building | none | — | 3 stone, 4 timber, 4 crystal | Makes 1d4 livestock each round; worth 1 point. | 1 |
 | Roost | basic building | none | — | 4 stone, 4 timber | Houses 2 more dragons. | — |
-| Tower Floor | basic building | none | — | 6 stone, 4 gold | Adds a floor to your tower. Floors count toward Tallest Tower. | — |
+| Tower Floor | basic building | none | — | 6 stone, 4 gold | Adds a floor to your tower. Houses 1 more dragon; counts toward Tallest Tower. | — |
 | Cliff Works | building card | building | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent mountain hex; worth 1 point. | 1 |
 | Stonemason | building card | building | 2 | 3 timber, 3 crystal, 2 livestock | Makes 1 stone each round for each adjacent stone building; worth 1 point. | 1 |
 | Woodcutter's Hut | building card | building | 2 | 3 stone, 3 crystal, 2 livestock | Makes 1 timber each round for each adjacent forest hex; worth 1 point. | 1 |
@@ -208,7 +208,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 | Guildhall, adjacent to a trade building | 5 stone, 6 timber | 2 | 2.5 stone, 3 timber | now |
 | Secret Hoard (action card) | nothing | 2 | nothing | now, uses a hand slot |
 
-Titles: 7 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
+Titles: 7 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth no other points (each houses 1 more dragon); gold held is worth points only through Largest Hoard.
 
 ## Dragons
 

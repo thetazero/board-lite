@@ -63,7 +63,7 @@ Dragons are worth no points; they count toward Strongest Dragon Army.
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): 2 each. Each goes adjacent to at least one of what its card names: a monument (a tower is one), a crystal field hex, an ocean hex or a trade building. No other building is worth points: not the tower, not its floors.
 - Secret Hoard cards: 2 each while in hand (hidden until the end).
 - Great beasts: 4 each to whoever slays it, for good.
-- Titles, 7 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) count only toward Tallest Tower. The holder keeps a title on a tie.
+- Titles, 7 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) are worth no points but count toward Tallest Tower, and each houses 1 more dragon. The holder keeps a title on a tie.
 
 ## Cards
 
