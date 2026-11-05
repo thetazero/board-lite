@@ -244,16 +244,16 @@ test('trades are binding and move resources and cards', () => {
   assert.equal(g.offers.length, 0);
 });
 
-test('an offer to everyone goes to the first to accept it, and the others may decline it', () => {
+test('an offer to anyone goes to the first to accept it, and the others may decline it', () => {
   const g = newGame(3, 11);
   keepAll(g);
-  // Only the acting player offers to everyone; out of turn, offers go to them.
-  assert.throws(() => apply(g, 1, 'offer everyone give 1 stone get'), /only make offers to the acting player/);
-  apply(g, 0, 'offer everyone give 1 stone get 1 timber');
+  // Only the acting player offers to anyone; out of turn, offers go to them.
+  assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /only make offers to the acting player/);
+  apply(g, 0, 'offer anyone give 1 stone get 1 timber');
   const o = g.offers[0];
   assert.equal(o.to, null);
   assert.deepEqual(waitingOn(g), [0, 1, 2]);
-  assert.match(playerView(g, 1), new RegExp(`accept ${o.id} {2}\\|  decline ${o.id} .*to everyone`));
+  assert.match(playerView(g, 1), new RegExp(`accept ${o.id} {2}\\|  decline ${o.id} .*to anyone`));
   // A decline takes it off that player's list only.
   apply(g, 1, `decline ${o.id}`);
   assert.deepEqual(waitingOn(g), [0, 2]);
@@ -264,14 +264,14 @@ test('an offer to everyone goes to the first to accept it, and the others may de
   assert.equal(g.players[2].resources.stone, stone + 1);
   assert.equal(g.players[2].resources.timber, timber - 1);
   // Once every other player declines it, it's gone; the turn ends as usual.
-  apply(g, 0, 'offer everyone give 1 stone get');
+  apply(g, 0, 'offer anyone give 1 stone get');
   apply(g, 1, `decline ${g.offers[0].id}`);
   apply(g, 2, `decline ${g.offers[0].id}`);
   assert.equal(g.offers.length, 0);
   // Gold is public: an ask for more than any of them has is refused.
   const most = Math.max(g.players[1].resources.gold, g.players[2].resources.gold);
-  assert.throws(() => apply(g, 0, `offer everyone give 1 stone get ${most + 1} gold`), /No other player has more than/);
-  apply(g, 0, 'offer everyone give 1 stone get');
+  assert.throws(() => apply(g, 0, `offer anyone give 1 stone get ${most + 1} gold`), /No other player has more than/);
+  apply(g, 0, 'offer anyone give 1 stone get');
   apply(g, 0, 'end');
   assert.equal(g.offers.length, 0);
 });

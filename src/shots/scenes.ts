@@ -530,23 +530,23 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    name: 'trade-everyone-4p',
+    name: 'trade-anyone-4p',
     players: 4,
     seed: 1,
     until: (g) => g.round === 4 && g.phase === 'action',
-    // The acting player offers everyone a trade, and the next seat declines it.
+    // The acting player offers anyone a trade, and the next seat declines it.
     setup: (g) => {
       const t = g.turn;
-      apply(g, t, `offer everyone give 1 ${most(g, t)} get 1 ${most(g, (t + 2) % 4, most(g, t))}`);
+      apply(g, t, `offer anyone give 1 ${most(g, t)} get 1 ${most(g, (t + 2) % 4, most(g, t))}`);
       apply(g, (t + 1) % 4, `decline ${g.offers[0].id}`);
     },
     shots: (g) => [
-      { file: 'tv-trade-everyone-4p', caption: 'TV: an offer to everyone', client: 'tv' },
-      { file: 'phone-trade-everyone-in-4p', caption: 'Phone: an offer to everyone, out of turn', client: 'phone', seat: (g!.turn + 2) % 4 },
-      { file: 'phone-trade-everyone-out-4p', caption: 'Phone, acting player: their offer to everyone, one player declined', client: 'phone', seat: g!.turn },
+      { file: 'tv-trade-anyone-4p', caption: 'TV: an offer to anyone', client: 'tv' },
+      { file: 'phone-trade-anyone-in-4p', caption: 'Phone: an offer to anyone, out of turn', client: 'phone', seat: (g!.turn + 2) % 4 },
+      { file: 'phone-trade-anyone-out-4p', caption: 'Phone, acting player: their offer to anyone, one player declined', client: 'phone', seat: g!.turn },
       {
-        file: 'phone-trade-everyone-compose-4p', caption: 'Phone, acting player: putting an offer to everyone together', client: 'phone', seat: g!.turn,
-        clicks: ['[data-tab=trade]', '[data-to="everyone"]', '[data-step="give stone 1"]', '[data-step="get gold 1"]'],
+        file: 'phone-trade-anyone-compose-4p', caption: 'Phone, acting player: putting an offer to anyone together', client: 'phone', seat: g!.turn,
+        clicks: ['[data-tab=trade]', '[data-to="anyone"]', '[data-step="give stone 1"]', '[data-step="get gold 1"]'],
       },
     ],
   },

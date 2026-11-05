@@ -265,7 +265,7 @@ function offerAnswer(ev: PublicState['log'][number]['ev'], seat: number): string
   if (!ev || !('from' in ev) || ev.from !== seat) return '';
   if (ev.k === 'trade') return `P${ev.to + 1} accepts your offer: you give ${ev.give} for ${ev.get}.`;
   if (ev.k === 'decline') return `P${ev.p + 1} declines your offer of ${ev.give} for ${ev.get}.`;
-  if (ev.k === 'expire') return `Your offer to ${ev.to === null ? 'everyone' : `P${ev.to + 1}`} expires: ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'expire') return `Your offer to ${ev.to === null ? 'anyone' : `P${ev.to + 1}`} expires: ${ev.give} for ${ev.get}.`;
   return '';
 }
 
@@ -758,11 +758,11 @@ function myDragon(d: DragonView, g: PublicState): string {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => (o.to === null ? o.from !== me.seat && !o.passed.includes(me.seat) : o.to === me.seat)).map((o) => `
-    <div class="offer in">${playerTag(o.from, names)} offers ${o.to === null ? 'everyone ' : ''}<b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
+    <div class="offer in">${playerTag(o.from, names)} offers ${o.to === null ? 'anyone ' : ''}<b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
       ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
-    <div class="offer out">You offer ${o.to === null ? 'everyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
+    <div class="offer out">You offer ${o.to === null ? 'anyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
   // Build and Trade (with the merchants) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
@@ -941,13 +941,13 @@ function bankView(me: Me): string {
 }
 
 function tradeView(g: PublicState, me: Me): string {
-  // On your turn you can offer anyone, or everyone at once (the first to
+  // On your turn you can offer one player, or anyone at once (the first to
   // accept trades); otherwise only the player whose turn it is.
   const seats = me.myTurn ? names.map((_, i) => i).filter((i) => i !== me.seat) : [g.turn];
   const others: (number | null)[] = me.myTurn && seats.length > 1 ? [...seats, null] : seats;
   if (!others.includes(trade.to)) trade.to = others[0];
   const who = others.map((i) => i === null
-    ? `<button data-to="everyone" class="${trade.to === null ? 'on' : ''}" style="--pc:#bcae9c">Everyone</button>`
+    ? `<button data-to="anyone" class="${trade.to === null ? 'on' : ''}" style="--pc:#bcae9c">Anyone</button>`
     : `<button data-to="${i}" class="${trade.to === i ? 'on' : ''}" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i])}</button>`).join('');
   // One row per resource: what you give and what you get side by side.
   // Gold is public, so you can't ask for more than they have; the rest of what
@@ -1599,7 +1599,7 @@ function wire(g: PublicState, me: Me) {
   on('bankgo', () => send(`merchants ${bank.give} ${bank.get} ${bank.times}`));
   // trade
   bind('[data-to]', (el) => {
-    trade.to = el.dataset.to === 'everyone' ? null : Number(el.dataset.to);
+    trade.to = el.dataset.to === 'anyone' ? null : Number(el.dataset.to);
     render();
   });
   bind('[data-step]', (el) => {
@@ -1610,7 +1610,7 @@ function wire(g: PublicState, me: Me) {
   });
   on('offer', () => {
     const side = (m: Record<string, number>, cards: string[] = []) => [...RESOURCES.filter((r) => m[r]).map((r) => `${m[r]} ${r}`), ...cards].join(' ');
-    const cmd = `offer ${trade.to === null ? 'everyone' : `P${trade.to + 1}`} give ${side(trade.give, [...trade.cards].filter((id) => me.hand.some((c) => c.id === id)))} get ${side(trade.get)}`;
+    const cmd = `offer ${trade.to === null ? 'anyone' : `P${trade.to + 1}`} give ${side(trade.give, [...trade.cards].filter((id) => me.hand.some((c) => c.id === id)))} get ${side(trade.get)}`;
     trade = fresh();
     tab = 'none';
     send(cmd);

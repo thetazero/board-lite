@@ -1054,7 +1054,7 @@ function tradesNothing(s: TradeSide): boolean {
   return !s.cards.length && !Object.values(s.res).some((n) => n);
 }
 
-// Whether offer o waits on p's answer: it's made to them, or open to everyone
+// Whether offer o waits on p's answer: it's made to them, or open to anyone
 // and they haven't declined it.
 export function offerFor(o: Offer, p: number): boolean {
   return o.to === null ? o.from !== p && !(o.passed ?? []).includes(p) : o.to === p;
@@ -1164,12 +1164,12 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     return log(g, `${pname(p)} accepts offer ${o!.id}: ${pname(o!.from)} gives ${giveText} for ${getText}.`, { k: 'trade', from: o!.from, to: p, give: giveText, get: getText });
   }
   if (verb === 'offer') {
-    // "everyone": an offer every other player may accept, made on your own turn.
-    const to = ['everyone', 'anyone'].includes(args[0]?.toLowerCase() ?? '') ? null : parsePlayer(g, args[0]);
+    // "anyone": an offer every other player may accept, made on your own turn.
+    const to = ['anyone', 'everyone'].includes(args[0]?.toLowerCase() ?? '') ? null : parsePlayer(g, args[0]);
     if (to === p) fail(`You can't trade with yourself.`);
     if (p !== g.turn && to !== g.turn) fail(`Out of turn, you can only make offers to the acting player, ${pname(g.turn)}.`);
     const gi = args.indexOf('give'), ge = args.indexOf('get');
-    if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold, or offer everyone give ...`);
+    if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold, or offer anyone give ...`);
     const o: Offer = { id: newId(g, 'o'), from: p, to, give: parseTradeSide(g, args.slice(gi + 1, ge)), get: parseTradeSide(g, args.slice(ge + 1)) };
     if (tradesNothing(o.give) && tradesNothing(o.get)) fail(`That trades nothing for nothing: give or get something.`);
     if (new Set([...o.give.cards, ...o.get.cards]).size < o.give.cards.length + o.get.cards.length) fail(`Name each card once.`);
@@ -1180,7 +1180,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     if ((o.get.res.gold ?? 0) > gold) fail(to === null ? `No other player has more than ${gold} gold.` : `${pname(to)} has ${gold} gold.`);
     if (to === null) o.passed = [];
     g.offers.push(o);
-    return log(g, `${pname(p)} offers ${to === null ? 'everyone' : pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
+    return log(g, `${pname(p)} offers ${to === null ? 'anyone' : pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
   }
   if (verb === 'cancel') {
     const o = g.offers.find((x) => x.id === args[0] && x.from === p);
