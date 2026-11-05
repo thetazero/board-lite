@@ -330,7 +330,8 @@ export const SCENES: Scene[] = [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
-      { file: 'phone-build-bank-3p', caption: 'Phone: basic buildings, the egg project and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
+      { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
+      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
       { file: 'tv-reconnecting', caption: 'TV: the connection to the server dropped', client: 'tv', offline: true },
@@ -844,7 +845,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
-        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=more]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
+        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
     },
   },
