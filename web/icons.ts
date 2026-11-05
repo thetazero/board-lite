@@ -199,6 +199,11 @@ const ICONS: Record<string, Facet[]> = {
     ['#1f6fd6', P([[6, 1], [4.5, 6.5], [0, 9], [0, 1.5]])],
     ['#d9eeff', P([[-3.5, 0], [-2, -3.5], [-1.6, 0.4]])],
   ],
+  // Neutral: a plain grey paper disc, folded flat: no element.
+  neutral: [
+    ...bevel(8, 9, 5.5, 22.5, '#e4e0d8', '#b8b3a9', '#8a857c'),
+    ['#cbc6bc', P(Array.from({ length: 8 }, (_, i) => polar(5.5, 22.5 + 45 * i)))],
+  ],
   // Dice: white paper shapes, one per kind of die (a square d6, a diamond d8,
   // a triangle d4). With pips, a die still to roll ("2" and a d6 is 2d6); the
   // blank `…face` shape carries a number once it's rolled (dieFace).

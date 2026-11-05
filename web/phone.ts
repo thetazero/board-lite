@@ -579,7 +579,8 @@ function wheelMark(g: PublicState): string {
 }
 
 // The element wheel, opened from the header: each element with an arrow to
-// the one it beats, and the rule in one line (docs/rules.md, "Elements").
+// the one it beats, neutral in the middle (no arrows: it beats nothing and
+// nothing beats it), and the rule in one line (docs/rules.md, "Elements").
 function wheelSheet(g: PublicState): string {
   const es = wheelOrder(g);
   const n = es.length, R = 36, gap = 13;
@@ -592,11 +593,10 @@ function wheelSheet(g: PublicState): string {
   const nodes = es.map((e, i) => {
     const [x, y] = wheelAt(i, n, R);
     return `<span class="wnode" style="left:${50 + x}%;top:${50 + y}%;--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 2)}<b>${e[0].toUpperCase()}${e.slice(1)}</b></span>`;
-  }).join('');
+  }).join('') + `<span class="wnode" style="left:50%;top:50%">${elemIcon('neutral', 2)}<b>Neutral</b></span>`;
   return `<div class="menuback" id="wheelclose"></div><div class="menu wheelsheet"><h3>Element wheel</h3>
     <div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>
     <p class="wheelrule">Double damage where the arrow points.</p>
-    <p>Neutral: no double damage, either way.</p>
     <div class="row"><button id="wheeldone">Close</button></div></div>`;
 }
 
