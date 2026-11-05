@@ -6,7 +6,7 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 - Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
-- Win at 30 points. Titles are 6 points each, from a minimum (see Points).
+- Win at 50 points. Titles are 7 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
 - Gold: no basic building makes it. It comes from raids, Markets and clearing fauna. The merchants don't trade it.
 - Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
@@ -208,7 +208,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 | Guildhall, adjacent to a trade building | 5 stone, 6 timber | 2 | 2.5 stone, 3 timber | now |
 | Secret Hoard (action card) | nothing | 2 | nothing | now, uses a hand slot |
 
-Titles: 6 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
+Titles: 7 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 

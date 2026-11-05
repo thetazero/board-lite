@@ -42,7 +42,7 @@ export const TERRAIN_NOUN: Record<Terrain, string> = {
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
 
 export const TUNING = {
-  pointsToWin: 30,
+  pointsToWin: 50,
   handCap: 7,
   // Each round a player draws this many building cards and keeps one.
   buildingCardsDrawn: 2,
@@ -53,7 +53,7 @@ export const TUNING = {
   bankRate: 4,
   livestockPerDragon: 1,
   // Dragons are worth no points; they count toward Strongest Dragon Army.
-  titlePoints: 6,
+  titlePoints: 7,
   // A title needs at least this much: dragons' combat power, tower floors,
   // gold. The army's is about 3 adults and a hatchling, as 10 dragon points
   // were (#134). The hoard's was a Monument's gold when Monuments cost gold
