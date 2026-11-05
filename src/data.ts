@@ -207,7 +207,7 @@ export const ACTIONS: Record<string, ActionDef> = {
   growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 10 },
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons.', copies: 8 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 6 },
-  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', amount: 2, cost: {}, text: 'Worth 2 points while in your hand.', copies: 8 },
+  secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', amount: 2, cost: {}, text: 'Worth 2 points while in your hand.', copies: 4 },
   // Sabotage, kept rare and dear (the owner: "a bit of this just like in
   // catan, you just don't want to over do it").
   rouse_bear: { name: 'Rouse the Bear', effect: 'send_fauna', fauna: 'cave_bear', cost: { crystal: 1 }, text: 'Place a Cave Bear on any land hex with no tower or beast.', copies: 8 },
