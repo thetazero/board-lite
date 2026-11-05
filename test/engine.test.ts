@@ -461,7 +461,7 @@ test('building cards count their neighbours; point buildings must go beside what
   g.players[0].hand.push({ id: 'cmo', deck: 'building', key: 'monument' });
   assert.ok(away, "a free hex beside the Cliff Works and away from any monument");
   assert.throws(() => apply(g, 0, `build cmo ${away}`), RuleError);
-  const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k] && !g.map[k].fauna)!;
   apply(g, 0, `build cmo ${next}`);
   assert.equal(buildingPoints(g, next), BUILDINGS.monument.points);
 });
@@ -805,6 +805,39 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   }
   assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
   assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
+});
+
+test('a wandering beast still moves at random, but more often to a hex beside no other beast', () => {
+  const g = newGame(2, 7);
+  for (const k of Object.keys(g.map)) if (!BEASTS[g.map[k].fauna ?? '']) delete g.map[k].fauna;
+  for (const d of g.dragons) d.stage = 0;
+  g.dragons.forEach((d) => (d.growth = -1000));
+  const openHex = (k: string) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower';
+  const lonely = (n: string, self: string) => !neighbors(n).some((m) => m !== self && g.map[m]?.fauna);
+  // Only great beasts are left, and they never move. Count, over many moves of
+  // a wolf pack, how often it picks a lonely hex against how often it could.
+  let at = Object.keys(g.map).sort().find(openHex)!;
+  g.map[at].fauna = 'wolf_pack';
+  let crowdedMoves = 0, lonelyMoves = 0, crowdedShare = 0;
+  for (let i = 0; i < 400 && g.phase !== 'over'; i++) {
+    const to = neighbors(at).filter(openHex);
+    const nLonely = to.filter((n) => lonely(n, at)).length;
+    const was = at;
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) {
+      const pl = g.players[p];
+      apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
+    }
+    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    if (at === was || nLonely === 0 || nLonely === to.length) continue;
+    if (lonely(at, at)) lonelyMoves++; else crowdedMoves++;
+    crowdedShare += (to.length - nLonely) / to.length;
+  }
+  const moves = lonelyMoves + crowdedMoves;
+  assert.ok(moves >= 10, `enough moves with a choice (${moves})`);
+  assert.ok(crowdedMoves > 0, 'it still sometimes moves beside a beast');
+  assert.ok(crowdedMoves < crowdedShare, `crowded hexes picked less than an even pick would (${crowdedMoves} < ${crowdedShare.toFixed(1)})`);
 });
 
 test('each option a seat is offered says why it is off, in the words a refused command uses', () => {
