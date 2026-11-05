@@ -3,7 +3,10 @@
 // docs/datasheet.md lists these numbers as the raw rules. After changing any, run `npm run datasheet` and read the
 // diff; `npm test` fails until it is regenerated.
 
-export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
+// The basic resources are the ones basic buildings make and the bank trades; gold is neither (#279).
+export const BASIC_RESOURCES = ['stone', 'timber', 'crystal', 'livestock'] as const;
+export type BasicResource = (typeof BASIC_RESOURCES)[number];
+export const RESOURCES = [...BASIC_RESOURCES, 'gold'] as const;
 export type Resource = (typeof RESOURCES)[number];
 export type Bundle = Partial<Record<Resource, number>>;
 
@@ -114,7 +117,7 @@ export interface BuildingDef {
   beside?: Counted; // must be built adjacent to at least one of these
   dragonCapacity?: number;
   growthBonus?: number;
-  bankRate?: { resource: Resource; rate: number }; // a better bank rate for one resource you give
+  bankRate?: { resource: BasicResource; rate: number }; // a better bank rate for one resource you give
   per?: Counted;
 }
 
@@ -125,7 +128,7 @@ const classMaker = (name: string, cls: BuildingClass, r: Resource, per: Building
 
 // A port trades one basic resource with the bank at 2:1 (#277), in place of
 // the generic 3:1 Port: one card each, gold has none.
-const portCard = (r: Resource): BuildingDef =>
+const portCard = (r: BasicResource): BuildingDef =>
   ({ name: `${r[0].toUpperCase()}${r.slice(1)} Port`, class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: { resource: r, rate: 2 }, text: `You trade ${r} with the bank at 2:1.`, copies: 1 });
 
 export const BUILDINGS: Record<string, BuildingDef> = {

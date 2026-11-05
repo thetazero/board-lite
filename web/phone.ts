@@ -41,7 +41,7 @@ let openCard: string | null = null;
 let openDragon: string | null = null; // one of your dragons tapped open: its card
 let selected = new Set<string>(); // discard picks
 let trade = fresh();
-let bank = { give: 'stone', get: 'gold', times: 1 };
+let bank = { give: 'stone', get: 'timber', times: 1 };
 // Commands go to the server one at a time, in the order they were tapped:
 // quick taps queue up instead of being lost. A tap that repeats the last
 // command still waiting (the same button twice) is a double tap, and is dropped.
@@ -937,7 +937,9 @@ function bankView(me: Me): string {
   // A resource a port trades better wears its rate, on the Give side.
   const usual = Math.max(...Object.values(me.bankRates));
   const tag = (side: string, r: string) => (side === 'give' && me.bankRates[r as 'stone'] < usual ? `<span class="rate">${me.bankRates[r as 'stone']}:1</span>` : '');
-  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${RESOURCES.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}${tag(side, r) ? `, ${me.bankRates[r]}:1` : ''}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}${tag(side, r)}</button>`).join('')}</div>`;
+  // Only what the bank trades: the basic resources, never gold.
+  const traded = RESOURCES.filter((r): r is keyof Me['bankRates'] => r in me.bankRates);
+  const pick = (side: 'give' | 'get', sel: string) => `<div class="respick">${traded.map((r) => `<button class="iconbtn${sel === r ? ' on' : ''}" data-bank="${side} ${r}" aria-label="${r}${tag(side, r) ? `, ${me.bankRates[r]}:1` : ''}" aria-pressed="${sel === r}">${resIcon(r, 1.8)}${tag(side, r)}</button>`).join('')}</div>`;
   return `<section class="panel"><h3>Bank</h3>
       <div class="bankrow"><span>Give</span>${pick('give', bank.give)}</div>
       <div class="bankrow"><span>Gain</span>${pick('get', bank.get)}</div>

@@ -42,8 +42,8 @@ function economy(): string {
 - Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} card from the action deck (action cards and dragons; see Decks); hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
-- Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''}, clearing fauna, and the bank.
-- Bank: ${TUNING.bankRate}:1. With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
+- Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''} and clearing fauna. The bank doesn't trade it.
+- Bank: ${TUNING.bankRate}:1, basic resources only (not gold). With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
 }
 
 // Every building, upgrade, action card and dragon: what it costs and does.

@@ -396,7 +396,7 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       return [
         { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
-        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get gold"]'] },
+        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
   },

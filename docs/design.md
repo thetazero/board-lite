@@ -256,7 +256,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are public as they're cast, and every player votes. (Changed in #238 from secret until everyone had voted.) A player with no raid-ready dragon skips the commit step.
 - Combat power is √(health × average damage a combat round), rounded; a side's is the sum (Lanchester's square law makes these add). Loot is split in proportion to it, rounded down per player, and the remainder goes to the player with the most power standing. Loot grows with the square of a kingdom's power. (#65)
-- The bank sells gold at the normal rate.
+- The bank doesn't trade gold, either way (#279). The owner: "Just remove gold from bank trades pls". Gold comes only from raids, Markets, Trade Charters and clearing fauna, so what it buys (tower floors, Markets, Trade Charters, wyrms, Growth Elixir, Largest Hoard) can't be bought with ordinary resources. (Changed from selling gold at the normal rate.)
 - Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.

@@ -8,8 +8,8 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 30 points. Titles are 6 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
-- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters, clearing fauna, and the bank.
-- Bank: 4:1. With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
+- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The bank doesn't trade it.
+- Bank: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 

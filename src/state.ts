@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRates, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -114,7 +114,7 @@ export interface PublicState {
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
-  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRates: Record<Resource, number> }[];
+  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRates: Record<BasicResource, number> }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -164,7 +164,7 @@ export interface SeatState {
   resources: Record<Resource, number>;
   hiddenPoints: number;
   totalPoints: number;
-  bankRates: Record<Resource, number>; // what you give the bank, per resource
+  bankRates: Record<BasicResource, number>; // what you give the bank, per basic resource (never gold)
   dragonsHoused: number;
   dragonCapacity: number;
   // What a round brings in, per resource: production minus what the dragons
