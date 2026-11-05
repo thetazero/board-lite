@@ -1927,7 +1927,7 @@ export class Board3D {
     // The Thunderbird on its peak's summit; the Leviathan in the sea. Neither has a lair.
     const y = key === 'thunderbird' ? TOP + PEAK_H - 0.2 : key === 'leviathan' ? -0.01 : onBuilding ? GROUND : TOP;
     pop.position.set(x, y, z);
-    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : onBuilding ? 1 : 1.15);
+    model.scale.setScalar(key === 'thunderbird' ? 1.7 : key === 'leviathan' ? 1.9 : 1.15); // the same size on a building's hex as on an open one
     if (!great) pop.add(lair(onBuilding ? 0.42 : 0.58));
     // Three-quarters to the room, half of them looking left.
     const face = (hash(k) % 2 ? -1 : 1) * 0.75 - Math.PI / 2;
