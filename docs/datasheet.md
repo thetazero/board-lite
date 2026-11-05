@@ -265,7 +265,7 @@ Healing: a hurt dragon heals 7 health at each production it's fed, instead of gr
 
 ## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast, among those adjacent to the fewest other beasts. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is twice as likely. New fauna comes only from cards.
 
 | Beast | Health | Attack (avg) | Element | Loot | Starts |
 |---|---|---|---|---|---|

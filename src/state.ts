@@ -112,6 +112,7 @@ export interface PublicState {
   titlePoints: number; // what each title is worth
   elementBeats: Record<string, string>; // the element wheel: what each element beats
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
+  faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
   players: { publicPoints: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
@@ -265,6 +266,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     titlePoints: TUNING.titlePoints,
     elementBeats: ELEMENT_BEATS,
     faunaWanderOdds: TUNING.faunaWanderOdds,
+    faunaSpreadWeight: TUNING.faunaSpreadWeight,
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);

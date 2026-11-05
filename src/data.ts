@@ -70,6 +70,9 @@ export const TUNING = {
   // In production, each beast of the fauna (not a great beast) has a 1 in this
   // many chance to move to a random adjacent land hex with no tower or beast.
   faunaWanderOdds: 3,
+  // A wandering beast is this many times as likely to pick an open hex beside
+  // no other beast as one beside a beast, so the fauna tends to spread out.
+  faunaSpreadWeight: 2,
   // Once the Thunderbird falls, each production building on or next to its
   // peak (the centre hex) makes this many more a round.
   peakBonus: 2,

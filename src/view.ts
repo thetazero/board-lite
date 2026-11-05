@@ -248,7 +248,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   });
   out.push(...mapText(g));
   const fauna = g.map.filter((h) => h.fauna).sort((a, b) => (a.k < b.k ? -1 : 1));
-  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna, or rivals' perched dragons, on their turn with "clear <hex> <dragons>"; a beast's loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast, among those adjacent to the fewest other beasts.`);
+  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna, or rivals' perched dragons, on their turn with "clear <hex> <dragons>"; a beast's loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast; one beside no other beast is ${g.faunaSpreadWeight === 2 ? 'twice' : `${g.faunaSpreadWeight} times`} as likely.`);
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
   out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point${g.beasts[0]?.points === 1 ? '' : 's'} for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
