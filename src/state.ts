@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, bankRates, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   neighbourCount, onPeak, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -121,7 +121,7 @@ export interface PublicState {
   peakBonus: number;
   map: HexView[];
   dragons: DragonView[];
-  offers: { id: string; from: number; to: number; give: string; get: string }[];
+  offers: { id: string; from: number; to: number | null; passed: number[]; give: string; get: string }[]; // to null: open to anyone; passed: who declined it
   raid: RaidView | null;
   kingdoms: TargetView[]; // every kingdom and the loot it holds now
   raidsLeft: number;
@@ -292,7 +292,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       };
     }),
     dragons: g.dragons.map((d) => dragonView(g, d)),
-    offers: g.offers.map((o) => ({ id: o.id, from: o.from, to: o.to, give: sideText(g, o.give), get: sideText(g, o.get) })),
+    offers: g.offers.map((o) => ({ id: o.id, from: o.from, to: o.to, passed: o.passed ?? [], give: sideText(g, o.give), get: sideText(g, o.get) })),
     raid: raid && {
       step: raid.step,
       candidates: raid.candidates.map((t) => targetView(g, t)),
@@ -410,7 +410,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     huntable: huntable(g, p),
     perchable: perchHexes(g, p),
     perched: g.dragons.filter((d) => d.owner === p && d.perch).map((d) => d.id),
-    cantAccept: Object.fromEntries(g.offers.filter((o) => o.to === p).flatMap((o) => { const why = acceptProblem(g, o); return why ? [[o.id, why]] : []; })),
+    cantAccept: Object.fromEntries(g.offers.filter((o) => offerFor(o, p)).flatMap((o) => { const why = acceptProblem(g, o, p); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     whyNoVote: raid?.step === 'vote' && !canVote(g, p) ? NO_VOTE : null,
     myChoice: raid?.choices[p] ?? null,

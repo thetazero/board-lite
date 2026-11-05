@@ -55,10 +55,11 @@ Action phase, on your turn:
 | `project fire` | special project: a base dragon egg of that element, no card, double cost |
 | `bank stone timber 2` | pay 2× your bank rate in stone for 2 timber (the bank doesn't trade gold) |
 | `offer P2 give 2 stone c12 get 1 gold` | propose a trade; items are `<n> <resource>` and card ids |
+| `offer everyone give 2 stone get 1 timber` | propose a trade to every other player at once; the first to accept trades |
 | `cancel o40` | withdraw your offer |
 | `end` | end your turn |
 
-Any time in the action phase: `accept o40` / `decline o40` for an offer made to you, and, out of turn, `offer` to the acting player.
+Any time in the action phase: `accept o40` / `decline o40` for an offer made to you or to everyone, and, out of turn, `offer` to the acting player.
 
 Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
 
