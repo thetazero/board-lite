@@ -15,7 +15,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Room, RoomError, type RoomOptions } from './room.ts';
+import { Room, RoomError, recapsDir, type RoomOptions } from './room.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 // Found the way Node finds any package, so a checkout that shares a parent's
@@ -31,6 +31,7 @@ const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
 const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
 const MAX_BODY = 4096;
+const RECAP_ID = /^[0-9a-f]{12}$/; // Room.recapId
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -121,6 +122,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
   async function api(req: IncomingMessage, res: ServerResponse, parts: string[], query: URLSearchParams) {
     // GET /api/info -> the addresses phones can reach this server on
     if (parts[0] === 'info') return json(res, 200, { lan: lanAddresses(), tailscale: tailscaleAddresses(), port: (req.socket.localPort ?? 0) });
+    // GET /api/recaps/ID -> a finished game's recap (src/recap.ts), kept after its room is gone
+    if (parts[0] === 'recaps' && parts.length === 2 && req.method === 'GET') return recap(res, parts[1]);
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
     // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone, for a game with no TV
     if (parts.length === 1 && req.method === 'POST') {
@@ -183,6 +186,13 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     return json(res, 404, { error: 'Not found.' });
   }
 
+  async function recap(res: ServerResponse, id: string) {
+    const text = RECAP_ID.test(id) ? await readFile(join(recapsDir(opts), `${id}.json`), 'utf8').catch(() => null) : null;
+    if (text === null) return json(res, 404, { error: 'No recap with that link.' });
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' });
+    res.end(text);
+  }
+
   async function file(req: IncomingMessage, res: ServerResponse, path: string) {
     const full = normalize(join(WEB, path));
     if (!full.startsWith(WEB) || full.slice(WEB.length).split(sep).some((part) => part.startsWith('.'))) return json(res, 404, { error: 'Not found.' });
@@ -229,6 +239,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       if (PAGES[url.pathname]) return await file(req, res, PAGES[url.pathname]);
       if (VENDOR[url.pathname]) return await vendor(res, VENDOR[url.pathname]);
       if (/^\/[A-Za-z]{4}\/?$/.test(url.pathname)) return await file(req, res, 'phone.html'); // a room's address
+      if (parts[0] === 'recap' && parts.length === 2 && RECAP_ID.test(parts[1])) return await file(req, res, 'recap.html'); // a game's recap
       return await file(req, res, url.pathname);
     } catch (e) {
       if (e instanceof RoomError) return json(res, 400, { error: e.message });
