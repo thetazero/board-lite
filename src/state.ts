@@ -42,7 +42,7 @@ export interface DragonView {
   growthTime: number;
   hp: number;
   maxHp: number;
-  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't grow either, a hunted one fought fauna
+  resting: '' | 'hungry' | 'hurt' | 'hunted'; // sitting out this round's raids; a hungry one doesn't heal or grow either, a hunted one fought fauna
   canRaid: boolean;
   perch: string | null; // the rival's building it perches on
   weak: string[]; // the elements that beat it on the element wheel, as for every fighter
