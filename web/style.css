@@ -924,7 +924,7 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 .watchtv .pname { font-size: 1.2em; font-weight: 800; }
 .watchtv h1 { margin: 0; font-size: 2.2em; }
 
-/* ================= A game with no TV (remote mode) =================
+/* ================= The table view (every game; from the start with no TV) =================
    On the phone: the table view is the TV's page for the room in a frame over
    the phone's own page, shown by the You / Table switch by the talk bar. */
 .tableview { position: fixed; inset: 0; z-index: 35; visibility: hidden; opacity: 0; background: #140f2a; transition: opacity .3s, visibility 0s .3s; }
@@ -932,7 +932,7 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 body.table-on .tableview { visibility: visible; opacity: 1; transition: opacity .3s; }
 body.table-on { overflow: hidden; }
 body.table-on .talkbar { z-index: 36; }
-body.remote .talkbar > .latest { padding-right: 9.5em; }
+body.has-table .talkbar > .latest { padding-right: 9.5em; }
 .viewswitch { position: fixed; right: .5em; bottom: .45em; z-index: 37; display: flex; border-radius: 99px; box-shadow: 0 .14em 0 var(--paper-edge), .05em .28em .12em #0b081a55; }
 .viewswitch button { font: inherit; font-weight: 800; padding: .45em .85em; margin: 0; box-shadow: none; transform: none; border-radius: 0; }
 .viewswitch button:first-child { border-radius: 99px 0 0 99px; }

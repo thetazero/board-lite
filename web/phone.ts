@@ -1,8 +1,9 @@
 // The phone: one player's hidden hand and their choices. Everything public
 // is on the TV, so this stays small: resources, cards, and the decision at hand.
-// A game with no TV (remote mode: the room was made on a phone) also shows the
-// table: the TV's page for the room, in a frame over this one, behind a
-// You / Table switch, and cut to on its own while a cutscene plays.
+// Every game also shows the table: the TV's page for the room, in a frame over
+// this one, behind a You / Table switch, and cut to on its own while a cutscene
+// plays. In a game with no TV (remote mode: the room was made on a phone) that's
+// from the start; in a game with a TV, once the player first opens the table.
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
@@ -214,10 +215,8 @@ function onSnapshot(s: Snapshot) {
   }
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
-  if (s.lobby.remote) {
-    table.show(code);
-    table.hold(s.scene > 0);
-  }
+  table.show(code, s.lobby.remote);
+  table.hold(s.lobby.remote && s.scene > 0);
   noteOffers(s.game, s.seat);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
@@ -386,15 +385,18 @@ function invite(c: string): string {
     <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>`;
 }
 
-// ---------- the table, in a game with no TV ----------
+// ---------- the table ----------
 
 // The TV's page for the room, in a frame over this page, kept loaded (and
-// hidden) for the whole game so its cutscenes are queued as they happen. The
-// switch sits by the talk bar in both views. While a cutscene plays (the round's
-// dice, a raid's or a beast's fight) the frame tells this page, and so does the
-// server's snapshot (its `scene`); the phone cuts to the table and back after,
-// unless the player switched by hand. While the server's scene plays, You is
-// off: there's nothing to do there, and it would only say to watch the table.
+// hidden) for the rest of the game so its cutscenes are queued as they happen.
+// The switch sits by the talk bar in both views. While a cutscene plays (the
+// round's dice, a raid's or a beast's fight) the frame tells this page, and in a
+// game with no TV so does the server's snapshot (its `scene`); the phone cuts to
+// the table and back after, unless the player switched by hand. While the
+// server's scene plays with no TV, You is off: there's nothing to do there.
+// In a game with a TV the frame is only made when Table is first tapped, so a
+// phone at the TV doesn't load a second board or cut away from the hand; there
+// the server's scene doesn't hold the table, and You says to watch the TV.
 const table = (() => {
   let wrap: HTMLElement | null = null;
   let sw: HTMLElement | null = null;
@@ -427,21 +429,25 @@ const table = (() => {
     framed = !!e.data.on;
     update();
   });
+  const frame = () => {
+    if (wrap?.firstChild) return;
+    wrap!.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(room)}&remote" title="The table"></iframe>`;
+  };
   return {
-    // The server's word on whether a scene plays: a phone joining mid-scene,
-    // or one whose frame missed it, still cuts to the table rather than saying
-    // to watch it.
+    // The server's word on whether a scene plays, in a game with no TV: a phone
+    // joining mid-scene, or one whose frame missed it, still cuts to the table
+    // rather than saying to watch it.
     hold(v: boolean) {
       held = v;
       update();
     },
-    show(c: string) {
+    show(c: string, remote: boolean) {
       if (wrap && room === c) return;
       this.hide();
       room = c;
       wrap = document.createElement('div');
       wrap.className = 'tableview';
-      wrap.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(c)}&remote" title="The table"></iframe>`;
+      if (remote) frame();
       sw = document.createElement('div');
       sw.className = 'viewswitch';
       sw.setAttribute('role', 'group');
@@ -449,10 +455,12 @@ const table = (() => {
       sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
       sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
         auto = false;
+        if (b.dataset.view === 'table') frame();
         set(b.dataset.view === 'table');
       }));
       document.body.append(wrap, sw);
-      document.body.classList.add('remote');
+      document.body.classList.add('has-table');
+      document.body.classList.toggle('remote', remote);
       set(false);
       update();
     },
@@ -462,7 +470,7 @@ const table = (() => {
       wrap = sw = null;
       room = '';
       on = auto = framed = held = false;
-      document.body.classList.remove('remote', 'table-on');
+      document.body.classList.remove('has-table', 'remote', 'table-on');
     },
   };
 })();
