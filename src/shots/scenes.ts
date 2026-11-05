@@ -514,7 +514,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-trade-acting-4p', caption: "Phone, acting player: an offer in, and their own out", client: 'phone', seat: g!.turn },
       {
         file: 'phone-trade-compose-4p', caption: 'Phone, acting player: putting an offer together', client: 'phone', seat: g!.turn, sizes: true,
-        clicks: ['[data-tab=trade]', '[data-to]:last-child', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '.handfan [data-card]'],
+        clicks: ['[data-tab=trade]', '[data-to]:nth-last-child(2)', '[data-step="give stone 1"]', '[data-step="give timber 1"]', '[data-step="get gold 1"]', '.handfan [data-card]'],
       },
       { file: 'phone-trade-own-offer-4p', caption: "Phone: your own offer out, on someone else's turn", client: 'phone', seat: (g!.turn + 2) % 4 },
       {
@@ -526,6 +526,27 @@ export const SCENES: Scene[] = [
         // Last: it changes the room. The offerer has spent what they offered, so Accept is off and says why.
         file: 'phone-trade-cant-accept-4p', caption: 'Phone: an offer the offerer can no longer pay (Accept is off, with the reason)', client: 'phone', seat: (g!.turn + 1) % 4,
         then: (room) => room.mutate((g2) => drain(g2, g2.turn)), waitFor: '.offer.in .blocked',
+      },
+    ],
+  },
+  {
+    name: 'trade-anyone-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    // The acting player offers anyone a trade, and the next seat declines it.
+    setup: (g) => {
+      const t = g.turn;
+      apply(g, t, `offer anyone give 1 ${most(g, t)} get 1 ${most(g, (t + 2) % 4, most(g, t))}`);
+      apply(g, (t + 1) % 4, `decline ${g.offers[0].id}`);
+    },
+    shots: (g) => [
+      { file: 'tv-trade-anyone-4p', caption: 'TV: an offer to anyone', client: 'tv' },
+      { file: 'phone-trade-anyone-in-4p', caption: 'Phone: an offer to anyone, out of turn', client: 'phone', seat: (g!.turn + 2) % 4 },
+      { file: 'phone-trade-anyone-out-4p', caption: 'Phone, acting player: their offer to anyone, one player declined', client: 'phone', seat: g!.turn },
+      {
+        file: 'phone-trade-anyone-compose-4p', caption: 'Phone, acting player: putting an offer to anyone together', client: 'phone', seat: g!.turn,
+        clicks: ['[data-tab=trade]', '[data-to="anyone"]', '[data-step="give stone 1"]', '[data-step="get gold 1"]'],
       },
     ],
   },

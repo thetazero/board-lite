@@ -47,7 +47,8 @@ export interface TradeSide {
 export interface Offer {
   id: string;
   from: number;
-  to: number;
+  to: number | null; // null: open to every other player, and the first to accept it trades
+  passed?: number[]; // an open offer: the players who have declined it
   give: TradeSide; // what `from` gives
   get: TradeSide; // what `from` receives
 }
@@ -108,11 +109,11 @@ export type GameEvent =
   | { k: 'recall'; p: number; ds: string[] }
   | { k: 'wander'; from: string; to: string; fauna: string; name: string } // a beast of the fauna moves 1 hex, in production
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
-  | { k: 'offer'; p: number; to: number }
+  | { k: 'offer'; p: number; to: number | null }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
   | { k: 'decline'; p: number; from: number; give: string; get: string }
   | { k: 'withdraw'; p: number }
-  | { k: 'expire'; from: number; to: number; give: string; get: string }
+  | { k: 'expire'; from: number; to: number | null; give: string; get: string }
   | { k: 'end'; p: number }
   | { k: 'title'; t: Title; p: number | null }
   | { k: 'discard'; p: number; n: number }
@@ -1053,10 +1054,16 @@ function tradesNothing(s: TradeSide): boolean {
   return !s.cards.length && !Object.values(s.res).some((n) => n);
 }
 
-// Why the player an offer is made to can't accept it now, or null if they can.
-export function acceptProblem(g: Game, o: Offer): string | null {
+// Whether offer o waits on p's answer: it's made to them, or open to anyone
+// and they haven't declined it.
+export function offerFor(o: Offer, p: number): boolean {
+  return o.to === null ? o.from !== p && !(o.passed ?? []).includes(p) : o.to === p;
+}
+
+// Why player p, who the offer is made to, can't accept it now, or null if they can.
+export function acceptProblem(g: Game, o: Offer, p: number): string | null {
   if (!hasTradeSide(g, o.from, o.give)) return `${pname(o.from)} no longer has what they offered.`;
-  if (!hasTradeSide(g, o.to, o.get)) return `You don't have ${tradeText(g, o.get)}.`;
+  if (!hasTradeSide(g, p, o.get)) return `You don't have ${tradeText(g, o.get)}.`;
   return null;
 }
 
@@ -1141,32 +1148,39 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
   const pl = g.players[p];
   if (verb === 'accept' || verb === 'decline') {
     const o = g.offers.find((x) => x.id === args[0]);
-    if (!o || o.to !== p) fail(`There is no offer "${args[0] ?? ''}" made to you.`);
-    g.offers = g.offers.filter((x) => x !== o);
-    if (verb === 'decline') return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from, give: tradeText(g, o!.give), get: tradeText(g, o!.get) });
-    const problem = acceptProblem(g, o!);
+    if (!o || !offerFor(o, p)) fail(`There is no offer "${args[0] ?? ''}" made to you.`);
+    if (verb === 'decline') {
+      // An open offer stays open to the others until all of them decline it.
+      if (o!.to === null) o!.passed = [...(o!.passed ?? []), p];
+      if (o!.to !== null || g.players.every((_, i) => !offerFor(o!, i))) g.offers = g.offers.filter((x) => x !== o);
+      return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from, give: tradeText(g, o!.give), get: tradeText(g, o!.get) });
+    }
+    const problem = acceptProblem(g, o!, p);
     if (problem) fail(problem);
+    g.offers = g.offers.filter((x) => x !== o);
     const giveText = tradeText(g, o!.give), getText = tradeText(g, o!.get);
     moveTradeSide(g, o!.from, p, o!.give);
     moveTradeSide(g, p, o!.from, o!.get);
     return log(g, `${pname(p)} accepts offer ${o!.id}: ${pname(o!.from)} gives ${giveText} for ${getText}.`, { k: 'trade', from: o!.from, to: p, give: giveText, get: getText });
   }
   if (verb === 'offer') {
-    const to = parsePlayer(g, args[0]);
+    // "anyone": an offer every other player may accept, made on your own turn.
+    const to = ['anyone', 'everyone'].includes(args[0]?.toLowerCase() ?? '') ? null : parsePlayer(g, args[0]);
     if (to === p) fail(`You can't trade with yourself.`);
     if (p !== g.turn && to !== g.turn) fail(`Out of turn, you can only make offers to the acting player, ${pname(g.turn)}.`);
     const gi = args.indexOf('give'), ge = args.indexOf('get');
-    if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold`);
+    if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold, or offer anyone give ...`);
     const o: Offer = { id: newId(g, 'o'), from: p, to, give: parseTradeSide(g, args.slice(gi + 1, ge)), get: parseTradeSide(g, args.slice(ge + 1)) };
     if (tradesNothing(o.give) && tradesNothing(o.get)) fail(`That trades nothing for nothing: give or get something.`);
     if (new Set([...o.give.cards, ...o.get.cards]).size < o.give.cards.length + o.get.cards.length) fail(`Name each card once.`);
     if (!hasTradeSide(g, p, o.give)) fail(`You don't have ${tradeText(g, o.give)}.`);
     // Gold is public, so an ask for more than they have is refused here; the
     // rest of what they hold is hidden, and is checked when they answer.
-    const gold = g.players[to].resources.gold;
-    if ((o.get.res.gold ?? 0) > gold) fail(`${pname(to)} has ${gold} gold.`);
+    const gold = to === null ? Math.max(...g.players.filter((_, i) => i !== p).map((x) => x.resources.gold)) : g.players[to].resources.gold;
+    if ((o.get.res.gold ?? 0) > gold) fail(to === null ? `No other player has more than ${gold} gold.` : `${pname(to)} has ${gold} gold.`);
+    if (to === null) o.passed = [];
     g.offers.push(o);
-    return log(g, `${pname(p)} offers ${pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
+    return log(g, `${pname(p)} offers ${to === null ? 'anyone' : pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
   }
   if (verb === 'cancel') {
     const o = g.offers.find((x) => x.id === args[0] && x.from === p);
@@ -1178,7 +1192,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
   switch (verb) {
     case 'end': {
       // An offer made to you gets an answer from you, not from the clock.
-      const open = g.offers.filter((o) => o.to === p);
+      const open = g.offers.filter((o) => offerFor(o, p));
       if (open.length) fail(`Answer ${open.map((o) => `${pname(o.from)}'s offer ${o.id}`).join(' and ')} first: accept or decline.`);
       log(g, `${pname(p)} ends their turn.`, { k: 'end', p });
       return endTurn(g);
@@ -1455,7 +1469,7 @@ export function apply(g: Game, p: number, command: string): void {
 export function waitingOn(g: Game): number[] {
   const all = g.players.map((_, p) => p);
   if (g.phase === 'over') return [];
-  if (g.phase === 'action') return [...new Set([g.turn, ...g.offers.map((o) => o.to)])];
+  if (g.phase === 'action') return [g.turn, ...all.filter((p) => p !== g.turn && g.offers.some((o) => offerFor(o, p)))];
   if (g.phase === 'discard') return all.filter((p) => g.players[p].hand.length > TUNING.handCap);
   if (g.phase === 'cards') return all.filter((p) => g.players[p].choice.length);
   const raid = g.raid!;

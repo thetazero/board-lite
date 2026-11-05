@@ -3,7 +3,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
 import {
-  acceptProblem, apply, bankRates, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
+  acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
   upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -16,7 +16,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
   if (g.phase === 'action') {
     const out: string[] = [];
     // Accept or decline at random; decline always works if accepting doesn't.
-    for (const o of g.offers.filter((x) => x.to === p)) out.push(...(!acceptProblem(g, o) && next(rng) < 0.5 ? [`accept ${o.id}`, `decline ${o.id}`] : [`decline ${o.id}`]));
+    for (const o of g.offers.filter((x) => offerFor(x, p))) out.push(...(!acceptProblem(g, o, p) && next(rng) < 0.5 ? [`accept ${o.id}`, `decline ${o.id}`] : [`decline ${o.id}`]));
     if (p !== g.turn) return out;
     for (const c of shuffle(rng, pl.hand.slice())) {
       if (!canAfford(pl, cardCost(c))) continue;
@@ -120,7 +120,7 @@ export function playOut(g: Game, rng: Rng, maxSteps = 20000): number {
 // oldest cards.
 export function standInCommands(g: Game, p: number): string[] {
   const pl = g.players[p];
-  if (g.phase === 'action') return [...g.offers.filter((o) => o.to === p).map((o) => `decline ${o.id}`), ...(g.turn === p ? ['end'] : [])];
+  if (g.phase === 'action') return [...g.offers.filter((o) => offerFor(o, p)).map((o) => `decline ${o.id}`), ...(g.turn === p ? ['end'] : [])];
   if (g.phase === 'cards') return pl.choice.length ? [`keep ${pl.choice[0].id}`] : [];
   if (g.phase === 'discard') return [`discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`];
   const raid = g.raid!;
