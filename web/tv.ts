@@ -356,7 +356,7 @@ function renderRaid(g: PublicState) {
   const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
   let body = '';
   if (raid.step === 'vote') {
-    body = `<h1>${icon('raid', 1.1)} Vote ${OPEN}${raidPips(g)}</h1>
+    body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
       <div class="candidates">${raid.candidates.map((t, i) => targetCard(t, `<div class="num">${i + 1}</div>`, voters(raid.votes, i, names))).join('')}</div>
       <div class="status">${names.map((_, p) => `${playerTag(p, names)} ${check(raid.votes[p] !== null)}`).join(' ')}</div>`;
   } else if (raid.step === 'commit') {
