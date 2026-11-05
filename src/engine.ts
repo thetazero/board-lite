@@ -360,7 +360,7 @@ export function production(g: Game, p: number): Record<Resource, { base: number;
 }
 
 function titleValue(g: Game, p: number, t: Title): number {
-  if (t === 'army') return g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + TUNING.dragonPointsByStage[d.stage], 0);
+  if (t === 'army') return g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + dragonPower(d), 0);
   if (t === 'tower') return g.buildings[g.towers[p]].floors;
   return g.players[p].resources.gold;
 }
@@ -386,7 +386,6 @@ function updateTitles(g: Game) {
 }
 
 export interface Score {
-  dragons: number;
   buildings: number;
   titles: number;
   beasts: number; // great beasts slain
@@ -396,14 +395,13 @@ export interface Score {
 }
 
 export function score(g: Game, p: number): Score {
-  const dragons = g.dragons.filter((d) => d.owner === p).reduce((s, d) => s + TUNING.dragonPointsByStage[d.stage], 0);
   let buildings = 0;
   for (const [k] of ownedBuildings(g, p)) buildings += buildingPoints(g, k);
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
   const hidden = g.players[p].hand.filter((c) => ACTIONS[c.key]?.effect === 'hidden_point').length;
   const beasts = Object.entries(g.slain).filter(([, by]) => by === p).reduce((s, [k]) => s + BEASTS[k].points, 0);
-  const pub = dragons + buildings + titles + beasts;
-  return { dragons, buildings, titles, beasts, hidden, public: pub, total: pub + hidden };
+  const pub = buildings + titles + beasts;
+  return { buildings, titles, beasts, hidden, public: pub, total: pub + hidden };
 }
 
 // ---------- setup ----------

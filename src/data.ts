@@ -31,11 +31,13 @@ export const TUNING = {
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
   livestockPerDragon: 1,
-  dragonPointsByStage: [0, 1, 2, 3], // egg, hatchling, young, adult
-  titlePoints: 2,
-  // A title needs at least this much: dragon points, tower floors, gold. The
-  // hoard's is a Monument's gold: keep it for the title or spend it on one (#109).
-  titleMinimum: { army: 10, tower: 4, hoard: 20 },
+  // Dragons are worth no points; they count toward Strongest Dragon Army.
+  titlePoints: 3,
+  // A title needs at least this much: dragons' combat power, tower floors,
+  // gold. The army's is about 3 adults and a hatchling, as 10 dragon points
+  // were (#134). The hoard's is a Monument's gold: keep it for the title or
+  // spend it on one (#109).
+  titleMinimum: { army: 55, tower: 4, hoard: 20 },
   // A hurt dragon heals this much health at each production and sits out
   // raids until it is whole, so a big hit costs several rounds.
   healPerRound: 7,

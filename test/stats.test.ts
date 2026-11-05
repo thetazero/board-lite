@@ -27,7 +27,7 @@ test('points rebuilt from the log equal score() at any point in a game, and the 
     g.players.forEach((_, p) => {
       const want = score(g, p);
       const got = s.points.at(-1)![p];
-      assert.deepEqual([got.dragons, got.buildings, got.titles, got.beasts, got.public], [want.dragons, want.buildings, want.titles, want.beasts, want.public], `seed ${seed} P${p + 1}`);
+      assert.deepEqual([got.buildings, got.titles, got.beasts, got.public], [want.buildings, want.titles, want.beasts, want.public], `seed ${seed} P${p + 1}`);
     });
     const total = (c: Record<string, number[]>) => Object.values(c).flat().reduce((a, b) => a + b, 0);
     assert.equal(total(s.built), events(g, 'build').length + events(g, 'floor').length);
