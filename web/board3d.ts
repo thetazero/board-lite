@@ -1445,7 +1445,7 @@ const UPGRADE_AT: [number, number] = [-0.56, 0.4];
 
 // What each upgrade puts beside the building it's on, as its card and icon
 // show it (icons.ts): a workshop's cog, nesting grounds' nest
-// (the dragons it houses sit by it), a trade charter's sealed scroll.
+// (the dragons it houses sit by it).
 function upgradeMark(key: string): THREE.Group {
   const g = new THREE.Group();
   switch (key) {
@@ -1473,19 +1473,6 @@ function upgradeMark(key: string): THREE.Group {
         g.add(part(box(0.16, 0.02, 0.02), '#c48a52', { at: [Math.cos(a) * 0.24, 0.07, Math.sin(a) * 0.24], rot: [0, -a + 0.6, 0.3], crease: false }));
       }
       g.add(dragonEgg(EGGS[0], [-0.05, 0.13, 0]), dragonEgg(EGGS[1], [0.07, 0.12, 0.04], 0.85));
-      break;
-    }
-    case 'trade_charter': {
-      // A charter on a lectern: a cream sheet between its rolled ends, a red seal.
-      g.add(part(box(0.04, 0.2, 0.04), WOOD_DARK, { at: [0, 0.1, -0.02], crease: false }));
-      const sheetG = new THREE.Group();
-      sheetG.add(part(box(0.26, 0.2, 0.012), '#f3ead7'));
-      for (const y of [-0.1, 0.1]) sheetG.add(part(cyl(0.025, 0.025, 0.3, 6), '#e3d6b8', { at: [0, y, 0.01], rot: [0, 0, Math.PI / 2] }));
-      for (const y of [-0.04, 0.0, 0.04]) sheetG.add(part(box(0.17, 0.012, 0.004), '#8a7a66', { at: [-0.02, y + 0.02, 0.008], crease: false }));
-      sheetG.add(part(cyl(0.04, 0.04, 0.02, 8), TRADE_RED, { at: [0.07, -0.05, 0.012], rot: [Math.PI / 2, 0, 0] }));
-      sheetG.position.set(0, 0.3, 0);
-      sheetG.rotation.x = -0.9;
-      g.add(sheetG);
       break;
     }
   }

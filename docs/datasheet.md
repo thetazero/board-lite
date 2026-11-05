@@ -6,18 +6,18 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 - Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
-- Win at 30 points. Titles are 6 points each, from a minimum (see Points).
+- Win at 50 points. Titles are 7 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
-- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The merchants don't trade it.
+- Gold: no basic building makes it. It comes from raids, Markets and clearing fauna. The merchants don't trade it.
 - Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 
 There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
 
-### Building deck: 44 cards
+### Building deck: 42 cards
 
-21 kinds of building card (34 cards) + 3 kinds of upgrade (10 cards) = 44 cards.
+21 kinds of building card (35 cards) + 2 kinds of upgrade (7 cards) = 42 cards.
 
 | Card | Kind | Copies | Share of deck |
 |---|---|---|---|
@@ -37,29 +37,28 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Timber Port | building card | 1 | 2% |
 | Crystal Port | building card | 1 | 2% |
 | Livestock Port | building card | 1 | 2% |
-| Market | building card | 2 | 5% |
+| Market | building card | 3 | 7% |
 | Monument | building card | 2 | 5% |
 | Standing Stones | building card | 2 | 5% |
 | Lighthouse | building card | 2 | 5% |
 | Guildhall | building card | 1 | 2% |
-| Workshop | upgrade | 4 | 9% |
+| Workshop | upgrade | 4 | 10% |
 | Nesting Grounds | upgrade | 3 | 7% |
-| Trade Charter | upgrade | 3 | 7% |
-| **Total** |  | **44** | **100%** |
+| **Total** |  | **42** | **100%** |
 
-### Action deck: 88 cards
+### Action deck: 84 cards
 
-8 kinds of action card (58 cards) + 5 kinds of base dragon (10 cards) + 10 kinds of dragon card (20 cards) = 88 cards.
+8 kinds of action card (54 cards) + 5 kinds of base dragon (10 cards) + 10 kinds of dragon card (20 cards) = 84 cards.
 
 | Card | Kind | Copies | Share of deck |
 |---|---|---|---|
 | Windfall | action card | 4 | 5% |
-| Buried Treasure | action card | 10 | 11% |
-| Growth Elixir | action card | 10 | 11% |
-| Healing Potion | action card | 8 | 9% |
+| Buried Treasure | action card | 10 | 12% |
+| Growth Elixir | action card | 10 | 12% |
+| Healing Potion | action card | 8 | 10% |
 | War Horn | action card | 6 | 7% |
-| Secret Hoard | action card | 8 | 9% |
-| Rouse the Bear | action card | 8 | 9% |
+| Secret Hoard | action card | 4 | 5% |
+| Rouse the Bear | action card | 8 | 10% |
 | Wake the Basilisk | action card | 4 | 5% |
 | Fire Dragon | base dragon | 2 | 2% |
 | Ice Dragon | base dragon | 2 | 2% |
@@ -76,7 +75,7 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 | Zephyr Drake | dragon card | 2 | 2% |
 | Abyss Wyrm | dragon card | 2 | 2% |
 | Reef Drake | dragon card | 2 | 2% |
-| **Total** |  | **88** | **100%** |
+| **Total** |  | **84** | **100%** |
 
 ## Costs
 
@@ -106,20 +105,19 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the merchants at 2:1. | — |
 | Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the merchants at 2:1. | — |
 | Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the merchants at 2:1. | — |
-| Market | building card | building | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
+| Market | building card | building | 3 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each of your adjacent production buildings, up to 3. | — |
 | Monument | building card | building | 2 | 6 stone, 5 timber | Worth 2 points. Build adjacent to a monument. | 2 |
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
 | Lighthouse | building card | building | 2 | 7 stone, 4 timber | Worth 2 points. Build adjacent to an ocean hex. | 2 |
 | Guildhall | building card | building | 1 | 5 stone, 6 timber | Worth 2 points. Build adjacent to a trade building. | 2 |
 | Workshop | upgrade | building | 4 | 4 stone, 4 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more. | — |
 | Nesting Grounds | upgrade | building | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
-| Trade Charter | upgrade | building | 3 | 4 stone, 8 gold | This port or market makes 1 more gold each round. | — |
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
 | Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
-| Secret Hoard | action card | action | 8 | nothing | Worth 2 points while in your hand. | 2 |
+| Secret Hoard | action card | action | 4 | nothing | Worth 2 points while in your hand. | 2 |
 | Rouse the Bear | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
 | Wake the Basilisk | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
 | Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
@@ -166,7 +164,7 @@ The land is ringed by ocean, where nothing is built. Each of its six coasts has 
 
 ## Building cards that count their neighbours
 
-Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them (the tower is a monument and a dragon building).
+Each effect is multiplied by how many of the building's six neighbouring hexes count: hexes of a terrain (built on or not), or buildings of a class, whoever owns them unless the card says yours (the tower is a monument and a dragon building).
 
 | Card | Class | Counts | Cost | Each one adds |
 |---|---|---|---|---|
@@ -181,7 +179,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Shepherd's Fold | livestock building | meadow hexes | 3 stone, 3 timber, 2 crystal | 1 livestock a round |
 | Drovers' Barn | livestock building | livestock buildings (anyone's) | 2 stone, 3 timber, 3 crystal | 1 livestock a round |
 | Fishery | livestock building | ocean hexes | 3 stone, 4 timber, 3 crystal | 1 livestock a round |
-| Market | trade building | trade buildings (anyone's) | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
+| Market | trade building | production buildings (your own), up to 3 | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
 
 ## Points
 
@@ -210,7 +208,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 | Guildhall, adjacent to a trade building | 5 stone, 6 timber | 2 | 2.5 stone, 3 timber | now |
 | Secret Hoard (action card) | nothing | 2 | nothing | now, uses a hand slot |
 
-Titles: 6 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
+Titles: 7 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 
@@ -307,8 +305,8 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 156 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 137 | 16% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 322 | 38% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 158 | 18% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 82 | 10% | Market, Trade Charter, raid loot (6 of 6 kingdoms), clearing fauna |
+| stone | 150 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
+| timber | 143 | 17% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
+| crystal | 328 | 39% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
+| livestock | 158 | 19% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
+| gold | 62 | 7% | Market, raid loot (6 of 6 kingdoms), clearing fauna |

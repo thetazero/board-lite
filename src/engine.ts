@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
   type Attack, type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -103,7 +103,8 @@ export type GameEvent =
   // and the rivals' dragons perched there. `units` are the defenders, the
   // beast first; a perched dragon's carries its id as `d`. `fauna` and `name`
   // are the beast's, or null and the first perched dragon's name.
-  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; units: { name: string; hp: number; d?: string }[] }
+  // `hps`: each of `ds`'s health as the fight starts (as for `fight`).
+  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string }[] }
   | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
   | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
   | { k: 'recall'; p: number; ds: string[] }
@@ -124,7 +125,9 @@ export type GameEvent =
   | { k: 'commit'; p: number; ds: string[]; ready?: boolean }
   | { k: 'locked'; ps: number[] }
   | { k: 'bail'; p: number }
-  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; units: { name: string; hp: number }[] }
+  // `hps`: each of `ds`'s health as the fight starts, lined up with `ds`, so a
+  // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
+  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number }[] }
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[] } // shares and power line up with winners
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'bailed' } // unable: no dragon was raid-ready
@@ -302,10 +305,12 @@ export function buildingClass(b: Building): BuildingClass[] {
 }
 
 // Does this hex count for an effect that counts `what`? Its terrain does, and
-// so does the class of any building on it, whoever owns it.
+// so does the class of any building on it, whoever owns it ('production' is
+// any of the four resource classes).
 function counts(g: Game, k: string, what: Counted): boolean {
   const b = g.buildings[k];
-  return g.map[k]?.terrain === what || (!!b && buildingClass(b).includes(what as BuildingClass));
+  const classes = what === 'production' ? PRODUCTION_CLASSES : [what as BuildingClass];
+  return g.map[k]?.terrain === what || (!!b && buildingClass(b).some((c) => classes.includes(c)));
 }
 
 // How many of hex k's neighbours count for `what`.
@@ -313,15 +318,23 @@ export function neighbourCount(g: Game, k: string, what: Counted): number {
   return neighbors(k).filter((n) => counts(g, n, what)).length;
 }
 
+// How many neighbours a building card at hex k counts, for its owner p: only
+// p's buildings if the card says so, and never more than its cap.
+export function perCount(g: Game, k: string, def: BuildingDef, p: number): number {
+  if (!def.per) return 1;
+  const n = neighbors(k).filter((n) => counts(g, n, def.per!) && (!def.perOwn || g.buildings[n]?.owner === p)).length;
+  return Math.min(n, def.perMax ?? n);
+}
+
 // What a point card must be built adjacent to, as text: "a monument", "an ocean hex".
 export function besideText(what: Counted): string {
-  const noun = (TERRAIN_NOUN as Record<string, string>)[what] ?? CLASS_NAMES[what as BuildingClass];
+  const noun = (TERRAIN_NOUN as Record<string, string>)[what] ?? (what === 'production' ? 'production building' : CLASS_NAMES[what as BuildingClass]);
   return `${/^[aeiou]/.test(noun) ? 'an' : 'a'} ${noun}`;
 }
 
 // The multiplier on a building's effects at hex k: 1, or its neighbour count.
 function times(g: Game, k: string, def: BuildingDef): number {
-  return def.per ? neighbourCount(g, k, def.per) : 1;
+  return perCount(g, k, def, g.buildings[k].owner);
 }
 
 // The building types other than the tower, with their hex and multiplier.
@@ -393,13 +406,12 @@ export function buildingYield(g: Game, k: string, upgrade: string | null = g.bui
   };
   if (b.type === 'tower') {
     for (const r of RESOURCES) add(r, TUNING.towerProduction[r] ?? 0);
-    for (const r of RESOURCES) add(r, up?.makes?.[r] ?? 0);
     return { makes, houses: TUNING.towerDragonCapacity + (up?.dragonCapacity ?? 0), points: 0 };
   }
   const def = BUILDINGS[b.type];
   const n = times(g, k, def);
   if (def.produces) add(def.produces.resource, def.produces.base, def.produces.die);
-  for (const r of RESOURCES) add(r, (def.makes?.[r] ?? 0) * n + (up?.makes?.[r] ?? 0));
+  for (const r of RESOURCES) add(r, (def.makes?.[r] ?? 0) * n);
   const made = madeResource(def);
   if (made && up?.baseBonus) add(made, up.baseBonus);
   if (made && onPeak(g, k)) add(made, TUNING.peakBonus);
@@ -780,9 +792,14 @@ function resolveBail(g: Game) {
   }
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
-  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp })) });
+  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp })) });
   // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
   for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round);
+}
+
+// A hatched dragon's health now: its life stage's, less the hits it carries.
+function healthOf(d: Dragon): number {
+  return Math.max(0, stageStats(d)!.hp - d.damage);
 }
 
 function rollAttack(g: Game, a: Attack): number {
@@ -942,13 +959,13 @@ function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
   const perched = rivalsPerched(g, p, k);
   const units: Battle['units'] = [
     ...(f ? [{ key: f, hp: faunaDef(f).hp }] : []),
-    ...perched.map((d) => ({ key: d.key, hp: stageStats(d)!.hp - d.damage, d: d.id })),
+    ...perched.map((d) => ({ key: d.key, hp: healthOf(d), d: d.id })),
   ];
   const b: Battle = { units, fighters: ds.map((d) => d.id) };
   const name = f ? faunaDef(f).name : dragonName(perched[0]);
   const foes = [...(f ? [`the ${name}`] : []), ...perched.map((d) => `${pname(d.owner)}'s ${dragonName(d)} (${d.id})`)].join(' and ');
   log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}.`, {
-    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}) })),
+    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}) })),
   });
   for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round);
   const won = b.units.every((u) => u.hp <= 0);

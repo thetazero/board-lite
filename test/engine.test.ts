@@ -533,13 +533,21 @@ test('a fight replays from its events: the hits add up to the result', () => {
       fights++;
       const units = e.ev.units.map((u) => u.hp);
       const fighting = new Set(e.ev.ds);
+      // Each dragon's health as the fight starts, so the replay can start a hurt one hurt (#311).
+      const hps = e.ev.hps!;
+      assert.equal(hps.length, e.ev.ds.length);
+      const hp = new Map(e.ev.ds.map((id, n) => [id, hps[n]]));
       let j = i + 1;
       for (let c = g.log[j].ev; c?.k === 'combat'; c = g.log[++j].ev) {
         for (const h of c.hits) {
           if (h.by === 'dragon') {
             units[h.u] = Math.max(0, units[h.u] - h.dmg);
             assert.equal(h.down, units[h.u] === 0);
-          } else if (h.down) fighting.delete(h.d);
+          } else {
+            hp.set(h.d, Math.max(0, hp.get(h.d)! - h.dmg));
+            assert.equal(h.down, hp.get(h.d) === 0);
+            if (h.down) fighting.delete(h.d);
+          }
         }
       }
       const end = g.log[j].ev;
@@ -550,6 +558,25 @@ test('a fight replays from its events: the hits add up to the result', () => {
     }
   }
   assert.ok(fights > 10);
+});
+
+test('a hurt dragon starts its fight hurt: the fight event carries its health', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 9 },
+    { id: 'd2', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, 'commit d1'); apply(g, 1, 'commit d2');
+  apply(g, 0, 'ready'); apply(g, 1, 'ready');
+  apply(g, 0, 'fight'); apply(g, 1, 'fight');
+  const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+  assert.ok(fight.k === 'fight');
+  const full = DRAGONS.fire_whelp.stages[2].hp;
+  assert.deepEqual(fight.hps, [full - 9, DRAGONS.ice_whelp.stages[2].hp]);
 });
 
 test('a knocked-out dragon cannot fight until a fed production heals it, then fights hurt', () => {

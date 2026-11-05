@@ -506,7 +506,7 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
+  return battle(g, head, dragons, startHp(ev.ds, ev.hps), fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
 // A fight for a hex: one player's dragons against what holds it (a beast,
@@ -532,11 +532,19 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     const d = u.d ? g.dragons.find((x) => x.id === u.d) : undefined;
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d };
   });
-  return battle(g, head, dragons, '', units, rounds, outcome, undefined, sc.ms);
+  return battle(g, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, undefined, sc.ms);
 }
 
-function battle(g: PublicState, head: string, dragons: DragonView[], fled: string, units: { name: string; hp: number; max?: number; d?: DragonView }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
-  const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(d.maxHp, d.maxHp)}</div>`).join('');
+// Each fighting dragon's health as its fight started, by id: drawn after the
+// fight, the dragon's own health is what it ended with. Saves from before the
+// events carried it start them at full health.
+function startHp(ds: string[], hps: number[] | undefined): Map<string, number> {
+  return new Map(hps ? ds.map((id, i) => [id, hps[i]]) : []);
+}
+
+function battle(g: PublicState, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: { name: string; hp: number; max?: number; d?: DragonView }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
+  const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
+  const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(hp0(d), d.maxHp)}</div>`).join('');
   const foes = units.map((u, i) => u.d
     ? `<div class="fighter unit" data-u="${i}" style="--pc:${PLAYER_COLORS[u.d.owner]}">${dragonBadge(u.d, 56)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.max ?? u.hp)}</div>`
     : `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
@@ -548,7 +556,7 @@ function battle(g: PublicState, head: string, dragons: DragonView[], fled: strin
   const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {
     const hp = new Map<string, [number, number]>();
-    dragons.forEach((d) => hp.set(`d${d.id}`, [d.maxHp, d.maxHp]));
+    dragons.forEach((d) => hp.set(`d${d.id}`, [hp0(d), d.maxHp]));
     units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max ?? u.hp]));
     const box = (key: string) => el.querySelector<HTMLElement>(key[0] === 'u' ? `[data-u="${key.slice(1)}"]` : `[data-d="${key.slice(1)}"]`);
     const battle = el.querySelector<HTMLElement>('.battle')!;
