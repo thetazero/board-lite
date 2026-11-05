@@ -595,8 +595,8 @@ function wheelSheet(g: PublicState): string {
   }).join('');
   return `<div class="menuback" id="wheelclose"></div><div class="menu wheelsheet"><h3>Element wheel</h3>
     <div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>
-    <p class="wheelrule">Each element beats the next one along the arrows. An element deals double damage to the one it beats.</p>
-    <p>Neutral beats nothing, and nothing beats it.</p>
+    <p class="wheelrule">Double damage where the arrow points.</p>
+    <p>Neutral: no double damage, either way.</p>
     <div class="row"><button id="wheeldone">Close</button></div></div>`;
 }
 
