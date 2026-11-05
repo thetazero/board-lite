@@ -7,7 +7,7 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
 import { PEAK, nearBeast, neighbors } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -249,6 +249,17 @@ function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)
     const p = seats[i % seats.length];
     const k = buildableHexes(g, p, 'roost').sort()[0];
     if (k) g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+  }
+}
+
+// Seat p reaches the points to win (shown, not hidden): their buildings worth
+// the most points, placed where they can go, until they do.
+function pointsToWin(g: Game, p: number) {
+  const worth = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].points && !BUILDINGS[k].onTower).sort((a, b) => BUILDINGS[b].points! - BUILDINGS[a].points! || (a < b ? -1 : 1));
+  for (let i = 0; score(g, p).public < TUNING.pointsToWin; i++) {
+    const at = worth.flatMap((type) => buildableHexes(g, p, type).sort().slice(0, 1).map((k) => ({ type, k })))[0];
+    if (!at || i > 50) throw new Error('pointsToWin: no room');
+    g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
   }
 }
 
@@ -759,9 +770,11 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 5, // seeds 1 to 4 end at a round's end, with no moment between
-    // The first moment anyone has the points to win: the round plays on to its end.
-    until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
+    seed: 1,
+    // Late in the game, the leader is staged up to the points to win: the
+    // round plays on to its end.
+    until: late(4, 1),
+    setup: (g) => pointsToWin(g, standings(g)[0].p),
     shots: (g) => {
       const top = g!.players.findIndex((_, p) => score(g!, p).public >= TUNING.pointsToWin);
       return [
