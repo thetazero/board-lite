@@ -100,26 +100,26 @@ const classMaker = (name: string, cls: BuildingClass, r: Resource, per: Building
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.
-  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 8, livestock: 6, crystal: 8 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
-  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 8, crystal: 8, livestock: 6 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
-  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 8, timber: 8, livestock: 6 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
-  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 8, crystal: 8, stone: 6 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
+  quarry: { name: 'Quarry', class: 'quarry', basic: true, cost: { timber: 4, livestock: 3, crystal: 4 }, terrain: 'mountain', produces: { resource: 'stone', base: 0, die: 4 }, text: 'Makes 1d4 stone each round.' },
+  lumber_camp: { name: 'Lumber Camp', class: 'lumber', basic: true, cost: { stone: 4, crystal: 4, livestock: 3 }, terrain: 'forest', produces: { resource: 'timber', base: 0, die: 4 }, text: 'Makes 1d4 timber each round.' },
+  crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, text: 'Makes 1d4 crystal each round.' },
+  pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, text: 'Makes 1d4 livestock each round.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 4, timber: 4 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
   // Worth no points itself: floors count only toward Tallest Tower, a side
   // quest and a sink for raid gold (#98).
   tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 6, gold: 4 }, onTower: true, text: 'Adds a floor to your tower. Floors count toward Tallest Tower.' },
   // Building cards. Most count their neighbours.
-  cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 6, crystal: 6, livestock: 4 }, 2),
-  stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 6, crystal: 6, livestock: 4 }, 2),
-  woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 6, crystal: 6, livestock: 4 }, 2),
-  sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 6, crystal: 6, livestock: 4 }, 2),
-  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 8, crystal: 6, livestock: 6 }, 1),
-  ley_spire: terrainMaker('Crystal Spire', 'mine', 'crystal', 'ley', { stone: 6, timber: 6, livestock: 4 }, 2),
-  gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 6, timber: 6, livestock: 4 }, 2),
-  smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 6, stone: 4, livestock: 6 }, 1),
-  shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 6, timber: 6, crystal: 4 }, 2),
-  drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 6, crystal: 6, stone: 4 }, 2),
-  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 6, timber: 8, crystal: 6 }, 1),
+  cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 3, crystal: 3, livestock: 2 }, 2),
+  stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 3, crystal: 3, livestock: 2 }, 2),
+  woodcutter: terrainMaker("Woodcutter's Hut", 'lumber', 'timber', 'forest', { stone: 3, crystal: 3, livestock: 2 }, 2),
+  sawmill: classMaker('Sawmill', 'lumber', 'timber', 'lumber', { stone: 3, crystal: 3, livestock: 2 }, 2),
+  driftwood_yard: terrainMaker('Driftwood Yard', 'lumber', 'timber', 'ocean', { stone: 4, crystal: 3, livestock: 3 }, 1),
+  ley_spire: terrainMaker('Crystal Spire', 'mine', 'crystal', 'ley', { stone: 3, timber: 3, livestock: 2 }, 2),
+  gem_cutter: classMaker('Gem Cutter', 'mine', 'crystal', 'mine', { stone: 3, timber: 3, livestock: 2 }, 2),
+  smelter: classMaker('Smelter', 'mine', 'crystal', 'quarry', { timber: 3, stone: 2, livestock: 3 }, 1),
+  shepherds_fold: terrainMaker("Shepherd's Fold", 'pasture', 'livestock', 'meadow', { stone: 3, timber: 3, crystal: 2 }, 2),
+  drovers_barn: classMaker("Drovers' Barn", 'pasture', 'livestock', 'pasture', { timber: 3, crystal: 3, stone: 2 }, 2),
+  fishery: terrainMaker('Fishery', 'pasture', 'livestock', 'ocean', { stone: 3, timber: 4, crystal: 3 }, 1),
   hatchery: { name: 'Hatchery', class: 'dragon', cost: { stone: 6, timber: 6, crystal: 6 }, growthBonus: 1, text: 'Your dragons grow 1 extra step each round.', copies: 2 },
   port: { name: 'Port', class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: 3, text: 'You trade with the bank at 3:1.', copies: 3 },
   market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'trade', text: 'Makes 1 gold each round for each adjacent trade building.', copies: 2 },
@@ -148,7 +148,7 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 8, stone: 8, crystal: 2 }, baseBonus: 2, text: 'This stone, timber, crystal or livestock building makes 2 more.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, text: 'This stone, timber, crystal or livestock building makes 2 more.', copies: 4 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
   trade_charter: { name: 'Trade Charter', appliesTo: ['trade'], cost: { gold: 8, stone: 4 }, makes: { gold: 1 }, text: 'This port or market makes 1 more gold each round.', copies: 3 },
 };
