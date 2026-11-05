@@ -183,13 +183,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     return `<p class="bintro">On the board a dragon is the color of its element, whatever its card, and grows bigger at each life stage: egg, hatchling, young, adult.</p>${groups}`;
   },
   elements(b) {
-    const es = wheelOrder(b.elementBeats);
-    const weakTo = (e: string) => es.find((x) => b.elementBeats[x] === e);
-    const rows = es.map((e) => `<div class="welem" style="--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 1.4)}<b>${cap(e)}</b><span>Beats ${b.elementBeats[e]}. Weak to ${weakTo(e)}.</span></div>`).join('');
-    return `<p class="bintro">Every dragon, defender, beast and great beast has an element. On the board a dragon is the color of its element.</p>
-      ${wheel(b.elementBeats)}
-      <p class="wheelrule">Double damage where the arrow points, whoever strikes.</p>
-      ${rows}<div class="welem">${elemIcon('neutral', 1.4)}<b>Neutral</b><span>Beats nothing, and nothing beats it.</span></div>`;
+    return `${wheel(b.elementBeats)}<p class="wheelrule">Double damage where the arrow points.</p>`;
   },
   kingdoms(b) {
     return `<p class="bintro">Raids attack these. A kingdom that doesn’t fall adds 1 gold to its loot after every raid.</p>

@@ -897,8 +897,6 @@ button.on:disabled { opacity: 1; }
 .booksheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .booksheet .wnode b { font-size: .85em; color: var(--ink); }
 .booksheet p.wheelrule { margin: 0 0 .6em; text-align: center; color: var(--ink); font-weight: 600; }
-.booksheet .welem { display: flex; align-items: center; gap: .45em; padding: .35em 0; border-bottom: 1px solid #0001; font-size: .9em; }
-.booksheet .welem b { width: 5.5em; flex: none; }
 .booksheet .bking { box-shadow: none; border-bottom: 1px solid #0001; border-radius: 0; padding: .5em 0; margin: 0; background: none; }
 button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* Someone the table waits on is away: anyone can let a bot play for them. */
