@@ -114,7 +114,7 @@ export interface PublicState {
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
-  players: { publicPoints: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
+  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -270,7 +270,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
+      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
@@ -436,5 +436,41 @@ export interface Snapshot {
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
   scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
+  recap?: string | null; // once the game is over: its recap's id (/recap/<id>, src/recap.ts)
   you: (SeatState & { name: string }) | null;
+}
+
+// ---------- a finished game's recap (built by src/recap.ts) ----------
+
+export interface RecapStanding {
+  p: number;
+  place: number; // players level on points share a place, but never first
+  tied: boolean;
+  tiebreak: 'gold' | 'turn order' | null;
+  total: number;
+  buildings: number;
+  titles: number;
+  beasts: number; // great beasts slain
+  hidden: number; // Secret Hoard cards in hand
+}
+
+// What happened that's worth telling, by round. Titles only when the holder
+// at a round's end differs from the round before (they can change hands
+// several times in a round); kingdoms only when they fall.
+export type Moment = { round: number } & (
+  | { k: 'title'; t: Title; name: string; p: number }
+  | { k: 'beast'; p: number; key: string; name: string; points: number }
+  | { k: 'fall'; name: string; ps: number[] }
+);
+
+export interface Recap {
+  v: 1;
+  id: string;
+  ended: string; // ISO date and time
+  rounds: number;
+  pointsToWin: number;
+  names: string[]; // by seat; the colours are the seats'
+  race: number[][]; // everyone's points at the start (0) and after each round; the last row has cards in hand too
+  standings: RecapStanding[];
+  moments: Moment[];
 }

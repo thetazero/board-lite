@@ -222,8 +222,10 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
   });
+  const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
+  if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);
   out.push(`Titles (${g.titlePoints} points each): ${g.titles.map((t) => `${t.name}: ${t.holder === null ? 'no one' : P(t.holder)} [${t.values.join('/')}; needs ${t.min}]`).join('; ')}`);
   out.push('');
   out.push('== You (hidden from others) ==');

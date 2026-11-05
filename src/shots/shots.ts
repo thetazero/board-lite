@@ -21,6 +21,7 @@
 // time on the machine (turn.ts): one started meanwhile waits for it, and says so.
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -378,15 +379,18 @@ function makeRoom(staged: Staged, code: string): Room {
   for (const f of [file, seatsFile(file)]) rmSync(f, { force: true });
   const { scene } = staged;
   const names = scene.names ?? NAMES;
+  // A finished game's recap: dated by the page's frozen clock, with an id that's the same every run.
+  const recap = { recaps: join(CACHE, 'recaps'), now: () => FROZEN_NOW, recapId: createHash('sha256').update(code).digest('hex').slice(0, 12) };
+  rmSync(join(recap.recaps, `${recap.recapId}.json`), { force: true });
   let room: Room;
   if (staged.game) {
     mkdirSync(join(CACHE, 'rooms'), { recursive: true });
     save(file, staged.game);
-    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, ...recap });
     // A hosted saved game starts with every seat open; otherwise everyone is seated.
     if (!scene.resume) room.seats.forEach((s, i) => Object.assign(s, { name: names[i], kind: scene.bots?.includes(i) ? 'bot' : 'player' }));
   } else {
-    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, ...recap });
     for (let i = 0; i < scene.players - scene.lobby!.bots; i++) room.join(names[i]);
     for (let i = 0; i < scene.lobby!.bots; i++) room.addBot();
   }
@@ -473,7 +477,7 @@ async function main() {
     return;
   }
 
-  const { server, rooms } = startServer(0);
+  const { server, rooms } = startServer(0, { recaps: join(CACHE, 'recaps') });
   await new Promise<void>((ok) => (server.listening ? ok() : server.on('listening', () => ok())));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const chrome = await launchChrome();
@@ -518,7 +522,7 @@ async function main() {
             } else if (shot.seat !== undefined) {
               url = `${base}/${code}?n=${n++}#code=${code}&token=${room.seats[shot.seat].token}`;
             } else {
-              url = `${base}${shot.path ?? `/${code}`}?n=${n++}`;
+              url = `${base}${(typeof shot.path === 'function' ? shot.path(room) : shot.path) ?? `/${code}`}?n=${n++}`;
               if (shot.remember) storage.name = shot.remember;
             }
             const screenGone = shot.screen ? room.connect(null) : null;
@@ -543,6 +547,7 @@ async function main() {
               if (shot.fill.name !== undefined) await tab.type('#name', shot.fill.name);
             }
             for (const sel of shot.clicks ?? []) await tab.click(sel);
+            if (shot.run) await tab.eval(shot.run);
             if (shot.press) await tab.press(shot.press.on, shot.press.dx ?? 0, shot.press.dy ?? 0);
             if (shot.waitFor && shot.hold) await tab.hold(shot.waitFor, 30000);
             else if (shot.waitFor) await tab.waitFor(`document.querySelector(${JSON.stringify(shot.waitFor)})`, shot.waitFor, 30000);

@@ -6,12 +6,14 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, unitIcon } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
+import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
+import type { Recap } from '../src/state.ts';
 import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, hitStep, madeOf, prodSpin, prodStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -68,6 +70,7 @@ function onSnapshot(s: Snapshot) {
     if (remote) return void (app.innerHTML = '');
     return renderLobby();
   }
+  if (s.game.phase !== 'over') sawPlay = true;
   const log = s.game.log;
   if (first) {
     // Joined mid-game (e.g. the TV reloaded): only animate what happens from now on,
@@ -237,6 +240,7 @@ function renderGame(g: PublicState) {
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
           <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
+        ${g.phase === 'over' ? '' : pointsTrack(p, g.pointsToWin)}
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
       </div>`;
@@ -267,6 +271,7 @@ function renderGame(g: PublicState) {
   // the feed and the titles take the bottom corners. Open trade offers sit
   // over the top of the board while they're open.
   const half = Math.ceil(n / 2);
+  const last = lastRoundHtml(g, names);
   app.innerHTML = `
     <div class="board">
       <section class="mapwrap" id="mapwrap">${board3d ? '' : flat()}</section>
@@ -274,7 +279,7 @@ function renderGame(g: PublicState) {
       <header class="topbar">
         <span class="round">Round ${bannerTop?.round ?? g.round}</span>
         ${phaseTrack(g)}
-        <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
+        ${last ? `<span class="goal last">${last}</span>` : `<span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>`}
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText(`${g.titlePoints} points`)}</span></h3><ul>${titles}</ul>
@@ -593,6 +598,121 @@ function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, rightward: bo
   return b;
 }
 
+// ---------- the end: how the game went, then the final scores ----------
+
+// When the game ends in front of it, the TV plays the game's recap
+// (src/recap.ts): the points race drawn a round at a time with what happened
+// in each, then where everyone's points came from, then the final scores with
+// a QR code to the recap page, for anyone to keep or share. A TV opened on a
+// game that's already over goes straight to the scores (Watch again plays it).
+// Phones and the table view in a game with no TV show the scores only.
+let sawPlay = false; // this TV watched the game being played
+let recap: Recap | null = null;
+let recapAsked = '';
+let summary: { step: number; timer: number } | null = null;
+let summaryPlayed = false;
+
+type SummaryStep = { kind: 'race'; upTo: number; ms: number } | { kind: 'points'; ms: number };
+const RACE_MS = 24000; // the race at most, however long the game
+const POINTS_MS = 8000;
+
+function summarySteps(r: Recap): SummaryStep[] {
+  const last = r.race.length - 1;
+  const told = (n: number) => r.moments.filter((m) => m.round === n).length;
+  // A round where something happened stays up long enough to read it.
+  const want = Array.from({ length: last }, (_, i) => (told(i + 1) ? 1600 + 600 * Math.min(told(i + 1), 4) : 600));
+  const sum = want.reduce((a, b) => a + b, 0);
+  const scale = Math.min(1, RACE_MS / sum);
+  return [...want.map((ms, i) => ({ kind: 'race' as const, upTo: i + 1, ms: Math.max(250, ms * scale) })), { kind: 'points', ms: POINTS_MS }];
+}
+
+function showEnd(g: PublicState) {
+  if (summary) return; // it ends on the scores
+  const id = snap?.recap ?? null;
+  if (!remote && id && recap?.id !== id) {
+    if (recapAsked !== id) {
+      recapAsked = id;
+      fetch(`/api/recaps/${id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((r: Recap | null) => {
+        recap = r;
+        if (!snap?.game || snap.game.phase !== 'over') return;
+        if (recap && sawPlay && !summaryPlayed) playSummary();
+        else showFinal(snap.game);
+      });
+    }
+    if (!overlayKey.startsWith('end')) return; // a moment, while the recap loads
+  }
+  showFinal(g);
+}
+
+function playSummary(from = 0) {
+  if (!recap) return;
+  if (summary) clearTimeout(summary.timer);
+  summaryPlayed = true;
+  summary = { step: from, timer: 0 };
+  summaryStep();
+}
+// For the screenshots: play it from a step (from the end if negative).
+(window as unknown as { summaryAt: (n: number) => void }).summaryAt = (n) => recap && playSummary(n < 0 ? summarySteps(recap).length + n : n);
+
+function stopSummary() {
+  if (summary) clearTimeout(summary.timer);
+  summary = null;
+  if (snap?.game) showFinal(snap.game);
+}
+
+function summaryStep() {
+  const steps = summarySteps(recap!);
+  const step = steps[summary!.step];
+  if (!step) return stopSummary();
+  const r = recap!;
+  if (step.kind === 'race') {
+    if (overlayKey !== 'end race') {
+      showOverlay('end', 'end race', `<div class="summary race-step">
+        <h1>How the game went</h1>
+        <div class="sumbody"><div class="chart" id="sumchart"></div><div class="told" id="sumtold"></div></div>
+        <button id="skip">Skip</button></div>`);
+      $('skip').onclick = stopSummary;
+    }
+    $('sumchart').innerHTML = raceSvg(r, { upTo: step.upTo });
+    // What happened lately: this round's moments under the ones before it.
+    const told = $('sumtold');
+    const recent = [...new Set(r.moments.filter((m) => m.round <= step.upTo).map((m) => m.round))].slice(-3);
+    told.innerHTML = momentsHtml({ ...r, moments: r.moments.filter((m) => recent.includes(m.round)) });
+    told.querySelector(`.moments > li:last-child`)?.classList.toggle('now', recent.at(-1) === step.upTo);
+    $('overlay').querySelector<HTMLElement>('.summary')!.dataset.step = `race-${step.upTo}`;
+  } else {
+    const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
+      <h1>Where the points came from</h1>
+      ${breakdownHtml(r)}
+      <button id="skip">Skip</button></div>`);
+    if (box) $('skip').onclick = stopSummary;
+  }
+  summary!.timer = window.setTimeout(() => {
+    if (!summary) return;
+    summary.step++;
+    summaryStep();
+  }, step.ms);
+}
+
+// The recap page's address, as phones reach this machine.
+function recapUrl(id: string): string {
+  const host = lan.lan[0] ?? lan.tailscale[0] ?? location.hostname;
+  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}/recap/${id}`;
+}
+
+function showFinal(g: PublicState) {
+  const w = g.standings![0].p;
+  const qr = !remote && recap ? `<div class="recapqr">${qrSvg(`http://${recapUrl(recap.id)}`, "the game's recap")}
+      <div class="step">Scan for the game's recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
+  showOverlay('end', 'end', `<div class="endbox${qr ? ' with-recap' : ''}" data-step="final" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
+      <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
+      <div class="endbody">${standingsHtml(g, names)}${qr}</div>
+      ${remote ? '' : `<div class="endactions">${recap ? '<button id="replay">Watch again</button>' : ''}<button class="primary" id="again">New game</button></div>`}</div>`);
+  if (remote) return;
+  $('again').onclick = () => (location.href = '/tv');
+  if (recap) $('replay').onclick = () => playSummary();
+}
+
 // Whether the board itself comes next, with no overlay over it.
 const boardNext = (g: PublicState) => !banners.length && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
 
@@ -600,15 +720,7 @@ function updateOverlay(g: PublicState) {
   if (bannerUp) return;
   const next = banners.shift();
   if (next) return showBanner(next);
-  if (g.phase === 'over') {
-    const w = g.standings![0].p;
-    showOverlay('end', 'end', `<div class="endbox" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
-      <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
-      ${standingsHtml(g, names)}
-      ${remote ? '' : '<button class="primary" id="again">New game</button>'}</div>`);
-    if (!remote) $('again').onclick = () => (location.href = '/tv');
-    return;
-  }
+  if (g.phase === 'over') return showEnd(g);
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
   hideOverlay();
 }

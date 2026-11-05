@@ -22,7 +22,7 @@ export interface Shot {
   caption: string;
   client: 'tv' | 'phone';
   seat?: number; // phone: whose phone; none means a phone that hasn't joined
-  path?: string; // a phone that hasn't joined: the address it opens (default: the room's, /CODE)
+  path?: string | ((room: Room) => string); // a phone that hasn't joined: the address it opens (default: the room's, /CODE)
   remember?: string; // a phone that hasn't joined: the name it remembers from an earlier game
   fill?: { code?: string; name?: string }; // the join form: typed in, then Join tapped
   guest?: boolean; // TV: a second screen opened on the room's address, without the room's host token
@@ -31,6 +31,7 @@ export interface Shot {
   then?: (room: Room) => void; // something that happens at the table after the page is up (before the clicks)
   offline?: boolean; // the connection to the server drops after the page is up
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
+  run?: string; // a script run in the page after the clicks (e.g. the TV's summaryAt)
   press?: { on: string; dx?: number; dy?: number }; // phone: a finger put down on this (after the clicks) and slid by dx, dy pixels, still held for the shot
   waitFor?: string; // a CSS selector that must match before the shot
   waitMs?: number; // extra settle time, for the TV's timed banners
@@ -69,6 +70,13 @@ export interface Staged {
 }
 
 const MAX_STEPS = 30000;
+
+// The TV's summary at the end of a game, played from step n (from the end if
+// negative), once the TV has the recap.
+const summaryAt = (n: number) => `new Promise((done) => {
+  const go = () => document.querySelector('.endbox.with-recap') ? done(window.summaryAt(${n})) : setTimeout(go, 30);
+  go();
+})`;
 
 // Bot moves until `until` holds. False if the game ended first.
 // The shots a run takes: those whose file or scene name contains one of the
@@ -720,12 +728,31 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'last-round-4p',
+    players: 4,
+    seed: 1,
+    // The first moment anyone has the points to win: the round plays on to its end.
+    until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
+    shots: (g) => {
+      const top = g!.players.findIndex((_, p) => score(g!, p).public >= TUNING.pointsToWin);
+      return [
+        { file: 'tv-last-round-4p', caption: 'TV: someone has the points to win, so this round is the last', client: 'tv' },
+        { file: 'phone-last-round-4p', caption: 'Phone: someone else has the points to win', client: 'phone', seat: (top + 1) % 4 },
+        { file: 'phone-last-round-mine-4p', caption: 'Phone: you have the points to win', client: 'phone', seat: top },
+      ];
+    },
+  },
+  {
     name: 'over-4p',
     players: 4,
     seed: 1,
     until: (g) => g.phase === 'over',
     shots: (g) => [
-      { file: 'tv-game-over-4p', caption: 'TV: final scores', client: 'tv' },
+      { file: 'tv-game-over-4p', caption: "TV: final scores, with a QR code to the game's recap", client: 'tv' },
+      { file: 'tv-recap-race-4p', caption: 'TV, at the end: the points race, drawn a round at a time (here round 12), with what happened lately', client: 'tv', run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
+      { file: 'tv-recap-race-end-4p', caption: 'TV, at the end: the whole race', client: 'tv', run: summaryAt(-2), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+      { file: 'tv-recap-points-4p', caption: "TV, at the end: where everyone's points came from", client: 'tv', run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
+      { file: 'phone-recap-page', caption: "The recap page the TV's QR code opens", client: 'phone', path: (room) => `/recap/${room.recapId}`, waitFor: '.recap-page .sheet' },
       { file: 'phone-game-over-winner', caption: 'Phone: the winner', client: 'phone', seat: g!.winner!, sizes: true },
       { file: 'phone-game-over-loser', caption: 'Phone: everyone else', client: 'phone', seat: (g!.winner! + 1) % 4 },
       { file: 'phone-join-another', caption: 'Phone: after "Join another game", back at the join form', client: 'phone', seat: (g!.winner! + 1) % 4, clicks: ['#newgame'], waitFor: '#join' },

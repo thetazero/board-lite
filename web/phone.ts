@@ -6,7 +6,7 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
@@ -611,6 +611,12 @@ function wheelSheet(g: PublicState): string {
 // The table waits on someone whose phone is gone (closed, asleep, out of
 // Wi-Fi): anyone may let a bot play for them, so the game doesn't stall. Their
 // phone coming back hands the seat back to them.
+// Once someone has the points to win, every phone says this round is the last.
+function lastRound(g: PublicState, me: Me): string {
+  const text = lastRoundHtml(g, names, { seat: me.seat, total: me.totalPoints });
+  return text ? `<div class="lastround">${text}</div>` : '';
+}
+
 function away(g: PublicState): string {
   const seats = snap!.lobby.seats;
   return g.waitingOn.filter((p) => seats[p]?.kind === 'player' && !seats[p].connected && !seats[p].standIn)
@@ -653,7 +659,7 @@ function render() {
   const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
-  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);

@@ -53,15 +53,15 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
-.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
+.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
 .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
 }
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
 .panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .sent, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
@@ -80,7 +80,7 @@ button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
 input, select { font: inherit; background: var(--grain), #fffaf0; border: 1px solid var(--paper-edge); border-radius: 2px; padding: .5em; box-shadow: inset 0 .12em .2em #0002; }
 small { color: var(--muted); }
 /* Headings and banners in the cards' book face. */
-.title, .topbar .phase, .production h1, .result h1, .endbox h1, .raidbox h1, .target h2, .result.fight h2, .panel h3, .corner.titles h3, .pover h1, .plobby h1, .pbody h2, .trade h3, .phone .status { font-family: var(--serif); }
+.title, .topbar .phase, .production h1, .result h1, .endbox h1, .summary h1, .recap-page h1, .recap-page h2, .raidbox h1, .target h2, .result.fight h2, .panel h3, .corner.titles h3, .pover h1, .plobby h1, .pbody h2, .trade h3, .phone .status { font-family: var(--serif); }
 /* A ribbon: a strip of paper with notched ends, like the cards' name strips. */
 .doing, .phone .status.you, .topbar .phase { clip-path: polygon(0 0, 100% 0, calc(100% - .45em) 50%, 100% 100%, 0 100%, .45em 50%); }
 .loading { padding: 2em; color: var(--muted); }
@@ -211,6 +211,20 @@ svg.token { flex: none; }
 .pts b { font-size: 1.5em; line-height: 1; }
 .title-badge { background: var(--grain), linear-gradient(175deg, #ffe18a 0 50%, #f3c64a 50%); color: var(--ink); border-radius: 3px; padding: 0 .35em; font-weight: 700; white-space: nowrap; box-shadow: 0 .08em 0 #a8801c; }
 .dragons { display: flex; flex-wrap: wrap; gap: .2em .9em; margin-top: .2em; }
+/* a player's points as a track to the goal: one segment per source, in their colour, each a shade lighter, the sources named under it */
+.ptrack { margin: .15em 0 .1em; }
+.pbar { display: flex; gap: .12em; height: .5em; border-radius: .25em; overflow: hidden; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.ptrack i { flex: none; background: var(--pc); }
+.ptrack i.s1 { background: color-mix(in srgb, var(--pc) 55%, #1a1218); }
+.ptrack i.s2 { background: color-mix(in srgb, var(--pc) 50%, #fff); }
+.ptrack i.s3 { background: color-mix(in srgb, var(--pc) 30%, #1a1218); }
+.pwhy span { display: inline-flex; align-items: center; gap: .25em; white-space: nowrap; }
+.pwhy span i { width: .7em; height: .7em; border-radius: 2px; }
+.ptrack.full .pbar { box-shadow: 0 0 0 .12em var(--accent); }
+.pwhy { display: flex; flex-wrap: wrap; gap: 0 .8em; font-size: .78em; line-height: 1.25; color: color-mix(in srgb, var(--ink) 70%, transparent); }
+.pwhy b { color: var(--ink); }
+/* someone has the points to win: the top bar says this round is the last */
+.topbar .goal.last { display: inline-block; background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); color: var(--ink); font-weight: 700; padding: .05em .7em; border-radius: 3px; font-size: 1.2em; }
 .tvdragon { display: flex; align-items: center; gap: .25em; line-height: 1.1; }
 .tvdragon svg { width: 1.9em; height: 1.9em; flex: none; }
 .tvdragon > div { display: flex; flex-direction: column; }
@@ -316,6 +330,82 @@ q::after { content: close-quote; }
 .endbox .tiebreak { margin: 0 0 .3em; color: var(--muted); font-size: 1.2em; }
 .endbox .standings { font-size: 1.5em; margin: .5em 2em; }
 .endbox button { font-size: 1.4em; margin-top: .6em; }
+.endbox .endactions { display: flex; gap: .8em; justify-content: center; }
+/* With the recap's QR code beside the standings, for anyone to scan on the way out. */
+.endbox .endbody { display: flex; align-items: center; justify-content: center; gap: 1.5em; margin: 0 2em; }
+.endbox .endbody .standings { flex: 1; margin: .5em 0; }
+.endbox .recapqr { flex: none; width: 15em; text-align: center; color: var(--ink-soft); }
+.endbox .recapqr .qr { display: block; width: 11em; height: 11em; margin: 0 auto .4em; border-radius: 3px; box-shadow: 0 0 0 2px #2a1d3322; }
+.endbox .recapqr .step { font-weight: 700; font-size: 1.1em; color: var(--ink); }
+.endbox .recapqr .url { font-size: .95em; overflow-wrap: anywhere; }
+
+/* ---------- the recap: the TV's summary at the end, and the recap page ---------- */
+.summary { position: relative; background: var(--sheet); border-radius: 2px; width: min(92vw, 100em); padding: .8em 2.5em 1.2em; box-shadow: 0 .18em 0 var(--paper-edge), 0 1.2em 2.4em #05030fcc; text-align: center;
+  clip-path: polygon(0 0, calc(100% - 2.2em) 0, 100% 2.2em, 100% 100%, 0 100%); }
+.summary h1 { margin: .2em 0 .4em; font-size: 2.6em; }
+.summary > button { position: absolute; right: 1.6em; bottom: 1.2em; font-size: 1.1em; }
+.summary .sumbody { display: grid; grid-template-columns: 1fr 30em; gap: 2em; align-items: start; text-align: left; min-height: 34em; }
+.summary .chart svg { display: block; width: 100%; height: auto; }
+.summary .told { font-size: 1.4em; }
+.summary.points-step { width: min(80vw, 70em); padding-bottom: 4em; }
+.summary.points-step .breakdown { font-size: 1.6em; }
+
+.race { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.race .grid { stroke: #6b553026; stroke-width: 1.5; }
+.race .axis { fill: var(--ink-soft); font-size: 20px; }
+.race .axis.label { font-size: 18px; }
+.race .goal { stroke: #a8801c; stroke-width: 2.5; stroke-dasharray: 10 8; }
+.race .goal-label { fill: #8a6610; font-weight: 700; }
+.race .run { fill: none; stroke: var(--pc); stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; }
+.race .run.grow { stroke-dasharray: 1; animation: race-draw .5s ease-out both; }
+@keyframes race-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.race .end { fill: var(--pc); stroke: var(--paper-hi); stroke-width: 2.5; }
+.race .mark { fill: var(--paper-hi); stroke: var(--pc); stroke-width: 4; }
+.race .mark.beast, .race .mark.fall { fill: var(--pc); stroke: var(--paper-hi); stroke-width: 3; }
+.race .mark.new { animation: race-mark .5s ease-out both; transform-box: fill-box; transform-origin: center; }
+@keyframes race-mark { from { transform: scale(2.4); opacity: 0; } }
+.race .who { fill: var(--pc); font-size: 22px; font-weight: 800; }
+.race .who .pts { fill: var(--ink); font-weight: 700; }
+
+.moments { list-style: none; padding: 0; margin: 0; }
+.moments > li { margin: 0 0 .7em; }
+.moments .rnd { display: block; font-family: var(--serif); font-weight: 700; color: var(--ink-soft); font-size: .85em; }
+.moments ul { list-style: none; padding: 0; margin: .1em 0 0; }
+.moments ul li { margin: .15em 0; line-height: 1.3; }
+.moments .gain { white-space: nowrap; font-weight: 700; }
+.summary .moments > li { opacity: .55; transition: opacity .4s; }
+.summary .moments > li.now { opacity: 1; animation: enter .4s ease-out; }
+.summary .moments > li.now .rnd { color: var(--ink); }
+
+.breakdown { list-style: none; padding: 0; margin: .3em 0; text-align: left; }
+.breakdown li { display: grid; grid-template-columns: 6.5em 1fr 3.6em; align-items: center; gap: .6em; margin: .35em 0; }
+.breakdown .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.breakdown .bar { display: block; }
+.breakdown .fill { display: flex; height: 1.5em; border-radius: 3px; overflow: hidden; animation: grow-bar .9s ease-out both; transform-origin: left; }
+.breakdown li:nth-child(2) .fill { animation-delay: .15s; } .breakdown li:nth-child(3) .fill { animation-delay: .3s; }
+.breakdown li:nth-child(4) .fill { animation-delay: .45s; } .breakdown li:nth-child(5) .fill { animation-delay: .6s; } .breakdown li:nth-child(6) .fill { animation-delay: .75s; }
+@keyframes grow-bar { from { transform: scaleX(0); } }
+.breakdown .part { flex-basis: 0; display: flex; align-items: center; justify-content: center; min-width: 1.4em; font-size: .7em; font-weight: 800; color: #fff; box-shadow: inset -2px 0 0 #fff6; }
+.breakdown .total { text-align: right; white-space: nowrap; }
+.part.buildings { background: #7a5c3e; } .part.titles { background: #c4951c; } .part.beasts { background: #6a4bb0; } .part.hand { background: #8a8296; }
+.partkey { display: flex; flex-wrap: wrap; gap: .4em 1.2em; justify-content: center; color: var(--ink-soft); font-size: 1.1em; }
+.partkey i { display: inline-block; width: .9em; height: .9em; border-radius: 2px; margin-right: .35em; vertical-align: -.1em; }
+
+/* the recap page: one sheet, for a phone first */
+html:has(body.recap-page), body.recap-page { height: auto; min-height: 100%; }
+body.recap-page { font-size: 16px; }
+.recap-page main { max-width: 46em; margin: 0 auto; padding: 1em .8em 2em; }
+.recap-page .sheet { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; overflow: hidden; padding-bottom: 1em; }
+.recap-page .sheet svg.scene { display: block; width: 100%; height: 9em; }
+.recap-page header { text-align: center; padding: 0 1em; }
+.recap-page h1 { margin: .4em 0 .1em; font-size: 2em; }
+.recap-page .when { color: var(--ink-soft); margin: 0; }
+.recap-page section { padding: 0 1em; }
+.recap-page h2 { font-size: 1.3em; margin: 1.1em 0 .4em; padding-top: .6em; border-top: 1px solid #6b553030; }
+.recap-page .race { width: 100%; height: auto; display: block; }
+.recap-page .breakdown li { grid-template-columns: 5.5em 1fr 3.2em; }
+.recap-page .partkey { font-size: .9em; }
+.recap-page .missing { text-align: center; padding: 3em 1em; }
 /* the final standings, TV and phone */
 .standings { list-style: none; padding: 0; text-align: left; }
 .standings li { display: grid; grid-template-columns: 2.6em 1fr auto 3.2em; align-items: center; gap: .5em; padding: .2em .5em; border-radius: 8px; }
@@ -770,6 +860,7 @@ button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* Someone the table waits on is away: anyone can let a bot play for them. */
 .awayline { margin: .35em .7em 0; padding: .3em 1em; display: flex; align-items: center; gap: .5em; flex-wrap: wrap; font-weight: 600; color: var(--text); }
 .awayline button { margin-left: auto; }
+.lastround { margin: .35em .7em 0; padding: .3em 1em; border-radius: 3px; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); }
 .toast.news { border-left-color: var(--accent); }
 /* The answers to your trade offers: they stay at the top until tapped. */
 .notices { position: fixed; top: .5em; left: 50%; transform: translateX(-50%); z-index: 55; display: flex; flex-direction: column; gap: .4em; width: max-content; max-width: 92vw; }
@@ -906,3 +997,5 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .pchosen p { margin: .1em 0; line-height: 1.35; }
 .pchosen .pchead { font-size: 1.05em; }
 .pchosen .pcafter b { color: var(--accent); }
+/* a name on the last-round banner, darkened to read on its yellow */
+:is(.topbar .goal.last, .lastround) .ptag { color: color-mix(in oklab, var(--pc) 50%, #1a1218); }
