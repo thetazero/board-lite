@@ -1080,7 +1080,7 @@ export const SCENES: Scene[] = [
       const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
       g.map[open].fauna = 'wolf_pack';
       readyDragons(g, p);
-      giveHand(g, p, ['wolf_call', 'rouse_bear', 'windfall']);
+      giveHand(g, p, ['rouse_bear', 'wake_basilisk', 'windfall']);
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 6));
     },
     shots: (g) => [

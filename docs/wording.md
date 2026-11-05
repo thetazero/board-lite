@@ -20,10 +20,10 @@ The game should read like a well-edited board game: the box's rulebook, the card
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. Every choice among several options has one, and each option's button still carries the verb ("Gain", not a bare icon). | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear", "Choose a resource to gain" |
 | **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or bail", "End of round" |
-| **Status** (what someone is doing, on a TV panel or the phone's top bar) | Sentence case, present tense, short: a present participle for what a player is doing. The TV's top bar names the phase (a heading), never a sentence. | "Taking a turn", "Voting", "Keeping a card" |
+| **Status** (what someone is doing, on a TV panel or the phone's top bar) | Sentence case, present tense, short: a present participle for what a player is doing. The TV's top bar names the phase (a heading), never a sentence. | "Taking a turn", "Voting", "Discarding" |
 | **State tag** (a dragon or building, at a glance) | Sentence case, one to four words: why it's out of play. A number in a tag says what it counts, and the tag claims only what the rules make sure of. | "Hungry", "Healed in 2 rounds", "Fought" (cleared fauna this round) |
 | **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax bails", "No one raids" |
-| **Why you can't** (a greyed card, an error) | A statement of the reason, then, if there's a fix, a colon and an imperative. Full stop. Every greyed-out button has one, under it, in the words the refused command would use. | "No room for another dragon: build a roost first.", "You can't afford 2 stone.", "Build it on your turn." |
+| **Why you can't** (a greyed card, an error) | A statement of the reason, then, if there's a fix, a colon and an imperative. Full stop. Every greyed-out button has one, under it, in the words the refused command would use, except on the phone for a cost you can't pay: the cost beside the greyed button already says it. | "No room for another dragon: build a roost first.", "You can't afford 2 stone.", "Build it on your turn." |
 | **Rules** (`docs/rules.md`) | Second person, present tense, as above; "may" for a choice, no "should", and "must" only where breaking it is possible and matters. | "On your turn, you may play an action card." |
 
 ## The game's words
@@ -36,7 +36,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **make** (a building) | produce, yield, give | What a building brings in each round: "Makes 1d6 stone each round." (The phase is still called **production**.) |
 | **each round** | a round, per round, every round | How often |
 | **adjacent** | neighbouring, next to, touching | Hexes sharing an edge. The rules' word for what building cards count |
-| **place** (a beast) | put, send | Putting a beast on a hex with Wolf Call or Rouse the Bear |
+| **place** (a beast) | put, send | Putting a beast on a hex with Rouse the Bear or Wake the Basilisk |
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
 | **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
 | **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it makes nothing |

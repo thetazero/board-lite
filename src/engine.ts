@@ -29,7 +29,7 @@ export interface Dragon {
   growth: number;
   damage: number;
   // Why the dragon sits out this round's raids: it was hungry (and doesn't
-  // grow) or hurt at production, or it already fought fauna this round.
+  // heal or grow) or hurt (and heals instead of growing) at production, or it already fought fauna this round.
   resting: '' | 'hungry' | 'hurt' | 'hunted';
   // The rival's building it perches on, if any: that building makes nothing
   // until the dragon is recalled or driven off.
@@ -205,6 +205,7 @@ export function canAfford(pl: Player, cost: Bundle): boolean {
 
 // Why a player can't pay a cost, or null if they can: the same words as the
 // error, so the phone's greyed button and a refused command say one thing.
+// web/phone.ts matches these words to leave the line out under a greyed button.
 export function afford(pl: Player, cost: Bundle): string | null {
   return canAfford(pl, cost) ? null : `You can't afford ${bundleText(cost)}.`;
 }
@@ -259,8 +260,8 @@ export function blocked(g: Game, k: string): boolean {
   return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
 }
 
-// The round a hurt dragon can raid again: it heals at each production and
-// sits out every round it starts hurt.
+// The round a hurt dragon can raid again: it heals at each production it's
+// fed and sits out every round it starts hurt.
 export function backInRound(g: Game, d: Dragon): number {
   return g.round + Math.ceil(d.damage / TUNING.healPerRound) + 1;
 }
@@ -513,17 +514,21 @@ function startRound(g: Game) {
     log(g, `${pname(p)} produces ${bundleText(got)}.`, { k: 'produce', p, got }, { dice });
   }
   wander(g);
-  // Every dragon eats, and a hurt one heals some. One that was hungry or hurt
-  // sits out the round's raids; only hunger stops it growing.
+  // Every dragon eats. A fed one heals some if it's hurt, and grows if it
+  // isn't; a hungry one does neither. One that was hungry or hurt sits out
+  // the round's raids.
   for (const d of g.dragons) {
     const pl = g.players[d.owner];
     const hurt = d.damage > 0;
-    d.damage = Math.max(0, d.damage - TUNING.healPerRound);
     const fed = pl.resources.livestock >= TUNING.livestockPerDragon;
     if (fed) pl.resources.livestock -= TUNING.livestockPerDragon;
     d.resting = !fed ? 'hungry' : hurt ? 'hurt' : '';
-    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'is healing and sits out this round\'s raids' : 'goes hungry: it doesn\'t grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
+    if (d.resting) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing and sits out this round\'s raids' : 'goes hungry: it doesn\'t heal or grow and sits out this round\'s raids'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
+    if (hurt) {
+      d.damage = Math.max(0, d.damage - TUNING.healPerRound);
+      continue;
+    }
     if (d.stage === 3) continue;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;
@@ -827,24 +832,34 @@ export function unitsText(g: Game): string {
   return g.raid!.units.map((u, i) => `${UNITS[u.key].name} #${i + 1} ${u.hp}/${UNITS[u.key].hp}hp`).join(', ');
 }
 
+// Loot split by power (power[p] is 0 for a player not fighting). Each
+// resource is split in proportion, rounded down. What's left over is handed
+// out 1 at a time, strongest first (the earlier seat on a tie), and the turn
+// carries on from one resource to the next: so equal powers get equal shares,
+// or as near as the loot allows.
+export function splitLoot(loot: Bundle, power: number[]): Bundle[] {
+  const total = power.reduce((s, x) => s + x, 0);
+  const winners = power.flatMap((x, p) => (x ? [p] : []));
+  const byPower = [...winners].sort((a, b) => power[b] - power[a] || a - b);
+  const shares: Bundle[] = power.map(() => ({}));
+  let next = 0;
+  for (const r of RESOURCES) {
+    if (!loot[r]) continue;
+    let left = loot[r]!;
+    for (const p of winners) { const n = Math.floor((loot[r]! * power[p]) / total); if (n) shares[p][r] = n; left -= n; }
+    for (; left > 0; left--, next++) { const p = byPower[next % byPower.length]; shares[p][r] = (shares[p][r] ?? 0) + 1; }
+  }
+  return shares;
+}
+
 function checkRaidOver(g: Game): boolean {
   const raid = g.raid!;
   if (raid.units.every((u) => u.hp <= 0)) {
     // Loot is split by the combat power each player still has fighting.
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
-    const total = power.reduce((s, x) => s + x, 0);
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
-    const shares: Bundle[] = g.players.map(() => ({}));
-    // Each resource is split in proportion, rounded down; what's left over goes
-    // to the player with the most power standing (the earlier seat on a tie).
-    const top = winners.reduce((a, b) => (power[b] > power[a] ? b : a));
-    for (const r of RESOURCES) {
-      if (!loot[r]) continue;
-      let left = loot[r]!;
-      for (const p of winners) { const n = Math.floor((loot[r]! * power[p]) / total); if (n) shares[p][r] = n; left -= n; }
-      if (left) shares[top][r] = (shares[top][r] ?? 0) + left;
-    }
+    const shares = splitLoot(loot, power);
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
     log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
@@ -1247,13 +1262,12 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         }
         case 'heal_dragon': {
           const d = ownDragon(g, p, args[1]);
-          if (d.resting === 'hunted') fail(`${d.id} fought on the map this round, so it sits out the raids anyway.`);
           if (d.damage === 0 && d.resting !== 'hurt') fail(`${d.id} isn't hurt.`);
           pay(pl, def.cost);
           d.damage = 0;
           if (d.resting === 'hurt') d.resting = '';
           ev.d = d.id;
-          what = `heals ${d.id}, ready to raid`;
+          what = `heals ${d.id}${canRaid(d) ? ', ready to raid' : ''}`;
           break;
         }
         case 'send_fauna': {
@@ -1339,9 +1353,9 @@ function discardCommand(g: Game, p: number, verb: string, args: string[]) {
   const pl = g.players[p];
   const over = pl.hand.length - TUNING.handCap;
   if (over <= 0) fail(`You don't need to discard.`);
-  if (verb !== 'discard') fail(`Discard ${nCards(over)}: discard <card ids>.`);
+  if (verb !== 'discard') fail(`Discard ${nCards(over)} first, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}".`);
   const ids = [...new Set(args)];
-  if (ids.length !== over) fail(`Discard exactly ${nCards(over)}.`);
+  if (ids.length !== over) fail(`Discard exactly ${nCards(over)}, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}": you hold ${pl.hand.length} and the hand limit is ${TUNING.handCap}.`);
   const cards = ids.map((id) => handCard(g, p, id));
   for (const c of cards) discardCard(g, p, c);
   log(g, `${pname(p)} discards ${nCards(ids.length)}.`, { k: 'discard', p, n: ids.length });
@@ -1379,6 +1393,7 @@ export function apply(g: Game, p: number, command: string): void {
   const snapshot = structuredClone(rest);
   const logged = g.log.length;
   try {
+    if (v === 'discard' && g.phase !== 'discard') fail(`Discard at the end of the round, after the raids, if you hold more than ${TUNING.handCap} cards.`);
     if (g.phase === 'cards') cardsCommand(g, p, v, args);
     else if (g.phase === 'action') actionCommand(g, p, v, args);
     else if (g.phase === 'raid') raidCommand(g, p, v, args);
