@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { standInMove } from '../src/bot.ts';
 import { RuleError, apply, canRaid, faunaHexes, newGame, production, waitingOn, type Dragon, type Game } from '../src/engine.ts';
-import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_STRONG, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
+import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
 import { neighbors } from '../src/map.ts';
@@ -210,17 +210,29 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   assert.ok(h);
 });
 
-test('one element chart for everything that fights; neutral is neutral against everything', () => {
+test('one element wheel for everything that fights: double damage only; neutral is neutral against everything', () => {
   for (const x of [...Object.values(UNITS), ...Object.values(FAUNA), ...Object.values(BEASTS)]) assert.ok(UNIT_ELEMENTS.includes(x.element), x.name);
   for (const d of Object.values(DRAGONS)) assert.ok(UNIT_ELEMENTS.includes(d.element), d.name);
+  // water → fire → ice → air → lightning → water: each element beats exactly one other, and is beaten by exactly one.
+  assert.deepEqual(ELEMENT_BEATS, { water: 'fire', fire: 'ice', ice: 'air', air: 'lightning', lightning: 'water' });
+  for (const e of ELEMENTS) assert.equal(ELEMENT_WEAK[e].length, 1, e);
   assert.deepEqual(ELEMENT_WEAK.neutral, []);
-  assert.deepEqual(ELEMENT_STRONG.neutral, []);
   for (const e of UNIT_ELEMENTS) {
-    assert.equal(elementalDamage(5, 'neutral', e), 5); // nothing is weak or strong against neutral
+    assert.equal(elementalDamage(5, 'neutral', e), 5);
     assert.equal(elementalDamage(5, e, 'neutral'), 5);
   }
-  for (const e of ELEMENTS) for (const w of ELEMENT_WEAK[e]) assert.equal(elementalDamage(5, w, e), 10);
-  for (const e of ELEMENTS) for (const st of ELEMENT_STRONG[e]) assert.equal(elementalDamage(5, st, e), 2);
+  // Double when the attacker's element beats the target's; otherwise unchanged, never halved.
+  for (const by of ELEMENTS) for (const to of ELEMENTS) assert.equal(elementalDamage(5, by, to), ELEMENT_BEATS[by] === to ? 10 : 5, `${by} on ${to}`);
+});
+
+test('foe elements', () => {
+  const el = (x: { element: string }) => x.element;
+  assert.deepEqual([UNITS.militia, UNITS.archers, UNITS.knights, FAUNA.wolf_pack, FAUNA.cave_bear, FAUNA.basilisk].map(el), Array(6).fill('neutral'));
+  assert.equal(UNITS.frost_golem.element, 'ice');
+  assert.equal(UNITS.storm_griffin.element, 'air');
+  assert.equal(BEASTS.thunderbird.element, 'air');
+  assert.equal(UNITS.sea_serpent.element, 'water');
+  assert.equal(BEASTS.leviathan.element, 'water');
 });
 
 // Every hit in a fight between perched fire dragons and the dragons sent at them.

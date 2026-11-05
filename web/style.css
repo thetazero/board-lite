@@ -315,12 +315,12 @@ q::after { content: close-quote; }
 .target { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; padding: .8em 1.2em; text-align: left; min-width: 24em; position: relative; }
 .target h2 { margin: 0 0 .4em; font-size: 1.6em; }
 .target .num { position: absolute; top: -.5em; left: -.5em; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: #111; font-weight: 900; font-size: 1.4em; display: flex; align-items: center; justify-content: center; }
-.weak { color: var(--good); } .strong { color: var(--warn); }
+.weak { color: var(--good); }
 .loot { margin-top: .5em; font-size: 1.2em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .3em; }
 .loot-label { font-size: .75em; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: .2em; }
 .elem { color: color-mix(in oklab, var(--ec) 50%, var(--text)); }
 .status { margin-top: 1em; font-size: 1.4em; display: flex; gap: 1em; justify-content: center; align-items: center; flex-wrap: wrap; }
-/* A kingdom's defenders: a picture per kind, how many, health, attack, weak and strong */
+/* A kingdom's defenders: a picture per kind, how many, health, attack, and what it is weak to */
 .foes { display: flex; flex-direction: column; gap: .35em; }
 .foe { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .6em; }
 .foe-pic { display: inline-flex; align-items: center; }

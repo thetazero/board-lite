@@ -9,20 +9,23 @@ export type Bundle = Partial<Record<Resource, number>>;
 
 export const ELEMENTS = ['fire', 'ice', 'lightning', 'air', 'water'] as const;
 export type Element = (typeof ELEMENTS)[number];
-// The one element chart, for everything that fights: dragons, raid
-// defenders, fauna and great beasts each have an element, and whatever is hit
-// takes double damage from an element it's weak to and half (at least 1) from
-// one it's strong against, whichever side struck (#217). Neutral is weak to
-// nothing and strong against nothing, and nothing is weak or strong against it.
+// The element wheel, for everything that fights (#223): dragons, raid
+// defenders, fauna and great beasts each have an element, and each element
+// beats exactly one other. A hit from an element that beats what it hits deals
+// double damage, whichever side struck, dragons fighting dragons too. That is
+// the only element effect: nothing deals half. Neutral beats nothing and
+// nothing beats it.
 export const UNIT_ELEMENTS = [...ELEMENTS, 'neutral'] as const;
 export type UnitElement = (typeof UNIT_ELEMENTS)[number];
-export const ELEMENT_WEAK: Record<UnitElement, Element[]> = { fire: ['water'], ice: ['fire'], lightning: ['ice'], air: ['ice'], water: ['lightning'], neutral: [] };
-export const ELEMENT_STRONG: Record<UnitElement, Element[]> = { fire: ['fire'], ice: ['ice'], lightning: ['lightning'], air: ['air'], water: ['water'], neutral: [] };
+// water → fire → ice → air → lightning → water
+export const ELEMENT_BEATS: Record<Element, Element> = { water: 'fire', fire: 'ice', ice: 'air', air: 'lightning', lightning: 'water' };
+// What each element is weak to: the elements that beat it.
+export const ELEMENT_WEAK: Record<UnitElement, Element[]> = Object.fromEntries(
+  UNIT_ELEMENTS.map((e) => [e, ELEMENTS.filter((by) => ELEMENT_BEATS[by] === e)]),
+) as Record<UnitElement, Element[]>;
 // Damage after elements: what `by` deals to something of element `to`.
 export function elementalDamage(dmg: number, by: UnitElement, to: UnitElement): number {
-  if (ELEMENT_WEAK[to].includes(by as Element)) return dmg * 2;
-  if (ELEMENT_STRONG[to].includes(by as Element)) return Math.max(1, Math.floor(dmg / 2));
-  return dmg;
+  return by !== 'neutral' && ELEMENT_BEATS[by] === to ? dmg * 2 : dmg;
 }
 
 export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
@@ -299,7 +302,7 @@ export const DECKS = {
 
 export interface UnitDef extends Attack {
   name: string;
-  element: UnitElement; // what it's weak to and strong against: the element chart (ELEMENT_WEAK, ELEMENT_STRONG)
+  element: UnitElement; // what beats it and what it beats: the element wheel (ELEMENT_BEATS)
 }
 
 // Defenders attack a random dragon still in the fight.
@@ -324,7 +327,7 @@ export interface FaunaDef extends UnitDef {
 export const FAUNA: Record<string, FaunaDef> = {
   wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4 } },
-  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'fire', loot: { livestock: 4, gold: 2 } },
+  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'neutral', loot: { livestock: 4, gold: 2 } },
 };
 // Great beasts (#67): the top tier of the fauna, one of each on every map.
 // Each holds its hex and every hex around it until it is slain: nothing is
@@ -337,7 +340,7 @@ export interface BeastDef extends FaunaDef {
 
 export const BEASTS: Record<string, BeastDef> = {
   // On the mountain at the centre of the map.
-  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, element: 'lightning', loot: {}, points: 4 },
+  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, element: 'air', loot: {}, points: 4 },
   // In the ocean off one coast, beside its harbor.
   leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, element: 'water', loot: {}, points: 4 },
 };

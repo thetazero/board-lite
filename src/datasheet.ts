@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_STRONG, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText } from './engine.ts';
@@ -147,9 +147,9 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 
 ${table(['Dragon', 'Element', 'Cost', 'Growth time', 'Targets', 'Hatchling', 'Young', 'Adult'], rows)}
 
-The element chart, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: whatever is hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against.
+The element wheel, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: a hit from an element that beats what it hits deals double damage. That's the only element effect. Neutral beats nothing, and nothing beats it.
 
-${table(['Element', 'Weak to', 'Strong against'], UNIT_ELEMENTS.map((e) => [e, ELEMENT_WEAK[e].join(', ') || '—', ELEMENT_STRONG[e].join(', ') || '—']))}`;
+${table(['Element', 'Beats', 'Weak to'], UNIT_ELEMENTS.map((e) => [e, e === 'neutral' ? '—' : ELEMENT_BEATS[e], ELEMENT_WEAK[e].join(', ') || '—']))}`;
 }
 
 // Rounds a dragon with this much damage sits out (it heals at each production).

@@ -51,7 +51,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **no one** | nobody | No player |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
-| **weak to** / **strong against** (an element) | ×2, ½, resists, shrugs off | Anything hit (a dragon, defender or beast) that takes double or half damage from an element, by the element chart: "Weak to ice", "Strong against air" |
+| **beats** / **weak to** (an element) | ×2, strong against, resists, counters | The element wheel: an element that beats what it hits deals double damage. Anything hit (a dragon, defender or beast) is weak to the element that beats its own: "Ice beats air", "Weak to ice" |
 | **Health**, **Attack**, **Power** | a heart, swords, a shield | A stat, always said with its name: "Health 10", "Attack 1d6 on 2 targets", "Power 9" |
 | **loot** | prize, reward | What a fight pays, labelled "Loot" beside it |
 | **crystal field** | ley line, ley | The purple terrain crystal comes from, every time. One hex of it is a "crystal field hex" |

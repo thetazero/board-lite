@@ -23,8 +23,8 @@ const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 const faunaCode = (key: string) => FAUNA_CODE[key] ?? key[0].toUpperCase();
 const STAGES = ['hatchling', 'young', 'adult']; // a dragon card's stages, in order (STAGE_NAMES in src/data.ts)
 
-function unitStats(u: { power: number; hp: number; attack: string; weak: string[]; strong: string[] }): string {
-  return `combat power ${u.power}; ${u.hp}hp ${u.attack}${u.weak.length ? ` weak:${u.weak.join('/')}` : ''}${u.strong.length ? ` strong:${u.strong.join('/')}` : ''}`;
+function unitStats(u: { power: number; hp: number; attack: string; weak: string[] }): string {
+  return `combat power ${u.power}; ${u.hp}hp ${u.attack}${u.weak.length ? ` weak:${u.weak.join('/')}` : ''}`;
 }
 
 export function cardText(c: CardView): string {

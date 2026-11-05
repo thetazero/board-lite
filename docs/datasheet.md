@@ -224,15 +224,15 @@ Each stage: combat power (see Raids), health, targets × dice (average damage a 
 | Abyss Wyrm | water | 8 crystal, 4 livestock, 2 gold | 3 | strongest_attacker | **6**: 8hp 1×1d8 (4.5) | **12**: 16hp 2×1d8 (9) | **22**: 28hp 2×2d8 (18) |
 | Reef Drake | water | 8 crystal, 4 livestock | 2 | weak_to_me | **5**: 7hp 1×1d6 (3.5) | **10**: 13hp 1×2d6 (7) | **17**: 21hp 2×2d6 (14) |
 
-The element chart, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: whatever is hit takes double damage from an element it's weak to and half (at least 1) from one it's strong against.
+The element wheel, for everything that fights (dragons, defenders, fauna, great beasts), whichever side strikes: a hit from an element that beats what it hits deals double damage. That's the only element effect. Neutral beats nothing, and nothing beats it.
 
-| Element | Weak to | Strong against |
+| Element | Beats | Weak to |
 |---|---|---|
-| fire | water | fire |
-| ice | fire | ice |
-| lightning | ice | lightning |
-| air | ice | air |
-| water | lightning | water |
+| fire | ice | water |
+| ice | air | fire |
+| lightning | water | air |
+| air | lightning | ice |
+| water | fire | lightning |
 | neutral | — | — |
 
 ## Raids
@@ -271,7 +271,7 @@ Beasts on the map. Nothing is built on a hex with fauna, and a building under fa
 |---|---|---|---|---|---|
 | Wolf Pack | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
-| Basilisk | 26 | 2×1d8 (9) | fire | 4 livestock, 2 gold | 4+ steps from the nearest tower |
+| Basilisk | 26 | 2×1d8 (9) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 
 On the starting map: one beast per 8 land hexes, none within 1 step of a tower.
 
@@ -288,7 +288,7 @@ Two on every map, the top tier of the fauna: fought like fauna (on your turn, yo
 
 | Beast | Health | Attack (avg) | Element | Points | Lives in |
 |---|---|---|---|---|---|
-| Thunderbird | 70 | 2×2d8 (18) | lightning | 4 | the mountain peak at the centre |
+| Thunderbird | 70 | 2×2d8 (18) | air | 4 | the mountain peak at the centre |
 | Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean beside one harbor |
 
 A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
