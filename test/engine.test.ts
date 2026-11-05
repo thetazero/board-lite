@@ -76,32 +76,33 @@ test('the final standings put the winner first, most points first', () => {
 
 test('ties in the standings: the win goes to the most gold, then turn order; other ties share a place', () => {
   // Staged: bot games almost never tie for the win.
-  const staged = (points: number[], gold: number[]) => {
-    const g = newGame(points.length, 5);
+  // Each player holds the given number of Secret Hoards, whatever one is worth.
+  const staged = (hoards: number[], gold: number[]) => {
+    const g = newGame(hoards.length, 5);
     g.players.forEach((pl, p) => {
       pl.resources.gold = gold[p];
       pl.hand = [];
-      const short = points[p] - score(g, p).total;
-      for (let i = 0; i < short; i++) pl.hand.push({ id: `h${p}-${i}`, deck: 'action', key: 'secret_hoard' });
-      assert.equal(score(g, p).total, points[p]);
+      const before = score(g, p).total;
+      for (let i = 0; i < hoards[p]; i++) pl.hand.push({ id: `h${p}-${i}`, deck: 'action', key: 'secret_hoard' });
+      assert.equal(score(g, p).total, before + hoards[p] * ACTIONS.secret_hoard.amount!);
     });
     return { g, st: standings(g) };
   };
   // P2 and P3 level on top; P3 has more gold. P1 and P4 level behind.
-  let { g, st } = staged([4, 6, 6, 4], [0, 1, 2, 0]);
+  let { g, st } = staged([2, 3, 3, 2], [0, 1, 2, 0]);
   assert.deepEqual(st.slice(0, 2).map((s) => [s.p, s.place, s.tied]), [[2, 1, true], [1, 2, true]]);
   assert.equal(st[0].tiebreak, 'gold');
   assert.equal(st[2].place, 3);
   assert.equal(st[3].place, 3, 'level behind the winner shares a place');
   assert.ok(st[2].tied && st[3].tied && st[2].tiebreak === null);
   // Level on points and gold: the earlier in turn order wins.
-  ({ g, st } = staged([5, 5, 2], [1, 1, 1]));
+  ({ g, st } = staged([3, 3, 1], [1, 1, 1]));
   const order = turnOrder(g).filter((p) => p < 2);
   assert.deepEqual(st.map((s) => [s.p, s.place]), [[order[0], 1], [order[1], 2], [2, 3]]);
   assert.equal(st[0].tiebreak, 'turn order');
   assert.ok(!st[2].tied);
   // No tie: no tiebreak.
-  ({ st } = staged([7, 3], [0, 9]));
+  ({ st } = staged([4, 2], [0, 9]));
   assert.deepEqual(st.map((s) => [s.p, s.tiebreak]), [[0, null], [1, null]]);
 });
 
@@ -414,7 +415,7 @@ test('each round you draw two building cards and keep one; the other is discarde
   for (const c of [...g.decks.building, ...g.discards.building]) assert.ok(!BUILDINGS[c.key]?.basic, c.key);
 });
 
-test('building cards count their neighbours, whoever owns them', () => {
+test('building cards count their neighbours; point buildings must go beside what they need', () => {
   const g = newGame(2, 8);
   keepAll(g);
   rich(g, 0);
@@ -431,15 +432,15 @@ test('building cards count their neighbours, whoever owns them', () => {
   g.map[around[0]].terrain = 'mountain';
   g.map[around[1]].terrain = 'mountain';
   assert.equal(stone(), base + 2);
-  // A monument counts adjacent monuments: the tower is one, and so is anyone else's monument.
+  // A Monument must go beside a monument (a tower counts), and is worth its flat points.
+  const away = neighbors(spot).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k]
+    && !neighbors(k).some((n) => g.buildings[n] && buildingClass(g.buildings[n]).includes('monument')));
   g.players[0].hand.push({ id: 'cmo', deck: 'building', key: 'monument' });
+  assert.ok(away, "a free hex beside the Cliff Works and away from any monument");
+  assert.throws(() => apply(g, 0, `build cmo ${away}`), RuleError);
   const next = ring.find((k) => g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
   apply(g, 0, `build cmo ${next}`);
-  const touching = neighbors(next).filter((k) => g.buildings[k] && buildingClass(g.buildings[k]).includes('monument')).length;
-  assert.equal(buildingPoints(g, next), touching);
-  const free = neighbors(next).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-  g.buildings[free] = { type: 'monument', owner: 1, upgrade: null, floors: 0 }; // P2's
-  assert.equal(buildingPoints(g, next), touching + 1);
+  assert.equal(buildingPoints(g, next), BUILDINGS.monument.points);
 });
 
 test('a fight replays from its events: the hits add up to the result', () => {
