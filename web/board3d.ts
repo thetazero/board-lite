@@ -362,8 +362,11 @@ function decor(h: HexView, seaward: number): THREE.Group {
         place(peak(0.28, 0.5, 5, r() * 3, false), [0.5, 0.28]);
         place(peak(0.24, 0.42, 4, r() * 3, true), [-0.5, 0.3]);
       } else if (built) {
-        place(peak(0.22, 0.42, 5, r() * 3, true), rim());
-        place(peak(0.16, 0.3, 4, r() * 3, false), rim());
+        // Still a mountain: a snowy peak and its shoulder rise behind
+        // whatever's built on it (a quarry is cut into its foot).
+        place(peak(0.46, 1.05, 5, r() * 3, true), [0.16 + r() * 0.08, -0.5]);
+        place(peak(0.32, 0.68, 4, r() * 3, true), [-0.44, -0.44 + r() * 0.06]);
+        place(peak(0.18, 0.32, 5, r() * 3, false), [0.6, -0.12]);
       } else {
         place(peak(0.5, 0.95, 5, r() * 3, true), [r() * 0.16 - 0.08, r() * 0.16 - 0.12]);
         place(peak(0.3, 0.55, 4, r() * 3, true), [0.42, 0.3]);
