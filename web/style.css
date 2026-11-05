@@ -860,14 +860,9 @@ button.on:disabled { opacity: 1; }
 .seatlist .seatbtn .tag { margin-left: auto; font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* The menu under your name: out of the way, but always there. */
 .me .menubtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-size: 1.3em; line-height: 1; padding: .05em .35em .2em; margin: 0 -.5em 0 .3em; }
-/* The element wheel: a ring of element dots beside your points, one tap from the whole wheel. */
+/* The element wheel: a ring of element dots beside your points, one tap from the rulebook's Elements tab. */
 .me .wheelbtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; line-height: 0; padding: .15em; margin: 0 0 0 .4em; }
 .me .wheelbtn svg { width: 1.6em; height: 1.6em; display: block; }
-.wheelsheet .wheel { position: relative; width: min(16em, 70vw); aspect-ratio: 1; margin: .2em auto .6em; color: var(--ink-soft); }
-.wheelsheet .wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.wheelsheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
-.wheelsheet .wnode b { font-size: .85em; color: var(--ink); }
-.wheelsheet .wheelrule { color: var(--ink); font-weight: 600; }
 .menuback { position: fixed; inset: 0; background: #0008; z-index: 40; }
 .menu { position: fixed; top: .6em; left: .6em; right: .6em; max-width: 26em; margin: 0 auto; z-index: 41; background: var(--grain), var(--sheet); --text: var(--ink); color: var(--ink); border-radius: 4px; box-shadow: var(--lift); padding: .8em 1em 1em; }
 .menu h3 { margin: 0 0 .3em; font-family: var(--serif); }
@@ -878,7 +873,7 @@ button.on:disabled { opacity: 1; }
 .menu.booksheet { bottom: .6em; display: flex; flex-direction: column; padding: .6em .8em .4em; max-width: 34em; }
 .booksheet .bookbar { display: flex; align-items: center; justify-content: space-between; }
 .booksheet .bookbar h3 { margin: 0; }
-.booksheet .booktabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3em; margin: .5em 0; }
+.booksheet .booktabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3em; margin: .5em 0; }
 .booksheet .booktabs button { padding: .45em .2em; font-size: .9em; }
 .booksheet .booktabs button.on { background: var(--grain), var(--accent); color: var(--ink); }
 .booksheet .bookpage { flex: 1; overflow-y: auto; overscroll-behavior: contain; margin: 0 -.4em; padding: 0 .4em .6em; }
@@ -903,6 +898,11 @@ button.on:disabled { opacity: 1; }
 .booksheet .bdhead { display: flex; align-items: center; justify-content: space-between; gap: .4em; margin-bottom: .15em; }
 .booksheet .bstage { display: flex; align-items: center; gap: .3em; font-size: .85em; }
 .booksheet .bstage small { width: 5.2em; color: var(--ink-soft); }
+.booksheet .wheel { position: relative; width: min(16em, 70vw); aspect-ratio: 1; margin: .6em auto; color: var(--ink-soft); }
+.booksheet .wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.booksheet .wnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.booksheet .wnode b { font-size: .85em; color: var(--ink); }
+.booksheet p.wheelrule { margin: 0 0 .6em; text-align: center; color: var(--ink); font-weight: 600; }
 .booksheet .bking { box-shadow: none; border-bottom: 1px solid #0001; border-radius: 0; padding: .5em 0; margin: 0; background: none; }
 button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* Someone the table waits on is away: anyone can let a bot play for them. */

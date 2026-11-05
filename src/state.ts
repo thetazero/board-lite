@@ -494,6 +494,7 @@ export interface Rulebook {
   terrains: string[];
   peakBonus: number; // what a production building on or next to the freed peak makes more
   faunaWanderOdds: number;
+  elementBeats: Record<string, string>; // the element wheel: what each element beats
 }
 
 export function rulebook(): Rulebook {
@@ -516,5 +517,6 @@ export function rulebook(): Rulebook {
     terrains: ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'],
     peakBonus: TUNING.peakBonus,
     faunaWanderOdds: TUNING.faunaWanderOdds,
+    elementBeats: ELEMENT_BEATS,
   };
 }
