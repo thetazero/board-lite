@@ -339,7 +339,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
-      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
+      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the merchants', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
       { file: 'phone-hand-raised-3p', caption: "Phone: the tucked hand tapped on someone else's turn, raised to look at", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]'] },
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]', '[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
@@ -397,7 +397,7 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       return [
         { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
-        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+        { file: 'phone-bank-port', caption: 'Phone: the merchants with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
   },
@@ -737,7 +737,7 @@ export const SCENES: Scene[] = [
   {
     name: 'last-round-4p',
     players: 4,
-    seed: 2, // seed 1's game ends at a round's end, with no moment between
+    seed: 3, // seeds 1 and 2 end at a round's end, with no moment between
     // The first moment anyone has the points to win: the round plays on to its end.
     until: (g) => g.phase !== 'over' && g.players.some((_, p) => score(g, p).public >= TUNING.pointsToWin),
     shots: (g) => {
@@ -886,7 +886,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: what it makes now and with it, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
-        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
+        { ...me, file: 'phone-bank-picks', caption: 'Phone: the merchants, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
     },
   },
@@ -1301,7 +1301,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
-      { file: 'phone-wheel-3p', caption: 'Phone: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], sizes: true },
+      { file: 'phone-wheel-3p', caption: 'Phone: the rulebook at its elements tab: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], waitFor: '.bookpage .wheel', sizes: true },
       ...(['board', 'buildings', 'beasts', 'dragons', 'kingdoms', 'cards'] as const).map((t): Shot => ({
         file: `phone-rules-${t}-3p`, caption: `Phone: the rulebook, from Rules in the header, at its ${t} tab`, client: 'phone', seat: 2,
         clicks: ['#book', `[data-booktab="${t}"]`], waitFor: t === 'kingdoms' || t === 'cards' ? '.bookpage .bentry, .bookpage .bking' : '.bookpage img.bpic', sizes: t === 'board',
@@ -1414,7 +1414,11 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 }],
+    shots: () => [
+      { file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 },
+      // You, tapped while the fight plays: the phone stays on the table, never "Watch the table" (#294).
+      { file: 'phone-remote-fight-you-3p', caption: 'No TV: You tapped mid-fight: the table stays, You is off till the fight ends', client: 'phone', seat: 1, live: true, run: `setTimeout(() => document.querySelector('[data-view="you"]').click(), 1000)`, waitFor: '.viewswitch', waitMs: 1800 },
+    ],
   },
   {
     name: 'remote-fight-end-3p',

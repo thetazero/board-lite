@@ -66,7 +66,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     const rates = bankRates(g, p);
     const rich = BASIC_RESOURCES.filter((r) => pl.resources[r] >= rates[r] + 2);
     const poor = BASIC_RESOURCES.filter((r) => !rich.includes(r));
-    if (rich.length && poor.length && next(rng) < 0.5) out.push(`bank ${pick(rng, rich)} ${pick(rng, poor)}`);
+    if (rich.length && poor.length && next(rng) < 0.5) out.push(`merchants ${pick(rng, rich)} ${pick(rng, poor)}`);
     out.push('end');
     return out;
   }

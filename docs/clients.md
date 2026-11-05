@@ -30,8 +30,8 @@ board-lite is running on port 8080.
 
 **Nobody stalls the table:**
 
-- **Element wheel:** the ring of colored dots by your points on the phone shows which element beats which.
-- **Rules:** **Rules** at the top of the phone opens a small rulebook over whatever screen you are on: every hex, border, building, beast, dragon, kingdom and action card, each building, beast and dragon drawn as the TV draws it. **Close** goes back to where you were. The TV carries no labels for these; the rulebook is where you look them up.
+- **Element wheel:** the ring of colored dots by your points on the phone opens the rulebook at **Elements**: which element beats which.
+- **Rules:** **Rules** at the top of the phone opens a small rulebook over whatever screen you are on: every hex, border, building, beast, dragon, element, kingdom and action card, each building, beast and dragon drawn as the TV draws it. **Close** goes back to where you were. The TV carries no labels for these; the rulebook is where you look them up.
 - **Quit:** **⋯** next to your name → **Quit game**. A bot plays your seat; tap your name at the room's address to come back.
 - **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The seat goes back to them when their phone returns.
 
@@ -49,9 +49,9 @@ The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/rec
 
 On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others. One phone and a few bots is a whole game.
 
-Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end.
+Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet.
 
-The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, and scenes cut to it only from then on.
+The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, scenes cut to it only from then on, and You stays on.
 
 ## Playing from the command line
 

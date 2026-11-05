@@ -3,7 +3,7 @@
 // docs/datasheet.md lists these numbers as the raw rules. After changing any, run `npm run datasheet` and read the
 // diff; `npm test` fails until it is regenerated.
 
-// The basic resources are the ones basic buildings make and the bank trades; gold is neither (#279).
+// The basic resources are the ones basic buildings make and the merchants trade; gold is neither (#279).
 export const BASIC_RESOURCES = ['stone', 'timber', 'crystal', 'livestock'] as const;
 export type BasicResource = (typeof BASIC_RESOURCES)[number];
 export const RESOURCES = [...BASIC_RESOURCES, 'gold'] as const;
@@ -117,7 +117,7 @@ export interface BuildingDef {
   beside?: Counted; // must be built adjacent to at least one of these
   dragonCapacity?: number;
   growthBonus?: number;
-  bankRate?: { resource: BasicResource; rate: number }; // a better bank rate for one resource you give
+  bankRate?: { resource: BasicResource; rate: number }; // a better merchants' rate for one resource you give
   per?: Counted;
 }
 
@@ -126,10 +126,10 @@ const terrainMaker = (name: string, cls: BuildingClass, r: Resource, per: Terrai
 const classMaker = (name: string, cls: BuildingClass, r: Resource, per: BuildingClass, cost: Bundle, copies: number): BuildingDef =>
   ({ name, class: cls, cost, makes: { [r]: 1 }, per, copies, points: 1, text: `Makes 1 ${r} each round for each adjacent ${CLASS_NAMES[per]}; worth 1 point.` });
 
-// A port trades one basic resource with the bank at 2:1 (#277), in place of
+// A port trades one basic resource with the merchants at 2:1 (#277), in place of
 // the generic 3:1 Port: one card each, gold has none.
 const portCard = (r: BasicResource): BuildingDef =>
-  ({ name: `${r[0].toUpperCase()}${r.slice(1)} Port`, class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: { resource: r, rate: 2 }, text: `You trade ${r} with the bank at 2:1.`, copies: 1 });
+  ({ name: `${r[0].toUpperCase()}${r.slice(1)} Port`, class: 'trade', cost: { timber: 6, stone: 2, livestock: 2 }, terrain: 'harbor', bankRate: { resource: r, rate: 2 }, text: `You trade ${r} with the merchants at 2:1.`, copies: 1 });
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   // Basic buildings: no card needed.

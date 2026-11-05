@@ -42,8 +42,8 @@ function economy(): string {
 - Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} card from the action deck (action cards and dragons; see Decks); hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
 - Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
-- Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''} and clearing fauna. The bank doesn't trade it.
-- Bank: ${TUNING.bankRate}:1, basic resources only (not gold). With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
+- Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''} and clearing fauna. The merchants don't trade it.
+- Merchants: ${TUNING.bankRate}:1, basic resources only (not gold). With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
 }
 
 // Every building, upgrade, action card and dragon: what it costs and does.
@@ -180,7 +180,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and the earlier seat on a tie, carrying on from one resource to the next).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next).
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot'], targetRows)}
 
