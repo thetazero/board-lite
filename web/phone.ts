@@ -11,7 +11,7 @@ import {
 import { foeStack, kingdomCard, lootLine } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
-import { bookSheet, loadBook, type BookTab } from './book.ts';
+import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -52,8 +52,7 @@ let sending = false;
 // hasn't caught up yet. Null once the server shows the same.
 let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
-let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
-let bookTab: BookTab | null = null; // the rulebook, from Rules in the header, open at this tab
+let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
 // A new screen tucks it again, if no card can be played there either.
@@ -534,7 +533,7 @@ function header(g: PublicState, me: Me): string {
         <span class="pname">${esc(me.name)}</span>
         <span class="pts">${icon('points', 1.4)}${me.totalPoints} <small>/ ${g.pointsToWin}</small>${hidden}</span>
         <button id="book" class="ghost bookbtn" aria-expanded="${!!bookTab}">Rules</button>
-        <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${wheelOpen}">${wheelMark(g)}</button>
+        <button id="wheel" class="ghost wheelbtn" aria-label="Element wheel" aria-expanded="${bookTab === 'elements'}">${wheelMark(g)}</button>
         <button id="menu" class="ghost menubtn" aria-label="Menu" aria-expanded="${menu}">⋯</button>
       </header>
       <div class="resbar">${res}</div>
@@ -581,49 +580,12 @@ function menuSheet(): string {
     <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
 }
 
-// The element wheel in order, each element followed by the one it beats:
-// water, fire, ice, air, lightning. From the server, so it is the engine's.
-function wheelOrder(g: PublicState): string[] {
-  const beats = g.elementBeats;
-  const start = 'water' in beats ? 'water' : Object.keys(beats)[0];
-  const order = [start];
-  for (let e = beats[start]; e && e !== start && order.length < 10; e = beats[e]) order.push(e);
-  return order;
-}
-// A point on the wheel: element i of n, clockwise from the top, round 0,0.
-function wheelAt(i: number, n: number, r: number): [number, number] {
-  const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
-  return [r * Math.cos(a), r * Math.sin(a)];
-}
-
 // The header's mark for the wheel: a dot of each element's colour in a ring,
-// always on screen, so the wheel is one tap away.
+// always on screen, so the wheel (the rulebook's Elements tab) is one tap away.
 function wheelMark(g: PublicState): string {
-  const es = wheelOrder(g);
+  const es = wheelOrder(g.elementBeats);
   const dots = es.map((e, i) => { const [x, y] = wheelAt(i, es.length, 6); return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${ELEMENT_COLORS[e]}"/>`; }).join('');
   return `<svg viewBox="-10 -10 20 20" aria-hidden="true"><circle r="6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>${dots}</svg>`;
-}
-
-// The element wheel, opened from the header: each element with an arrow to
-// the one it beats, neutral in the middle (no arrows: it beats nothing and
-// nothing beats it), and the rule in one line (docs/rules.md, "Elements").
-function wheelSheet(g: PublicState): string {
-  const es = wheelOrder(g);
-  const n = es.length, R = 36, gap = 13;
-  const arrows = es.map((_, i) => {
-    const [x1, y1] = wheelAt(i, n, R), [x2, y2] = wheelAt(i + 1, n, R);
-    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
-    const ux = dx / d, uy = dy / d;
-    return `<line x1="${(x1 + ux * gap).toFixed(2)}" y1="${(y1 + uy * gap).toFixed(2)}" x2="${(x2 - ux * gap).toFixed(2)}" y2="${(y2 - uy * gap).toFixed(2)}" marker-end="url(#wheelhead)"/>`;
-  }).join('');
-  const nodes = es.map((e, i) => {
-    const [x, y] = wheelAt(i, n, R);
-    return `<span class="wnode" style="left:${50 + x}%;top:${50 + y}%;--ec:${ELEMENT_COLORS[e]}">${elemIcon(e, 2)}<b>${e[0].toUpperCase()}${e.slice(1)}</b></span>`;
-  }).join('') + `<span class="wnode" style="left:50%;top:50%">${elemIcon('neutral', 2)}<b>Neutral</b></span>`;
-  return `<div class="menuback" id="wheelclose"></div><div class="menu wheelsheet"><h3>Element wheel</h3>
-    <div class="wheel"><svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><marker id="wheelhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor"/></marker></defs><g stroke="currentColor" stroke-width="1.6">${arrows}</g></svg>${nodes}</div>
-    <p class="wheelrule">Double damage where the arrow points.</p>
-    <div class="row"><button id="wheeldone">Close</button></div></div>`;
 }
 
 // The table waits on someone whose phone is gone (closed, asleep, out of
@@ -677,7 +639,7 @@ function render() {
   const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
   document.body.classList.toggle('has-hand', !!dock);
   document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
-  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : bookTab ? bookSheet(bookTab) : ''}`);
+  morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me) + lastRound(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : bookTab ? bookSheet(bookTab) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
@@ -1625,23 +1587,19 @@ function wire(g: PublicState, me: Me) {
   });
   on('menu', () => {
     menu = !menu;
-    wheelOpen = false;
-    bookTab = null;
-    render();
-  });
-  on('wheel', () => {
-    wheelOpen = !wheelOpen;
-    menu = false;
     bookTab = null;
     render();
   });
   // The rulebook lies over whatever the screen is, and closes back to it.
-  on('book', () => {
-    bookTab = bookTab ? null : 'board';
-    menu = wheelOpen = false;
+  // Rules opens it at its first tab, the wheel's ring of dots at Elements.
+  const openBook = (tab: BookTab) => {
+    bookTab = bookTab ? null : tab;
+    menu = false;
     render();
     if (bookTab) loadBook(me.seat, () => bookTab && render());
-  });
+  };
+  on('book', () => openBook('board'));
+  on('wheel', () => openBook('elements'));
   for (const id of ['bookclose', 'bookdone']) {
     on(id, () => {
       bookTab = null;
@@ -1653,12 +1611,6 @@ function wire(g: PublicState, me: Me) {
     render();
     app.querySelector('.bookpage')?.scrollTo(0, 0);
   });
-  for (const id of ['wheelclose', 'wheeldone']) {
-    on(id, () => {
-      wheelOpen = false;
-      render();
-    });
-  }
   for (const id of ['menuclose', 'menucancel']) {
     on(id, () => {
       menu = false;

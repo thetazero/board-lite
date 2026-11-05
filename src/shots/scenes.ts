@@ -1300,7 +1300,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
-      { file: 'phone-wheel-3p', caption: 'Phone: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], sizes: true },
+      { file: 'phone-wheel-3p', caption: 'Phone: the rulebook at its elements tab: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], waitFor: '.bookpage .wheel', sizes: true },
       ...(['board', 'buildings', 'beasts', 'dragons', 'kingdoms', 'cards'] as const).map((t): Shot => ({
         file: `phone-rules-${t}-3p`, caption: `Phone: the rulebook, from Rules in the header, at its ${t} tab`, client: 'phone', seat: 2,
         clicks: ['#book', `[data-booktab="${t}"]`], waitFor: t === 'kingdoms' || t === 'cards' ? '.bookpage .bentry, .bookpage .bking' : '.bookpage img.bpic', sizes: t === 'board',
