@@ -572,6 +572,19 @@ test('loot left over goes out 1 at a time, strongest first, carrying on across r
   assert.deepEqual(splitLoot({ gold: 7 }, [2, 1]), [{ gold: 5 }, { gold: 2 }]);
 });
 
+test('equal powers take the odd loot in the round\'s turn order, so it moves with the first player', () => {
+  // 2 equal winners, 2 livestock and 1 gold: the first of them in turn order gets the gold.
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 1 }, [0, 5, 5], [2, 0, 1]), [{}, { livestock: 1 }, { livestock: 1, gold: 1 }]);
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 1 }, [0, 5, 5], [0, 1, 2]), [{}, { livestock: 1, gold: 1 }, { livestock: 1 }]);
+  // Over a cycle of first players, each of 3 equal raiders gets the same.
+  const got = [0, 0, 0];
+  for (let first = 0; first < 3; first++) {
+    const order = [0, 1, 2].map((i) => (first + i) % 3);
+    splitLoot({ gold: 1 }, [5, 5, 5], order).forEach((b, p) => (got[p] += b.gold ?? 0));
+  }
+  assert.deepEqual(got, [1, 1, 1]);
+});
+
 test('Healing Potion heals a knocked-out dragon, ready to fight', () => {
   const g = newGame(2, 3);
   keepAll(g);
