@@ -296,6 +296,37 @@ test('Largest Hoard goes to the most gold, from its minimum, and changes hands',
   assert.equal(score(g, 1).titles, TUNING.titlePoints);
 });
 
+test('dragons are worth no points; Strongest Dragon Army goes to the most combat power, from its minimum (#134)', () => {
+  const g = newGame(2, 6);
+  keepAll(g);
+  g.players[0].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 0 };
+  g.dragons = [];
+  const add = (owner: number, stage: number) => g.dragons.push({ id: `d${g.dragons.length + 50}`, owner, key: 'fire_whelp', stage, growth: 0, damage: 0, resting: '' });
+  const adult = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0, resting: '' });
+  const hatchling = dragonPower({ id: 'x', owner: 0, key: 'fire_whelp', stage: 1, growth: 0, damage: 0, resting: '' });
+  // 3 adults fall short (the 9 dragon points they were worth fell short of 10); a hatchling more doesn't.
+  assert.ok(3 * adult < TUNING.titleMinimum.army && 3 * adult + hatchling >= TUNING.titleMinimum.army);
+  for (let i = 0; i < 3; i++) add(0, 3);
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.army, null);
+  assert.equal(score(g, 0).public, 0); // dragons alone score nothing
+  add(0, 1);
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.army, 0);
+  assert.equal(score(g, 0).public, TUNING.titlePoints);
+  for (let i = 0; i < 3; i++) add(1, 3);
+  add(1, 1); // a tie: the holder keeps it
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.army, 0);
+  add(1, 0); // an egg has no power
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.army, 0);
+  add(1, 1);
+  apply(g, 0, 'bank stone timber');
+  assert.equal(g.titles.army, 1);
+  assert.equal(score(g, 1).titles, TUNING.titlePoints);
+});
+
 test('table talk is allowed any time, private talk reaches only the two players, and nothing else changes', () => {
   const g = newGame(3, 13);
   hatchAll(g);

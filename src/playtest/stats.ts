@@ -20,7 +20,7 @@ import { type Game, type GameEvent, score } from '../engine.ts';
 
 type Count = Record<string, number[]>; // key -> per seat
 
-export interface SeatPoints { dragons: number; buildings: number; titles: number; beasts: number; public: number }
+export interface SeatPoints { buildings: number; titles: number; beasts: number; public: number }
 export interface GameStats {
   game: string;
   commit?: string; // the code it was played on, from results.json
@@ -89,7 +89,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   };
   const dragon = (id: string) => r.dragons.find((d) => d.id === id)!;
   const snap = () => {
-    s.points.push(g.players.map((_, p) => { const x = score(r, p); return { dragons: x.dragons, buildings: x.buildings, titles: x.titles, beasts: x.beasts, public: x.public }; }));
+    s.points.push(g.players.map((_, p) => { const x = score(r, p); return { buildings: x.buildings, titles: x.titles, beasts: x.beasts, public: x.public }; }));
     for (const [t, h] of Object.entries(r.titles)) if (h !== null) bump(s.titleRounds, t, h, n);
   };
   let target = '';
@@ -177,7 +177,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   // The rebuilt end state against the saved one.
   g.players.forEach((_, p) => {
     const want = score(g, p), got = s.points.at(-1)![p];
-    for (const k of ['dragons', 'buildings', 'titles', 'beasts'] as const) {
+    for (const k of ['buildings', 'titles', 'beasts'] as const) {
       if (want[k] !== got[k]) s.check.push(`P${p + 1} ${k}: rebuilt from the log ${got[k]}, the saved board ${want[k]}`);
     }
   });
@@ -287,10 +287,12 @@ export function gameMarkdown(s: GameStats): string {
   L.push(`Points at the end of each round (public; Secret Hoards only at the end):`, '');
   L.push(`| Seat | Source | ${s.points.map((_, i) => `r${i + 1}`).join(' | ')} | Hoards | Final |`, `|---|---|${s.points.map(() => '---|').join('')}---|---|`);
   s.seats.forEach((st, p) => {
-    for (const k of ['dragons', 'buildings', 'titles', 'beasts', 'public'] as const) {
+    let first = true; // the seat's name goes on its first row shown
+    for (const k of ['buildings', 'titles', 'beasts', 'public'] as const) {
       const row = s.points.map((r) => r[p][k]);
       if (k !== 'public' && row.every((x) => x === 0)) continue;
-      L.push(`| ${k === 'dragons' ? `${st.seat} ${st.model}` : ''} | ${k === 'public' ? '**total**' : k} | ${row.join(' | ')} | ${k === 'public' ? st.hidden : ''} | ${k === 'public' ? `**${st.final}**` : ''} |`);
+      L.push(`| ${first ? `${st.seat} ${st.model}` : ''} | ${k === 'public' ? '**total**' : k} | ${row.join(' | ')} | ${k === 'public' ? st.hidden : ''} | ${k === 'public' ? `**${st.final}**` : ''} |`);
+      first = false;
     }
   });
   L.push('');
@@ -317,7 +319,7 @@ function modelRolls(games: GameStats[]): ModelRoll[] {
   const maxR = Math.max(0, ...games.map((s) => s.rounds));
   const roundN: Record<string, number[]> = {};
   for (const s of games) s.seats.forEach((st, p) => {
-    const m = (out[st.model] ??= { model: st.model, seatGames: 0, wins: 0, src: { dragons: 0, buildings: 0, titles: 0, beasts: 0, public: 0 }, hidden: 0, final: 0, byRound: zeros(maxR), n: {} });
+    const m = (out[st.model] ??= { model: st.model, seatGames: 0, wins: 0, src: { buildings: 0, titles: 0, beasts: 0, public: 0 }, hidden: 0, final: 0, byRound: zeros(maxR), n: {} });
     const rn = (roundN[st.model] ??= zeros(maxR));
     m.seatGames++;
     if (s.winner === p) m.wins++;
@@ -379,8 +381,8 @@ export function batchMarkdown({ games, skipped, saved }: Batch): string {
 
   const rolls = modelRolls(games);
   L.push('### Where points came from', '');
-  L.push('| Model | Seat-games | Wins | Dragons | Buildings | Titles | Great beasts | Hoards | Final |', '|---|---|---|---|---|---|---|---|---|');
-  for (const m of rolls) L.push(`| ${m.model} | ${m.seatGames} | ${m.wins} | ${avg(m.src.dragons, m.seatGames)} | ${avg(m.src.buildings, m.seatGames)} | ${avg(m.src.titles, m.seatGames)} | ${avg(m.src.beasts, m.seatGames)} | ${avg(m.hidden, m.seatGames)} | ${avg(m.final, m.seatGames)} |`);
+  L.push('| Model | Seat-games | Wins | Buildings | Titles | Great beasts | Hoards | Final |', '|---|---|---|---|---|---|---|---|');
+  for (const m of rolls) L.push(`| ${m.model} | ${m.seatGames} | ${m.wins} | ${avg(m.src.buildings, m.seatGames)} | ${avg(m.src.titles, m.seatGames)} | ${avg(m.src.beasts, m.seatGames)} | ${avg(m.hidden, m.seatGames)} | ${avg(m.final, m.seatGames)} |`);
   const maxR = Math.max(...games.map((s) => s.rounds));
   L.push('', 'Average public points at the end of each round (games still going that round):', '');
   L.push(`| Model | ${Array.from({ length: maxR }, (_, i) => `r${i + 1}`).join(' | ')} |`, `|---|${'---|'.repeat(maxR)}`);
@@ -430,7 +432,7 @@ export function compareMarkdown(a: { dir: string; games: GameStats[] }, b: { dir
   L.push('| | A | B | B − A |', '|---|---|---|---|');
   line('rounds', (gs) => per(gs, (s) => s.rounds));
   line('winner\'s points', (gs) => per(gs, (s) => (s.winner === null ? 0 : s.seats[s.winner].final)));
-  for (const k of ['dragons', 'buildings', 'titles', 'beasts'] as const) line(`points from ${k} (all seats)`, seats((s, p) => s.points.at(-1)![p][k]));
+  for (const k of ['buildings', 'titles', 'beasts'] as const) line(`points from ${k} (all seats)`, seats((s, p) => s.points.at(-1)![p][k]));
   line('points from hoards (all seats)', seats((s, p) => s.seats[p].hidden));
   line('title changes', (gs) => per(gs, (s) => s.titles.length));
   line('raids held', (gs) => per(gs, (s) => sum(Object.values(s.raids.targets).map((v) => v.chosen))));

@@ -102,7 +102,7 @@ export interface PublicState {
   titlePoints: number; // what each title is worth
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   waitingOn: number[];
-  players: { publicPoints: number; dragons: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
+  players: { publicPoints: number; buildings: number; titles: number; beasts: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRate: number }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -252,7 +252,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, dragons: s.dragons, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
+      return { publicPoints: s.public, buildings: s.buildings, titles: s.titles, beasts: s.beasts, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRate: bankRate(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({

@@ -278,7 +278,7 @@ function renderGame(g: PublicState) {
         <span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>
       </header>
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
-      <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText('2 points')}</span></h3><ul>${titles}</ul>
+      <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText(`${g.titlePoints} points`)}</span></h3><ul>${titles}</ul>
         <h3>Great beasts <span class="chip">+${iconText(`${g.beasts[0]?.points ?? 0} points`)}</span></h3><ul>${beasts}</ul></div></aside>
     </div>`;
   if (board3d) {

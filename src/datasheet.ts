@@ -10,7 +10,7 @@ import {
   ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UPGRADES, avgDamage, combatPower, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
-import { bundleText, specialProjectCost } from './engine.ts';
+import { bundleText } from './engine.ts';
 import { mapRadius } from './map.ts';
 
 
@@ -54,11 +54,11 @@ function costs(): string {
     ...Object.values(BUILDINGS).map((b) => row(b, b.text, b.per && b.points ? `${b.points} each` : pts(b.points))),
     ...Object.values(UPGRADES).map((u) => row(u, u.text, '—')),
     ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? '1' : '—')),
-    ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, TUNING.dragonPointsByStage.slice(1).join(' / '))),
+    ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, '—')),
   ];
   return `## Costs
 
-Everything that can be bought, as the game has it. Deck is the deck its cards are in (see Decks); a kind isn't a deck, and dragons are in the action deck. Basic buildings have no copies and are in no deck: anyone may build them, no card needed. Dragon points are hatchling / young / adult.
+Everything that can be bought, as the game has it. Deck is the deck its cards are in (see Decks); a kind isn't a deck, and dragons are in the action deck. Basic buildings have no copies and are in no deck: anyone may build them, no card needed. Dragons are worth no points; they count toward Strongest Dragon Army (see Points).
 
 ${table(['Name', 'Kind', 'Deck', 'Copies', 'Cost', 'Does', 'Points'], rows)}`;
 }
@@ -112,8 +112,7 @@ function growth(gt: number, perRound: number, stage: number) {
   return Math.ceil((stage * gt) / perRound);
 }
 
-// Every way to make points, with what it pays in full (dragons: cost plus
-// the livestock eaten while growing, from egg, without a hatchery).
+// Every way to make points that can be bought, with what it pays.
 type PointSource = { name: string; pays: Bundle; shown: string; points: number; ready: string };
 function pointSources(): PointSource[] {
   const out: PointSource[] = [];
@@ -125,39 +124,18 @@ function pointSources(): PointSource[] {
   for (const a of Object.values(ACTIONS).filter((a) => a.effect === 'hidden_point')) {
     out.push({ name: `${a.name} (action card)`, pays: a.cost, shown: cost(a.cost), points: 1, ready: 'now, uses a hand slot' });
   }
-  const seen = new Set<string>();
-  const fed = (c: Bundle, rounds: number): Bundle => ({ ...c, livestock: (c.livestock ?? 0) + rounds * TUNING.livestockPerDragon });
-  for (const d of Object.values(DRAGONS)) {
-    const sig = `${cost(d.cost)}/${d.growthTime}`;
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    const label = d.base ? 'Base dragon' : `${Object.values(DRAGONS).filter((x) => !x.base && `${cost(x.cost)}/${x.growthTime}` === sig).map((x) => x.name).join(', ')}`;
-    for (const stage of [1, 2, 3]) {
-      const rounds = growth(d.growthTime, 1, stage);
-      out.push({ name: `${label}, ${STAGE_NAMES[stage]}`, pays: fed(d.cost, rounds), shown: `${cost(d.cost)} + ${rounds} livestock`, points: TUNING.dragonPointsByStage[stage], ready: rounds === 1 ? '1 round' : `${rounds} rounds` });
-    }
-  }
-  const base = Object.values(DRAGONS).find((d) => d.base)!;
-  const r3 = growth(base.growthTime, 1, 3);
-  out.push({ name: 'Base dragon by special project, adult', pays: fed(specialProjectCost(base.cost), r3), shown: `${cost(specialProjectCost(base.cost))} + ${r3} livestock`, points: TUNING.dragonPointsByStage[3], ready: `${r3} rounds` });
   return out;
 }
 
 function points(): string {
   const rows = pointSources().map((s) => [s.name, s.shown, s.points, perPoint(s.pays, s.points), s.ready]);
-  const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus);
-  const base = Object.values(DRAGONS).find((d) => d.base)!;
-  const r3 = growth(base.growthTime, 1, 3);
-  const hatcheryNote = hatchery
-    ? `\n\nWith a ${hatchery.name} (+${hatchery.growthBonus} growth a round), a growth-time-${base.growthTime} dragon reaches adult in ${growth(base.growthTime, 1 + hatchery.growthBonus!, 3)} rounds instead of ${r3}.`
-    : '';
   return `## Points
 
-Every way to make points. Dragon costs include the livestock eaten while growing, from egg, without a hatchery; an adult keeps eating ${TUNING.livestockPerDragon} livestock a round. Neighbour-counting monuments are shown at 2 neighbours.
+Every way to buy points. Neighbour-counting monuments are shown at 2 neighbours. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts).
 
-${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}${hatcheryNote}
+${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
-Titles: ${TUNING.titlePoints} points each, for most dragon points (at least ${TUNING.titleMinimum.army}), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
+Titles: ${TUNING.titlePoints} points each, for most combat power across your dragons (at least ${TUNING.titleMinimum.army}; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
 }
 
 function dragons(): string {

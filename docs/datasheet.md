@@ -6,7 +6,7 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 - Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
-- Win at 20 points. Titles are 2 points each, from a minimum (see Points).
+- Win at 20 points. Titles are 3 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
 - Gold: no basic building makes it. It comes from raids, Markets, Trade Charters, clearing fauna, and the bank.
 - Bank: 4:1, 3:1 with a Port.
@@ -77,7 +77,7 @@ There are 2 decks, and these tables are all of each one: every card in it, its c
 
 ## Costs
 
-Everything that can be bought, as the game has it. Deck is the deck its cards are in (see Decks); a kind isn't a deck, and dragons are in the action deck. Basic buildings have no copies and are in no deck: anyone may build them, no card needed. Dragon points are hatchling / young / adult.
+Everything that can be bought, as the game has it. Deck is the deck its cards are in (see Decks); a kind isn't a deck, and dragons are in the action deck. Basic buildings have no copies and are in no deck: anyone may build them, no card needed. Dragons are worth no points; they count toward Strongest Dragon Army (see Points).
 
 | Name | Kind | Deck | Copies | Cost | Does | Points |
 |---|---|---|---|---|---|---|
@@ -116,21 +116,21 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Secret Hoard | action card | action | 8 | nothing | Worth 1 point while in your hand. | 1 |
 | Wolf Call | action card | action | 8 | 1 crystal | Place a Cave Bear on any land hex with no tower or beast. | — |
 | Rouse the Bear | action card | action | 4 | 1 crystal | Place a Basilisk on any land hex with no tower or beast. | — |
-| Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Ice Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Lightning Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Air Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Water Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Ember Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | fire, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Cinder Drake | dragon card | action | 2 | 8 crystal, 4 livestock | fire, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Frost Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | ice, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Rime Drake | dragon card | action | 2 | 8 crystal, 4 livestock | ice, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Storm Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | lightning, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Bolt Drake | dragon card | action | 2 | 8 crystal, 4 livestock | lightning, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Sky Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | air, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Zephyr Drake | dragon card | action | 2 | 8 crystal, 4 livestock | air, grows a stage every 2 rounds | 1 / 2 / 3 |
-| Abyss Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | water, grows a stage every 3 rounds | 1 / 2 / 3 |
-| Reef Drake | dragon card | action | 2 | 8 crystal, 4 livestock | water, grows a stage every 2 rounds | 1 / 2 / 3 |
+| Fire Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
+| Ice Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | ice, grows a stage every 2 rounds | — |
+| Lightning Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | lightning, grows a stage every 2 rounds | — |
+| Air Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | air, grows a stage every 2 rounds | — |
+| Water Dragon | base dragon | action | 2 | 6 crystal, 4 livestock | water, grows a stage every 2 rounds | — |
+| Ember Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | fire, grows a stage every 3 rounds | — |
+| Cinder Drake | dragon card | action | 2 | 8 crystal, 4 livestock | fire, grows a stage every 2 rounds | — |
+| Frost Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | ice, grows a stage every 3 rounds | — |
+| Rime Drake | dragon card | action | 2 | 8 crystal, 4 livestock | ice, grows a stage every 2 rounds | — |
+| Storm Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | lightning, grows a stage every 3 rounds | — |
+| Bolt Drake | dragon card | action | 2 | 8 crystal, 4 livestock | lightning, grows a stage every 2 rounds | — |
+| Sky Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | air, grows a stage every 3 rounds | — |
+| Zephyr Drake | dragon card | action | 2 | 8 crystal, 4 livestock | air, grows a stage every 2 rounds | — |
+| Abyss Wyrm | dragon card | action | 2 | 8 crystal, 4 livestock, 2 gold | water, grows a stage every 3 rounds | — |
+| Reef Drake | dragon card | action | 2 | 8 crystal, 4 livestock | water, grows a stage every 2 rounds | — |
 
 ## Basic production buildings
 
@@ -183,7 +183,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 ## Points
 
-Every way to make points. Dragon costs include the livestock eaten while growing, from egg, without a hatchery; an adult keeps eating 1 livestock a round. Neighbour-counting monuments are shown at 2 neighbours.
+Every way to buy points. Neighbour-counting monuments are shown at 2 neighbours. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts).
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
@@ -192,20 +192,8 @@ Every way to make points. Dragon costs include the livestock eaten while growing
 | Lighthouse, 2 neighbours | 10 stone, 6 timber, 20 gold | 2 | 5 stone, 3 timber, 10 gold | now |
 | Guildhall, 2 neighbours | 6 stone, 6 timber, 20 gold | 2 | 3 stone, 3 timber, 10 gold | now |
 | Secret Hoard (action card) | nothing | 1 | nothing | now, uses a hand slot |
-| Base dragon, hatchling | 6 crystal, 4 livestock + 2 livestock | 1 | 6 crystal, 6 livestock | 2 rounds |
-| Base dragon, young | 6 crystal, 4 livestock + 4 livestock | 2 | 3 crystal, 4 livestock | 4 rounds |
-| Base dragon, adult | 6 crystal, 4 livestock + 6 livestock | 3 | 2 crystal, 3.3 livestock | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, hatchling | 8 crystal, 4 livestock, 2 gold + 3 livestock | 1 | 8 crystal, 7 livestock, 2 gold | 3 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, young | 8 crystal, 4 livestock, 2 gold + 6 livestock | 2 | 4 crystal, 5 livestock, 1 gold | 6 rounds |
-| Ember Wyrm, Frost Wyrm, Storm Wyrm, Sky Wyrm, Abyss Wyrm, adult | 8 crystal, 4 livestock, 2 gold + 9 livestock | 3 | 2.7 crystal, 4.3 livestock, 0.7 gold | 9 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, hatchling | 8 crystal, 4 livestock + 2 livestock | 1 | 8 crystal, 6 livestock | 2 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, young | 8 crystal, 4 livestock + 4 livestock | 2 | 4 crystal, 4 livestock | 4 rounds |
-| Cinder Drake, Rime Drake, Bolt Drake, Zephyr Drake, Reef Drake, adult | 8 crystal, 4 livestock + 6 livestock | 3 | 2.7 crystal, 3.3 livestock | 6 rounds |
-| Base dragon by special project, adult | 12 crystal, 8 livestock + 6 livestock | 3 | 4 crystal, 4.7 livestock | 6 rounds |
 
-With a Hatchery (+1 growth a round), a growth-time-2 dragon reaches adult in 3 rounds instead of 6.
-
-Titles: 2 points each, for most dragon points (at least 10), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
+Titles: 3 points each, for most combat power across your dragons (at least 55; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least 4) and most gold (at least 20). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.
 
 ## Dragons
 
