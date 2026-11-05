@@ -339,7 +339,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
-      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the bank', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
+      { file: 'phone-trade-bank-3p', caption: 'Phone: the trade tab on your turn: an offer to a player, and the merchants', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]'], sizes: true },
       { file: 'phone-hand-raised-3p', caption: "Phone: the tucked hand tapped on someone else's turn, raised to look at", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]'] },
       { file: 'phone-card-out-of-turn-3p', caption: "Phone: a card tapped open on someone else's turn", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-raisehand]', '[data-card]'] },
       { file: 'phone-trade-out-of-turn-3p', caption: "Phone: the trade tab on someone else's turn (only the acting player can be offered)", client: 'phone', seat: (g!.turn + 1) % 3, clicks: ['[data-tab=trade]'] },
@@ -396,7 +396,7 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       return [
         { file: 'tv-port-4p', caption: 'TV: a port on the coast, facing the sea', client: 'tv' },
-        { file: 'phone-bank-port', caption: 'Phone: the bank with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+        { file: 'phone-bank-port', caption: 'Phone: the merchants with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
   },
@@ -885,7 +885,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
         { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: what it makes now and with it, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
-        { ...me, file: 'phone-bank-picks', caption: 'Phone: the bank, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
+        { ...me, file: 'phone-bank-picks', caption: 'Phone: the merchants, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
     },
   },

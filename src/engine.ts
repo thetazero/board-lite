@@ -335,8 +335,8 @@ export function dragonCapacity(g: Game, p: number): number {
   return cap;
 }
 
-// What you give the bank for 1 of another resource, per resource you give:
-// 4, or a port's rate for its own resource. The bank trades basic resources
+// What you give the merchants for 1 of another resource, per resource you give:
+// 4, or a port's rate for its own resource. The merchants trade basic resources
 // only, never gold (#279).
 export function bankRates(g: Game, p: number): Record<BasicResource, number> {
   const rates = Object.fromEntries(BASIC_RESOURCES.map((r) => [r, TUNING.bankRate])) as Record<BasicResource, number>;
@@ -1183,16 +1183,17 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       log(g, `${pname(p)} ends their turn.`, { k: 'end', p });
       return endTurn(g);
     }
-    case 'bank': {
+    case 'merchants':
+    case 'bank': { // "bank" is the old name, still accepted
       const give = parseResource(args[0]), get = parseResource(args[1]);
       const times = args[2] ? Number(args[2]) : 1;
-      if (give === 'gold' || get === 'gold') fail(`The bank doesn't trade gold.`);
+      if (give === 'gold' || get === 'gold') fail(`The merchants don't trade gold.`);
       if (give === get) fail(`Trade two different resources.`);
       if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
       const rate = bankRates(g, p)[give as BasicResource];
       pay(pl, { [give]: rate * times });
       gain(pl, { [get]: times });
-      return log(g, `${pname(p)} trades ${rate * times} ${give} to the bank for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
+      return log(g, `${pname(p)} trades ${rate * times} ${give} to the merchants for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
     }
     case 'build': {
       // A basic building by name, or a building card from hand.
@@ -1337,7 +1338,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
     }
   }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, bank, offer, accept, decline, cancel, end.`);
+  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, merchants, offer, accept, decline, cancel, end.`);
 }
 
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {

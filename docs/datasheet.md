@@ -8,8 +8,8 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 30 points. Titles are 6 points each, from a minimum (see Points).
 - Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
-- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The bank doesn't trade it.
-- Bank: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
+- Gold: no basic building makes it. It comes from raids, Markets, Trade Charters and clearing fauna. The merchants don't trade it.
+- Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 
@@ -102,10 +102,10 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Drovers' Barn | building card | building | 2 | 2 stone, 3 timber, 3 crystal | Makes 1 livestock each round for each adjacent livestock building; worth 1 point. | 1 |
 | Fishery | building card | building | 1 | 3 stone, 4 timber, 3 crystal | Makes 1 livestock each round for each adjacent ocean hex; worth 1 point. | 1 |
 | Hatchery | building card | building | 2 | 6 stone, 6 timber, 6 crystal | Your dragons grow 1 extra step each round. | — |
-| Stone Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade stone with the bank at 2:1. | — |
-| Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the bank at 2:1. | — |
-| Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the bank at 2:1. | — |
-| Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the bank at 2:1. | — |
+| Stone Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade stone with the merchants at 2:1. | — |
+| Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the merchants at 2:1. | — |
+| Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the merchants at 2:1. | — |
+| Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the merchants at 2:1. | — |
 | Market | building card | building | 2 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each adjacent trade building. | — |
 | Monument | building card | building | 2 | 6 stone, 5 timber | Worth 2 points. Build adjacent to a monument. | 2 |
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |

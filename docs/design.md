@@ -130,7 +130,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Lots of variety: "I want lots of fun variety."
   - Variety within classes: "there can be lots of different buildings but they can still be classes like "quary" which is upgraded by any quarry upgrade."
   - Drawing: "draw two keep 1 is the correct direction".
-- Building classes so far: one per resource (stone, timber, crystal and livestock buildings, each holding its basic building: quarry, lumber camp, crystal mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (ports: 2:1 at the bank for one basic resource each; market). No defense buildings (see Raids).
+- Building classes so far: one per resource (stone, timber, crystal and livestock buildings, each holding its basic building: quarry, lumber camp, crystal mine, pasture), dragon buildings (roost, hatchery), monuments (tower floors and other point buildings), trade buildings (ports: 2:1 with the merchants for one basic resource each; market). No defense buildings (see Raids).
 
 ### Special projects
 
@@ -211,7 +211,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 ## Trading
 
 - Players trade with each other (resources and cards).
-- Bank trades at 4:1, like Catan. A port trades one basic resource at 2:1: a Stone, Timber, Crystal and Livestock Port, one card each, built on a harbor (#277). They replaced the generic 3:1 Port so players get good at turning one resource into others and have a reason to buy it from the table. The owner: "sure we can replace the generic 3:1 with specifics"; no gold port, "gold is not a basic resource".
+- The merchants ("the bank" before #286) trade at 4:1, like Catan. A port trades one basic resource at 2:1: a Stone, Timber, Crystal and Livestock Port, one card each, built on a harbor (#277). They replaced the generic 3:1 Port so players get good at turning one resource into others and have a reason to buy it from the table. The owner: "sure we can replace the generic 3:1 with specifics"; no gold port, "gold is not a basic resource".
 - Trades between players are binding once confirmed.
 
 ## Map generation
@@ -256,7 +256,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.
 - Raid votes are public as they're cast, and every player votes. (Changed in #238 from secret until everyone had voted.) A player with no raid-ready dragon skips the commit step.
 - Combat power is √(health × average damage a combat round), rounded; a side's is the sum (Lanchester's square law makes these add). Loot is split in proportion to it, rounded down per player, and the remainder goes to the player with the most power standing. Loot grows with the square of a kingdom's power. (#65)
-- The bank doesn't trade gold, either way (#279). The owner: "Just remove gold from bank trades pls". Gold comes only from raids, Markets, Trade Charters and clearing fauna, so what it buys (tower floors, Markets, Trade Charters, wyrms, Growth Elixir, Largest Hoard) can't be bought with ordinary resources. (Changed from selling gold at the normal rate.)
+- The merchants don't trade gold, either way (#279). The owner: "Just remove gold from bank trades pls". Gold comes only from raids, Markets, Trade Charters and clearing fauna, so what it buys (tower floors, Markets, Trade Charters, wyrms, Growth Elixir, Largest Hoard) can't be bought with ordinary resources. (Changed from selling gold at the normal rate.)
 - Titles go to the single leader once they reach a minimum (in `src/data.ts`); the holder keeps one on a tie.
 - Resource counts are hidden; hand sizes are public. A card offered in a trade is shown to everyone.
 - Trade offers expire at the end of the acting player's turn, but the acting player must answer (accept or decline) every offer made to them before ending it.

@@ -284,7 +284,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       const what = ev.gain ? gainChips(ev.gain, 1.2) : ev.d ? dragon(ev.d) : ev.raids ? `: ${ev.raids} extra raid${ev.raids === 1 ? '' : 's'} this round` : ev.fauna ? `${icon(ev.fauna, 1.5)}${on ? `<span class="arrow">➜</span>${buildingChip(on.type, on.owner, null, 26, on.cls)}` : ''}` : '';
       return `${who(ev.p)} plays <span class="evcard">${esc(ev.name)}</span> ${what}`;
     }
-    case 'bank': return `${who(ev.p)} trades ${res(ev.give)} to the bank for ${res(ev.get)}`;
+    case 'bank': return `${who(ev.p)} trades ${res(ev.give)} to the merchants for ${res(ev.get)}`;
     case 'trade': return `${who(ev.from)} gives <b>${iconText(esc(ev.give))}</b> to ${who(ev.to)} for <b>${iconText(esc(ev.get))}</b>`;
     case 'decline': return `${who(ev.p)} <span class="no">declines</span> ${whose(ev.from)} offer`;
     case 'title': {

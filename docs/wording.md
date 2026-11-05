@@ -32,7 +32,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 
 | Say | Not | Meaning |
 |---|---|---|
-| **gain** | get, receive, take (from the supply) | You get resources from the supply or the bank. "take" is for loot and titles ("Ada takes Tallest Tower") |
+| **gain** | get, receive, take (from the supply) | You get resources from the supply or the merchants. "take" is for loot and titles ("Ada takes Tallest Tower") |
 | **make** (a building) | produce, yield, give | What a building brings in each round: "Makes 1d6 stone each round." (The phase is still called **production**.) |
 | **each round** | a round, per round, every round | How often |
 | **adjacent** | neighbouring, next to, touching | Hexes sharing an edge. The rules' word for what building cards count |
@@ -49,6 +49,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **falls** / **holds** | is defeated, wins, survives | A kingdom's or a beast's fate after a fight |
 | **bail** | flee, retreat, leave | Pulling out of a raid before the fight |
 | **no one** | nobody | No player |
+| **the merchants** | the bank, the market | Who you trade resources with at a fixed rate (4:1, or a port's 2:1). "Market" is a building, so it isn't this |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
 | **empty** (hex) | open, free | A land hex with no building and no beast |
 | **beats** / **weak to** (an element) | ×2, strong against, resists, counters | The element wheel: an element that beats what it hits deals double damage. Anything hit (a dragon, defender or beast) is weak to the element that beats its own: "Ice beats air", "Weak to ice" |
