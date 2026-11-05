@@ -318,15 +318,20 @@ q::after { content: close-quote; }
 .voters { display: flex; flex-wrap: wrap; gap: .3em; margin-top: .5em; }
 .voters .ptag { background: var(--pc); color: #111 !important; font-weight: 800; padding: .1em .55em; border-radius: 1em; }
 .target .voters { font-size: 1.5em; }
-.candidates.vote { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 26em)); gap: 1.4em; }
-.cand { display: flex; flex-direction: column; align-items: flex-start; gap: .4em; min-width: 0; padding: 1em 1.4em; }
-.cand h2 { margin: 0; font-size: 2em; }
+.candidates.vote { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 21em)); gap: 1.6em 2em; }
+.cand { display: flex; flex-direction: column; align-items: flex-start; gap: .5em; min-width: 0; padding: .9em 1.3em 1em; }
+.cand h2 { margin: 0; font-size: 1.9em; line-height: 1.1; }
+.cand-fight { display: flex; align-items: center; gap: .3em 1.2em; flex-wrap: wrap; }
+.pshield { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; flex: none; }
+.pshield svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pshield b { position: relative; font-size: .36em; font-weight: 900; color: #fff; margin-top: -.15em; text-shadow: 0 .05em .1em #0006; }
 .cand.lead, .choice.lead { outline: .25em solid var(--accent); outline-offset: .2em; }
-.cand > .stat.power.big { font-size: 2.2em; margin: 0; }
-.foeicons { display: flex; flex-wrap: wrap; gap: .2em 1em; align-items: center; }
+.foeicons { display: flex; flex-wrap: wrap; gap: .2em .9em; align-items: center; }
 .foeicon { display: inline-flex; align-items: center; gap: .15em; }
-.foeicon b { font-size: 1.6em; font-weight: 900; }
-.cand .loot { font-size: 1.5em; margin-top: 0; }
+.foeicon b { font-size: 1.5em; font-weight: 900; }
+.cand .loot { font-size: 1.4em; margin-top: 0; gap: .1em .2em; }
+.cand .loot .chip { margin-right: .5em; }
+.cand .loot .loot-label { margin-right: .4em; }
 .cand .voters { margin-top: auto; padding-top: .3em; }
 .weak { color: var(--good); }
 .loot { margin-top: .5em; font-size: 1.2em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .3em; }
@@ -812,9 +817,9 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .target { min-width: 0; width: 100%; padding: .6em .8em; }
 .remote .target h2 { font-size: 1.25em; }
 .remote .target .foes { font-size: 1em; }
-.remote .candidates.vote { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8em; width: 100%; }
-.remote .cand { padding: .7em .8em; font-size: .75em; }
-.remote .cand .foeicons { font-size: .8em; }
+.remote .candidates.vote { grid-template-columns: repeat(auto-fill, minmax(min(100%, 19em), 1fr)); gap: .8em; width: 100%; }
+.remote .cand { padding: .7em .9em; font-size: .78em; }
+.remote .cand h2 { font-size: 1.9em; }
 .remote .target .loot { font-size: 1.15em; }
 .remote .target .num { font-size: 1.1em; }
 .remote .status { font-size: 1.1em; }
@@ -860,3 +865,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 @keyframes handout { to { translate: 0 3em; opacity: 0; } }
 /* The phone's open panels come in rather than appear. */
 .pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }
+/* The table view's vote: loot down the right, so a wide card isn't half empty. */
+.remote .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "voters voters"; align-items: center; gap: .3em .8em; }
+.remote .cand h2 { grid-area: name; }
+.remote .cand .cand-fight { grid-area: fight; flex-wrap: nowrap; }
+.remote .cand .loot { grid-area: loot; justify-self: end; flex-direction: column; align-items: flex-end; gap: .1em; }
+.remote .cand .loot .chip { margin-right: 0; }
+.remote .cand .voters { grid-area: voters; }

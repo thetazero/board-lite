@@ -8,7 +8,7 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, foeStack, lootLine, gainChips, hpBar, hpFill, powerTag,
   icon, iconText, mapSvg, named, playerTag, post, resChips, standingsHtml, tiebreakNote, unitIcon, watch,
-  fadeAway, foeIcons, leadsVote, voters,
+  fadeAway, foeIcons, leadsVote, powerShield, voters,
 } from './common.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
@@ -329,7 +329,8 @@ function targetCard(t: TargetView): string {
 // its name, combat power, defenders as pictures, loot, and who has
 // voted for it, outlined while it leads. Each defender's stats wait for the commit step's card.
 function candidateCard(t: TargetView, i: number, votes: (number | null)[], n: number): string {
-  return `<div class="target cand${leadsVote(votes, i, n) ? ' lead' : ''}"><h2>${esc(t.name)}</h2>${powerTag(t.power, 'big')}${foeIcons(t.units, 3.2)}${lootLine(t.loot, 1.8)}${voters(votes, i, names)}</div>`;
+  return `<div class="target cand${leadsVote(votes, i, n) ? ' lead' : ''}"><h2>${esc(t.name)}</h2>
+    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, i, names)}</div>`;
 }
 
 function check(done: boolean): string {

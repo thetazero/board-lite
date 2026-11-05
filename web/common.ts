@@ -319,6 +319,11 @@ export function powerTag(n: number, cls = '', label = 'Power'): string {
   return `<span class="stat power ${cls}" title="combat power">${label} <b>${n}</b></span>`;
 }
 
+// Combat power drawn: the number on a shield, for where it has to read from across the room.
+export function powerShield(n: number, size = 3): string {
+  return `<span class="pshield" style="font-size:${size}em" title="combat power">${icon('shield', 1)}<b>${n}</b></span>`;
+}
+
 // A stat said in words: "Health 10", "Attack 1d6".
 export function statTag(label: string, value: string | number): string {
   return `<span class="stat">${label} <b>${value}</b></span>`;
