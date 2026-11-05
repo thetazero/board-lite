@@ -48,6 +48,10 @@ let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
 let wheelOpen = false; // the element wheel's sheet, from the wheel by your points, is open
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
+// The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
+// A new screen tucks it again, if no card can be played there either.
+let handUp: string | null = null;
+let screenKey = ''; // the key of the screen shown now
 // Cards arriving in the hand fly in: the ids already seen, and when each new one lands.
 // Null until the hand is first shown, so reloading mid-game doesn't deal it again.
 let seenHand: Set<string> | null = null;
@@ -274,7 +278,7 @@ function offerNotice(text: string) {
 }
 
 function renderWatch(me: Me) {
-  document.body.classList.remove('has-hand', 'raiding', 'hand-below');
+  document.body.classList.remove('has-hand', 'hand-tucked', 'hand-below');
   morph(app, screen('watch', `<div class="watchtv" style="--pc:${PLAYER_COLORS[me.seat]}"><span class="pname">${esc(me.name)}</span><h1>${snap?.lobby.remote ? 'Watch the table' : 'Watch the TV'}</h1></div>`));
 }
 
@@ -305,7 +309,7 @@ function leaveToJoin(msg: string) {
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
-  document.body.classList.remove('has-hand', 'hand-below', 'raiding');
+  document.body.classList.remove('has-hand', 'hand-below', 'hand-tucked');
   document.body.style.removeProperty('--hs');
   renderJoin('', undefined, msg);
 }
@@ -632,17 +636,27 @@ function render() {
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
   const zoom = open ? cardZoom(open, me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding) : dragonOpen ? dragonZoom(g, dragonOpen) : '';
-  // The hand is held along the bottom edge whenever cards matter: your turn, others' turns, discarding.
-  const dock = !choosing && g.phase !== 'over' ? handFan(me, me.myTurn && g.phase === 'action', g.phase === 'discard' && me.deciding, tradeOpen(g, me)) : '';
-  document.body.classList.toggle('has-hand', !!dock);
-  document.body.classList.toggle('raiding', g.phase === 'raid');
   // Picking a hex is always on your turn: the ribbon saying so gives the map its room.
   const key = picking ? `pick ${picking.title}` : choosing ? 'hunt' : g.phase === 'over' ? 'over'
     : g.phase === 'raid' ? `raid ${g.round} ${g.raidsLeft} ${g.raid?.step}` : g.phase === 'action' ? `action ${me.myTurn}` : `${g.phase} ${me.deciding} ${me.choice.length > 0}`;
+  // The hand is held along the bottom edge when its cards can be used: played on your
+  // turn, discarded, offered in a trade. Otherwise (others' turns, the raid, keeping a
+  // card) it's tucked down, only the tops of the cards showing: tap it to raise it.
+  const playable = me.myTurn && g.phase === 'action';
+  const discarding = g.phase === 'discard' && me.deciding;
+  const offering = tradeOpen(g, me);
+  screenKey = key;
+  const tucked = !playable && !discarding && !offering && handUp !== key;
+  const dock = !choosing && g.phase !== 'over' ? handFan(me, playable, discarding, offering, tucked) : '';
+  document.body.classList.toggle('has-hand', !!dock);
+  document.body.classList.toggle('hand-tucked', !!dock && tucked && me.hand.length > 0);
   morph(app, g.phase === 'over' && !picking ? screen(key, body) : `${header(g, me)}${screen(key, `${picking ? '' : status(g, me)}<main class="pbody">${den}${body}</main>`)}${dock}${zoom}${menu ? menuSheet() : wheelOpen ? wheelSheet(g) : ''}`);
   fitHand();
   fitMap(g);
   wire(g, me);
+  // A raised hand no card can be played from goes back down at a tap on the page above it.
+  const scr = app.querySelector<HTMLElement>('.screen');
+  if (scr) scr.onpointerdown = dock && !tucked && handUp === key && !playable && !discarding && !offering ? () => { handUp = null; render(); } : null;
 }
 
 // What the phone is asking or showing, as one screen: a new one (your turn,
@@ -670,8 +684,13 @@ function fitHand() {
   document.body.classList.remove('hand-below');
   if (!fan || !main) return document.body.style.removeProperty('--hs');
   const em = parseFloat(getComputedStyle(document.body).fontSize);
+  const top0 = main.getBoundingClientRect().bottom + scrollY;
+  if (fan.classList.contains('tucked')) { // only its tops showing: it never grows, and goes after a long page too
+    document.body.style.removeProperty('--hs');
+    return document.body.classList.toggle('hand-below', innerHeight - top0 - 3.9 * em - 3.6 * em < 0);
+  }
   const width = Math.min(innerWidth, 34 * em);
-  const top = main.getBoundingClientRect().bottom + scrollY; // where the page's content ends
+  const top = top0; // where the page's content ends
   const room = innerHeight - top - 3.9 * em - 0.6 * em; // down to the talk bar, a little air above the cards
   const byHeight = room / (9.4 * em);
   const byWidth = (0.42 * width) / (6.6 * 0.78 * em);
@@ -835,7 +854,8 @@ function dragonZoom(g: PublicState, d: DragonView): string {
 
 // The hand, held like real cards: fanned along the bottom edge of the screen,
 // overlapping when there are many. On your turn the cards you can play now glow.
-function handFan(me: Me, playable: boolean, discarding: boolean, offering = false): string {
+// Tucked, it sits low with only the tops of the cards showing, and a tap raises it.
+function handFan(me: Me, playable: boolean, discarding: boolean, offering = false, tucked = false): string {
   const n = me.hand.length;
   if (!n) return '<div class="handfan empty" id="hand"></div>';
   const mid = (n - 1) / 2;
@@ -847,7 +867,7 @@ function handFan(me: Me, playable: boolean, discarding: boolean, offering = fals
     const pos = `--x:${n > 1 ? d / mid : 0};--r:${(d * tilt).toFixed(1)}deg;--y:${(Math.abs(d) * Math.abs(d) * tilt * 0.22).toFixed(1)}px;z-index:${i + 1}`;
     return cardFace(c, me, playable, `${pos}${gripStyle(c.id)}`, `${ready && !offering ? ' ready' : ''}${offering && trade.cards.has(c.id) ? ' offered' : ''}${c.name.length >= 10 ? ' longname' : ''}${gripClass(c.id)}`);
   }).join('');
-  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}" id="hand" data-leave="down" style="--n:${n}">${cards}</div>`;
+  return `<div class="handfan${discarding ? ' discarding' : ''}${offering ? ' offering' : ''}${tucked ? ' tucked' : ''}" id="hand" data-leave="down" style="--n:${n}"${tucked ? ' data-raisehand role="button" aria-label="Show your hand"' : ''}>${cards}</div>`;
 }
 
 // One of your dragons as an option to tap, the same on every screen that
@@ -1349,7 +1369,11 @@ function wire(g: PublicState, me: Me) {
     if (performance.now() < swallowClick) return; // the end of a slide or a hold, not a tap
     tapCard(g, me, el.dataset.card!);
   });
-  app.querySelectorAll<HTMLElement>('.handfan [data-card]').forEach((el) => {
+  bind('[data-raisehand]', () => {
+    handUp = screenKey;
+    render();
+  });
+  app.querySelectorAll<HTMLElement>('.handfan:not(.tucked) [data-card]').forEach((el) => {
     el.onpointerdown = (e) => grab(e, el);
     el.oncontextmenu = (e) => e.preventDefault(); // holding a card opens it, not the browser's menu
   });
