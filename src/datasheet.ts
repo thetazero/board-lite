@@ -159,7 +159,7 @@ function healing(): string {
   const base = Object.keys(DRAGONS).find((k) => DRAGONS[k].base)!;
   const ko = [1, 2, 3].map((st) => `${STAGE_NAMES[st]} ${roundsOut(DRAGONS[base].stages[st - 1].hp)}`).join(', ');
   const big = Object.values(DRAGONS).reduce((m, d) => (d.stages[2].hp > m.stages[2].hp ? d : m));
-  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
+  return `Healing: a hurt dragon heals ${TUNING.healPerRound} health at each production it's fed, instead of growing, and sits out every round's raids until it is whole, so it misses one raid round per ${TUNING.healPerRound} damage, rounded up. Knocked out (0 health), a base dragon is out: ${ko} rounds; the ${big.name}, the toughest adult, ${roundsOut(big.stages[2].hp)}.`;
 }
 
 function raids(): string {
@@ -180,7 +180,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down, and what's left over goes to the player with the most power).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and the earlier seat on a tie, carrying on from one resource to the next).
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot'], targetRows)}
 

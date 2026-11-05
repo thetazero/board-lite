@@ -184,7 +184,7 @@ function doing(g: PublicState, p: number): string {
   if (bannerUp || !g.waitingOn.includes(p)) return ''; // during a scene, everyone watches
   if (g.phase === 'action') return g.turn === p ? 'Taking a turn' : 'Answering an offer';
   if (g.phase === 'discard') return 'Discarding';
-  if (g.phase === 'cards') return 'Keeping a card';
+  // The card step shows nothing: everyone keeps a card at once, and the phone asks (#229).
   if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'Voting' : g.raid?.step === 'commit' ? 'Sending dragons' : 'Fighting or bailing';
   return '';
 }

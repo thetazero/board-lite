@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playOut } from '../src/bot.ts';
-import { RuleError, apply, backInRound, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, backInRound, splitLoot, bankRate, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -346,7 +346,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.equal(g.raid!.step, 'vote');
 });
 
-test('a dragon hurt in a raid heals and grows but sits out the next raid', () => {
+test('a dragon hurt in a raid heals instead of growing and sits out the next raid', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
   a.damage = 3; // hurt in this round's raid
@@ -358,13 +358,13 @@ test('a dragon hurt in a raid heals and grows but sits out the next raid', () =>
   assert.equal(g.round, 2);
   assert.equal(a.damage, 0);
   assert.equal(a.resting, 'hurt');
-  assert.ok(a.growth + a.stage * 10 > ga, 'a hurt dragon still grows');
+  assert.equal(a.growth + a.stage * 10, ga, 'a hurt dragon does not grow while it heals');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
   assert.throws(() => apply(g, a.owner, `commit ${a.id}`), RuleError);
 });
 
-test('a hungry dragon neither grows nor raids', () => {
+test('a hungry dragon neither heals, grows nor raids', () => {
   const g = newGame(2, 7);
   hatchAll(g);
   const a = g.dragons[0];
@@ -373,10 +373,12 @@ test('a hungry dragon neither grows nor raids', () => {
   // Dragons eat in hatching order: one hatched earlier eats the tower's only livestock.
   g.dragons.unshift({ ...a, id: 'd99' });
   g.players[a.owner].resources.livestock = 0;
+  a.damage = 3;
   while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(a.resting, 'hungry');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
+  assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
 
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
@@ -496,7 +498,7 @@ test('a hurt dragon heals a little each production and sits out until it is whol
   assert.ok(canRaid(a), `back in round ${g.round}`);
 });
 
-test('raid loot is split by the combat power still fighting at the end, the rest to the strongest', () => {
+test('raid loot is split by the combat power still fighting at the end', () => {
   let shared = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
@@ -525,20 +527,42 @@ test('raid loot is split by the combat power still fighting at the end, the rest
     assert.equal(loot.gold, TARGETS.archers_hold.loot.gold! + hoard.archers_hold);
     // The kingdom that fell is back to its printed loot; every other one adds 1 gold.
     for (const t of Object.keys(TARGETS)) assert.equal(g.hoard[t], t === 'archers_hold' ? 0 : hoard[t] + 1, t);
-    const total = end.power.reduce((s, x) => s + x, 0);
-    const top = end.winners[end.power.indexOf(Math.max(...end.power))];
+    const power = g.players.map((_, p) => { const i = end.winners.indexOf(p); return i < 0 ? 0 : end.power[i]; });
+    const shares = splitLoot(loot, power);
     for (const r of RESOURCES) {
       if (!loot[r]) continue;
       const got: number[] = end.winners.map((p) => g.players[p].resources[r] - before[p][r]);
       assert.equal(got.reduce((s, x) => s + x, 0), loot[r], 'none of the loot is lost');
-      end.winners.forEach((p, i) => {
-        const fair = Math.floor((loot[r]! * end.power[i]) / total);
-        assert.equal(got[i], p === top ? loot[r]! - end.power.reduce((s, x, j) => (j === i ? s : s + Math.floor((loot[r]! * x) / total)), 0) : fair);
-      });
+      end.winners.forEach((p, i) => assert.equal(got[i], shares[p][r] ?? 0));
     }
     if (end.winners.length === 2) shared++;
   }
   assert.ok(shared > 0, 'some raids should be shared');
+});
+
+test('loot left over goes out 1 at a time, strongest first, carrying on across resources', () => {
+  // 3 equal winners, 2 livestock and 2 gold: P1 and P2 take a livestock, P3 and P1 a gold.
+  assert.deepEqual(splitLoot({ livestock: 2, gold: 2 }, [5, 5, 5]), [{ livestock: 1, gold: 1 }, { livestock: 1 }, { gold: 1 }]);
+  // Strongest first, equal powers in seat order; a player not fighting gets nothing.
+  assert.deepEqual(splitLoot({ stone: 1, gold: 1 }, [3, 0, 7, 3]), [{ gold: 1 }, {}, { stone: 1 }, {}]);
+  // Shares in proportion come first, then the leftover: 7 gold at 2:1 is 4 and 2, then 1 to the stronger.
+  assert.deepEqual(splitLoot({ gold: 7 }, [2, 1]), [{ gold: 5 }, { gold: 2 }]);
+});
+
+test('Healing Potion heals a dragon that cleared a hex, which still sits out the raids', () => {
+  const g = newGame(2, 3);
+  keepAll(g);
+  g.dragons = [{ id: 'd1', owner: g.turn, key: 'fire_whelp', stage: 2, growth: 0, damage: 3, resting: 'hunted' }];
+  g.players[g.turn].hand.push({ id: 'cx', deck: 'action', key: 'healing_potion' });
+  apply(g, g.turn, 'play cx d1');
+  assert.equal(g.dragons[0].damage, 0);
+  assert.equal(canRaid(g.dragons[0]), false, 'it cleared a hex, so it sits out this round');
+});
+
+test('discard is refused outside the end of the round', () => {
+  const g = newGame(2, 3);
+  keepAll(g);
+  assert.throws(() => apply(g, g.turn, 'discard c1'), /end of the round/);
 });
 
 test('combat power: dragons and kingdoms carry one number, and a side adds up', () => {
@@ -700,16 +724,16 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
   apply(g, 0, 'end');
-  const card = { id: 'c999', deck: 'action' as const, key: 'wolf_call' };
+  const card = { id: 'c999', deck: 'action' as const, key: 'rouse_bear' };
   g.players[1].hand.push(card);
   assert.throws(() => apply(g, 1, `play c999 ${g.towers[0]}`), RuleError);
   const ocean = Object.keys(g.map).find((k) => g.map[k].terrain === 'ocean')!;
   assert.throws(() => apply(g, 1, `play c999 ${ocean}`), RuleError);
   const crystal = g.players[1].resources.crystal;
   apply(g, 1, `play c999 ${near}`);
-  assert.equal(g.map[near].fauna, ACTIONS.wolf_call.fauna);
+  assert.equal(g.map[near].fauna, ACTIONS.rouse_bear.fauna);
   assert.equal(g.map[near].sent, true);
-  assert.equal(g.players[1].resources.crystal, crystal - ACTIONS.wolf_call.cost.crystal!);
+  assert.equal(g.players[1].resources.crystal, crystal - ACTIONS.rouse_bear.cost.crystal!);
   assert.equal(production(g, 0).livestock.dice.length, 0);
   assert.ok(!g.players[1].hand.includes(card));
 });
