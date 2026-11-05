@@ -7,3 +7,5 @@ Before writing or changing any text a player reads (cards, buttons, the TV, the 
 Before changing a rule, read the design principles and complexity budget at the top of `docs/design.md`. A change has to stay within the budget; one that raises a ceiling says why in its PR.
 
 To check a change with screenshots, shoot only the screens it touched: `npm run shots -- --only <name>` (`--list` shows the names). Not `--all` or `--every-size` of everything unless a full audit is asked for; see `docs/clients.md`.
+
+A PR that changes anything a player sees (the TV, the phone, the CLI's view) shows it: screenshots of each changed screen, embedded as images in the PR description, before and after where there was a before. A UI PR without them isn't ready for review.
