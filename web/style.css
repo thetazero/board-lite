@@ -662,6 +662,12 @@ body.phone { font-size: 16px; max-width: 34em; margin: 0 auto; padding-bottom: 2
    most of all, which is a whole card of text). Nothing on it selects but what a
    player types into, and no double-tap zooms. */
 body.phone { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* No pull-to-refresh, and no swipe back to the last page: a tap that drifts
+   down at the top of a page that doesn't scroll reloaded it (#396), and a
+   sideways swipe (through open cards) could leave the game. The page never
+   needs either: it reconnects by itself. The viewport takes this from the
+   root element, so it's set there. */
+:root:has(> body.phone), body.phone { overscroll-behavior: none; }
 body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 /* phone: joining and the lobby, under a strip of the papercraft scene */
 .phone .hero { position: relative; flex: none; height: 11em; overflow: hidden; }
