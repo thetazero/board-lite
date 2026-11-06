@@ -54,14 +54,14 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
 .pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
-.talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
+.fhead, .fightscene .outcome, .fled, .fig-name, .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
 }
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .fhead, .fightscene .outcome, .fled, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .mylog, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .mylog, .fhead, .fightscene .outcome, .fled, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
 .panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .sent, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
@@ -499,43 +499,88 @@ body.recap-page { font-size: 16px; }
 .rd small { font-size: .55em; color: var(--text); white-space: nowrap; }
 .home { display: inline-flex; align-items: center; gap: .4em; font-size: 1.1em; }
 .home.none { font-style: italic; opacity: .55; font-size: .95em; }
-.fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; opacity: .55; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
-.battle { position: relative; }
-.beam { position: absolute; height: .45em; margin-top: -.22em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 40%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .6em var(--bc); z-index: 0; animation: beamin .12s ease-out; transition: opacity .25s; }
+/* A fight, on its own stage (#326, tv.ts battle): the TV cuts from the map to
+   the place's backdrop, full screen; the dragons stand on the left facing the
+   defenders on the right, each a paper figure at its size (--s, the square
+   root of its full health, times --k). --k is as big as lets the more crowded
+   side fit across (--sl, --sr: the sums of their sizes) and the biggest
+   figure (--mx) fit up. */
+.fightscene { position: fixed; inset: 0; overflow: hidden; color: var(--text); }
+.overlay > .fightscene.enter { animation: fadein .4s ease-out; }
+.fightscene .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The folded diorama (board3d.ts stageArt): cropped to the screen, its ground kept. */
+.fightscene img.backdrop { object-fit: cover; object-position: 50% 100%; }
+.fhead { position: absolute; top: 2.2vh; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 1.2em; }
+.fhead h2 { margin: 0; font-family: var(--serif); font-size: 2.4em; display: flex; gap: .4em; align-items: center; background: var(--sheet); color: var(--ink); padding: .2em .9em; border-radius: 2px; box-shadow: var(--lift); }
+.fhead .bvs { background: var(--sheet); color: var(--ink-soft); border-radius: 2px; box-shadow: var(--lift); padding: .15em .7em .3em; min-width: 3.5em; }
+.bvs { display: flex; flex-direction: column; align-items: center; }
+.bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
+.bvs b { font-size: 2.2em; line-height: 1; color: var(--ink); min-height: 1em; }
+.battle { position: absolute; left: 3vw; right: 3vw; bottom: 9vh; top: 30vh; display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; align-items: end;
+  --k: clamp(.45em, min(calc(34vw / var(--sl)), calc(34vw / var(--sr)), calc(46vh / var(--mx))), 3em); }
+/* wrap-reverse: a second row stands behind the first, and flex-start is the ground. */
+.bside { display: flex; flex-wrap: wrap-reverse; align-items: flex-start; align-content: flex-start; gap: 3.2em .8em; }
+.bside.bl { justify-content: flex-end; }
+.bside.br { justify-content: flex-start; }
+.fig { position: relative; display: flex; flex-direction: column; align-items: center; width: calc(var(--s) * var(--k)); min-width: 0; flex: none; }
+.fig .hpbar { width: max(3em, 70%); height: .7em; margin-bottom: .35em; box-shadow: 0 0 0 2px #f7f0de, 0 .15em .3em #0006; transition: opacity .4s; }
+.fig-body { position: relative; display: block; width: 100%; transition: transform .5s cubic-bezier(.5, 0, .7, 1), filter .5s, opacity .5s; transform-origin: 15% 100%; }
+.fig-body::after { content: ''; position: absolute; z-index: -1; left: 8%; right: 8%; bottom: -.35em; height: .9em; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in oklab, var(--pc, #1a1220) 70%, #000) , transparent); opacity: .75; }
+.fig-art { display: block; width: 100%; height: auto; filter: drop-shadow(.12em .2em .1em #0007); }
+.fig-u .fig-body { transform-origin: 85% 100%; }
+/* A rival's dragon perched on the hex faces the raiders. */
+.fig-u.fig-d .fig-art:not(.fig-3d) { transform: scaleX(-1); }
+.fig-name { margin-top: .5em; font-size: clamp(.75em, calc(var(--s) * var(--k) * .17), 1.25em); line-height: 1.1; text-align: center; background: var(--sheet); color: color-mix(in oklab, var(--pc, var(--ink)) 72%, #1a1218); padding: .1em .45em; border-radius: 2px; box-shadow: 0 .1em 0 var(--paper-edge), 0 .2em .4em #0005; max-width: max(100%, 7em); }
+.fig-u:not(.fig-d) .fig-name { color: var(--ink); }
+/* The attacker lunges at what it hits, and what's hit flinches. */
+.fig.strike .fig-body { animation: lunge .3s ease-out; }
+.fig-u.strike .fig-body { animation-name: lunge-l; }
+@keyframes lunge { 40% { translate: 18% -3%; } }
+@keyframes lunge-l { 40% { translate: -18% -3%; } }
+.fig.hit .fig-art { animation: flinch .25s; }
+@keyframes flinch { 30% { filter: brightness(2.2) drop-shadow(0 0 .3em #fff); } }
+/* Knocked out: it falls over backwards, and greys. */
+.fig.down .fig-body { transform: translateY(8%) rotate(-82deg); filter: grayscale(.9) brightness(.85); opacity: .7; }
+.fig-u.down .fig-body { transform: translateY(8%) rotate(82deg); }
+.fig.down .hpbar { opacity: 0; }
+.fig.down .fig-name { opacity: .55; }
+/* The bolt from attacker to target, in the attacker's colour. */
+.beam { position: absolute; z-index: 3; height: .55em; margin-top: -.27em; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, var(--bc) 30%, #fff 85%, var(--bc)); border-radius: 99px; pointer-events: none; box-shadow: 0 0 .8em .15em var(--bc); animation: beamin .14s ease-out; transition: opacity .25s; }
 .beam.gone { opacity: 0; }
 @keyframes beamin { from { scale: 0 1; opacity: .4; } }
-.battle .bvs { position: relative; z-index: 1; text-shadow: 0 0 .3em #000; }
-.fighter.unit .ricon { flex: none; }
-.fighter.unit b { font-size: .8em; }
-/* A raid's fight, replayed: dragons left, defenders right */
-.result.fight { min-width: 60em; }
-.result.fight h2 { font-size: 1.8em; margin: .2em 0 .6em; display: flex; gap: .4em; align-items: center; justify-content: center; }
-.battle { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1.5em; align-items: center; }
-.bside { display: flex; flex-direction: column; gap: .5em; }
-.fighter { position: relative; display: flex; align-items: center; gap: .6em; background: var(--grain), var(--mottle), linear-gradient(180deg, #ece1c8, #e0d2b4); box-shadow: inset 0 1px 0 #fffbf080, 0 .1em 0 var(--paper-edge), .04em .18em .08em #0b081a40; border-radius: 2px; padding: .35em .8em; font-size: 1.3em; border-left: 5px solid var(--pc, #8a8f9c); transition: opacity .3s; }
-.fighter b { flex: 1; text-align: left; color: color-mix(in oklab, var(--pc, var(--text)) 72%, #1a1218); }
-.fighter.unit { flex-direction: row-reverse; border-left: 0; border-right: 5px solid #8a8496; }
-.fighter.unit b { text-align: right; color: var(--text); }
-.fighter .hpbar { width: 7em; height: .75em; }
-.fighter.down { opacity: .3; }
-.fighter.strike { animation: strike .25s; }
-@keyframes strike { 50% { transform: scale(1.06) rotate(-1deg); background: var(--paper-hi); } }
-.fighter .dmg { position: absolute; top: -.2em; left: 50%; color: var(--hit); font-weight: 900; font-size: 1.3em; line-height: 1; animation: dmg 1.2s forwards; pointer-events: none; transform: translateY(calc(var(--slot, 0) * -.95em)) scale(calc(1 - var(--slot, 0) * .3)); transform-origin: 50% 100%; transition: transform .15s ease-out; }
-.fighter .dmg.gone { animation: dmg 1.2s forwards, out .45s forwards; }
+/* The damage, over the figure; a hit whose element beats its target's
+   bursts behind its number in the attacker's colour. */
+.fig .dmg { position: absolute; z-index: 4; top: 18%; left: 50%; translate: -50% 0; display: grid; place-items: center; pointer-events: none; animation: dmg 1.2s forwards;
+  transform: translateY(calc(var(--slot, 0) * -1.1em)) scale(calc(1 - var(--slot, 0) * .3)); transform-origin: 50% 100%; transition: transform .15s ease-out; }
+.fig .dmg b { grid-area: 1 / 1; font-size: 2em; font-weight: 900; color: var(--hit); line-height: 1; -webkit-text-stroke: .1em #f7f0de; paint-order: stroke fill; text-shadow: 0 .08em .15em #0008; }
+.fig .dmg.beats b { font-size: 2.6em; color: #fff; -webkit-text-stroke: .1em #1a1020; }
+.fig .dmg .burst-art { grid-area: 1 / 1; width: 6.5em; height: 6.5em; filter: drop-shadow(0 0 .5em var(--bc)); animation: burst .5s ease-out; }
+@keyframes burst { from { scale: .2; rotate: -40deg; } }
+.fig .dmg.gone { animation: dmg 1.2s forwards, out .45s forwards; }
 @keyframes out { to { opacity: 0; } }
-.fighter .dmg { left: auto; right: 3em; } .fighter.unit .dmg { left: 3em; right: auto; }
-/* The number pops in, holds to be read, then drifts up and fades. It drifts on
-   translate and pops on scale, so the transform that stacks it stays free. */
-@keyframes dmg { from { scale: 1.5; } 15% { scale: 1; } 60% { translate: 0 0; opacity: 1; } to { translate: 0 -.8em; opacity: 0; } }
-.bvs { display: flex; flex-direction: column; align-items: center; color: var(--muted); min-width: 3em; }
-.bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
-.bvs b { font-size: 2.4em; color: var(--text); }
-.spoils > span { display: inline-flex; align-items: center; gap: .3em; }
-.outcome { opacity: 0; transition: opacity .4s; min-height: 5.5em; }
+@keyframes dmg { from { scale: 1.5; } 15% { scale: 1; } 60% { translate: -50% 0; opacity: 1; } to { translate: -50% -.8em; opacity: 0; } }
+/* The outcome, on a sheet under the heading. */
+.fightscene .outcome { position: absolute; left: 50%; top: 11vh; translate: -50% 0; min-width: 34em; max-width: 92vw; background: var(--sheet); color: var(--ink); text-align: center; padding: .3em 2.2em .9em; border-radius: 2px; box-shadow: var(--lift); opacity: 0; transition: opacity .4s; z-index: 5; }
+.fightscene .outcome:empty { display: none; }
 .outcome.show { opacity: 1; }
-.outcome h1 { margin: .5em 0 .2em; }
+.outcome h1 { margin: .3em 0 .2em; font-family: var(--serif); font-size: 2.3em; }
 .spoils { display: flex; gap: 2em; justify-content: center; font-size: 1.6em; }
+.spoils > span { display: inline-flex; align-items: center; gap: .3em; }
+/* The scoring beat: the crown comes down on the most power standing, on
+   their dragons and their name, then the points. */
+.outcome .score { display: flex; align-items: center; justify-content: center; gap: .5em; margin-top: .5em; padding-top: .45em; border-top: 1px solid var(--paper-edge); font-size: 1.6em; opacity: 0; transition: opacity .4s; }
+.outcome .score .crown { width: 1.6em; height: 1.2em; }
+.outcome .score .pts { display: inline-flex; align-items: center; gap: .15em; font-size: 1.5em; opacity: 0; scale: 1.8; transition: opacity .3s, scale .45s cubic-bezier(.3, 1.6, .5, 1); }
+.crowned .outcome .score { opacity: 1; }
+.scored .outcome .score .pts { opacity: 1; scale: 1; }
+.fig-crown { position: absolute; z-index: 2; left: 50%; top: 0; width: 50%; max-width: 4em; min-width: 2.2em; translate: -50% -180%; opacity: 0; transition: opacity .3s, translate .6s cubic-bezier(.3, 1.4, .5, 1); pointer-events: none; }
+.fig-crown .crown { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 .5em #f5c542); }
+.fig.king .fig-crown { opacity: 1; translate: -50% -110%; }
+.fig.king .fig-art { filter: drop-shadow(0 0 .6em color-mix(in oklab, var(--pc) 60%, #fff)); }
+/* Whoever bailed, flown home, in a corner. */
+.fledrow { position: absolute; left: 1.5vw; bottom: 1.5vh; display: flex; flex-direction: column; gap: .3em; }
+.fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; background: var(--sheet); color: var(--ink); border-radius: 2px; box-shadow: var(--lift); }
 .tag { display: inline-flex; vertical-align: middle; font-size: .6em; }
 
 /* The log, drawn: a row of icons per thing that happened */
@@ -1040,14 +1085,39 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .arena { flex-direction: column; gap: .6em; }
 .remote .arena .vs { display: none; }
 .remote .raiders { font-size: 1em; min-width: 0; width: 100%; }
-.remote .result.fight { min-width: 0; }
-.remote .result.fight h2 { font-size: 1.2em; flex-wrap: wrap; }
-.remote .battle { gap: .4em; }
-.remote .fighter { font-size: .85em; padding: .3em .4em; gap: .3em; flex-wrap: wrap; }
-.remote .fighter .hpbar { width: 100%; height: .6em; }
-.remote .fighter svg { width: 2.2em; height: 2.2em; }
-.remote .bvs b { font-size: 1.6em; }
+.remote .fhead { top: 1vh; flex-wrap: wrap; gap: .4em; padding: 0 .5em; }
+.remote .fhead h2 { font-size: 1.2em; flex-wrap: wrap; justify-content: center; }
+.remote .fhead .bvs b { font-size: 1.4em; }
+.remote .battle { left: 2vw; right: 2vw; top: 36vh; bottom: 17vh; gap: 3vw; --k: clamp(.3em, min(calc(40vw / var(--sl)), calc(40vw / var(--sr)), calc(36vh / var(--mx))), 3em); }
+.remote .fledrow { bottom: 9vh; }
+/* A screen held upright: each side stands its figures one above another, in
+   columns of up to four (tv.ts), the first column nearest the other side.
+   Every column of a side has its rows (--rl, --rr) of the same height, so a
+   row lines up. Each side's --k is as big as lets it fit across (--sl, --sr)
+   and its rows (--hl, --hr, plus each figure's bar and name) fit up. */
+.battle.stack { top: 20vh; bottom: 17vh; align-items: stretch; --up: 63vh; }
+.battle.stack .bl { --rows: var(--rl); --k: clamp(.3em, min(calc(36vw / var(--sl)), calc((var(--up) - var(--rl) * 3.4em) / var(--hl))), 3em); }
+.battle.stack .br { --rows: var(--rr); --k: clamp(.3em, min(calc(36vw / var(--sr)), calc((var(--up) - var(--rr) * 3.4em) / var(--hr))), 3em); }
+/* A boss stands over its side's columns (tv.ts), in the top 26vh; the
+   columns share what's left below it. */
+.battle.stack .br.bossed { --up: calc(63vh - 26vh - 3.4em); flex-direction: column; align-items: stretch; }
+.battle.stack .boss { display: flex; justify-content: center; }
+.battle.stack .boss .fig-body { width: min(42vw, calc(26vh * var(--a))); }
+.battle.stack .bcols { flex: 1; display: flex; gap: .6em; }
+.battle.stack .bside { display: flex; flex-wrap: nowrap; align-items: stretch; gap: .6em; }
+.battle.stack .bl { flex-direction: row-reverse; justify-content: flex-start; }
+.battle.stack .br { justify-content: flex-start; }
+.battle.stack .bcol { display: grid; grid-template-rows: repeat(var(--rows), 1fr); align-items: end; justify-items: center; }
+/* A column is as wide as its names; each figure keeps its own size in it. */
+.battle.stack .fig { width: auto; min-width: 5.2em; }
+.battle.stack .fig-body { width: calc(var(--s) * var(--k)); }
+.battle.stack .fig-name { max-width: 6em; }
+.remote .bside { gap: .3em .4em; }
+.remote .fig-name { font-size: .7em; max-width: max(100%, 5em); }
+.remote .fig .dmg { font-size: .7em; }
+.remote .fightscene .outcome { top: 13vh; min-width: 0; width: 94vw; padding: .2em .6em .6em; font-size: .85em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
+.remote .outcome .score { font-size: 1.1em; flex-wrap: wrap; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
 /* A dragon in the roost is a button: tap it for its card. */
 .dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
@@ -1095,3 +1165,19 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .pchosen .pcafter b { color: var(--accent); }
 /* a name on the last-round banner, darkened to read on its yellow */
 :is(.topbar .goal.last, .lastround) .ptag { color: color-mix(in oklab, var(--pc) 50%, #1a1218); }
+
+/* The live fight (board3d.ts, FightStage): the scene fills the screen, its
+   fighters standing on the place's ground, and each one's name and bar
+   pinned over its model (tv.ts sets each .fig's box to the model's, and
+   --foot to the lowest of it): a plate at its feet, as on a miniature's
+   base, its name over its health. */
+.fightscene .stagebox { position: absolute; inset: 0; }
+.fightscene .stage3d { display: block; }
+.fightscene .battle.live { inset: 0; display: block; pointer-events: none; }
+.fightscene .battle.live .fig { position: absolute; display: block; min-width: 0; }
+.fightscene .battle.live .fig-body { position: absolute; inset: 0; transform: none; animation: none; }
+.fightscene .battle.live .fig-body::after { display: none; }
+.fightscene .battle.live .fig-name { position: absolute; left: 50%; top: var(--foot); translate: -50% .2em; margin: 0; width: max-content; max-width: 6.5em; text-align: center; font-size: .85em; padding-bottom: .75em; }
+.fightscene .battle.live .fig .hpbar { position: absolute; z-index: 1; left: 50%; top: var(--foot); translate: -50% calc(var(--plate, 1.5em) - .3em); width: clamp(3em, 60%, 5em); height: .45em; margin: 0; box-shadow: none; }
+.fightscene .battle.live .fig-crown { top: 0; }
+.remote .fightscene .battle.live .fig-name { font-size: .7em; max-width: 6em; }

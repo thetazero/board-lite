@@ -377,7 +377,8 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${solo}/bot`, { token: me })).status, 200);
     assert.equal((await post(`/api/rooms/${solo}/start`, { token: me })).status, 200);
     assert.ok(rooms.get(solo)!.game, 'one phone and a bot is a game');
-    // The table view a phone shows is the TV page as a watcher: three.js isn't loaded for it.
+    // The table view a phone shows is the TV page as a watcher: three.js is loaded on demand
+    // (behind the table, for the fights' figures), never as part of the page.
     assert.match(await (await fetch(`${base}/tv.ts`)).text(), /await import\('\.\/board3d\.ts'\)/);
 
     // Both pages have an icon, so no browser logs a missing favicon.

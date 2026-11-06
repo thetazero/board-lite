@@ -34,6 +34,8 @@ const GROUND = TOP + PLATE_H; // where a building stands on its plate
 // from top-down. Lower shows more of the models' fronts and
 // sides; straight down would flatten them.
 const CAMERA_TILT = 1.13;
+// The map camera's field of view, up and down (degrees). A fight is seen through the same camera.
+const MAP_FOV = 26;
 
 // Paper colours. Terrain is the phone map's colours, so the two maps match.
 const WALL = '#f1e8d4';
@@ -1844,7 +1846,7 @@ export class Board3D {
   readonly el: HTMLDivElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(26, 16 / 9, 0.1, 200);
+  private camera = new THREE.PerspectiveCamera(MAP_FOV, 16 / 9, 0.1, 200);
   private sun: THREE.DirectionalLight;
   private world = new THREE.Group();
   private mapSig = '';
@@ -2746,4 +2748,970 @@ function portraitScene(p: Portrait): THREE.Scene {
     scene.add(obj);
   }
   return scene;
+}
+
+// ---------- the fight's stage (#326) ----------
+// When a raid or a hunt is fought, the TV cuts from the map to the place
+// being fought over, built as a paper diorama from the board's own pieces
+// (cottages, towers, peaks, pines, crystals, the lighthouse, the sea), and
+// stands the fighters in front of it: the board's origami dragons, its
+// beasts, and the kingdoms' defenders folded the same way. Each is drawn
+// once, with the board's paper and light, to an image the fight scene
+// (tv.ts) moves about; nothing here animates.
+
+// ---------- folds ----------
+// The fight's own pieces are folded from sheets, as origami is: pleated
+// cones and tubes, kites bent along their middle, gable roofs, each a thin
+// sheet coloured on its face and white on its back, so where a fold turns
+// it over the white shows.
+
+const BACK = '#fbf6ea';
+const BACKS = new Map<string, THREE.MeshLambertMaterial>();
+function backPaper(color = BACK): THREE.MeshLambertMaterial {
+  let m = BACKS.get(color);
+  if (!m) {
+    GRAIN ??= paperTexture();
+    m = new THREE.MeshLambertMaterial({ color, map: GRAIN, flatShading: true, side: THREE.BackSide });
+    BACKS.set(color, m);
+  }
+  return m;
+}
+
+// A folded sheet: its face in `color`, its back white, its folds creased.
+function leaf(geo: THREE.BufferGeometry, color: string, o: PartOpts & { back?: string } = {}): THREE.Mesh {
+  const m = part(geo, color, { ...o, two: false });
+  const b = new THREE.Mesh(geo, backPaper(o.back));
+  b.castShadow = true;
+  b.receiveShadow = true;
+  m.add(b);
+  return m;
+}
+
+// A cone folded in pleats: its rim zigzags in and out (`depth` of the
+// radius) `n` times round, its point at the top, open underneath.
+function pleatCone(r: number, h: number, n: number, depth = 0.3): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [[0, h / 2, 0]];
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2, rr = i % 2 ? r * (1 - depth) : r;
+    pts.push([Math.cos(a) * rr, -h / 2, Math.sin(a) * rr]);
+  }
+  const tris: number[][] = [];
+  for (let i = 0; i < n * 2; i++) tris.push([0, 1 + ((i + 1) % (n * 2)), 1 + i]);
+  return sheet(pts, tris);
+}
+
+// A tube folded in pleats (a tower's wall, a quiver): open at both ends,
+// standing on y = 0, narrowing from `r` at the foot to `rt` at the top.
+function pleatTube(r: number, rt: number, h: number, n: number, depth = 0.2): THREE.BufferGeometry {
+  const ring = (y: number, R: number) => Array.from({ length: n * 2 }, (_, i) => {
+    const a = (i / (n * 2)) * Math.PI * 2, rr = i % 2 ? R * (1 - depth) : R;
+    return [Math.cos(a) * rr, y, Math.sin(a) * rr] as [number, number, number];
+  });
+  const pts = [...ring(0, r), ...ring(h, rt)], m = n * 2, tris: number[][] = [];
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    tris.push([i, m + i, j], [j, m + i, m + j]);
+  }
+  return sheet(pts, tris);
+}
+
+// A kite folded along its middle, from the origin up `len` to its point,
+// its two halves `w` wide bent back (to -x) by `bend`: a leg, an arm, a
+// blade, a flame, a feather.
+function kite(len: number, w: number, bend = w * 0.6, at = 0.3): THREE.BufferGeometry {
+  return sheet([[0, 0, 0], [0, len, 0], [-bend, len * at, w], [-bend, len * at, -w]], [[0, 1, 2], [0, 3, 1]]);
+}
+
+// A wall folded like a fan: an accordion of `n` pleats along x, `d` deep,
+// its top cut into battlements when `teeth`.
+function pleatWall(len: number, h: number, n: number, d: number, teeth = false): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [], tris: number[][] = [];
+  for (let i = 0; i <= n; i++) {
+    const x = -len / 2 + (i / n) * len, z = i % 2 ? -d : 0, top = teeth && i % 2 ? h * 0.86 : h;
+    pts.push([x, 0, z], [x, top, z]);
+    if (i) tris.push([(i - 1) * 2, i * 2, (i - 1) * 2 + 1], [i * 2, i * 2 + 1, (i - 1) * 2 + 1]);
+  }
+  return sheet(pts, tris);
+}
+
+// A paper house: a box of walls folded round, and a roof folded once along
+// its ridge, overhanging, its white underside under the eaves.
+function paperHouse(w: number, d: number, h: number, wall: string, roof: string): THREE.Group {
+  const g = group(leaf(pleatTube(Math.SQRT1_2, Math.SQRT1_2, h, 2, 0), wall, { rot: [0, Math.PI / 4, 0], scale: [w, 1, d] }));
+  const rw = w * 0.62, rh = h * 0.7, rd = d * 0.62;
+  g.add(leaf(sheet([[-rw, 0, -rd], [rw, 0, -rd], [rw, rh, 0], [-rw, rh, 0], [-rw, 0, rd], [rw, 0, rd]], [[0, 3, 1], [1, 3, 2], [3, 4, 5], [3, 5, 2]]), roof, { at: [0, h, 0] }));
+  // The gable ends: two triangles of wall.
+  for (const s of [-1, 1]) g.add(leaf(sheet([[s * w / 2, 0, -d / 2], [s * w / 2, 0, d / 2], [s * w / 2, rh * 0.95, 0]], s > 0 ? [[0, 2, 1]] : [[0, 1, 2]]), wall, { at: [0, h, 0] }));
+  g.add(part(box(w * 0.22, h * 0.6, 0.02), DARK, { at: [0, h * 0.3, d / 2 + 0.01], crease: false }));
+  return g;
+}
+
+// A pine folded from three pleated cones.
+function paperPine(s: number, color: string): THREE.Group {
+  return groupScaled(s, [
+    part(cyl(0.035, 0.045, 0.14, 4), WOOD_DARK, { at: [0, 0.07, 0], crease: false }),
+    leaf(pleatCone(0.22, 0.26, 5, 0.35), color, { at: [0, 0.24, 0] }),
+    leaf(pleatCone(0.17, 0.24, 5, 0.35), mix(color, '#9fc28a', 0.12), { at: [0, 0.38, 0], rot: [0, 0.3, 0] }),
+    leaf(pleatCone(0.11, 0.2, 4, 0.35), mix(color, '#9fc28a', 0.24), { at: [0, 0.52, 0] }),
+  ]);
+}
+
+// A mountain folded in pleats, its snow a smaller pleated cap.
+function paperPeak(r: number, h: number, color: string, spin: number, snow: boolean): THREE.Group {
+  const g = group(leaf(pleatCone(r, h, 5, 0.32), color, { at: [0, h / 2, 0], rot: [0, spin, 0] }));
+  if (snow) g.add(leaf(pleatCone(r * 0.38, h * 0.36, 5, 0.32), SNOW, { at: [0, h - h * 0.18 + 0.02, 0], rot: [0, spin, 0] }));
+  return g;
+}
+
+// A defender standing on two legs, facing +x, folded the way a paper
+// figure is: kite legs and arms, a skirt pleated round, a diamond chest
+// with a collar turned down to its white back, a diamond head. `chunk`
+// thickens it for the giants.
+interface Folk { coat: string; trim: string; skin: string; legs?: string; chunk?: number; eyes?: string }
+function folk(o: Folk): { g: THREE.Group; head: THREE.Group; hand: THREE.Group; off: THREE.Group } {
+  const k = o.chunk ?? 1;
+  const legs = o.legs ?? mix(o.coat, '#1d1712', 0.45);
+  const g = new THREE.Group();
+  for (const z of [-0.07, 0.07]) {
+    g.add(leaf(kite(0.34, 0.055 * k, 0.04 * k, 0.75), legs, { at: [0, 0.34, z * k], rot: [Math.PI, 0, 0] }));
+    g.add(part(kite(0.14 * k, 0.04 * k, 0.03, 0.4), mix(legs, '#1d1712', 0.3), { at: [-0.03, 0.01, z * k], rot: [0, 0, -Math.PI / 2], two: true }));
+  }
+  g.add(leaf(pleatCone(0.22 * k, 0.4, 5, 0.35), o.coat, { at: [0, 0.42, 0], rot: [0, Math.PI / 10, 0] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), o.coat, { at: [0, 0.64, 0], scale: [0.11 * k, 0.15, 0.17 * k] }));
+  // The collar: a flap folded down over the chest.
+  g.add(leaf(sheet([[0, 0, 0], [0.04 * k, -0.07, 0.08 * k], [0.07 * k, -0.11, 0], [0.04 * k, -0.07, -0.08 * k]], [[0, 1, 2], [0, 2, 3]]), o.trim, { at: [0.05 * k, 0.79, 0] }));
+  const head = new THREE.Group();
+  head.position.set(0, 0.88, 0);
+  const hk = k > 1 ? k * 0.85 : 1;
+  head.position.y += (hk - 1) * 0.1;
+  head.add(part(new THREE.OctahedronGeometry(0.1 * hk, 0), o.skin, { scale: [1, 1.25, 1], rot: [0, Math.PI / 4, 0] }));
+  for (const z of [-0.035, 0.035]) head.add(part(box(0.02 * hk, 0.025 * hk, 0.02 * hk), o.eyes ?? DARK, { at: [0.075 * hk, 0.02 * hk, z * hk], glow: o.eyes ? 0.9 : 0, crease: false }));
+  g.add(head);
+  // The weapon arm reaches forward, the other holds a shield or hangs.
+  const arm = () => group(
+    leaf(kite(0.32, 0.05 * k, 0.035 * k, 0.25), o.coat, { rot: [Math.PI, 0, 0] }),
+    part(new THREE.OctahedronGeometry(0.045 * k, 0), o.skin, { at: [0, -0.32, 0] }),
+  );
+  const hand = arm();
+  hand.position.set(0.02, 0.74, 0.17 * k);
+  hand.rotation.z = -0.9;
+  const off = arm();
+  off.position.set(0, 0.74, -0.17 * k);
+  off.rotation.z = -0.35;
+  g.add(hand, off);
+  return { g, head, hand, off };
+}
+
+// What a hand holds: placed at the fist (y = -0.32 in the arm), upright
+// whatever the arm's angle, then tipped forward by `tip`.
+const held = (arm: THREE.Group, tip: number, ...kids: THREE.Object3D[]) => {
+  const fist = group(...kids);
+  fist.position.y = -0.32;
+  fist.rotation.z = -arm.rotation.z - tip;
+  arm.add(fist);
+};
+
+const SKIN = '#e8c39e', STEEL = '#c9ced6', STEEL_DARK = '#8e949e';
+// A blade folded from a long thin kite.
+const blade = (len: number, w: number, color: string, at = 0) => leaf(kite(len, w, w * 0.5, 0.15), color, { at: [0, at, 0] });
+
+function militia(): THREE.Group {
+  const f = folk({ coat: '#a0703c', trim: '#e9d9b0', skin: SKIN });
+  // A straw hat folded in pleats, and a pitchfork.
+  f.head.add(leaf(pleatCone(0.19, 0.14, 7, 0.18), STRAW, { at: [0, 0.12, 0] }));
+  held(f.hand, 0.1,
+    part(cyl(0.012, 0.012, 0.9, 4), WOOD, { at: [0, 0.1, 0], crease: false }),
+    part(box(0.02, 0.02, 0.14), STEEL_DARK, { at: [0, 0.55, 0], crease: false }),
+    ...[-0.06, 0, 0.06].map((z) => leaf(kite(0.15, 0.014, 0.01), STEEL, { at: [0, 0.56, z] })));
+  return f.g;
+}
+
+function archers(): THREE.Group {
+  const f = folk({ coat: '#4c7f45', trim: '#d9c79a', skin: SKIN, legs: '#5e3e26' });
+  // A pointed hood folded over the head, a pleated quiver of arrows on the back, a bow drawn forward.
+  f.head.add(leaf(pleatCone(0.13, 0.26, 3, 0.3), '#35603a', { at: [-0.02, 0.07, 0], rot: [0, 0, 0.2] }));
+  f.g.add(leaf(pleatTube(0.05, 0.05, 0.3, 3, 0.25), WOOD_DARK, { at: [-0.18, 0.55, -0.1], rot: [0.3, 0, 0.3] }));
+  f.g.add(...[0, 1, 2].map((i) => leaf(kite(0.1, 0.025, 0.015), '#fbf8f1', { at: [-0.22 + i * 0.015, 0.84, -0.12 + i * 0.04], rot: [0.3, 0, 0.3] })));
+  f.hand.rotation.z = -1.45;
+  held(f.hand, 0,
+    part(new THREE.TorusGeometry(0.3, 0.018, 3, 10, Math.PI * 0.75), WOOD, { rot: [Math.PI / 2, 0, -Math.PI * 0.375 + Math.PI / 2], at: [-0.17, 0, 0] }),
+    part(cyl(0.004, 0.004, 0.55, 3), '#fbf8f1', { at: [-0.06, 0, 0], crease: false }));
+  return f.g;
+}
+
+function knights(): THREE.Group {
+  const f = folk({ coat: STEEL, trim: '#c8463d', skin: STEEL_DARK, legs: STEEL_DARK });
+  // A pleated helm with a folded red plume, a sword up, a kite shield on the near arm.
+  f.head.add(leaf(pleatTube(0.1, 0.085, 0.2, 4, 0.15), STEEL, { at: [0, -0.08, 0] }), leaf(pleatCone(0.085, 0.08, 4, 0.15), STEEL, { at: [0, 0.16, 0] }));
+  f.head.add(part(box(0.02, 0.02, 0.12), DARK, { at: [0.1, 0.03, 0], crease: false }));
+  f.head.add(leaf(kite(0.26, 0.05, 0.03), '#c8463d', { at: [0, 0.18, 0], rot: [0, 0, 0.9] }));
+  f.hand.rotation.z = -1.1;
+  held(f.hand, 0.5,
+    part(box(0.03, 0.12, 0.04), WOOD_DARK, { at: [0, 0.02, 0], crease: false }),
+    part(box(0.02, 0.03, 0.16), GOLD, { at: [0, 0.09, 0], crease: false }),
+    blade(0.6, 0.035, '#eef1f5', 0.1));
+  // The shield on the other arm, the one nearer the room since defenders
+  // face left: a kite folded down its middle, a gold cross on it.
+  const shield = group(
+    leaf(sheet([[0.02, 0.2, 0], [0, 0.12, 0.15], [0, -0.32, 0], [0, 0.12, -0.15], [0.05, 0, 0]], [[0, 1, 4], [1, 2, 4], [0, 4, 3], [4, 2, 3]]), '#c8463d'),
+    part(box(0.02, 0.36, 0.035), GOLD, { at: [0.035, -0.04, 0], crease: false }),
+    part(box(0.02, 0.035, 0.22), GOLD, { at: [0.03, 0.06, 0], crease: false }),
+  );
+  shield.position.set(0.17, 0.56, -0.2);
+  shield.rotation.y = 0.8;
+  f.g.add(shield);
+  return f.g;
+}
+
+function frostGolem(): THREE.Group {
+  const ice = '#9fd3ef', deep = '#5fa6cf';
+  const g = new THREE.Group();
+  // Pleated legs, a great folded diamond of a body, a smaller one for its head.
+  for (const z of [-0.13, 0.13]) g.add(leaf(pleatTube(0.13, 0.1, 0.3, 3, 0.3), deep, { at: [0, 0, z] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), ice, { at: [0, 0.58, 0], scale: [0.27, 0.36, 0.34] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), mix(ice, '#fff', 0.35), { at: [0.06, 0.62, 0], scale: [0.22, 0.2, 0.3], rot: [0, 0, 0], crease: true }));
+  g.add(part(new THREE.OctahedronGeometry(0.15, 0), ice, { at: [0.08, 0.98, 0], scale: [1, 1.1, 1], rot: [0, Math.PI / 4, 0] }));
+  for (const z of [-0.05, 0.05]) g.add(part(box(0.03, 0.03, 0.03), '#e8fbff', { at: [0.2, 1.0, z], glow: 0.9, crease: false }));
+  // Heavy arms, folded kites, and crystals grown out of its shoulders and back.
+  for (const z of [-0.34, 0.34]) g.add(leaf(kite(0.48, 0.1, 0.08, 0.35), deep, { at: [0.1, 0.76, z], rot: [Math.PI + (z > 0 ? -0.15 : 0.15), 0, -0.25] }));
+  for (const [x, y, z, h, rz] of [[-0.1, 0.9, 0.22, 0.28, 0.4], [-0.15, 0.85, -0.22, 0.24, 0.5], [-0.25, 0.7, 0, 0.3, 0.9], [0, 0.95, -0.12, 0.2, -0.2]]) {
+    const c = crystal(h, '#d9f2ff');
+    c.position.set(x, y, z);
+    c.rotation.set(z * 2, 0, rz);
+    g.add(c);
+  }
+  return g;
+}
+
+function stormGriffin(): THREE.Group {
+  const hide = '#c9a25e', hide2 = '#9c7a3e', feather = '#fbf8f1', wing = mix(ELEMENT_COLORS.air, '#3d3f8f', 0.25);
+  const g = new THREE.Group();
+  for (const [x, z] of [[0.2, 0.08], [0.2, -0.08], [-0.2, 0.08], [-0.2, -0.08]]) g.add(leaf(kite(0.3, 0.035, 0.025, 0.7), x > 0 ? GOLD : hide2, { at: [x, 0.3, z], rot: [Math.PI, 0, 0] }));
+  // A diamond body, as the dragon's, and a ruff of feathers folded at its chest.
+  g.add(part(new THREE.OctahedronGeometry(1, 0), hide, { at: [-0.04, 0.38, 0], scale: [0.34, 0.17, 0.17] }));
+  g.add(leaf(pleatCone(0.16, 0.26, 5, 0.4), feather, { at: [0.2, 0.47, 0], rot: [0, 0, -1.2] }));
+  const head = group(
+    part(new THREE.OctahedronGeometry(1, 0), feather, { scale: [0.12, 0.1, 0.09] }),
+    leaf(kite(0.16, 0.04, 0.03), GOLD, { at: [0.08, -0.01, 0], rot: [0, 0, -Math.PI / 2 - 0.3] }),
+    ...[-0.05, 0.05].map((z) => part(box(0.025, 0.025, 0.02), DARK, { at: [0.06, 0.03, z], crease: false })),
+    leaf(kite(0.14, 0.03, 0.02), wing, { at: [-0.06, 0.05, 0], rot: [0, 0, 1.1] }),
+  );
+  head.position.set(0.34, 0.62, 0);
+  g.add(head);
+  // A lion's tail with a tuft, and two wings raised to strike, each folded once.
+  g.add(part(cone(0.025, 0.34, 3), hide2, { at: [-0.4, 0.42, 0], rot: [0, 0, 1.0], crease: false }), leaf(kite(0.12, 0.04, 0.03), wing, { at: [-0.52, 0.5, 0], rot: [0, 0, 0.9] }));
+  for (const s of [1, -1]) {
+    const w = group(
+      leaf(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.2, 0.3, s * 0.08], [-0.36, 0.5, 0], [-0.3, 0.06, 0]], s > 0 ? [[0, 1, 2], [0, 2, 4], [2, 3, 4]] : [[0, 2, 1], [0, 4, 2], [2, 4, 3]]), wing),
+      leaf(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.04, 0.4, s * 0.03]], s > 0 ? [[0, 1, 2]] : [[0, 2, 1]]), mix(wing, '#fff8ea', 0.4)),
+    );
+    w.position.set(0.06, 0.46, s * 0.1);
+    w.rotation.set(s * -0.5, 0, -0.15);
+    g.add(w);
+  }
+  return g;
+}
+
+function giant(o: { coat: string; trim: string; skin: string; legs: string; eyes: string }, gear: (f: ReturnType<typeof folk>) => void): THREE.Group {
+  const f = folk({ ...o, chunk: 1.7 });
+  gear(f);
+  return f.g;
+}
+
+function fireGiant(): THREE.Group {
+  return giant({ coat: '#5a2420', trim: '#ff9a3c', skin: '#b84a2e', legs: '#3a1a16', eyes: '#ffd23f' }, (f) => {
+    // Hair of folded flames, glowing eyes and a burning club.
+    for (const [x, z, h, r] of [[-0.06, 0, 0.36, 0], [0, 0.1, 0.26, -0.4], [0, -0.1, 0.28, 0.4], [-0.12, 0.06, 0.24, -0.2], [-0.12, -0.07, 0.26, 0.2]]) f.head.add(part(kite(h, 0.06, 0.04), h > 0.3 ? '#ffd23f' : '#ff7a2f', { at: [x, 0.08, z], rot: [r, 0, 0.15], glow: 0.7, two: true }));
+    f.hand.rotation.z = -1.25;
+    held(f.hand, 0.8,
+      leaf(pleatTube(0.035, 0.07, 0.62, 3, 0.3), WOOD_DARK, { at: [0, -0.02, 0] }),
+      leaf(pleatCone(0.11, 0.16, 4, 0.3), '#3a1a16', { at: [0, 0.68, 0] }),
+      ...[-0.04, 0.04].map((z, i) => part(kite(0.2 - i * 0.04, 0.05, 0.03), i ? '#ffd23f' : '#ff7a2f', { at: [0, 0.72, z], glow: 0.8, two: true })));
+  });
+}
+
+function titan(): THREE.Group {
+  return giant({ coat: '#5d5a72', trim: GOLD, skin: '#9a97b8', legs: '#4c4962', eyes: '#fff4b8' }, (f) => {
+    // A crown folded in gold points, pleated stone shoulder plates, a bolt of lightning held high.
+    f.head.add(leaf(pleatWallRing(0.12, 0.1, 6), GOLD, { at: [0, 0.1, 0], glow: 0.2 }));
+    for (const z of [-0.26, 0.26]) f.g.add(leaf(pleatCone(0.14, 0.1, 4, 0.3), '#6e6b86', { at: [0, 0.8, z] }));
+    f.hand.rotation.z = -2.2;
+    held(f.hand, 0.3, part(sheet([[0, 0, 0], [0.12, 0.3, 0], [0.05, 0.3, 0], [0.16, 0.62, 0], [-0.02, 0.26, 0], [0.05, 0.26, 0]], [[0, 1, 5], [5, 1, 2], [2, 3, 4], [2, 4, 5]]), BOLT, { glow: 0.8, rot: [0, 0, -0.3], two: true, crease: false }));
+  });
+}
+
+// A crown: a band of paper folded into `n` points, round.
+function pleatWallRing(r: number, h: number, n: number): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [], tris: number[][] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2;
+    pts.push([Math.cos(a) * r, 0, Math.sin(a) * r], [Math.cos(a) * r, i % 2 ? h * 0.45 : h, Math.sin(a) * r]);
+  }
+  const m = n * 2;
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    tris.push([i * 2, i * 2 + 1, j * 2], [j * 2, i * 2 + 1, j * 2 + 1]);
+  }
+  return sheet(pts, tris);
+}
+
+// The kingdoms' defenders, by UNITS key; anything else is a beast of the board.
+const DEFENDERS: Record<string, () => THREE.Group> = {
+  militia, archers, knights, frost_golem: frostGolem, storm_griffin: stormGriffin, sea_serpent: leviathan, fire_giant: fireGiant, titan,
+};
+const BEASTS = new Set(['wolf_pack', 'cave_bear', 'basilisk', 'thunderbird', 'leviathan']);
+
+export type Fighter = { dragon: { element: string; stage: number } } | { foe: string };
+
+// A dragon squared up to fight: chest up, wings raised, neck reaching.
+function fightingDragon(element: string): THREE.Group {
+  const r = dragonRig(element);
+  r.body.rotation.x = -0.12;
+  r.neck.rotation.set(0.25, 0, 0);
+  r.legs.rotation.x = 0;
+  r.tail.forEach((seg, i) => seg.rotation.set(i === 0 ? 0.35 : -0.05, 0.25 - i * 0.1, 0));
+  for (const w of r.wings) w.rotation.set(0, 0.35, 1.05);
+  return r.root;
+}
+
+// ---------- the places ----------
+
+// A sky of paper: its colours top to bottom, laid behind everything.
+function skyTexture(top: string, bottom: string): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 256;
+  const x = c.getContext('2d')!;
+  const grad = x.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, top);
+  grad.addColorStop(1, bottom);
+  x.fillStyle = grad;
+  x.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// The ground: one big sheet, gently creased, in the place's colour, from in
+// front of the camera back to `back` (where a sea begins), rising a little
+// into the distance.
+function groundSheet(color: string, seed: string, back = -40): THREE.Mesh {
+  const w = 400, front = 160, d = front - back;
+  const geo = new THREE.PlaneGeometry(w, d, 18, 12);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, 0, front - d / 2);
+  const r = rng(seed);
+  const p = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w * 0.4, uv.getY(i) * d * 0.4); // the paper's grain at the board's scale
+  for (let i = 0; i < p.count; i++) p.setY(i, (r() - 0.5) * 0.18 + (back < -20 ? Math.max(0, -p.getZ(i) - 8) * 0.05 : 0));
+  const flat = geo.toNonIndexed();
+  flat.computeVertexNormals();
+  geo.dispose();
+  const m = part(flat, color, { crease: false });
+  m.castShadow = false;
+  return m;
+}
+
+// A low hill: a wide cone folded in shallow pleats.
+const hill = (r: number, h: number, color: string, x: number, z: number, spin = 0) => leaf(pleatCone(r, h, 6, 0.12), color, { at: [x, h / 2 - 0.05, z], rot: [0, spin, 0] });
+// A pine wood, seeded.
+function wood(seed: string, n: number, x0: number, x1: number, z0: number, z1: number, s: [number, number], color = PINE): THREE.Group {
+  const r = rng(seed);
+  const g = new THREE.Group();
+  for (let i = 0; i < n; i++) {
+    const t = paperPine(s[0] + r() * (s[1] - s[0]), LEAF[i % 3] === LEAF[0] ? color : LEAF[i % 3]);
+    t.position.set(x0 + r() * (x1 - x0), 0, z0 + r() * (z1 - z0));
+    t.rotation.y = r() * 3;
+    g.add(t);
+  }
+  return g;
+}
+const placed = (o: THREE.Object3D, x: number, z: number, s = 1, spin = 0, y = 0) => {
+  o.position.set(x, y, z);
+  o.scale.multiplyScalar(s);
+  o.rotation.y = spin;
+  return o;
+};
+
+// A castle wall between towers along x at depth z: the wall folded like a
+// fan, its top cut into battlements; each tower a pleated tube, crowned
+// with a folded ring of battlements or a pleated roof.
+function curtainWall(x0: number, x1: number, z: number, h: number, wall: string, roof: string | null, banner?: string): THREE.Group {
+  const g = new THREE.Group();
+  const n = Math.round((x1 - x0) / 0.35);
+  g.add(leaf(pleatWall(x1 - x0, h, n - (n % 2), 0.3, true), wall, { at: [(x0 + x1) / 2, 0, z + 0.15] }));
+  for (const tx of [x0, (x0 + x1) / 2, x1]) {
+    const th = h * 1.6;
+    const tc = mix(wall, '#fff8ea', 0.08);
+    g.add(leaf(pleatTube(0.85, 0.75, th, 6, 0.14), tc, { at: [tx, 0, z] }));
+    if (roof) g.add(leaf(pleatCone(1.0, 1.4, 6, 0.3), roof, { at: [tx, th + 0.68, z] }));
+    else g.add(leaf(pleatWallRing(0.78, 0.4, 8), tc, { at: [tx, th - 0.02, z] }));
+    if (banner) g.add(placed(flag(banner, 1.4), tx, z, 2.2, 0, th + (roof ? 1.25 : 0.25)));
+    g.add(leaf(kite(0.45, 0.13, 0.02, 0.5), DARK, { at: [tx, th * 0.55, z + 0.84], rot: [0, -Math.PI / 2, 0] }));
+  }
+  // The gate.
+  g.add(part(box(1.1, 1.5, 0.04), DARK, { at: [(x0 + x1) / 2 + ((x1 - x0) / 4), 0.75, z + 0.33], crease: false }));
+  return g;
+}
+
+// A lighthouse folded from paper: a tapering pleated tower, bands round it,
+// a glowing lamp under a pleated cap.
+function paperLighthouse(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(leaf(pleatTube(0.24, 0.15, 1.0, 6, 0.12), MONUMENT_STONE, { at: [0, 0.1, 0] }));
+  for (const y of [0.45, 0.8]) g.add(leaf(pleatTube(0.215 - (y - 0.45) * 0.2, 0.2 - (y - 0.45) * 0.2, 0.08, 6, 0.12), MONUMENT_DARK, { at: [0, y, 0] }));
+  g.add(part(cyl(0.12, 0.12, 0.18, 6), '#ffd23f', { at: [0, 1.19, 0], glow: 0.8 }));
+  g.add(leaf(pleatCone(0.2, 0.2, 6, 0.25), MONUMENT_DARK, { at: [0, 1.38, 0] }));
+  g.add(part(box(0.1, 0.16, 0.02), DARK, { at: [0, 0.3, -0.21], crease: false }));
+  return g;
+}
+
+// A rock: a low cone folded in a few pleats.
+const rock = (r: number, h: number, color: string, at: [number, number, number], spin = 0) => leaf(pleatCone(r, h, 4, 0.3), color, { at: [at[0], at[1] + h / 2, at[2]], rot: [0, spin, 0] });
+
+// A zigzag of lightning across the sky.
+function skyBolt(x: number, y: number, z: number, s: number): THREE.Mesh {
+  return part(sheet([[0, 0, 0], [-0.4, -1.1, 0], [-0.1, -1.05, 0], [-0.5, -2.3, 0], [0.3, -0.9, 0], [0, -0.95, 0], [0.3, 0, 0]], [[0, 1, 5], [1, 2, 5], [5, 2, 4], [2, 3, 4], [0, 5, 6]]), BOLT, { at: [x, y, z], scale: s, two: true, glow: 1, crease: false });
+}
+
+interface Place { sky: [string, string]; ground: string; build: (g: THREE.Group) => void; sun?: [number, number, string]; shore?: number }
+const SEA_PAPER = mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2);
+function seaBand(g: THREE.Group, z0: number, color = SEA_PAPER) {
+  const sea = part(new THREE.PlaneGeometry(80, 40).rotateX(-Math.PI / 2), color, { at: [0, 0.06, z0 - 20], crease: false });
+  sea.castShadow = false;
+  g.add(sea);
+  const r = rng(`sea${z0}`);
+  for (let i = 0; i < 26; i++) g.add(placed(waveCrests(r), -14 + r() * 28, z0 - 1 - r() * 14, 2.2, 0, 0.06));
+}
+
+const PLACES: Record<string, Place> = {
+  brindle: {
+    sky: ['#f6b26b', '#fbe3a1'], sun: [5, 6, '#fff2c0'], ground: '#9cb85a',
+    build: (g) => {
+      g.add(hill(9, 2.2, '#8ea35a', -6, -16), hill(11, 2.8, '#a8bd6e', 7, -18, 1), hill(7, 1.6, '#7a9844', 0, -13, 2));
+      g.add(placed(paperHouse(0.5, 0.4, 0.32, WALL, '#9a5a32'), -5.2, -5, 3, 0.3), placed(paperHouse(0.45, 0.4, 0.3, '#e8d6b0', '#b5653a'), -2.6, -7.5, 3, -0.2));
+      g.add(placed(paperHouse(0.5, 0.42, 0.32, WALL, '#b5653a'), 3.6, -6.5, 3, -0.4), placed(paperHouse(0.42, 0.38, 0.28, '#e8d6b0', '#9a5a32'), 6.4, -4.8, 3, 0.5));
+      g.add(wood('brindle', 10, -10, 10, -12, -8, [1.6, 2.4]));
+      g.add(placed(sheep(), -0.8, -4.5, 2.2, 0.8), placed(sheep(), 0.6, -5.2, 2.2, 2));
+    },
+  },
+  archers_hold: {
+    sky: ['#8fc0e6', '#eadbb4'], ground: '#b39a62',
+    build: (g) => {
+      g.add(wood('hold', 26, -14, 14, -16, -9, [2.2, 3.4]));
+      // The stockade: a fence folded like a fan, its top cut to points, a gap for the gate.
+      g.add(leaf(pleatWall(12.1, 2.3, 30, 0.3, true), WOOD, { at: [-5.95, 0, -6] }), leaf(pleatWall(10.1, 2.3, 26, 0.3, true), WOOD, { at: [7.05, 0, -6] }));
+      for (const x of [-5, 6]) {
+        for (const [dx, dz] of [[-0.6, -0.5], [0.6, -0.5], [-0.6, 0.5], [0.6, 0.5]]) g.add(part(cyl(0.09, 0.09, 3.6, 4), WOOD_DARK, { at: [x + dx, 1.8, -6.8 + dz], crease: false }));
+        g.add(part(box(1.7, 0.18, 1.5), WOOD, { at: [x, 3.6, -6.8] }), part(box(1.7, 0.6, 0.1), WOOD, { at: [x, 3.95, -6.1] }));
+        g.add(leaf(pleatCone(1.35, 1.1, 4, 0.2), '#8a3a2a', { at: [x, 4.8, -6.8], rot: [0, Math.PI / 4, 0] }));
+        g.add(placed(flag('#e5484d', 1), x, -6.8, 1.6, 0, 5.3));
+      }
+    },
+  },
+  frostpeak: {
+    sky: ['#9fd0ee', '#eef8ff'], ground: '#e8f4fb',
+    build: (g) => {
+      for (const [x, z, r, h, s] of [[-9, -16, 4, 8, 0.3], [-3, -19, 5, 10.5, 1], [4, -17, 4.2, 8.5, 2], [10, -20, 5, 11, 0.6], [0, -13, 3, 5.5, 1.5]]) g.add(placed(paperPeak(r, h, mix(STONE, '#8d8f96', 0.4), s, true), x, z));
+      g.add(hill(6, 1.2, '#cfe7f5', -6, -8), hill(7, 1.4, '#d9eef8', 6, -9, 1));
+      for (const [x, z, h, rz] of [[-7, -5, 1.6, 0.2], [-6.2, -5.6, 1, -0.3], [7, -4.5, 1.8, -0.2], [7.8, -5.3, 1.1, 0.4], [-2, -8, 0.9, 0.1]]) {
+        const c = crystal(h, '#bfe3f5');
+        c.position.set(x, h * 0.8, z);
+        c.rotation.z = rz;
+        g.add(c);
+      }
+    },
+  },
+  knightsgate: {
+    sky: ['#6f88b8', '#d3dbea'], ground: '#86965e',
+    build: (g) => {
+      g.add(hill(10, 2.2, '#61789a', -8, -22), hill(12, 2.8, '#6c82a2', 9, -24, 1));
+      g.add(curtainWall(-8, 8, -9, 2.6, '#a5a8b3', '#5a6a9a', '#e5484d'));
+      g.add(leaf(pleatTube(1.0, 0.9, 5.2, 6, 0.14), '#b4b7c2', { at: [0, 0, -12] }), leaf(pleatCone(1.2, 2.2, 6, 0.3), '#5a6a9a', { at: [0, 6.3, -12] }), placed(flag('#e5484d', 1.4), 0, -12, 2.2, 0, 7.4));
+    },
+  },
+  stormspire: {
+    sky: ['#221d3c', '#5d518d'], ground: '#4c4670',
+    build: (g) => {
+      const stone = '#3a3360';
+      for (const [x, z, r, h] of [[-9, -16, 4, 6], [-4, -18, 3.5, 5], [5, -17, 4, 6.5], [10, -19, 3.8, 5]]) g.add(leaf(pleatCone(r, h, 5, 0.3), stone, { at: [x, h / 2, z], rot: [0, x, 0] }));
+      g.add(leaf(pleatCone(1.1, 11, 5, 0.3), '#2a2445', { at: [0.5, 5.5, -13] }), placed(crystal(0.9, BOLT), 0.5, -13, 1, 0, 11.3));
+      g.add(skyBolt(-5, 10, -15, 1.6), skyBolt(6.5, 11, -16, 1.9));
+      for (const [x, z, h] of [[-6, -6, 1.2], [6.5, -5, 1.4], [-3, -9, 0.8]]) {
+        const c = crystal(h, '#8a91e0');
+        c.position.set(x, h * 0.8, z);
+        g.add(c);
+      }
+    },
+  },
+  tidewatch: {
+    sky: ['#78bfd6', '#dff1ec'], ground: '#ddc98f', shore: -6,
+    build: (g) => {
+      seaBand(g, -6);
+      g.add(placed(paperLighthouse(), 5, -10, 4.2), rock(2.8, 1.0, STONE, [5, 0, -10]));
+      g.add(curtainWall(-10, -3.5, -4.6, 1.5, '#c9c3b5', '#c8463d', '#2f8fff'));
+    },
+  },
+  cinderkeep: {
+    sky: ['#1e0a0e', '#7a2416'], ground: '#3b2018',
+    build: (g) => {
+      // The volcano: a cut-off cone, its crater glowing and fire out of the top.
+      g.add(leaf(pleatTube(7, 1.8, 5.6, 7, 0.16), '#4a1e16', { at: [5, 0, -19] }), part(cyl(1.6, 1.6, 0.1, 14), '#ff6a2a', { at: [5, 5.45, -19], glow: 1, crease: false }));
+      for (const [dx, h, c] of [[0, 2.6, '#ffb02e'], [-0.7, 1.7, '#ff7a2f'], [0.7, 1.9, '#ff7a2f']] as const) g.add(part(kite(h, 0.6, 0.4), c, { at: [5 + dx, 5.4, -19], rot: [0, -Math.PI / 2, dx * -0.4], glow: 1, two: true }));
+      g.add(hill(6, 1.3, '#2c120e', -7, -12), hill(5, 1.1, '#2c120e', 9, -10, 1));
+      g.add(curtainWall(-10, -1, -9, 2.4, '#3a2420', null));
+      for (const x of [-8, -5.5, -3]) g.add(part(box(0.3, 0.45, 0.02), '#ff9a3a', { at: [x, 1.4, -8.69], glow: 1, crease: false }));
+      for (const [x, z] of [[-1, -4], [3, -6], [7.5, -4.5]]) g.add(part(pleatCone(0.55, 0.08, 4, 0.35), '#ff7a2f', { at: [x, 0.05, z], glow: 0.9, two: true, crease: false }));
+    },
+  },
+  titans_throne: {
+    sky: ['#15122e', '#4a3f7a'], ground: '#3c3a52',
+    build: (g) => {
+      for (const [x, z, r, h] of [[-10, -18, 4.5, 7], [-5, -21, 4, 6], [6, -20, 4.2, 6.5], [11, -18, 4.6, 7.5]]) g.add(leaf(pleatCone(r, h, 5, 0.3), '#2b2650', { at: [x, h / 2, z], rot: [0, x, 0] }));
+      // The throne: a stepped dais, a seat and a high back, arms of stone.
+      const st = '#5d5a72', st2 = '#6e6b86';
+      g.add(part(box(9, 0.8, 4), '#4c4962', { at: [0, 0.4, -12] }), part(box(7, 0.8, 3), st, { at: [0, 1.2, -12.3] }));
+      g.add(part(box(4, 1.6, 2.4), st2, { at: [0, 2.4, -12.4] }), leaf(pleatWall(4.4, 7, 8, 0.45), st, { at: [0, 1.1, -13.3] }));
+      g.add(leaf(pleatWallRing(1.6, 1.4, 5), st, { at: [0, 8.05, -13.5], scale: [1.4, 1, 0.3] }));
+      for (const x of [-2.4, 2.4]) g.add(part(box(0.8, 2.6, 2.6), st2, { at: [x, 2.9, -12.4] }));
+      g.add(leaf(pleatCone(0.5, 0.8, 5, 0.35), GOLD, { at: [0, 9.85, -13.5], glow: 0.3 }));
+      g.add(skyBolt(-6, 11, -16, 1.8), skyBolt(7, 10.5, -16, 1.5));
+    },
+  },
+  // A fight over a hex, by its terrain.
+  forest: { sky: ['#20304a', '#5f7a86'], ground: '#2f5a36', build: (g) => { g.add(wood('forest-far', 70, -18, 18, -20, -9, [4, 6.5])); g.add(wood('forest-near', 10, -12, 12, -7, -4.5, [3, 4.2])); } },
+  mountain: {
+    sky: ['#8aa0b8', '#d8dee6'], ground: '#9a9ca3',
+    build: (g) => { for (const [x, z, r, h, s] of [[-9, -15, 4, 7, 0.3], [-2, -19, 5, 10, 1], [5, -16, 4.4, 8, 2], [11, -19, 4.6, 9, 0.6], [-5, -10, 2.4, 3.4, 1.2], [7, -9, 2, 3, 0.4]]) g.add(placed(paperPeak(r, h, mix(STONE, '#8d8f96', 0.4), s, h > 5), x, z)); },
+  },
+  ley: {
+    sky: ['#2e2456', '#7d68c0'], ground: '#5d4a9c',
+    build: (g) => {
+      g.add(hill(9, 2, '#4a3c86', -7, -18), hill(10, 2.4, '#4a3c86', 8, -20, 1));
+      for (const [x, z, h] of [[-7, -7, 2.2], [-5.5, -8.2, 1.4], [6, -6.5, 2.6], [7.4, -7.6, 1.6], [-1.5, -11, 1.8], [2.5, -12, 2.4], [0.5, -9, 1]]) {
+        const c = crystal(h, '#c3aefc');
+        c.position.set(x, h * 0.8, z);
+        c.rotation.z = (x % 3) * 0.08;
+        g.add(c);
+      }
+    },
+  },
+  meadow: {
+    sky: ['#8fc6ea', '#eef6d8'], sun: [6, 7, '#fff6c8'], ground: '#8fbf4f',
+    build: (g) => { g.add(hill(10, 2, '#a8c070', -7, -18), hill(12, 2.4, '#9cc060', 8, -20, 1)); g.add(wood('meadow', 7, -12, 12, -12, -7, [1.8, 2.6])); g.add(placed(sheep(), -4, -6, 2.2, 0.5), placed(sheep(), 4.5, -7, 2.2, 2.4)); },
+  },
+  plains: {
+    sky: ['#9cc7e8', '#f2e6c0'], ground: '#d9c68e',
+    build: (g) => {
+      g.add(hill(12, 1.6, '#c8b77c', -6, -20), hill(12, 1.8, '#d0be84', 8, -22, 1));
+      for (const [x, z] of [[-6, -8], [-4.6, -9], [5, -7.5], [7, -9.5]]) g.add(leaf(pleatTube(0.75, 0.6, 0.9, 6, 0.15), STRAW, { at: [x, 0, z] }), leaf(pleatCone(0.7, 0.55, 6, 0.25), mix(STRAW, '#fff8ea', 0.2), { at: [x, 1.17, z] }));
+    },
+  },
+  harbor: { sky: ['#7fc4d6', '#e3f2ec'], ground: '#d9c68e', shore: -6, build: (g) => { seaBand(g, -6, mix(TERRAIN_COLORS.harbor, '#e6eef2', 0.2)); g.add(placed(paperLighthouse(), -6, -9, 3), rock(2, 0.8, STONE, [-6, 0, -9])); } },
+  ocean: { sky: ['#3f6f96', '#a6cbe0'], ground: SEA_PAPER, shore: 2, build: (g) => seaBand(g, 2) },
+};
+
+
+// ---------- the fight, live ----------
+
+// One fighter on the stage: `key` names it to the page (its bar and name are
+// drawn over it there), `maxHp` sizes it.
+// `label` is the size in CSS pixels of what the page draws with it (its
+// name across, its bar and name together up), so they're spaced to fit.
+export type FightFigure = { key: string; fighter: Fighter; maxHp: number; label: { w: number; h: number } };
+// Where a figure is on the canvas, in CSS pixels: its box, and where its
+// plate (its name and bar) goes, under the lowest of it.
+export type FigureAnchor = { x0: number; y0: number; x1: number; y1: number; foot: number };
+
+type Standing = {
+  side: 1 | -1; // which way it faces: 1 the raiders, toward +x
+  obj: THREE.Group; // stands at (x, 0, z), turned to face; lunges and falls
+  x: number; z: number; h: number;
+  r: number; rx: number; rz: number; // its footprint: half its longest side; half across; half deep
+  label: { w: number; h: number };
+  u: number; // world units to a CSS pixel where it stood when last looked at (0 before)
+  pts: THREE.Vector3[]; // points on its model, from where it stands: what the camera must see of it
+  rigs: BeastRig[];
+  mats: { m: THREE.MeshLambertMaterial; c: THREE.Color }[];
+  strikeAt: number; hitAt: number; downAt: number;
+};
+
+// A figure's size from its full health: its area goes with its health, as
+// on the cards, so a Knight (12) is about 1.9 across, an adult dragon 2.5 to
+// 3, the Fire Giant 5.4 and the Titan 7: the bosses loom.
+const FIG_K = 1;
+const BOSS_LOOM = 1.35;
+// How many fighters a column holds before its side starts another.
+const PER_COLUMN = { upright: 5, wide: 3 };
+const CROWN_PX = 44; // the crown over a head, at the scoring (style.css .fig-crown)
+const LUNGE_S = 0.3, FLINCH_S = 0.25, FALL_S = 0.5;
+const GREY = new THREE.Color('#8a8790');
+
+// A fight, played on the place it's fought over: the place's diorama and
+// the fighters as one scene, every fighter standing on its ground, under
+// one sun, as the board is. The raiders stand on the left facing right,
+// the defenders on the right facing left, each side in columns going back
+// (layout). A boss (four times any other defender's health) stands as a
+// column of its own beyond its side's on a wide screen; on one held
+// upright, with no room across, it stands behind them. It's seen through
+// the map's camera (its field of view, looking down at CAMERA_TILT), so it
+// reads as the board does: nothing stands in front of anything. The camera
+// is as far back as lets every fighter, with room for its plate, fit between `safe.top` and `safe.bottom` (fractions of the
+// height kept clear for the page's header and footer). Labels are the
+// page's (tv.ts), pinned over each model by anchor().
+export class FightStage {
+  readonly el: HTMLCanvasElement;
+  private renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(MAP_FOV, 16 / 9, 0.1, 600);
+  private figs = new Map<string, Standing>();
+  private clock = new THREE.Clock();
+  private sun = new THREE.DirectionalLight('#fff1dc', 3.4);
+  private size = { w: 0, h: 0 };
+  private dead = false;
+  private mounted = false;
+  /** Called whenever the figures' places on the canvas change (a resize). */
+  onLayout: (() => void) | null = null;
+
+  private upright: boolean;
+  private safe: { top: number; bottom: number };
+  private left: Standing[] = [];
+  private foes: Standing[] = [];
+  private boss: Standing | null = null;
+
+  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }) {
+    this.upright = upright;
+    this.safe = safe;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.el = this.renderer.domElement;
+    this.el.className = 'stage3d';
+    GRAIN ??= paperTexture();
+
+    const p = PLACES[place] ?? PLACES.plains;
+    this.scene.background = skyTexture(p.sky[0], p.sky[1]);
+    const world = new THREE.Group();
+    world.add(groundSheet(p.ground, place, p.shore));
+    p.build(world);
+    this.scene.add(world);
+    if (p.sun) {
+      const [x, y, c] = p.sun;
+      this.scene.add(part(cyl(1.6, 1.6, 0.05, 8), c, { at: [x, y, -30], rot: [Math.PI / 2, 0, 0], glow: 1, crease: false }));
+    }
+    this.scene.fog = new THREE.Fog(p.sky[1], 34, 75);
+
+    this.left = left.map((f) => this.stand(f, 1));
+    const r = right.map((f) => this.stand(f, -1));
+    // The biggest defender stands farthest from the dragons, the smallest nearest.
+    const order = r.map((_, i) => i).sort((a, b) => right[a].maxHp - right[b].maxHp || a - b);
+    this.foes = order.map((i) => r[i]);
+    if (order.length > 1 && right[order.at(-1)!].maxHp >= 4 * right[order.at(-2)!].maxHp) {
+      this.boss = this.foes.at(-1)!;
+      this.foes = this.foes.slice(0, -1);
+      // A little bigger than its health alone makes it, so it looms (and,
+      // standing at the back on a phone, isn't shrunk by the distance).
+      const b = this.boss;
+      b.obj.scale.setScalar(BOSS_LOOM);
+      b.h *= BOSS_LOOM; b.r *= BOSS_LOOM; b.rx *= BOSS_LOOM; b.rz *= BOSS_LOOM;
+      for (const p of b.pts) p.multiplyScalar(BOSS_LOOM);
+    }
+    this.scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 0.95));
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.bias = -0.0005;
+    this.sun.shadow.normalBias = 0.02;
+    this.scene.add(this.sun, this.sun.target);
+  }
+
+  // The sun, from the room's left as on the board, over the fighters where
+  // they stand, its shadows reaching across all of them and the place behind.
+  private aimSun() {
+    const all = [...this.figs.values()];
+    const cx = (Math.min(...all.map((f) => f.x - f.rx)) + Math.max(...all.map((f) => f.x + f.rx))) / 2;
+    const cz = (Math.min(...all.map((f) => f.z - f.rz)) + Math.max(...all.map((f) => f.z + f.rz))) / 2;
+    const span = Math.max(12, ...all.map((f) => Math.max(Math.abs(f.x - cx), Math.abs(f.z - cz)) + f.r + 2));
+    const at = new THREE.Vector3(cx, 0, Math.min(cz, -4));
+    this.sun.position.copy(at).add(new THREE.Vector3(-1.4, 3.3, 1.7).multiplyScalar(span));
+    this.sun.target.position.copy(at);
+    Object.assign(this.sun.shadow.camera, { left: -span * 1.6, right: span * 1.6, top: span * 1.6, bottom: -span * 1.6, near: 0.1, far: span * 12 });
+    this.sun.shadow.camera.updateProjectionMatrix();
+  }
+
+  // A fighter's model, sized by its health and turned to face the other side,
+  // three-quarters to the room.
+  private stand(f: FightFigure, side: 1 | -1): Standing {
+    let model: THREE.Group;
+    let face: number;
+    const turn = 0.5;
+    let rigs: BeastRig[] = [];
+    if ('dragon' in f.fighter) {
+      model = fightingDragon(f.fighter.dragon.element);
+      face = side * (Math.PI / 2 - turn); // dragons are built head to +z
+    } else {
+      const make = DEFENDERS[f.fighter.foe];
+      model = make ? make() : BEASTS.has(f.fighter.foe) ? beastModel(f.fighter.foe) : militia();
+      if (!make && BEASTS.has(f.fighter.foe)) rigs = model.userData.rigs as BeastRig[];
+      face = side === 1 ? -turn : Math.PI + turn; // everything else head to +x
+    }
+    for (const r of rigs) animateBeast(r, 0, 0, 0);
+    model.rotation.y = face;
+    model.updateMatrixWorld(true);
+    let b = new THREE.Box3().setFromObject(model);
+    let s = b.getSize(new THREE.Vector3());
+    const k = (FIG_K * Math.sqrt(Math.max(1, f.maxHp))) / Math.sqrt(Math.max(1e-3, s.y * Math.max(s.x, s.z)));
+    model.scale.setScalar(k);
+    model.updateMatrixWorld(true);
+    b = new THREE.Box3().setFromObject(model);
+    s = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    // Its feet on the ground, its footprint centred on where it stands.
+    model.position.set(-c.x, -b.min.y, -c.z);
+    const obj = new THREE.Group();
+    obj.add(model);
+    this.scene.add(obj);
+    // Some of its corners, from where it stands, for the camera to fit to
+    // (its box's corners would ask room for the air round a sprawling model).
+    obj.updateMatrixWorld(true);
+    const pts: THREE.Vector3[] = [];
+    obj.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const p = o.geometry.getAttribute('position');
+      const step = Math.max(1, Math.floor(p.count / 40));
+      for (let i = 0; i < p.count; i += step) pts.push(new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld));
+    });
+    // Its own paper, so it can grey when it falls without greying its kind.
+    const mats: Standing['mats'] = [];
+    obj.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshLambertMaterial)) return;
+      o.material = o.material.clone();
+      mats.push({ m: o.material, c: o.material.color.clone() });
+    });
+    const st: Standing = { side, obj, x: 0, z: 0, h: s.y, r: Math.max(s.x, s.z) / 2, rx: s.x / 2, rz: s.z / 2, label: f.label, u: 0, pts, rigs, mats, strikeAt: -1, hitAt: -1, downAt: -1 };
+    this.figs.set(f.key, st);
+    return st;
+  }
+
+  // Every fighter's place, with `u` world units to a CSS pixel (so labels
+  // can be given room); then all of them moved up in front of the place's
+  // scenery, which starts a few steps behind the middle.
+  private place() {
+    this.layout(this.left, 1);
+    this.layout(this.foes, -1);
+    const boss = this.boss;
+    if (boss && !this.upright) {
+      // A column of its own beyond its side's, where there's room, level with their middle.
+      boss.x = Math.max(1.2, ...this.foes.map((f) => f.x + Math.max(2 * f.rx, f.label.w * f.u) / 2)) + 0.4 + Math.max(2 * boss.rx, boss.label.w * boss.u) / 2;
+      const zs = this.foes.map((f) => f.z);
+      boss.z = zs.length ? (Math.min(...zs) + Math.max(...zs)) / 2 : 0;
+    } else if (boss) {
+      // Behind its files, across the middle of its side.
+      const xs = this.foes.map((f) => f.x);
+      boss.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 1.2 + boss.rx;
+      boss.z = Math.min(0, ...this.foes.map((f) => f.z - f.rz - f.h / Math.tan(CAMERA_TILT) * 0.3)) - boss.rz - boss.label.h * boss.u;
+    }
+    const all = [...this.figs.values()];
+    const shift = -3 - Math.min(...all.map((f) => f.z - f.rz));
+    for (const f of all) {
+      f.z += shift;
+      f.obj.position.set(f.x, 0, f.z);
+    }
+  }
+
+  // A side's places: columns going back, the first nearest the other side
+  // and each next one further out, so every bolt crosses the screen from
+  // one side to the other. A column holds PER_COLUMN fighters (more on a
+  // phone held upright, which has height to spare and no width), and a
+  // side takes another column only when it needs one. The ranks line up
+  // across the columns, each as far in front of the one behind as its
+  // tallest figure needs to leave that one, its plate and crown showing.
+  private layout(fs: Standing[], side: 1 | -1) {
+    const per = this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
+    const cols: Standing[][] = [];
+    for (let i = 0; i < fs.length; i += per) cols.push(fs.slice(i, i + per));
+    if (!cols.length) return;
+    const back = 1 / Math.tan(CAMERA_TILT); // how far back a height reaches, looking down
+    const GAP = 0.4, MID = 1.2;
+    // (Labels a little wider than measured: the camera settles a little further back than it was when they were.)
+    const wide = (f: Standing) => Math.max(2 * f.rx, f.label.w * f.u * 1.15);
+    // Depth on the ground shows on the screen foreshortened, by the tilt's sine.
+    // (A rank's plates, and the crowns over the heads in front of them at the scoring.)
+    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => (f.label.h + CROWN_PX) * f.u)) * 1.15) / Math.sin(CAMERA_TILT) + 0.3;
+    const ranks = Math.max(...cols.map((c) => c.length));
+    const zs = [0];
+    for (let k = 1; k < ranks; k++) {
+      const prev = cols.map((c) => c[k - 1]).filter(Boolean), cur = cols.map((c) => c[k]).filter(Boolean);
+      const pr = Math.max(...prev.map((f) => f.rz)), cr = Math.max(...cur.map((f) => f.rz)), ch = Math.max(...cur.map((f) => f.h));
+      zs.push(zs[k - 1] + Math.max(pr + cr, ch * back) + clear([...prev, ...cur]));
+    }
+    const front = zs[ranks - 1];
+    let x = MID;
+    for (const col of cols) {
+      const w = Math.max(...col.map(wide)) / 2;
+      col.forEach((f, k) => {
+        f.x = -side * (x + w);
+        f.z = zs[k] - front;
+      });
+      x += 2 * w + Math.max(GAP, 24 * Math.max(...col.map((f) => f.u)));
+    }
+  }
+
+  /** Puts it in `box` (which it fills) and starts playing; it stops itself once taken off the page. */
+  mount(box: HTMLElement) {
+    box.append(this.el);
+    this.mounted = true;
+    const fit = () => {
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h || (w === this.size.w && h === this.size.h)) return;
+      this.size = { w, h };
+      this.renderer.setSize(w, h, false);
+      this.el.style.width = `${w}px`;
+      this.el.style.height = `${h}px`;
+      // Labels are sized in pixels, the scene in world units: place, look,
+      // see how big a world unit came out, and place again.
+      for (let i = 0; i < 3; i++) {
+        this.place();
+        this.fit();
+        this.measure();
+      }
+      this.aimSun();
+      this.onLayout?.();
+    };
+    new ResizeObserver(fit).observe(box);
+    fit();
+    const loop = () => {
+      if (this.dead) return;
+      if (this.mounted && !this.el.isConnected) return this.dispose();
+      requestAnimationFrame(loop);
+      this.frame();
+    };
+    loop();
+  }
+
+  // The camera: looking down at the fighters' middle, as far back as fits
+  // them all, plates and all (and no nearer than the place needs to show),
+  // then moved up or down so they sit in the middle of the clear band.
+  private fit() {
+    const { w, h } = this.size;
+    const aspect = w / h;
+    this.camera.aspect = aspect;
+    const top = 1 - 2 * this.safe.top, bottom = -1 + 2 * this.safe.bottom;
+    this.camera.clearViewOffset();
+    const all = [...this.figs.values()];
+    const at = new THREE.Vector3(
+      all.length ? (Math.min(...all.map((f) => f.x - f.rx)) + Math.max(...all.map((f) => f.x + f.rx))) / 2 : 0, 0,
+      all.length ? (Math.min(...all.map((f) => f.z - f.rz)) + Math.max(...all.map((f) => f.z + f.rz))) / 2 : 0);
+    const dir = new THREE.Vector3(0, Math.sin(CAMERA_TILT), Math.cos(CAMERA_TILT));
+    // Room over each head for the crown, under its feet for its plate.
+    const over = (2 * CROWN_PX) / h;
+    const v = new THREE.Vector3();
+    // How much of the screen the fighters take, up and across, from `d` away.
+    const extent = (d: number) => {
+      this.camera.position.copy(at).addScaledVector(dir, d);
+      this.camera.lookAt(at);
+      this.camera.updateMatrixWorld();
+      this.camera.updateProjectionMatrix();
+      let lo = Infinity, hi = -Infinity, wide = 0;
+      for (const f of all) {
+        let low = Infinity;
+        for (const p of f.pts) {
+          v.set(f.x + p.x, p.y, f.z + p.z).project(this.camera);
+          hi = Math.max(hi, v.y + over);
+          low = Math.min(low, v.y);
+          wide = Math.max(wide, Math.abs(v.x));
+        }
+        // Its plate hangs under the lowest of it.
+        lo = Math.min(lo, low - (2 * (f.label.h + 4)) / h);
+        v.set(f.x, 0, f.z).project(this.camera);
+        wide = Math.max(wide, Math.abs(v.x) + f.label.w / w);
+        // Room to fall, away from the other side (a boss falls back).
+        if (f !== this.boss) wide = Math.max(wide, Math.abs(v.set(f.x - f.side * f.h, 0, f.z).project(this.camera).x));
+      }
+      return { lo, hi, wide };
+    };
+    const fits = (d: number) => {
+      const e = extent(d);
+      return e.hi - e.lo <= top - bottom && e.wide <= 0.92;
+    };
+    let lo = 4, hi = 400;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    const d = Math.max(hi, 22);
+    // Then moved up or down the screen so what's drawn sits in the middle of the clear band.
+    const e = extent(d);
+    this.camera.setViewOffset(w, h, 0, (((top + bottom) - (e.hi + e.lo)) / 2) * (h / 2), w, h);
+    this.camera.updateProjectionMatrix();
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = d + 10;
+    fog.far = d + 60;
+  }
+
+  // Each figure's world units to a CSS pixel, where it stands: nearer the
+  // camera, a pixel is less of the world.
+  private measure() {
+    for (const f of this.figs.values()) {
+      const a = new THREE.Vector3(f.x - 1, 0, f.z).project(this.camera), b = new THREE.Vector3(f.x + 1, 0, f.z).project(this.camera);
+      const px = (Math.abs(b.x - a.x) / 2) * (this.size.w / 2);
+      f.u = px > 0 ? 1 / px : 0;
+    }
+  }
+
+  /** Where a figure stands on the canvas, as it stood before the fight. */
+  anchor(key: string): FigureAnchor | null {
+    const f = this.figs.get(key);
+    if (!f || !this.size.w) return null;
+    const v = new THREE.Vector3();
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of f.pts) {
+      v.set(f.x + p.x, p.y, f.z + p.z).project(this.camera);
+      const px = ((v.x + 1) / 2) * this.size.w, py = ((1 - v.y) / 2) * this.size.h;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    return { x0, y0, x1, y1, foot: y1 };
+  }
+
+  /** It lunges at the other side. */
+  strike(key: string) { const f = this.figs.get(key); if (f) f.strikeAt = this.clock.getElapsedTime(); }
+  /** It flinches from a hit. */
+  hit(key: string) { const f = this.figs.get(key); if (f) f.hitAt = this.clock.getElapsedTime(); }
+  /** It falls over, away from the other side (a boss onto its back), and greys. */
+  fall(key: string) { const f = this.figs.get(key); if (f && f.downAt < 0) f.downAt = this.clock.getElapsedTime(); }
+
+  private frame() {
+    const t = this.clock.getElapsedTime();
+    for (const f of this.figs.values()) {
+      for (const r of f.rigs) animateBeast(r, t, 0, 0);
+      const ls = f.strikeAt < 0 ? 1 : (t - f.strikeAt) / LUNGE_S;
+      const lunge = ls < 1 ? Math.sin(ls * Math.PI) * Math.max(0.4, f.r * 0.5) : 0;
+      const fl = f.hitAt < 0 ? 1 : (t - f.hitAt) / FLINCH_S;
+      const flinch = fl < 1 ? Math.sin(fl * Math.PI) : 0;
+      const dn = f.downAt < 0 ? 0 : Math.min(1, (t - f.downAt) / FALL_S);
+      const fall = dn * dn * (3 - 2 * dn);
+      f.obj.position.set(f.x + f.side * (lunge - flinch * 0.15 * f.r), 0, f.z);
+      // Tipped back from the other side by a flinch; laid on its side by a
+      // fall, away from the other side, which reads from above. A boss falls
+      // onto its back instead, so it doesn't fall off the screen or onto its own.
+      const big = f === this.boss;
+      f.obj.rotation.z = f.side * (flinch * 0.12 + (big ? 0 : fall * 1.45));
+      f.obj.rotation.x = big ? -fall * 1.45 : 0;
+      if (f.downAt >= 0 && dn <= 1) for (const { m, c } of f.mats) m.color.copy(c).lerp(GREY, fall * 0.7);
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    if (this.dead) return;
+    this.dead = true;
+    this.scene.traverse((o) => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
+    });
+    (this.scene.background as THREE.Texture | null)?.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+  }
 }

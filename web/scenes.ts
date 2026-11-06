@@ -50,12 +50,19 @@ export const eatOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? (ev.e
 export const prodRowsOf = (ev: GameEvent | undefined) => madeOf(ev).length + (eatOf(ev) && !madeOf(ev).includes('livestock') ? 1 : 0);
 
 // A fight: a beat to look up and see who's there, the hits (at most 6 s of
-// them), then the outcome long enough to read.
+// them), then the outcome long enough to read. A kingdom that scores (#326)
+// adds a beat of its own after the loot: the crown comes down on the player
+// with the most power standing, then their points, held to be read.
 export const FIGHT_LEAD_MS = 1600;
 export const HIT_MS = 400;
 export const OUTCOME_MS = 4500;
+export const CROWN_AT_MS = 2400; // after the outcome: the loot read, the crown comes down
+export const POINTS_AT_MS = 1100; // after the crown: the points
+export const SCORED_MS = 3800; // the points held
 export const hitStep = (hits: number) => Math.min(HIT_MS, 6000 / Math.max(1, hits));
-const fightMs = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400 + OUTCOME_MS;
+// When the outcome shows, from the scene's start.
+export const outcomeAt = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400;
+const fightMs = (hits: number, scored = false) => outcomeAt(hits) + (scored ? CROWN_AT_MS + POINTS_AT_MS + SCORED_MS : OUTCOME_MS);
 
 export const NO_RAID_MS = 4000;
 
@@ -79,7 +86,8 @@ export function scenesOf(events: SceneEvent[]): Scene[] {
       out.push({ kind: 'roll', at, rolls, ms: prodMs(rolls.map((j) => prodRowsOf(events[j].ev))) });
     } else if (ev?.k === 'fight') {
       const f = fightOf(at, 'raidEnd');
-      out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat)) });
+      const end = f.end === null ? undefined : events[f.end].ev;
+      out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat), end?.k === 'raidEnd' && end.scorer !== undefined) });
     } else if (ev?.k === 'hunt') {
       const f = fightOf(at, 'cleared');
       out.push({ kind: 'hunt', at, ...f, ms: fightMs(hits(f.combat)) });

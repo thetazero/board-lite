@@ -528,7 +528,11 @@ async function main() {
             const screenGone = shot.screen ? room.connect(null) : null;
             await tab.load(url, device, { storage, loading: shot.loading });
             // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
-            if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
+            if (st.scene.remote && st.game && shot.seat !== undefined) {
+              await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
+              // As at a real table, three.js is in before the fight, so its figures are folded, not flat.
+              await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.body.classList.contains('folded')`, 'the table view to load its 3D', 30000);
+            }
             if (shot.live) {
               room.mutate((g) => st.scene.live!(g, st.rng));
               await sleep(100);
