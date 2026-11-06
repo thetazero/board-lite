@@ -775,6 +775,7 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .offer.out { background: transparent; box-shadow: none; border: 2px dashed #f3ead766; --text: var(--paper); --muted: var(--muted); color: var(--paper); }
 .offer.out .ricon { filter: none; }
 .offer.out .ptag { color: var(--pc); }
+.offer.in .open { margin: .2em 0 .4em; font-size: .9em; color: var(--muted); }
 .offer.out .declined { margin: .3em 0 0; font-size: .9em; color: var(--muted); }
 .proj { display: flex; align-items: center; gap: .5em; margin: .35em 0; }
 .proj b { min-width: 7em; margin-right: .4em; }

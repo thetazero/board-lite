@@ -792,11 +792,12 @@ function myDragon(d: DragonView, g: PublicState): string {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => (o.to === null ? o.from !== me.seat && !o.passed.includes(me.seat) : o.to === me.seat)).map((o) => `
-    <div class="offer in" data-key="offer ${o.id}">${playerTag(o.from, names)} offers ${o.to === null ? 'anyone ' : ''}<b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
+    <div class="offer in" data-key="offer ${o.id}">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
+      ${o.to === null ? '<p class="open">To anyone: the first to accept trades.</p>' : ''}
       ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
-    <div class="offer out" data-key="offer ${o.id}">You offer ${o.to === null ? 'anyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
+    <div class="offer out" data-key="offer ${o.id}">You offer ${o.to === null ? '' : `${playerTag(o.to, names)} `}<b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b>${o.to === null ? ' to anyone' : ''} <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
   // Build and Trade (with the merchants) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
