@@ -1387,6 +1387,20 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // Fauna beside a great beast (#357): a Basilisk on a hex the Thunderbird
+    // holds. The hex is still held, so it keeps its border.
+    name: 'beast-hold-fauna-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      const n = neighbors(PEAK).sort().find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.map[x].fauna && !g.buildings[x])!;
+      g.map[n].fauna = 'basilisk';
+    },
+    shots: () => [{ file: 'tv-beast-hold-fauna-3p', caption: 'TV: a Basilisk beside the Thunderbird, on a hex it holds: still ringed', client: 'tv', waitMs: 4800 }],
+  },
+  {
     // The same fight, at its end.
     name: 'beasts-slain-3p',
     players: 3,

@@ -809,6 +809,15 @@ test('a great beast holds the hexes around it: nothing is built there until it f
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock! + TUNING.peakBonus);
 });
 
+test('a hex a great beast holds stays held with other fauna on it, on the TV and in the CLI', () => {
+  const { g, ring } = beastGame();
+  g.map[ring].fauna = 'basilisk';
+  const hex = publicState(g).map.find((h) => h.k === ring)!;
+  assert.equal(hex.held, 'thunderbird');
+  assert.equal(publicState(g).map.find((h) => h.k === PEAK)!.held, undefined); // the beast's own hex has no border
+  assert.match(playerView(g, 0), new RegExp(`${ring}:[A-Z.~]\\{[^}]+\\}\\{x\\}`));
+});
+
 test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {
   const { g } = beastGame();
   const d = g.dragons.find((x) => x.owner === 0)!;
