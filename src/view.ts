@@ -151,10 +151,10 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight its beast and rivals' perched dragons to the end; 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
+      out.push(`clear <hex> <dragon ids...>   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
     }
     if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: ${you.autoClear.join(' ')})`);
-    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Hexes: ${you.perchable.join(' ')})`);
+    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (perched: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card, cost ${resText(you.eggProject.cost)})`);
     for (const u of you.upgradeProjects) {
