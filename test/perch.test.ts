@@ -145,7 +145,7 @@ test('a suppressed roost houses no dragons, and too many dragons only stops hatc
   assert.ok(me.dragonsHoused > me.dragonCapacity);
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = seatView({ lobby: { code: 'T', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...me, name: 'P1' } }, 10);
-  assert.match(view, /2 over your room/);
+  assert.match(view, /2 over, no hatching until there.s room/);
 });
 
 test('nothing blocks a tower: no dragon perches there and no beast is placed there', () => {
@@ -258,7 +258,7 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   apply(g, 1, 'end');
   toTurnOf(g, 0);
   assert.ok(seatState(g, 0).huntable.includes(pasture));
-  assert.match(view(0), new RegExp(`you can fight: .*${pasture} ${d.id}`));
+  assert.match(view(0), new RegExp(`Hexes: .*${pasture} ${d.id}`));
   assert.ok(h);
 });
 

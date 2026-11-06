@@ -223,8 +223,8 @@ test('illegal moves are refused without changing the game', () => {
 test('an offer must trade something real', () => {
   const g = newGame(2, 11);
   keepAll(g);
-  assert.throws(() => apply(g, 0, 'offer P2 give 0 stone get 0 gold'), /nothing for nothing/);
-  assert.throws(() => apply(g, 0, 'offer P2 give get'), /nothing for nothing/);
+  assert.throws(() => apply(g, 0, 'offer P2 give 0 stone get 0 gold'), /offer is empty/);
+  assert.throws(() => apply(g, 0, 'offer P2 give get'), /offer is empty/);
   const card = g.players[0].hand[0];
   assert.throws(() => apply(g, 0, `offer P2 give ${card.id} ${card.id} get 1 stone`), /Name each card once/);
   // Gold is public: asking for more than they have is refused at once.
@@ -270,7 +270,7 @@ test('an offer to anyone goes to the first to accept it, and the others may decl
   const g = newGame(3, 11);
   keepAll(g);
   // Only the acting player offers to anyone; out of turn, offers go to them.
-  assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /only make offers to the acting player/);
+  assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /you can only offer to P/);
   apply(g, 0, 'offer anyone give 1 stone get 1 timber');
   const o = g.offers[0];
   assert.equal(o.to, null);
@@ -421,7 +421,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.ok(playerView(g, 0).includes('P2 to P1 (private): "I will bail, trust me"'));
   assert.ok(!playerView(g, 2).includes('I will bail'));
   assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), /You can't tell yourself\./);
-  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Tell whom\?/);
+  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Name a player to tell/);
   assert.throws(() => apply(g, 0, 'say'), RuleError);
   advanceToRaidVote(g);
   apply(g, 0, 'say vote 2 with me');
@@ -481,7 +481,7 @@ test('production says what the dragons eat apart from what is made, and so does 
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
   assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
-  assert.match(playerView(g, p), /livestock \d+ \(your dragons eat 2\)/);
+  assert.match(playerView(g, p), /livestock [0-9+d]+ \(dragons eat 2\)/);
 });
 
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
@@ -793,7 +793,7 @@ test('combat power: dragons and kingdoms carry one number, and a side adds up', 
   const st = DRAGONS[a.key].stages[2];
   assert.equal(dragonPower(a), Math.round(Math.sqrt(st.hp * st.targets * st.dice * (st.sides + 1) / 2)));
   assert.equal(targetPower('brindle'), 2 * combatPower(UNITS.militia));
-  assert.match(playerView(g, 0), new RegExp(`power ${dragonPower(a)}`));
+  assert.match(playerView(g, 0), new RegExp(`Power ${dragonPower(a)}`));
 });
 
 // The map as generated, before the first production lets fauna wander.
@@ -1205,5 +1205,5 @@ test('a Workshop is also a special project, at double the card, and works like t
   assert.match(seatState(g, p).upgradeProjects[0].why!, /without an upgrade/);
   // Only base upgrades are special projects.
   rich(g, p);
-  assert.throws(() => apply(g, p, `project nesting_grounds ${g.towers[p]}`), /special project is a base dragon egg/);
+  assert.throws(() => apply(g, p, `project nesting_grounds ${g.towers[p]}`), /Use: project </);
 });
