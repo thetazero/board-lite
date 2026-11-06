@@ -74,6 +74,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 - Each beast has an elemental weakness, so "the race is to get the right dragons, not the most dragons", and "a well-built force should be able to win around round 8–10, not round 4" (proposed by the orchestrator; the owner: "Yup I like it").
 - The centre mountain: nobody builds on or next to the peak while the Thunderbird lives; once it's slain, buildings next to the peak produce more ("Right I think a production bonus makes sense").
 - The sea serpent prowls one coast, and the harbour there produces nothing until it's killed ("I like it").
+- Since #339 the Leviathan moves every round: "I feel like it should move to a random tile every turn. With the same [pseudo random] pushing it to go somewhere further away, but not always further away." In production it moves to a random other ocean hex, each weighted by its distance from where it is (so a hex twice as far is twice as likely), and keeps to the ocean hexes whose hold stays clear of the towers' adjacent hexes, as its starting spot always did. It holds wherever it is now: a port built while it was away keeps working when it comes back (the hold only stops building, as before). On the TV it dives and comes up at its new hex a few seconds later ("sink into the ocean, or swim into the ocean, or really dive, and then pop back out a few seconds later").
 - Points from beasts: "It's not a raid, and that's not a hard rul" (of "raids give loot only, no points").
 
 ## Theme

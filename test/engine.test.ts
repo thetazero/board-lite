@@ -5,7 +5,7 @@ import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingC
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
-import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '../src/map.ts';
+import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
@@ -929,7 +929,7 @@ test('a beast a card sent gives no loot when it falls', () => {
   assert.deepEqual(g.players[0].resources, before);
 });
 
-test('in production, fauna wanders to adjacent land hexes with no tower or beast; great beasts stay', () => {
+test('in production, fauna wanders to adjacent land hexes with no tower or beast; the Thunderbird stays', () => {
   const g = newGame(2, 7);
   for (const k of Object.keys(g.map)) if (!BEASTS[g.map[k].fauna ?? '']) delete g.map[k].fauna;
   for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
@@ -937,7 +937,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   let at = Object.keys(g.map).find((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && !g.buildings[k] && neighbors(k).every((n) => g.map[n]))!;
   g.map[at].fauna = 'wolf_pack';
   g.map[at].sent = true;
-  const great = Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort();
+  const peak = Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird');
   let moves = 0;
   let stays = 0;
   for (let i = 0; i < 40 && g.phase !== 'over'; i++) {
@@ -958,10 +958,46 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
       assert.equal(g.map[at].sent, undefined);
     }
     at = now;
-    assert.deepEqual(Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort(), great);
+    assert.deepEqual(Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird'), peak);
   }
   assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
   assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
+});
+
+test('in production the Leviathan moves to another hex of its waters, more often a far one', () => {
+  const g = newGame(3, 11);
+  for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
+  g.dragons.forEach((d) => (d.growth = -1000));
+  const waters = leviathanWaters(g.map, 3);
+  const dist = (a: string, b: string) => {
+    const [aq, ar] = parseKey(a)!, [bq, br] = parseKey(b)!;
+    return distance(aq - bq, ar - br);
+  };
+  let at = Object.keys(g.map).find((k) => g.map[k].fauna === 'leviathan')!;
+  assert.ok(waters.includes(at), 'it starts in its waters');
+  assert.ok(waters.length < Object.keys(g.map).filter((k) => g.map[k].terrain === 'ocean').length, 'its hold keeps clear of the towers');
+  const went: number[] = [];
+  for (let i = 0; i < 80 && g.phase !== 'over'; i++) {
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) {
+      const pl = g.players[p];
+      apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
+    }
+    const now = Object.keys(g.map).filter((k) => g.map[k].fauna === 'leviathan');
+    assert.equal(now.length, 1);
+    assert.notEqual(now[0], at, 'it moves every round');
+    assert.ok(waters.includes(now[0]), `${now[0]} is in its waters`);
+    went.push(dist(at, now[0]));
+    at = now[0];
+  }
+  // Weighted by distance: further on average than an even pick, but it
+  // still sometimes comes up close by.
+  const even = (from: string) => waters.filter((k) => k !== from).reduce((s, k) => s + dist(from, k), 0) / (waters.length - 1);
+  const mean = went.reduce((a, b) => a + b, 0) / went.length;
+  assert.ok(mean > even(at) + 0.5, `mean ${mean} vs even ${even(at)}`);
+  assert.ok(went.some((d) => d <= 2), 'sometimes close');
+  assert.ok(g.log.some((e) => e.ev?.k === 'wander' && e.ev.fauna === 'leviathan'));
 });
 
 test('a wandering beast still moves at random, but more often to a hex beside no other beast', () => {
