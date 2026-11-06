@@ -517,7 +517,8 @@ body.recap-page { font-size: 16px; }
 /* The folded diorama (board3d.ts stageArt): cropped to the screen, its ground kept. */
 .fightscene img.backdrop { object-fit: cover; object-position: 50% 100%; }
 .fhead { position: absolute; top: 2.2vh; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 1.2em; }
-.fhead h2 { margin: 0; font-family: var(--serif); font-size: 2.4em; display: flex; gap: .4em; align-items: center; background: var(--sheet); color: var(--ink); padding: .2em .9em; border-radius: 2px; box-shadow: var(--lift); }
+.fhead h2 { margin: 0; max-width: calc(94vw - 6em); font-family: var(--serif); font-size: 2.4em; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 .4em; align-items: center; background: var(--sheet); color: var(--ink); padding: .2em .9em; border-radius: 2px; box-shadow: var(--lift); }
+.fhead h2 .ptag { white-space: nowrap; }
 .fhead .bvs { background: var(--sheet); color: var(--ink-soft); border-radius: 2px; box-shadow: var(--lift); padding: .15em .7em .3em; min-width: 3.5em; }
 .bvs { display: flex; flex-direction: column; align-items: center; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
@@ -566,12 +567,18 @@ body.recap-page { font-size: 16px; }
 @keyframes out { to { opacity: 0; } }
 @keyframes dmg { from { scale: 1.5; } 15% { scale: 1; } 60% { translate: -50% 0; opacity: 1; } to { translate: -50% -.8em; opacity: 0; } }
 /* The outcome, on a sheet under the heading. */
-.fightscene .outcome { position: absolute; left: 50%; top: 11vh; translate: -50% 0; min-width: 34em; max-width: 92vw; background: var(--sheet); color: var(--ink); text-align: center; padding: .3em 2.2em .9em; border-radius: 2px; box-shadow: var(--lift); opacity: 0; transition: opacity .4s; z-index: 5; }
+.fightscene .outcome { position: absolute; left: 50%; top: 11vh; translate: -50% 0; box-sizing: border-box; width: max-content; min-width: 34em; max-width: 92vw; background: var(--sheet); color: var(--ink); text-align: center; padding: .3em 2.2em .9em; border-radius: 2px; box-shadow: var(--lift); opacity: 0; transition: opacity .4s; z-index: 5; }
 .fightscene .outcome:empty { display: none; }
 .outcome.show { opacity: 1; }
 .outcome h1 { margin: .3em 0 .2em; font-family: var(--serif); font-size: 2.3em; }
-.spoils { display: flex; gap: 2em; justify-content: center; font-size: 1.6em; }
-.spoils > span { display: inline-flex; align-items: center; gap: .3em; }
+/* Each winner's name and loot stay whole; a long row wraps inside the sheet.
+   Past three winners, each stands its name over its loot, smaller, so six fit across. */
+.spoils { display: flex; flex-wrap: wrap; gap: .3em 2em; justify-content: center; font-size: 1.6em; }
+.spoils > span { display: inline-flex; align-items: center; gap: .3em; white-space: nowrap; }
+.spoils .gains { display: inline-flex; align-items: center; }
+.spoils.many { font-size: 1.25em; gap: .5em 1em; }
+.spoils.many .chip { margin: 0 .15em; }
+.spoils.many > span { flex-direction: column; gap: 0; }
 /* The scoring beat: the crown comes down on the most power standing, on
    their dragons and their name, then the points. */
 .outcome .score { display: flex; align-items: center; justify-content: center; gap: .5em; margin-top: .5em; padding-top: .45em; border-top: 1px solid var(--paper-edge); font-size: 1.6em; opacity: 0; transition: opacity .4s; }
@@ -1094,7 +1101,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .arena .vs { display: none; }
 .remote .raiders { font-size: 1em; min-width: 0; width: 100%; }
 .remote .fhead { top: 1vh; flex-wrap: wrap; gap: .4em; padding: 0 .5em; }
-.remote .fhead h2 { font-size: 1.2em; flex-wrap: wrap; justify-content: center; }
+.remote .fhead h2 { font-size: 1.2em; max-width: none; }
 .remote .fhead .bvs b { font-size: 1.4em; }
 .remote .battle { left: 2vw; right: 2vw; top: 36vh; bottom: 17vh; gap: 3vw; --k: clamp(.3em, min(calc(40vw / var(--sl)), calc(40vw / var(--sr)), calc(36vh / var(--mx))), 3em); }
 .remote .fledrow { bottom: 9vh; }
