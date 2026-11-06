@@ -421,7 +421,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.ok(playerView(g, 0).includes('P2 to P1 (private): "I will bail, trust me"'));
   assert.ok(!playerView(g, 2).includes('I will bail'));
   assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), /You can't tell yourself\./);
-  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Tell whom\?/);
+  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Name a player to tell/);
   assert.throws(() => apply(g, 0, 'say'), RuleError);
   advanceToRaidVote(g);
   apply(g, 0, 'say vote 2 with me');

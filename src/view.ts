@@ -77,7 +77,7 @@ export function targetText(t: TargetView): string {
 }
 
 export function faunaText(f: FaunaView): string {
-  const prize = f.points !== undefined ? `great beast: ${f.points} point${f.points === 1 ? '' : 's'} for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card sent it';
+  const prize = f.points !== undefined ? `great beast: ${f.points} point${f.points === 1 ? '' : 's'} for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card placed it';
   return `${f.name} (${unitStats(f)}; ${prize})`;
 }
 
@@ -89,7 +89,7 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   const raid = g.raid!;
   const out: string[] = [];
   if (raid.step === 'vote') {
-    out.push("Raid: vote for a target. Each vote counts its voter's power (their raid-ready dragons' combat power, summed); the most power wins. Candidates:");
+    out.push("Raid: vote for a target. Your vote is worth your raid-ready dragons' combat power, added up; the kingdom with the most power voted for it is raided. Kingdoms:");
     raid.candidates.forEach((t, i) => {
       const got = raid.votes.reduce<number>((s, v, q) => s + (v === i ? raid.votePower[q] : 0), 0);
       out.push(`  ${i + 1}. ${targetText(t)}${got ? `; votes worth ${got} power` : ''}`);
@@ -114,7 +114,7 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
 export function commandHints(g: PublicState, you: SeatState): string[] {
   if (!you.deciding) return [];
   const out: string[] = [];
-  const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
+  const afford = (c: { affordable: boolean }) => (c.affordable ? '' : " (can't afford yet)");
   if (g.phase === 'action') {
     for (const o of g.offers.filter((x) => (x.to === null ? x.from !== you.seat && !x.passed.includes(you.seat) : x.to === you.seat))) {
       const why = you.cantAccept[o.id];
@@ -136,7 +136,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         out.push(`play ${c.id}   (hatch ${c.name})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
       } else if (c.needs !== 'unplayable') {
         const arg = { resource: ' <stone|timber|crystal|livestock>', dragon: ' <dragon id>', hex: ' <hex>', none: '' }[c.needs];
-        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: any land hex without fauna or a tower; ${faunaText(c.fauna)}` : ''})${afford(c)}`);
+        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: a land hex with no tower or beast; ${faunaText(c.fauna)}` : ''})${afford(c)}`);
       }
     }
     for (const b of you.basics) {
@@ -148,7 +148,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
+      out.push(`clear <hex> <dragon ids...>   (send dragons against what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. 1 try at a great beast each round. Your raid-ready dragons: ${you.raidReady.join(' ')}; you can clear: ${foes.join(', ')})`);
     }
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
@@ -175,7 +175,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   const raid = g.raid;
   if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
   if (raid?.step === 'commit') {
-    out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
+    out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to send none; replaces what you sent)`);
     out.push('ready   (lock in your commitment)');
   }
   if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
@@ -184,10 +184,10 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
 
 function phaseText(g: PublicState): string {
   if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
-  if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps one of the two building cards they drew.`;
-  if (g.phase === 'action') return `Round ${g.round}, action phase, ${P(g.turn)}'s turn.`;
+  if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps 1 of the 2 building cards they drew.`;
+  if (g.phase === 'action') return `Round ${g.round}, actions, ${P(g.turn)}'s turn.`;
   if (g.phase === 'discard') return `Round ${g.round}, end of round: everyone over the hand limit discards down to it.`;
-  return `Round ${g.round}, raid phase (${g.raid!.step}), ${plural(g.raidsLeft, 'raid')} left this round.`;
+  return `Round ${g.round}, raid (${g.raid!.step}), ${plural(g.raidsLeft, 'raid')} left this round.`;
 }
 
 const waitingText = (g: PublicState) => g.waitingOn.map(P).join(', ') || 'no one';
@@ -210,7 +210,7 @@ function tableText(s: Snapshot, you = -1): string {
 export function statusText(s: Snapshot): string {
   const names = tableText(s);
   const g = s.game;
-  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'nobody yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
+  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'no one yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
   const out = [`Room ${s.lobby.code}: ${names}.`, phaseText(g)];
   if (s.lobby.seating) out.push('The game goes on once every seat is taken.');
   else if (g.waitingOn.length) out.push(`Waiting on: ${waitingText(g)}`);
@@ -234,7 +234,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${amounts(pl.production)}`);
   });
   const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
   if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);

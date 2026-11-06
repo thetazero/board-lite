@@ -171,7 +171,7 @@ function renderLobby() {
   const canStart = l.seats.length >= l.minPlayers;
   const first = firstPlayer(l);
   const hint = l.seating ? `The game goes on once every seat is taken${isHost ? ' (a bot can take one)' : ''}.`
-    : !canStart ? `${l.minPlayers - l.seats.length > 1 ? `${l.minPlayers - l.seats.length} more players` : 'One more player'} to start (a bot counts).`
+    : !canStart ? `Waiting for ${l.minPlayers - l.seats.length} more player${l.minPlayers - l.seats.length > 1 ? 's' : ''} (a bot counts).`
     : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')
     : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
   app.innerHTML = `
@@ -192,7 +192,7 @@ function renderLobby() {
           </div>
         </div>
         <div class="table">
-          ${l.seating ? `<h2 class="seating">${open > 1 ? `${open} open seats` : 'One open seat'}</h2>` : ''}
+          ${l.seating ? `<h2 class="seating">${open} open seat${open > 1 ? 's' : ''}</h2>` : ''}
           <ul class="seatcards">${seats}</ul>
           ${isHost ? `<div class="lobby-actions">
             <button id="bot" ${(l.seating ? !open : l.seats.length >= l.maxPlayers) ? 'disabled' : ''}>Add a bot</button>
@@ -572,7 +572,7 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   }).join('');
   const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power still fighting</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
@@ -595,7 +595,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
     : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>${ev.fauna === 'thunderbird' ? peakBoon(g.peakBonus) : ''}`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
-    : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
+    : `<h1>The perched dragons <span class="ok">fall</span></h1>${flown}`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? esc(ev.name) : 'Perched dragons'}`;
   // Saves from before perching carry one beast and no units.
   const units = (ev.units ?? [{ name: ev.name, hp: ev.hp }]).map((u) => {

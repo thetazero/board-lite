@@ -24,7 +24,7 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
 export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; names: string[] } | null): string {
   if (!t.points) return '';
   const now = leader ? ` <span class="leads">${playerTag(leader.p, leader.names)} leads</span>` : '';
-  return `<div class="loot worth"><span class="loot-label">Worth</span><span class="chip">${t.points}${icon('points', size)}</span><small>to the most power standing</small>${now}</div>`;
+  return `<div class="loot worth"><span class="loot-label">Worth</span><span class="chip">${t.points}${icon('points', size)}</span><small>to the most power still fighting</small>${now}</div>`;
 }
 
 // Who would score a kingdom's points if the fight ended now: the most power

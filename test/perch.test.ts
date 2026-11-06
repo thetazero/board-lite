@@ -258,7 +258,7 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   apply(g, 1, 'end');
   toTurnOf(g, 0);
   assert.ok(seatState(g, 0).huntable.includes(pasture));
-  assert.match(view(0), new RegExp(`you can fight: .*${pasture} ${d.id}`));
+  assert.match(view(0), new RegExp(`you can clear: .*${pasture} ${d.id}`));
   assert.ok(h);
 });
 

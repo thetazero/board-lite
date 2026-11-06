@@ -375,12 +375,12 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const d = DRAGONS[c.key];
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
-    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
+    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon. Hatches as an egg and grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. Adult: Health ${adult.hp}, Attack ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) };
     return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? NO_ROOM : null };
   }
   const a = ACTIONS[c.key];
-  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep this card in your hand to score its points.' };
+  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'It scores while it stays in your hand.' };
   if (a.effect === 'gain_resource') return { ...base, text: a.text, needs: 'resource' };
   if (a.effect === 'grow_dragon') {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);

@@ -335,7 +335,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
     case 'cleared': {
       const home = (ev.home ?? []).map((id) => dragon(id)).join('');
-      if (!ev.fauna) return ev.won ? `${who(ev.p)} drives off ${home} <span class="ok">home</span>` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
+      if (!ev.fauna) return ev.won ? `The perched dragons <span class="ok">fall</span> to ${who(ev.p)}${home ? `; ${home} go home` : ''}` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
       const it = beast(ev.fauna, ev.name);
       const The = it.replace(/^the/, 'The');
       if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;

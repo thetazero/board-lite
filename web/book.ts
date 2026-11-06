@@ -146,9 +146,9 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     return `${head('Hexes', 'A building whose card names no terrain goes on any land hex.')}${land}
       ${entry(pic('terrain ocean', 'Ocean hex'), 'Ocean hex', text('Nothing is built on it.'), 'terrain ocean')}
       ${head('Borders and marks')}
-      ${entry(pic('border', 'A border in your color'), 'A border in a player’s color', text('Runs round the hexes that player’s buildings stand on.'), 'border')}
+      ${entry(pic('border', 'A border in your color'), 'A border in a player’s color', text('Runs around the hexes that player’s buildings stand on.'), 'border')}
       ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('A beast holds it: it’s suppressed, as if it weren’t there, until someone clears the beast.'), 'shut')}
-      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building is suppressed, as if it weren’t there, until its owner recalls it or it’s knocked out.'), 'perched')}
+      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building is suppressed, as if it weren’t there, until the dragon’s owner recalls it or it’s knocked out.'), 'perched')}
       ${b.greatBeasts.map((f) => entry(pic(`held ${f.key}`, `Held by the ${f.name}`), `A border in the ${f.name}’s color`, text(`The ${f.name} holds this hex: nothing is built here while the ${f.name} lives.`), `held ${f.key}`)).join('')}
       ${entry(pic('peak zone', `A gold border and a +${b.peakBonus}`), `A gold border and a +${b.peakBonus}`, text(`On or adjacent to the Thunderbird’s peak, once the Thunderbird is slain: a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
   },

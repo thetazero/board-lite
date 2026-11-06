@@ -402,7 +402,7 @@ const ICONS: Record<string, Facet[]> = {
 
 export const ICON_NAMES = Object.keys(ICONS);
 
-const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
+const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'Tallest Tower', hoard: 'Largest Hoard', d4: '4-sided die', d6: '6-sided die', d8: '8-sided die', d4face: '4-sided die', d6face: '6-sided die', d8face: '8-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent', fire_giant: 'Fire Giant', titan: 'Titan',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };

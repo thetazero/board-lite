@@ -347,7 +347,7 @@ function renderLobby() {
       <div class="hero">${tableScene([pc])}</div>
       <div class="lobbybody">
         <h1>You're in, ${esc(l.seats[me]?.name ?? '')}</h1>
-        <p class="muted">Room <b>${esc(l.code)}</b>${l.seating ? `: ${open > 1 ? `${open} open seats` : 'one open seat'}` : ''}</p>
+        <p class="muted">Room <b>${esc(l.code)}</b>${l.seating ? `: ${open > 1 ? `${open} open seats` : '1 open seat'}` : ''}</p>
         ${l.remote ? invite(l.code) : ''}
         <ul class="seatlist">${l.seats.map(seat).join('')}</ul>
         ${host && !l.seating ? act('Start game', 'id="start"', l.seats.length >= l.minPlayers ? null : `You need ${l.minPlayers} players: add a bot.`) : ''}
@@ -797,7 +797,7 @@ function actionView(g: PublicState, me: Me): string {
       ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
-    <div class="offer out" data-key="offer ${o.id}">You offer ${o.to === null ? '' : `${playerTag(o.to, names)} `}<b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b>${o.to === null ? ' to anyone' : ''} <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
+    <div class="offer out" data-key="offer ${o.id}">You offer ${o.to === null ? '' : `${playerTag(o.to, names)} `}<b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b>${o.to === null ? ' to anyone' : ''} <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">${o.passed.map((p) => playerTag(p, names)).join(', ')} ${o.passed.length === 1 ? 'declines' : 'decline'}</p>` : ''}</div>`).join('');
   // Build and Trade (with the merchants) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
@@ -863,7 +863,7 @@ function dragonStats(key: string, element: string, d: { growth: number; targetin
 function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): string {
   let actions = '';
   const left = me.hand.length - me.handCap - selected.size;
-  if (discarding) actions = selected.has(c.id) ? act("Don't discard", `data-discardpick="${c.id}"`, null, 'big') : act('Discard', `data-discardpick="${c.id}"`, left > 0 ? null : 'You have picked enough cards: put one back first.');
+  if (discarding) actions = selected.has(c.id) ? act("Don't discard", `data-discardpick="${c.id}"`, null, 'big') : act('Discard', `data-discardpick="${c.id}"`, left > 0 ? null : 'You have chosen enough cards: put one back first.');
   // A card kept, not played, says so instead of offering a button.
   else if (c.needs === 'unplayable') actions = `<p class="hint">${esc(c.blocked ?? '')}</p>`;
   // A card that can't be played now (not your turn, can't afford it, nothing
@@ -1132,8 +1132,8 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
 // and, on or next to the freed peak, whether it makes the peak's bonus (#366).
 function placeDetail(g: PublicState, name: string, d: Does | undefined): string {
   if (!d) return '';
-  const peak = d.peak === 'more' ? `<p class="hint">Includes ${g.peakBonus} more each round, by the Thunderbird’s peak.</p>`
-    : d.peak === 'none' ? `<p class="hint">Production buildings here make ${g.peakBonus} more each round, by the Thunderbird’s peak. The ${esc(name)} isn’t one: it makes no resource.</p>` : '';
+  const peak = d.peak === 'more' ? `<p class="hint">Includes ${g.peakBonus} more each round from the Thunderbird’s peak.</p>`
+    : d.peak === 'none' ? `<p class="hint">Production buildings here make ${g.peakBonus} more each round from the Thunderbird’s peak. The ${esc(name)} isn’t one: it makes no resource.</p>` : '';
   return `<p class="pchead">The <b>${esc(name)}</b> here</p><p>${said(doesLines(d))}</p>${peak}`;
 }
 
