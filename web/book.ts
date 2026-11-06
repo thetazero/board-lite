@@ -168,7 +168,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under a beast makes nothing. Clear a beast with your dragons for its loot; a beast a card placed has none. In production each beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
       ${b.fauna.map((f) => beast(f, '')).join('')}
       ${head('Great beasts', 'Each holds its hex and every adjacent hex: nothing is built there while it lives. Each player gets 1 try at a great beast each round. Whoever slays it scores its points for good.')}
-      ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center of the map.' : 'Lives in the ocean beside a harbor.')).join('')}`;
+      ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center of the map.' : 'Lives in the ocean. In production it swims to another ocean hex, most likely a far one.')).join('')}`;
   },
   dragons(b) {
     const groups = ELEMENTS.map((e) => {

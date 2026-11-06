@@ -212,7 +212,7 @@ ${table(['Card', 'Sends', 'Cost', 'Copies'], cardRows)}`;
 function beasts(): string {
   const unitRows = Object.entries(BEASTS).map(([k, b]) => [
     b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.element, b.points,
-    k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean beside one harbor',
+    k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean, starting beside one harbor; in production it moves to another ocean hex, each as likely as it is far',
   ]);
   const base = Object.values(DRAGONS).find((d) => d.base)!;
   const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus)!;
@@ -220,7 +220,7 @@ function beasts(): string {
   const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
   return `## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 

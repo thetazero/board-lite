@@ -97,19 +97,28 @@ export function nearBeast(hexes: Record<string, Hex>, k: string): boolean {
 }
 
 // The great beasts: the Thunderbird on the peak at the centre, and the
-// Leviathan in the ocean beside one coast's harbor, on a random coast, on
-// the side of that harbor that keeps clear of the towers' neighbours.
+// Leviathan in the ocean beside one coast's harbor, on a random coast.
 function placeBeasts(rng: Rng, hexes: Record<string, Hex>, players: number) {
   hexes[PEAK].terrain = 'mountain';
   hexes[PEAK].fauna = 'thunderbird';
-  const towers = towerSpots(players);
-  const nearTower = (k: string) => towers.some((t) => t === k || neighbors(t).includes(k));
   const harbors = Object.keys(hexes).filter((k) => hexes[k].terrain === 'harbor').sort();
   const harbor = harbors[Math.floor(next(rng) * harbors.length)];
+  const waters = leviathanWaters(hexes, players);
   const sea = neighbors(harbor).filter((n) => hexes[n]?.terrain === 'ocean');
-  const clear = sea.filter((s) => !neighbors(s).some((n) => hexes[n] && nearTower(n)));
+  const clear = sea.filter((n) => waters.includes(n));
   const pool = clear.length ? clear : sea;
   hexes[pool[Math.floor(next(rng) * pool.length)]].fauna = 'leviathan';
+}
+
+// Where the Leviathan may be: the ocean hexes whose hold keeps clear of every
+// tower's adjacent hexes, so each player's first ring stays open (all of the
+// ocean if none does).
+export function leviathanWaters(hexes: Record<string, Hex>, players: number): string[] {
+  const towers = towerSpots(players);
+  const nearTower = (k: string) => towers.some((t) => t === k || neighbors(t).includes(k));
+  const sea = Object.keys(hexes).filter((k) => hexes[k].terrain === 'ocean').sort();
+  const clear = sea.filter((s) => !neighbors(s).some((n) => hexes[n] && nearTower(n)));
+  return clear.length ? clear : sea;
 }
 
 // Aggressive fauna on the starting map: one beast per TUNING.landHexesPerFauna

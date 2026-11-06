@@ -292,12 +292,12 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 ## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 | Beast | Health | Attack (avg) | Element | Points | Lives in |
 |---|---|---|---|---|---|
 | Thunderbird | 70 | 2×2d8 (18) | air | 4 | the mountain peak at the centre |
-| Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean beside one harbor |
+| Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean, starting beside one harbor; in production it moves to another ocean hex, each as likely as it is far |
 
 A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 

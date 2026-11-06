@@ -8,7 +8,7 @@
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
 import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
-import { PEAK, nearBeast, neighbors } from '../map.ts';
+import { PEAK, distance, leviathanWaters, nearBeast, neighbors, parseKey } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
 import type { Room } from '../server/room.ts';
@@ -1345,6 +1345,23 @@ export const SCENES: Scene[] = [
       { file: 'tv-beasts-3p', caption: 'TV: the Thunderbird on its peak and the Leviathan off its harbor, the hexes they hold ringed', client: 'tv', waitMs: 4800 },
       { file: 'phone-beast-pick-3p', caption: 'Phone: choosing which beast to fight, great beasts included', client: 'phone', seat: g!.turn, clicks: ['#hunt'] },
       { file: 'phone-beast-send-3p', caption: 'Phone: sending dragons against the Thunderbird', client: 'phone', seat: g!.turn, clicks: ['#hunt', `[data-hex="${PEAK}"]`, '[data-hunter]'] },
+      {
+        // The Leviathan swims to a far hex of its waters (#339): it dives,
+        // stays under, and comes up there a few seconds later.
+        file: 'tv-leviathan-dive-3p', caption: 'TV: the Leviathan dives, and comes up at a far hex a few seconds later', client: 'tv',
+        then: (room) => room.mutate((g2) => {
+          const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'leviathan')!;
+          const [q, r] = parseKey(k)!;
+          const n = leviathanWaters(g2.map, 3).reduce((a, b) => {
+            const [aq, ar] = parseKey(a)!, [bq, br] = parseKey(b)!;
+            return distance(bq - q, br - r) > distance(aq - q, ar - r) ? b : a;
+          });
+          g2.map[n].fauna = 'leviathan';
+          delete g2.map[k].fauna;
+        }),
+        waitMs: 1500, // the board has the move before its clock starts
+        frames: [0, 0.6, 1.2, 2.5, 4.2, 4.7, 5.6],
+      },
       // Last: the fight changes the game.
       { file: 'tv-beast-fight-3p', caption: 'TV: a fight against the Thunderbird mid-replay', client: 'tv', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
     ],
