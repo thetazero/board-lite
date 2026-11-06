@@ -622,7 +622,7 @@ function waitText(g: PublicState): string {
   if (!w) return 'Waiting for the table.';
   const step = g.raid?.step;
   const what = g.phase === 'discard' ? 'to discard' : g.phase === 'cards' ? 'to keep a card' : g.phase === 'action' ? 'to answer an offer'
-    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : step === 'commit' ? 'to send dragons or stay home' : 'to fight or bail') : '';
+    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : step === 'commit' ? 'to send dragons or stay home' : 'to fight or hold back') : '';
   return `Waiting for ${w}${what ? ` ${what}` : ''}.`;
 }
 
@@ -630,7 +630,7 @@ function waitText(g: PublicState): string {
 // which every raid screen shows, whatever you've done.
 function raidStep(g: PublicState): string {
   const r = g.raid!;
-  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or bail'}`;
+  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or hold back'}`;
 }
 
 // The menu under your name: quitting is there, out of the way of the game.
@@ -680,7 +680,7 @@ function render() {
   // but each only once: a dragon the screen lists below (to send, or sent) isn't in the roost too.
   const listed = choosing && body ? me.raidReady
     : g.phase === 'raid' && g.raid?.step === 'commit' ? me.raidReady
-    : g.phase === 'raid' && g.raid?.step === 'bail' ? g.raid.commits[me.seat] : [];
+    : g.phase === 'raid' && g.raid?.step === 'choose' ? g.raid.commits[me.seat] : [];
   const den = !picking && g.phase !== 'over' ? roost(g, me, new Set(listed)) : '';
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
@@ -1222,7 +1222,7 @@ function raidView(g: PublicState, me: Me): string {
     const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
     return `${targetPanel(raid.target!, lead)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
   }
-  if (raid.step === 'bail') {
+  if (raid.step === 'choose') {
     const mine = raid.commits[me.seat];
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
@@ -1232,14 +1232,14 @@ function raidView(g: PublicState, me: Me): string {
     if (!mine.length) return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
-    // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
+    // Alone, the loot is all yours if you fight, so Fight shows it; shared, how much is yours depends on who's knocked out.
     const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
-    const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
+    const split = others ? '<p class="hint">Fought or held back, every dragon not knocked out splits the loot by power.</p>' : '';
     return `${targetPanel(raid.target!, lead)}${sentHead}
       <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}${split}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>
-      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
+      <button id="hold" class="big${chose === 'hold' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Hold back</button></div>`;
   }
   return '';
 }
@@ -1740,7 +1740,7 @@ function wire(g: PublicState, me: Me) {
     send('ready');
   });
   on('fight', () => send('fight'));
-  on('bail', () => send('bail'));
+  on('hold', () => send('hold'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
   on('newgame', () => {
     code = ''; // a new game is in a new room: type its code, or scan the TV

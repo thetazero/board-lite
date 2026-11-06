@@ -123,7 +123,7 @@ const bots = (until: (g: Game) => boolean) => (g: Game, rng: Rng) => void drive(
 // ---------- staging ----------
 
 // The moves that change as little as they can (the stand-in's: end the turn,
-// keep the first card, vote for the first target, send nothing, bail), made
+// keep the first card, vote for the first target, send nothing, hold back), made
 // for whoever is waited on until `until` holds.
 function pass(g: Game, until: (g: Game) => boolean) {
   for (let steps = 0; !until(g); steps++) {
@@ -151,8 +151,8 @@ function sendAll(g: Game, p: number) {
   apply(g, p, `commit ${g.dragons.filter((d) => d.owner === p && ready(d)).map((d) => d.id).join(' ')}`);
   apply(g, p, 'ready');
 }
-// To the fight-or-bail step: the raiders send everything, everyone else stays home.
-function toBail(g: Game, raiders: number[]) {
+// To the fight-or-hold-back step: the raiders send everything, everyone else stays home.
+function toChoice(g: Game, raiders: number[]) {
   for (const p of raiders) sendAll(g, p);
   for (const p of g.players.keys()) if (!g.raid!.ready[p]) apply(g, p, 'ready');
 }
@@ -288,7 +288,7 @@ function blockedReasons(g: Game, p: number) {
   return [...seen.values()];
 }
 // How the last raid ended, as the log says it.
-const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone bails|No one raids|no raid this round/.test(e.text))?.text ?? '';
+const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone holds back|No one raids|no raid this round/.test(e.text))?.text ?? '';
 const raidOver = (g: Game) => g.raid === null || g.raid.step === 'vote';
 const drain = (g: Game, p: number) => Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 0));
 
@@ -689,7 +689,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
       toVote(g);
       vote(g, 'cinderkeep');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
@@ -710,7 +710,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, 'cinderkeep');
       const all = [...g.players.keys()];
-      toBail(g, all);
+      toChoice(g, all);
       for (const p of all.slice(1)) apply(g, p, 'fight');
     },
     live: bots(raidOver),
@@ -728,7 +728,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
       toVote(g);
       vote(g, 'cinderkeep');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
@@ -747,7 +747,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       g.raid!.candidates[0] = 'titans_throne';
       vote(g, 'titans_throne');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
@@ -767,14 +767,14 @@ export const SCENES: Scene[] = [
       toVote(g);
       g.raid!.candidates[0] = 'titans_throne';
       vote(g, 'titans_throne');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
     shots: () => [{ file: 'phone-remote-titan-fight-3p', caption: "No TV: Titan's Throne on a phone: each side in columns of up to four", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2900 }],
   },
   {
-    name: 'bail-3p',
+    name: 'choose-3p',
     players: 3,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
@@ -784,16 +784,16 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, [2]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, t, 'fight');
     },
     shots: (g) => [
-      { file: 'tv-raid-bail-3p', caption: 'TV, fight or bail (3 players): one has chosen', client: 'tv' },
-      { file: 'phone-raid-bail-3p', caption: 'Phone: fight or bail, in secret', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !g!.raid!.choices[p]) },
+      { file: 'tv-raid-choose-3p', caption: 'TV, fight or hold back (3 players): one has chosen', client: 'tv' },
+      { file: 'phone-raid-choose-3p', caption: 'Phone: fight or hold back, in secret', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !g!.raid!.choices[p]) },
     ],
   },
   {
-    name: 'bail-5p',
+    name: 'choose-5p',
     players: 5,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
@@ -805,14 +805,14 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === raiders[1] ? [3, 2] : p === raiders[3] ? [1] : [2]);
       toVote(g);
       vote(g, byPower(g).at(-1)!);
-      toBail(g, raiders);
+      toChoice(g, raiders);
       apply(g, raiders[0], 'fight');
-      apply(g, raiders[2], 'bail');
+      apply(g, raiders[2], 'hold');
     },
-    shots: () => [{ file: 'tv-raid-bail-5p', caption: 'TV, fight or bail (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
+    shots: () => [{ file: 'tv-raid-choose-5p', caption: 'TV, fight or hold back (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
   },
   {
-    name: 'remote-bail-3p',
+    name: 'remote-choose-3p',
     players: 3,
     seed: 1,
     remote: true,
@@ -822,10 +822,10 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, [2]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, t, 'fight');
     },
-    shots: () => [{ file: 'tv-remote-bail-3p', caption: 'No TV: fight or bail on the table view', client: 'tv', table: true, sizes: true }],
+    shots: () => [{ file: 'tv-remote-choose-3p', caption: 'No TV: fight or hold back on the table view', client: 'tv', table: true, sizes: true }],
   },
   {
     name: 'raid-result-3p',
@@ -860,24 +860,24 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'phone-raid-watch-3p', caption: 'Phone, while the TV replays a fight: everyone watches, and the next decision waits', client: 'phone', seat: 1, live: true, screen: true, waitMs: 600 }],
   },
   {
-    // A fight one raider bailed out of: they're shown flown home beside it.
-    name: 'raid-fled-4p',
+    // A fight one raider held back from: they're shown beside it.
+    name: 'raid-held-4p',
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // Three raiders: the first bails, the second fights, the third decides live.
+    // Three raiders: the first holds back, the second fights, the third decides live.
     setup: (g) => {
       const [a, b, c] = turnOrder(g);
       for (const p of g.players.keys()) arm(g, p, [a, b, c].includes(p) ? [3, 3] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [a, b, c]);
-      apply(g, a, 'bail');
+      toChoice(g, [a, b, c]);
+      apply(g, a, 'hold');
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 3300 }],
+    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the raider who held back beside it', client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     name: 'discard-4p',
@@ -1223,7 +1223,7 @@ export const SCENES: Scene[] = [
     },
   },
   {
-    name: 'bail-4p',
+    name: 'choose-4p',
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
@@ -1232,12 +1232,12 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 4 ? [2] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 4]);
+      toChoice(g, [t, (t + 1) % 4]);
       apply(g, t, 'fight');
     },
     shots: (g) => [
-      { file: 'phone-raid-not-in-4p', caption: "Phone, fight or bail: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
-      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or bail: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
+      { file: 'phone-raid-not-in-4p', caption: "Phone, fight or hold back: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
+      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or hold back: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
     ],
   },
   {
@@ -1251,7 +1251,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [1] : [0]);
       toVote(g);
       vote(g, byPower(g).at(-1)!);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, (t + 1) % 3, 'fight');
     },
     live: bots(raidOver),
@@ -1259,21 +1259,21 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid, at the end of the replay ("… holds")', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
-    name: 'raid-bailed-2p',
+    name: 'raid-held-2p',
     players: 2,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // Both send a dragon; the first bails, and the second bails live.
+    // Both send a dragon; the first holds back, and the second holds back live.
     setup: (g) => {
       for (const p of [0, 1]) arm(g, p, [1]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [0, 1]);
-      apply(g, 0, 'bail');
+      toChoice(g, [0, 1]);
+      apply(g, 0, 'hold');
     },
-    live: (g) => apply(g, 1, 'bail'),
-    liveEnd: (g) => /Everyone bails/.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-bailed-2p', caption: 'TV: everyone bailed (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    live: (g) => apply(g, 1, 'hold'),
+    liveEnd: (g) => /Everyone holds back/.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-held-2p', caption: 'TV: everyone held back (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
     name: 'raid-nobody-3p',
@@ -1298,7 +1298,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [3] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, (t + 1) % 3, 'fight');
     },
     live: bots((g) => g.phase === 'action'),
@@ -1820,7 +1820,7 @@ function wonRaid(g: Game) {
   for (const p of g.players.keys()) arm(g, p, p === a || p === b ? [3, 3] : [0]);
   toVote(g);
   vote(g, byPower(g)[0]);
-  toBail(g, [a, b]);
+  toChoice(g, [a, b]);
   // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
   g.dragons.find((d) => d.id === g.raid!.commits[a][0])!.damage = 8;
   apply(g, b, 'fight');

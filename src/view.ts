@@ -104,8 +104,8 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
     raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`));
   } else {
     out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-    out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
-    if (you?.myChoice) out.push(`  You chose to ${you.myChoice}.`);
+    out.push(`Secret choice, fight or hold back. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
+    if (you?.myChoice) out.push(`  You chose to ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
   }
   return out;
 }
@@ -179,7 +179,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
     out.push('ready   (lock in your commitment)');
   }
-  if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
+  if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 

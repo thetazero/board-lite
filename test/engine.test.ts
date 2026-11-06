@@ -133,7 +133,7 @@ test('a view shows only your own hand and resources', () => {
   }
 });
 
-test('votes are public as cast; fight-or-bail choices stay secret until revealed', () => {
+test('votes are public as cast; fight-or-hold-back choices stay secret until revealed', () => {
   const g = newGame(2, 3);
   hatchAll(g);
   advanceToRaidVote(g);
@@ -146,12 +146,12 @@ test('votes are public as cast; fight-or-bail choices stay secret until revealed
   apply(g, 0, 'ready');
   apply(g, 1, `commit ${g.dragons[1].id}`);
   apply(g, 1, 'ready');
-  assert.equal(g.raid!.step, 'bail');
-  apply(g, 0, 'bail');
-  assert.ok(!playerView(g, 1, 1000).includes('bail!'));
+  assert.equal(g.raid!.step, 'choose');
+  apply(g, 0, 'hold');
+  assert.ok(!playerView(g, 1, 1000).includes('holds back'));
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
   apply(g, 1, 'fight');
-  assert.ok(playerView(g, 1, 1000).includes('P1 bails.'));
+  assert.ok(playerView(g, 1, 1000).includes('P1 holds back.'));
   // There is no retreat: the fight plays out to the end with no more choices.
   assert.equal(g.raid, null);
   assert.match(playerView(g, 1, 1000), /falls\.|holds\./);
@@ -436,7 +436,7 @@ test('a hurt dragon heals instead of growing, and still fights', () => {
   g.players[a.owner].resources.livestock = 5;
   const ga = a.growth + a.stage * 10;
   advanceToRaidVote(g);
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(g.round, 2);
   assert.equal(a.damage, 3);
@@ -457,7 +457,7 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   g.dragons.unshift({ ...a, id: 'd99' });
   g.players[a.owner].resources.livestock = 0;
   a.damage = 3;
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.ok(canRaid(a), 'a hungry dragon with health left still fights');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
@@ -477,7 +477,7 @@ test('production says what the dragons eat apart from what is made, and so does 
   advanceToRaidVote(g);
   g.players[p].resources.livestock = 5;
   const from = g.log.length;
-  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
   assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
@@ -612,7 +612,7 @@ test('a knocked-out dragon cannot fight until a fed production heals it, then fi
   const passRound = () => {
     for (const pl of g.players) pl.hand = []; // nothing to discard
     advanceToRaidVote(g);
-    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
     while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   };
   assert.ok(!canRaid(a));
@@ -622,7 +622,7 @@ test('a knocked-out dragon cannot fight until a fed production heals it, then fi
   assert.ok(canRaid(a), `back in round ${g.round}, hurt`);
 });
 
-test('raid loot is split by the combat power still fighting at the end', () => {
+test('raid loot is split by the combat power still fighting at the end, when everyone fights', () => {
   let shared = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
@@ -664,7 +664,55 @@ test('raid loot is split by the combat power still fighting at the end', () => {
   assert.ok(shared > 0, 'some raids should be shared');
 });
 
-test('a scoring kingdom gives its points to the most power still fighting, ties in turn order', () => {
+test('a dragon held back takes no hits and shares the loot by its power; a knocked-out fighter gets nothing', () => {
+  let held = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    hatchAll(g);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    g.dragons = [
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 }, // stays home
+    ];
+    g.raid!.candidates = ['archers_hold'];
+    g.raidsLeft = 2;
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
+    apply(g, 0, 'ready'); apply(g, 1, 'ready');
+    apply(g, 0, 'fight'); apply(g, 1, 'hold');
+    const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+    assert.ok(fight.k === 'fight');
+    assert.deepEqual(fight.ps, [0]);
+    assert.deepEqual(fight.ds, ['d1', 'd2']);
+    assert.equal(g.dragons.find((d) => d.id === 'd3')!.damage, 0, 'held back, so never hit');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd' || !end.won) continue;
+    assert.ok(end.winners.includes(1), 'the one who held back shares the loot');
+    assert.equal(end.power[end.winners.indexOf(1)], dragonPower(g.dragons.find((d) => d.id === 'd3')!));
+    held++;
+    // P1's power counts only their dragons not knocked out.
+    const standing = ['d1', 'd2'].map((id) => g.dragons.find((d) => d.id === id)!).filter((d) => d.damage < DRAGONS[d.key].stages[2].hp);
+    assert.equal(end.power[end.winners.indexOf(0)], standing.reduce((s, d) => s + dragonPower(d), 0));
+  }
+  assert.ok(held > 0, 'some raids should fall');
+});
+
+test('everyone holding back calls the raid off', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, `commit ${g.dragons[0].id}`); apply(g, 1, `commit ${g.dragons[1].id}`);
+  apply(g, 0, 'ready'); apply(g, 1, 'ready');
+  apply(g, 0, 'hold'); apply(g, 1, 'hold');
+  assert.ok(g.log.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'held'));
+  assert.ok(!g.log.some((e) => e.ev?.k === 'fight' || e.ev?.k === 'raidEnd'), 'no fight, so no loot');
+});
+
+test('a scoring kingdom gives its points to the most power standing, ties in turn order', () => {
   let scored = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
