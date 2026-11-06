@@ -53,7 +53,7 @@ water → fire → ice → air → lightning → water
 
 **Suppressed buildings.** A suppressed building counts as if it weren't there: it makes nothing, is worth no points, houses no dragons, and nothing counts it as adjacent. Only its hex stays taken: nothing is built there. With more dragons than room, you keep them all but can't hatch more until there's room.
 
-**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is air; the Leviathan is water. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
+**Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives, and a building there is suppressed, as under a beast. When the Leviathan moves on, a building it held works again. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is air; the Leviathan is water. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 
 **Adjacent hexes.** Every building has a class (stone building, timber building, crystal building, livestock building, dragon building, monument or trade building; each basic building that makes a resource is in that resource's class, with the building cards that make the same); the tower is a monument and a dragon building. Many building cards count their 6 adjacent hexes, either hexes of a terrain, built on or not ("each adjacent meadow hex"), or buildings of a class, whoever owns them ("each adjacent livestock building"). The count is always the current one: an adjacent building built later counts too.
 

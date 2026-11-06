@@ -1457,6 +1457,40 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-beast-hold-fauna-3p', caption: 'TV: a Basilisk beside the Thunderbird, on a hex it holds: still ringed', client: 'tv', waitMs: 4800 }],
   },
   {
+    // The Leviathan surfacing by a port holds it (#370): the port is
+    // suppressed, its hex dark grey, the feed says so, and its owner's
+    // merchants are back to 4:1 for timber until the Leviathan moves off.
+    name: 'leviathan-port-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const at = Object.keys(g.map).find((x) => g.map[x].fauna === 'leviathan')!;
+      const harbor = neighbors(at).find((x) => g.map[x]?.terrain === 'harbor')!;
+      g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrade: null, floors: 0 };
+      g.players[g.turn].resources.timber = Math.max(g.players[g.turn].resources.timber, 6);
+      // It starts off away, out of sight of the port, and surfaces by it in the first shot.
+      const away = leviathanWaters(g.map, 3).find((x) => dist(x, harbor) > 3)!;
+      g.map[away].fauna = 'leviathan';
+      delete g.map[at].fauna;
+    },
+    shots: (g) => [
+      {
+        file: 'tv-leviathan-port-3p', caption: "TV: the Leviathan surfaces by a Timber Port: it's suppressed, its hex dark grey", client: 'tv',
+        then: (room) => room.mutate((g2) => {
+          const from = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'leviathan')!;
+          const port = Object.keys(g2.buildings).find((x) => g2.buildings[x].type === 'timber_port')!;
+          const to = neighbors(port).find((x) => g2.map[x]?.terrain === 'ocean' && leviathanWaters(g2.map, 3).includes(x))!;
+          g2.map[to].fauna = 'leviathan';
+          delete g2.map[from].fauna;
+          g2.log.push({ round: g2.round, text: `The Leviathan dives at ${from} and surfaces at ${to}.`, ev: { k: 'wander', from, to, fauna: 'leviathan', name: BEASTS.leviathan.name } });
+        }),
+        waitMs: 5200,
+      },
+      { file: 'phone-bank-leviathan-port-3p', caption: 'Phone: the merchants while the Leviathan holds your Timber Port: timber at 4:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+    ],
+  },
+  {
     // The same fight, at its end.
     name: 'beasts-slain-3p',
     players: 3,

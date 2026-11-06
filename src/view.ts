@@ -56,7 +56,7 @@ function mapText(g: PublicState): string[] {
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
   lines.push("Perched dragons show as <ids>: the building there is suppressed, as if it weren't there, while they stay.");
-  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there, and a building there is suppressed, until it is slain.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
   for (const r of [...rows.keys()].sort((a, b) => a - b)) {

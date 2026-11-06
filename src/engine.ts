@@ -263,9 +263,11 @@ export function perchedOn(g: Game, k: string): Dragon[] {
 }
 
 // Is the building on hex k shut down, making and scoring nothing? A beast or
-// a perched dragon on it stops it. Nothing stops a tower.
+// a perched dragon on it stops it, and so does a great beast holding it from
+// an adjacent hex, as the Leviathan can when it surfaces by a port (#370).
+// Nothing stops a tower.
 export function blocked(g: Game, k: string): boolean {
-  return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
+  return g.buildings[k]?.type !== 'tower' && (nearBeast(g.map, k) || !!g.map[k]?.fauna || perchedOn(g, k).length > 0);
 }
 
 export function dragonPower(d: Dragon): number {

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { standInMove } from '../src/bot.ts';
-import { RuleError, apply, buildableHexes, canRaid, dragonCapacity, faunaHexes, newGame, production, score, waitingOn, type Dragon, type Game } from '../src/engine.ts';
+import { RuleError, apply, bankRates, buildableHexes, canRaid, dragonCapacity, faunaHexes, newGame, production, score, waitingOn, type Dragon, type Game } from '../src/engine.ts';
 import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -307,4 +307,32 @@ test('the chart works both ways when dragons fight dragons: water doubles on fir
   // A perched fire dragon defending against ice: every hit it lands is doubled.
   const fire = fightHits('ice_whelp', 1).filter((h) => h.by === 'unit');
   assert.ok(fire.length && fire.every((h) => h.dmg % 2 === 0), `fire on ice: ${fire.map((h) => h.dmg)}`);
+});
+
+// The Leviathan surfacing by a port holds it: suppressed, it trades at 4:1,
+// as under fauna or a perched dragon, until the Leviathan moves off (#370).
+test('a building the Leviathan holds from an adjacent hex is suppressed, and works again once it moves off', () => {
+  const { g } = perchGame();
+  const tower = g.towers[0];
+  const harbor = neighbors(tower).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  g.map[harbor].terrain = 'harbor';
+  g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
+  apply(g, 0, `build cport ${harbor}`);
+  assert.equal(bankRates(g, 0).stone, 2);
+  const before = score(g, 0).buildings;
+  // Somewhere beside the port but not beside the tower, as the ocean there would be.
+  const sea = neighbors(harbor).find((k) => g.map[k] && !neighbors(k).includes(tower) && k !== tower && !g.buildings[k])!;
+  for (const k of Object.keys(g.map)) if (g.map[k].fauna === 'leviathan') delete g.map[k].fauna;
+  g.map[sea].terrain = 'ocean';
+  g.map[sea].fauna = 'leviathan';
+  assert.equal(bankRates(g, 0).stone, TUNING.bankRate);
+  assert.ok(score(g, 0).buildings < before, 'the port scores nothing');
+  const hex = publicState(g).map.find((h) => h.k === harbor)!;
+  assert.equal(hex.suppressed, true);
+  assert.equal(hex.held, 'leviathan');
+  assert.equal(publicState(g).map.find((h) => h.k === tower)!.suppressed, undefined, 'nothing stops a tower');
+  delete g.map[sea].fauna;
+  assert.equal(bankRates(g, 0).stone, 2);
+  assert.equal(score(g, 0).buildings, before);
+  assert.equal(publicState(g).map.find((h) => h.k === harbor)!.suppressed, undefined);
 });
