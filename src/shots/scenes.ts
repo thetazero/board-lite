@@ -1466,27 +1466,20 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       const at = Object.keys(g.map).find((x) => g.map[x].fauna === 'leviathan')!;
-      const harbor = neighbors(at).find((x) => g.map[x]?.terrain === 'harbor')!;
+      const waters = leviathanWaters(g.map, 3);
+      const harbor = Object.keys(g.map).sort().find((x) => g.map[x].terrain === 'harbor' && !g.buildings[x] && !g.map[x].fauna && neighbors(x).some((n) => waters.includes(n)))!;
+      // No other beast near it, so the Leviathan's hold is all that greys it.
+      for (const n of [harbor, ...neighbors(harbor), ...neighbors(harbor).flatMap(neighbors)]) if (g.map[n]?.fauna && !BEASTS[g.map[n].fauna!]) delete g.map[n].fauna;
       g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrade: null, floors: 0 };
       g.players[g.turn].resources.timber = Math.max(g.players[g.turn].resources.timber, 6);
-      // It starts off away, out of sight of the port, and surfaces by it in the first shot.
-      const away = leviathanWaters(g.map, 3).find((x) => dist(x, harbor) > 3)!;
-      g.map[away].fauna = 'leviathan';
+      // It has just surfaced beside the port, as in production, and the feed says so.
+      const to = neighbors(harbor).find((x) => waters.includes(x))!;
       delete g.map[at].fauna;
+      g.map[to].fauna = 'leviathan';
+      g.log.push({ round: g.round, text: `The Leviathan dives at ${at} and surfaces at ${to}.`, ev: { k: 'wander', from: at, to, fauna: 'leviathan', name: BEASTS.leviathan.name } });
     },
     shots: (g) => [
-      {
-        file: 'tv-leviathan-port-3p', caption: "TV: the Leviathan surfaces by a Timber Port: it's suppressed, its hex dark grey", client: 'tv',
-        then: (room) => room.mutate((g2) => {
-          const from = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'leviathan')!;
-          const port = Object.keys(g2.buildings).find((x) => g2.buildings[x].type === 'timber_port')!;
-          const to = neighbors(port).find((x) => g2.map[x]?.terrain === 'ocean' && leviathanWaters(g2.map, 3).includes(x))!;
-          g2.map[to].fauna = 'leviathan';
-          delete g2.map[from].fauna;
-          g2.log.push({ round: g2.round, text: `The Leviathan dives at ${from} and surfaces at ${to}.`, ev: { k: 'wander', from, to, fauna: 'leviathan', name: BEASTS.leviathan.name } });
-        }),
-        waitMs: 5200,
-      },
+      { file: 'tv-leviathan-port-3p', caption: "TV: the Leviathan holds a Timber Port: it's suppressed, its hex dark grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-bank-leviathan-port-3p', caption: 'Phone: the merchants while the Leviathan holds your Timber Port: timber at 4:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
     ],
   },
