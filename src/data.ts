@@ -144,9 +144,9 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   crystal_mine: { name: 'Crystal Mine', class: 'mine', basic: true, cost: { stone: 4, timber: 4, livestock: 3 }, terrain: 'ley', produces: { resource: 'crystal', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 crystal each round; worth 1 point.' },
   pasture: { name: 'Pasture', class: 'pasture', basic: true, cost: { timber: 4, crystal: 4, stone: 3 }, terrain: 'meadow', produces: { resource: 'livestock', base: 0, die: 4 }, points: 1, text: 'Makes 1d4 livestock each round; worth 1 point.' },
   roost: { name: 'Roost', class: 'dragon', basic: true, cost: { stone: 4, timber: 4 }, dragonCapacity: 2, text: 'Houses 2 more dragons.' },
-  // Worth no points itself: floors count only toward Tallest Tower, a side
-  // quest and a sink for raid gold (#98).
-  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 6, gold: 4 }, onTower: true, text: 'Adds a floor to your tower. Floors count toward Tallest Tower.' },
+  // Worth no points itself: floors count toward Tallest Tower, a side
+  // quest and a sink for raid gold (#98), and each houses a dragon (#323).
+  tower_floor: { name: 'Tower Floor', class: 'monument', basic: true, cost: { stone: 6, gold: 4 }, onTower: true, dragonCapacity: 1, text: 'Adds a floor to your tower. Houses 1 more dragon; counts toward Tallest Tower.' },
   // Building cards. Most count their neighbours.
   cliff_works: terrainMaker('Cliff Works', 'quarry', 'stone', 'mountain', { timber: 3, crystal: 3, livestock: 2 }, 2),
   stonemason: classMaker('Stonemason', 'quarry', 'stone', 'quarry', { timber: 3, crystal: 3, livestock: 2 }, 2),
@@ -184,11 +184,12 @@ export interface UpgradeDef {
   text: string;
   baseBonus?: number; // more of what the building makes
   dragonCapacity?: number;
+  points?: number; // added to the building's
   copies: number;
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, text: 'This stone, timber, crystal or livestock building makes 2 more.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, points: 1, text: 'This stone, timber, crystal or livestock building makes 2 more; worth 1 point.', copies: 4 },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
 };
 

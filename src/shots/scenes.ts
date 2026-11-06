@@ -849,7 +849,8 @@ export const SCENES: Scene[] = [
   {
     name: 'over-6p',
     players: 6,
-    seed: 1,
+    // Seed 1's bots stopped finishing once tower floors housed dragons (#323).
+    seed: 2,
     until: (g) => g.phase === 'over',
     shots: () => [{ file: 'tv-game-over-6p', caption: 'TV: final scores (6 players)', client: 'tv', sizes: true }],
   },

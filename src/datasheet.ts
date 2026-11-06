@@ -52,7 +52,7 @@ function costs(): string {
   const row = (c: { name: string; copies?: number; cost: Bundle }, does: string, points: string) => [c.name, kindOf(c), deckOf(c), c.copies ?? '—', cost(c.cost), does, points];
   const rows: (string | number)[][] = [
     ...Object.values(BUILDINGS).map((b) => row(b, b.beside ? `${b.text} Build adjacent to ${besideText(b.beside)}.` : b.text, pts(b.points))),
-    ...Object.values(UPGRADES).map((u) => row(u, u.text, '—')),
+    ...Object.values(UPGRADES).map((u) => row(u, u.text, pts(u.points))),
     ...Object.values(ACTIONS).map((a) => row(a, a.text, a.effect === 'hidden_point' ? String(a.amount) : '—')),
     ...Object.values(DRAGONS).map((d) => row(d, `${d.element}, grows a stage every ${d.growthTime} rounds`, '—')),
   ];
@@ -134,7 +134,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
-Titles: ${TUNING.titlePoints} points each, for most combat power across your dragons (at least ${TUNING.titleMinimum.army}; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth nothing else; gold held is worth points only through Largest Hoard.`;
+Titles: ${TUNING.titlePoints} points each, for most combat power across your dragons (at least ${TUNING.titleMinimum.army}; a dragon counts its stage's power, as in Dragons, hurt or not, eggs 0), most tower floors (at least ${TUNING.titleMinimum.tower}) and most gold (at least ${TUNING.titleMinimum.hoard}). Tower floors are worth no other points (each houses ${BUILDINGS.tower_floor.dragonCapacity} more dragon); gold held is worth points only through Largest Hoard.`;
 }
 
 function dragons(): string {
