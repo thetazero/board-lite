@@ -151,7 +151,17 @@ Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round. Also added withou
 
 ## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes), 5p radius 6 (127 land hexes), 6p radius 6 (127 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+
+Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+| Players | Towers | From the centre | Land within 3 steps | Land nearest each tower |
+|---|---|---|---|---|
+| 2 | 3,0 -3,0 | 3 | 23 | 31 |
+| 3 | 3,0 0,-3 -3,3 | 3 | 23 | 20 |
+| 4 | 4,0 4,-4 -4,0 -4,4 | 4 | 23 | 23 |
+| 5 | 4,-1 3,-4 -2,-2 -4,2 -1,4 | 4 | 33 | 24–28 |
+| 6 | 5,0 5,-5 0,-5 -5,0 -5,5 0,5 | 5 | 23 | 21 |
 
 | Terrain | For | Share of land |
 |---|---|---|
@@ -183,7 +193,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 ## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power standing (see Raids).
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
@@ -256,7 +266,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Points |
 |---|---|---|---|---|---|---|
@@ -292,7 +302,7 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 ## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 | Beast | Health | Attack (avg) | Element | Points | Lives in |
 |---|---|---|---|---|---|

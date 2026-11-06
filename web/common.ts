@@ -326,11 +326,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'discard': return `${who(ev.p)} discards ${ev.n} card${ev.n === 1 ? '' : 's'}`;
     case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
-    case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
+    case 'hold': return `${who(ev.p)} <span class="no">holds back</span>`;
     case 'raidEnd': return ev.won
       ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}${p === ev.scorer ? ` +${ev.points} ${icon('points', 1.2)}` : ''}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
+    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'held' ? 'Everyone holds back' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
     // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
     case 'cleared': {
@@ -343,7 +343,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'wander': {
       const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;
-      return b && b.type !== 'tower' ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}` : '';
+      if (b && b.type !== 'tower') return `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}`;
+      // The Leviathan surfacing holds the hexes adjacent to it: each building there is suppressed (#370).
+      const there = g.map.some((h) => h.k === ev.to && h.fauna?.key === ev.fauna);
+      const held = !there ? [] : g.map.filter((h) => h.held === ev.fauna && h.suppressed && h.building).map((h) => h.building!);
+      return held.length ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} holds ${held.map((x) => `${whose(x.owner)} ${buildingChip(x.type, x.owner, x.upgrade, 26, x.cls)} ${esc(x.name)}`).join(', ')}` : '';
     }
     default: return '';
   }
@@ -487,8 +491,8 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      // Shut down by a beast or a perched dragon on it: the building's mark goes grey (the hex's rim keeps its owner).
-      cells.push(`<g transform="translate(${x} ${y})"${h.fauna || h.perched?.length ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
+      // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey (the hex's rim keeps its owner).
+      cells.push(`<g transform="translate(${x} ${y})"${h.suppressed ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
       if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }

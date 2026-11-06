@@ -2004,8 +2004,8 @@ export class Board3D {
     if (regrow) this.regrowDecor();
     for (const h of g.map) {
       const b = h.building;
-      // Shut down (a beast or a perched dragon on it): it makes nothing and is worth no points, so it goes grey.
-      const shut = !!h.fauna || h.perched.length > 0;
+      // Suppressed (a beast on it or holding it, or a perched dragon): it makes nothing and is worth no points, so it goes grey.
+      const shut = !!h.suppressed;
       const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${shut ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;

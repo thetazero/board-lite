@@ -85,7 +85,7 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
     return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
   }
-  return [next(rng) < 0.85 ? 'fight' : 'bail'];
+  return [next(rng) < 0.85 ? 'fight' : 'hold'];
 }
 
 function isNeighbour(a: string, b: string): boolean {
@@ -146,7 +146,7 @@ export function endingTarget(g: Game, target: number, by = 40): number {
 // table waits on them): as little as possible, so it keeps the game moving
 // without spending their resources, sending their dragons or taking a trade.
 // It answers offers with a decline, ends the turn, keeps the first building
-// card, votes for the first target, sends no dragons, and discards the
+// card, votes for the first target, sends no dragons (or holds back the ones it sent), and discards the
 // oldest cards.
 export function standInCommands(g: Game, p: number): string[] {
   const pl = g.players[p];
@@ -156,7 +156,7 @@ export function standInCommands(g: Game, p: number): string[] {
   const raid = g.raid!;
   if (raid.step === 'vote') return ['vote 1'];
   if (raid.step === 'commit') return raid.commits[p].length ? ['commit none'] : ['ready'];
-  return ['bail'];
+  return ['hold'];
 }
 
 export function standInMove(g: Game, p: number): string {

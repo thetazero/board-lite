@@ -56,7 +56,7 @@ function mapText(g: PublicState): string[] {
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
   lines.push("Perched dragons show as <ids>: the building there is suppressed, as if it weren't there, while they stay.");
-  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there, and a building there is suppressed, until it is slain.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
   for (const r of [...rows.keys()].sort((a, b) => a - b)) {
@@ -104,8 +104,8 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
     raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`));
   } else {
     out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-    out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
-    if (you?.myChoice) out.push(`  You chose to ${you.myChoice}.`);
+    out.push(`Secret choice, fight or hold back. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
+    if (you?.myChoice) out.push(`  You chose to ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
   }
   return out;
 }
@@ -150,6 +150,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       });
       out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
+    if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (clear your own buildings one at a time, weakest first, each time sending all your raid-ready dragons; it stops when nothing is left or a fight is lost. Holding your buildings: ${you.autoClear.join(' ')})`);
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
@@ -178,7 +179,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
     out.push('ready   (lock in your commitment)');
   }
-  if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
+  if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 

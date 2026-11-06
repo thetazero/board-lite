@@ -622,7 +622,7 @@ function waitText(g: PublicState): string {
   if (!w) return 'Waiting for the table.';
   const step = g.raid?.step;
   const what = g.phase === 'discard' ? 'to discard' : g.phase === 'cards' ? 'to keep a card' : g.phase === 'action' ? 'to answer an offer'
-    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : step === 'commit' ? 'to send dragons or stay home' : 'to fight or bail') : '';
+    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : step === 'commit' ? 'to send dragons or stay home' : 'to fight or hold back') : '';
   return `Waiting for ${w}${what ? ` ${what}` : ''}.`;
 }
 
@@ -630,7 +630,7 @@ function waitText(g: PublicState): string {
 // which every raid screen shows, whatever you've done.
 function raidStep(g: PublicState): string {
   const r = g.raid!;
-  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or bail'}`;
+  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or hold back'}`;
 }
 
 // The menu under your name: quitting is there, out of the way of the game.
@@ -680,7 +680,7 @@ function render() {
   // but each only once: a dragon the screen lists below (to send, or sent) isn't in the roost too.
   const listed = choosing && body ? me.raidReady
     : g.phase === 'raid' && g.raid?.step === 'commit' ? me.raidReady
-    : g.phase === 'raid' && g.raid?.step === 'bail' ? g.raid.commits[me.seat] : [];
+    : g.phase === 'raid' && g.raid?.step === 'choose' ? g.raid.commits[me.seat] : [];
   const den = !picking && g.phase !== 'over' ? roost(g, me, new Set(listed)) : '';
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
@@ -809,6 +809,8 @@ function actionView(g: PublicState, me: Me): string {
   const beasts = g.map.filter((h) => h.fauna && me.huntable.includes(h.k));
   const clear = me.myTurn && me.huntable.length && me.raidReady.length
     ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} ${beasts.length === me.huntable.length ? 'Clear fauna' : 'Clear'}</button>` : '';
+  // Auto clear (#374): clearing your own buildings, weakest first, with every raid-ready dragon each time.
+  const auto = me.myTurn && me.autoClear.length && me.raidReady.length ? `<button id="autoclear" class="huntbtn">${icon('raid', 1.3)} Auto clear</button>` : '';
   const perch = me.myTurn && me.perchable.length && me.raidReady.length ? '<button id="perch" class="huntbtn">Perch</button>' : '';
   // Your perched dragons, each with its way home.
   const recall = me.myTurn ? me.perched.map((id) => {
@@ -820,7 +822,7 @@ function actionView(g: PublicState, me: Me): string {
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
   // End turn sits above an open panel, so a long one (Trade, with the merchants, runs past the
   // screen) never pushes it down under the hand.
-  return `${incoming}${mine}${tabs}${clear}${perch}${recall}${end}${content}`;
+  return `${incoming}${mine}${tabs}${clear}${auto}${perch}${recall}${end}${content}`;
 }
 
 // "1 dragon", "2 dragons".
@@ -1115,7 +1117,8 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
   const b = h.building;
   if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
   const whose = b.owner === me.seat ? 'Your ' : `${playerTag(b.owner, names)}'s `;
-  const stopped = h.fauna ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(h.fauna.name)} holds it.</p>`
+  const holder = h.suppressed ? h.fauna?.name ?? g.beasts.find((x) => x.key === h.held)?.name : undefined;
+  const stopped = holder ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(holder)} holds it.</p>`
     : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
   const name = `<b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}`;
   // An upgrade only goes on your own building, so its name alone says which,
@@ -1219,7 +1222,7 @@ function raidView(g: PublicState, me: Me): string {
     const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
     return `${targetPanel(raid.target!, lead)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
   }
-  if (raid.step === 'bail') {
+  if (raid.step === 'choose') {
     const mine = raid.commits[me.seat];
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
@@ -1229,14 +1232,14 @@ function raidView(g: PublicState, me: Me): string {
     if (!mine.length) return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
-    // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
+    // Alone, the loot is all yours if you fight, so Fight shows it; shared, how much is yours depends on who's knocked out.
     const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
-    const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
+    const split = others ? '<p class="hint">Fought or held back, every dragon not knocked out splits the loot by power.</p>' : '';
     return `${targetPanel(raid.target!, lead)}${sentHead}
       <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}${split}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>
-      <button id="bail" class="big${chose === 'bail' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${buildingIcon('roost', 26, '#4a3d45')} Bail</button></div>`;
+      <button id="hold" class="big${chose === 'hold' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Hold back</button></div>`;
   }
   return '';
 }
@@ -1619,6 +1622,7 @@ function wire(g: PublicState, me: Me) {
     picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });
+  on('autoclear', () => send('autoclear'));
   on('perch', () => {
     const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It's suppressed, as if it weren't there, while they stay.</p>";
     picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about };
@@ -1736,7 +1740,7 @@ function wire(g: PublicState, me: Me) {
     send('ready');
   });
   on('fight', () => send('fight'));
-  on('bail', () => send('bail'));
+  on('hold', () => send('hold'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
   on('newgame', () => {
     code = ''; // a new game is in a new room: type its code, or scan the TV
