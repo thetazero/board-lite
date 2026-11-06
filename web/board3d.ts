@@ -3650,7 +3650,7 @@ export class FightStage {
     };
     const fits = (d: number) => {
       const e = extent(d);
-      return e.hi - e.lo <= top - bottom && e.wide <= 0.95;
+      return e.hi - e.lo <= top - bottom && e.wide <= 0.92;
     };
     let lo = 4, hi = 400;
     for (let i = 0; i < 30; i++) {
