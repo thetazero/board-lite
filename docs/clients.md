@@ -26,7 +26,7 @@ board-lite is running on port 8080.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 
-**Reconnecting:** a phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. On another phone, open the room's address and tap your name.
+**Reconnecting:** a phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. A page whose connection goes quiet (no word from the server for 40 seconds, though it pings every 15) connects again by itself, so it never sits on an old moment of the game until someone reloads it. On another phone, open the room's address and tap your name.
 
 **Nobody stalls the table:**
 
