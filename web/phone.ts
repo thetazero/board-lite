@@ -1081,16 +1081,14 @@ function amountText(r: string, m: { base: number; dice: number[] }): string {
   for (const s of [...new Set(m.dice)].sort((a, b) => b - a)) parts.push(`${m.dice.filter((d) => d === s).length}d${s}`);
   return `${parts.join(' + ')} ${r}`;
 }
-// What a building does each round, in the cards' words, a sentence each:
-// "Makes 1d4 stone each round.", "Worth 1 point."
-function doesLines(d: Does): string[] {
-  const out: string[] = [];
-  const made = RESOURCES.filter((r) => d.makes[r]).map((r) => amountText(r, d.makes[r]!));
-  if (made.length) out.push(`Makes ${made.join(', ')} each round.`);
-  if (d.houses) out.push(`Houses ${d.houses} dragon${d.houses > 1 ? 's' : ''}.`);
-  if (d.note) out.push(d.note);
-  if (d.points) out.push(`Worth ${d.points} point${d.points > 1 ? 's' : ''}.`);
-  return out.length ? out : ['Makes nothing.'];
+// What a building does each round, at a glance: numbers and icons, no
+// sentence ("2 + 1d4 [stone]", "1 [point]", "Houses 2 dragons"). `peak` marks
+// how much of what it makes comes from the freed peak.
+function doesParts(d: Does, peak = 0): string[] {
+  const out = RESOURCES.filter((r) => d.makes[r]).map((r) => amountText(r, d.makes[r]!) + (peak ? ` (${peak} from the peak)` : ''));
+  if (d.houses) out.push(`Houses ${d.houses} dragon${d.houses > 1 ? 's' : ''}`);
+  if (d.points) out.push(`${d.points} point${d.points > 1 ? 's' : ''}`);
+  return out.length ? out : ['Makes nothing'];
 }
 // What an upgrade changes on a building, one short item per number, before →
 // after, with the icon for what it counts: "5 → 7 stone", "1 → 2 points",
@@ -1107,7 +1105,8 @@ function changeParts(a: Does, b: Does): string[] {
   if (a.points !== b.points) out.push(`${a.points} → ${b.points} point${b.points === 1 ? '' : 's'}`);
   return out;
 }
-const said = (lines: string[]) => iconText(esc(lines.join(' ')));
+// Items side by side on one line, each kept whole, with its icons.
+const glance = (parts: string[]) => parts.map((x) => `<span class="nobr">${iconText(esc(x)).replace('→', '<span class="pcto">→</span>')}</span>`).join('');
 // The hex picked for a beast or an upgrade: whose building it is and what it
 // does, with (for an upgrade) each change as before → after.
 function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): string {
@@ -1121,20 +1120,18 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
   // An upgrade only goes on your own building, so its name alone says which,
   // and what changes sits on the same line.
   const parts = after ? changeParts(b.does, after) : [];
-  if (parts.length) {
-    const delta = parts.map((x) => `<span class="nobr">${iconText(esc(x)).replace('→', '<span class="pcto">→</span>')}</span>`).join('');
-    return `<p class="pchead pcdelta">${name}${delta}</p>${stopped}`;
-  }
-  return `<p class="pchead">${whose}${name}</p><p>${said(doesLines(b.does))}</p>${stopped}`;
+  if (parts.length) return `<p class="pchead pcdelta">${name}${glance(parts)}</p>${stopped}`;
+  const note = b.does.note ? `<p class="hint">${iconText(esc(b.does.note))}</p>` : '';
+  return `<p class="pchead pcdelta">${whose}${name}${glance(doesParts(b.does))}</p>${note}${stopped}`;
 }
 
 // The hex picked for a building before it's built: what it would do there,
 // and, on or next to the freed peak, whether it makes the peak's bonus (#366).
 function placeDetail(g: PublicState, name: string, d: Does | undefined): string {
   if (!d) return '';
-  const peak = d.peak === 'more' ? `<p class="hint">Includes ${g.peakBonus} more each round from the Thunderbird’s peak.</p>`
-    : d.peak === 'none' ? `<p class="hint">Production buildings here make ${g.peakBonus} more each round from the Thunderbird’s peak. The ${esc(name)} isn’t one: it makes no resource.</p>` : '';
-  return `<p class="pchead">The <b>${esc(name)}</b> here</p><p>${said(doesLines(d))}</p>${peak}`;
+  // The card is in view under the map, so its rule text isn't repeated here.
+  const none = d.peak === 'none' ? `<p class="hint">No bonus from the peak</p>` : '';
+  return `<p class="pchead pcdelta"><b>${esc(name)}</b>${glance(doesParts(d, d.peak === 'more' ? g.peakBonus : 0))}</p>${none}`;
 }
 
 // What a pick is for, under the map: the card (or basic building) being placed,
