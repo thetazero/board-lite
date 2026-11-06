@@ -1393,7 +1393,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
-    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
+    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good, and the freed peak\'s +2 pops up', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
   },
   {
     // After the Thunderbird falls: the peak is free and its ring is rich
@@ -1410,6 +1410,34 @@ export const SCENES: Scene[] = [
       g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
     },
     shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
+  },
+  {
+    // Building by the freed peak (#366): a hex tapped shows what the building
+    // would do there before Build, a Pasture with the peak's 2 more, and a
+    // Hatchery, which makes no resource, told it makes nothing more.
+    name: 'peak-build-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      huntPeak(g);
+      const ring = neighbors(PEAK).filter((k) => !g.buildings[k]);
+      g.map[ring[0]].terrain = 'meadow';
+      g.buildings[ring[0]] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
+      g.map[ring[1]].terrain = 'meadow';
+      giveHand(g, g.turn, ['hatchery']);
+      for (const r of Object.keys(g.players[g.turn].resources)) g.players[g.turn].resources[r as 'gold'] = 20;
+    },
+    shots: (g) => {
+      const me = seatState(g!, g!.turn);
+      const peakHex = (hexes: string[]) => hexes.find((k) => k === PEAK || neighbors(PEAK).includes(k))!;
+      const pasture = peakHex(me.basics.find((b) => b.key === 'pasture')!.hexes);
+      return [
+        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that it makes nothing more', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
+        { file: 'phone-peak-build-pasture-3p', caption: "Phone: a hex by the freed peak tapped for a Pasture: what it makes there, the peak's 2 more included", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-basic=pasture]', `.pmap [data-hex="${pasture}"]`] },
+      ];
+    },
   },
   {
     // Clearing ordinary fauna (#96): a Cave Bear beside the acting player's

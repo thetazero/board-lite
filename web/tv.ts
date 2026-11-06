@@ -576,7 +576,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   const flown = home ? `<div class="spoils"><span>${home}<span class="arrow">➜</span>${HOME}</span></div>` : '';
   const The = ev.fauna ? `The ${esc(ev.name)}` : 'The perched dragons';
   const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
-    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
+    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>${ev.fauna === 'thunderbird' ? peakBoon(g.peakBonus) : ''}`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
     : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? esc(ev.name) : 'Perched dragons'}`;
@@ -587,6 +587,12 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms);
+}
+
+// The Thunderbird's fall frees its peak: the rule pops up under the points,
+// on the gold token the board then shows on each of the peak's hexes (#354).
+function peakBoon(n: number): string {
+  return `<div class="boon"><span class="ptoken">+${n}</span><span>Production buildings on and adjacent to its peak make ${n} more each round.</span></div>`;
 }
 
 // Each fighting dragon's health as its fight started, by id: drawn after the
