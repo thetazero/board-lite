@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { playOut } from '../src/bot.ts';
+import { botStep, playToEnd } from '../src/bot.ts';
 import { newGame, score, standings } from '../src/engine.ts';
 import { buildRecap } from '../src/recap.ts';
 import { Room } from '../src/server/room.ts';
@@ -17,7 +17,8 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 
 function finished(seed: number, players: number) {
   const g = newGame(players, seed);
-  playOut(g, { state: seed * 13 });
+  const rng = { state: seed * 13 };
+  playToEnd(g, () => botStep(g, rng)); // ends whatever the win target
   assert.equal(g.phase, 'over');
   return g;
 }
