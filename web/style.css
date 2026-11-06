@@ -220,6 +220,10 @@ body.tv.fullscreen #fullscreen { display: none; }
   box-shadow: 0 0 0 .18em var(--pc), .06em .3em 0 color-mix(in srgb, var(--pc) 45%, #0b081a), .1em .7em 1.1em -.1em #0b081acc; }
 .phead { display: flex; align-items: center; gap: .45em; white-space: nowrap; }
 .pname { font-size: 1.3em; font-weight: 800; color: var(--pc); line-height: 1.1; }
+/* titles and slain beasts: when the row is full they wrap first, then a long name ends in "…": the cards and points always show (#398) */
+.phead .badges { display: flex; flex-wrap: wrap; gap: .2em .45em; }
+.phead .pname { flex-shrink: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+.phead .hand, .phead .pts { flex-shrink: 0; }
 .pcard > .doing { display: inline-block; margin: .1em 0; }
 .doing { background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); color: var(--ink); font-weight: 800; padding: 0 .75em; white-space: nowrap; }
 .hand { margin-left: auto; display: inline-flex; align-items: center; gap: .1em; font-weight: 700; color: var(--muted); }

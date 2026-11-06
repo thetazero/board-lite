@@ -999,6 +999,20 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // A crowded panel header (#398): one player holds every title and slew
+    // both great beasts, five badges between their name and their points.
+    name: 'many-badges-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 8 && g.phase === 'action',
+    setup: (g) => {
+      for (const t of Object.keys(g.titles) as (keyof typeof g.titles)[]) g.titles[t] = 0;
+      for (const k of Object.keys(g.map)) if (g.map[k].fauna && BEASTS[g.map[k].fauna!]) delete g.map[k].fauna;
+      for (const b of Object.keys(BEASTS)) g.slain[b] = 0;
+    },
+    shots: () => [{ file: 'tv-many-badges-3p', caption: "TV: a player with every title and both great beasts: their points still show in full", client: 'tv' }],
+  },
+  {
     name: 'last-round-4p',
     players: 4,
     seed: 1,
