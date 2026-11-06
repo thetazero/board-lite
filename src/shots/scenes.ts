@@ -1433,7 +1433,7 @@ export const SCENES: Scene[] = [
   },
   {
     // Perching (#217): two rivals' dragons sit on the acting player's
-    // Pasture, which makes nothing while they're there, and the acting
+    // Pasture, suppressed while they're there, and the acting
     // player has one of their own perched on a rival's Lumber Camp, with three
     // adults at home to send.
     name: 'perch-3p',
@@ -1442,7 +1442,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => perchers(g),
     shots: (g) => [
-      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, which make nothing", client: 'tv', waitMs: 4800 },
+      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, suppressed and grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-perch-turn-3p', caption: 'Phone: your turn, with perched dragons to clear, a building to perch on and a dragon to recall', client: 'phone', seat: g!.turn },
       { file: 'phone-perch-pick-3p', caption: "Phone: choosing a rival's building to perch on", client: 'phone', seat: g!.turn, clicks: ['#perch'] },
       { file: 'phone-perch-send-3p', caption: 'Phone: choosing dragons to perch there', client: 'phone', seat: g!.turn, clicks: ['#perch', '[data-hex]', '[data-hunter]'] },
@@ -1450,6 +1450,19 @@ export const SCENES: Scene[] = [
       { file: 'phone-perch-other-3p', caption: "Phone: a rival's view, their dragon perched on someone else's Pasture", client: 'phone', seat: (g!.turn + 1) % 3 },
       // Last: the fight changes the game.
       { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2000, then: (room) => room.mutate((g2) => apply(g2, g2.turn, `clear ${perchedPasture(g2)} ${g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id).join(' ')}`)) },
+    ],
+  },
+  {
+    // A rival perched on the acting player's roost (#352): suppressed, it
+    // houses no dragons, and the phone says they're over their room.
+    name: 'perch-roost-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => roostPerched(g),
+    shots: (g) => [
+      { file: 'tv-perch-roost-3p', caption: "TV: a dragon perched on a rival's roost, which goes grey", client: 'tv', waitMs: 4800 },
+      { file: 'phone-perch-roost-3p', caption: 'Phone: your roost suppressed, so you have 1 dragon more than room', client: 'phone', seat: g!.turn },
     ],
   },
   {
@@ -1721,6 +1734,24 @@ function perchers(g: Game) {
   for (const key of ['frost_wyrm', 'fire_whelp', 'bolt_drake']) add(p, key, 3);
   add(a, 'ice_whelp', 1);
   add(b, 'air_whelp', 1);
+  // Two roosts of the acting player's, so their four dragons have room.
+  for (let i = 0; i < 2; i++) roostBeside(g, p);
+}
+
+// A roost on an empty land hex beside q's tower.
+function roostBeside(g: Game, q: number): string {
+  const k = [g.towers[q], ...neighbors(g.towers[q])].flatMap((t) => neighbors(t)).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x) && neighbors(x).some((n) => g.buildings[n]?.owner === q))!;
+  delete g.map[k].fauna;
+  g.buildings[k] = { type: 'roost', owner: q, upgrade: null, floors: 0 };
+  return k;
+}
+
+// As perchers, and a rival's hatchling perched on one of the acting player's
+// roosts: suppressed, it houses no dragons, so they have 1 more than room (#352).
+function roostPerched(g: Game) {
+  perchers(g);
+  const roost = Object.keys(g.buildings).find((k) => g.buildings[k].owner === g.turn && g.buildings[k].type === 'roost')!;
+  g.dragons.find((d) => d.key === 'air_whelp')!.perch = roost;
 }
 
 // The acting player's Pasture with rivals perched on it.

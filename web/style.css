@@ -662,6 +662,7 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 .roost .nests { display: flex; flex-wrap: wrap; gap: .35em .9em; align-items: center; }
 .nest { width: 32px; height: 32px; opacity: .85; flex: none; }
 .roost .room { display: inline-flex; align-items: center; gap: .35em; color: var(--muted); font-size: .9em; white-space: nowrap; }
+.roost .room.over { color: var(--bad); font-weight: 600; white-space: normal; }
 .phone .status { margin: .5em .7em 0; font-size: 1.1em; font-weight: 700; padding: .45em 1em; justify-content: flex-start; color: var(--text); border-bottom: 1px dashed var(--line); }
 /* your turn, and anything you're asked to do: a gold ribbon */
 .phone .status.you { --text: var(--ink); --muted: var(--ink-soft); --hit: #c0392b; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); border: 0; margin: .55em .4em 0; padding: .45em 1.3em; font-size: 1.3em; filter: drop-shadow(0 .15em .2em #0009); }

@@ -81,11 +81,22 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
   // hatched dragons appear as the log says, starting dragons are there from the start.
   const hatchedIds = new Set(g.log.flatMap((e) => (e.ev?.k === 'hatch' ? [e.ev.d] : [])));
   const keyOf = Object.fromEntries(g.dragons.map((d) => [d.id, d.key]));
+  // Where each beast stood at the start: the saved map's fauna, walked back
+  // through the log. Beasts and perched dragons suppress buildings, so the
+  // rebuilt board moves them as the log says (#352).
+  const fauna: Record<string, string | undefined> = Object.fromEntries(Object.entries(g.map).map(([k, h]) => [k, h.fauna]));
+  for (const e of [...g.log].reverse()) {
+    const ev = e.ev as GameEvent;
+    if (ev?.k === 'wander') { fauna[ev.from] = fauna[ev.to]; delete fauna[ev.to]; }
+    else if (ev?.k === 'play' && ev.fauna && ev.hex) delete fauna[ev.hex];
+    else if (ev?.k === 'cleared' && ev.won && ev.fauna) fauna[ev.hex] = ev.fauna;
+  }
   const r: Game = {
     ...g,
     players: g.players.map((pl) => ({ ...pl, hand: [] })),
+    map: Object.fromEntries(Object.entries(g.map).map(([k, h]) => { const { fauna: _, ...rest } = h; return [k, fauna[k] ? { ...rest, fauna: fauna[k] } : rest]; })),
     buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrade: null, floors: 0 }])),
-    dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => ({ ...d, stage: TUNING.startingDragonStage })),
+    dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => { const { perch: _, ...rest } = d; return { ...rest, stage: TUNING.startingDragonStage }; }),
     titles: { army: null, tower: null, hoard: null }, slain: {}, raidPoints: g.players.map(() => 0),
   };
   const dragon = (id: string) => r.dragons.find((d) => d.id === id)!;
@@ -136,6 +147,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'play':
         bump(s.played, ev.card, ev.p, n);
         if (ev.card === 'growth_elixir' && ev.d) dragon(ev.d).stage++;
+        if (ev.fauna && ev.hex) r.map[ev.hex].fauna = ev.fauna;
         break;
       case 'title':
         r.titles[ev.t] = ev.p;
@@ -143,7 +155,12 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         break;
       // A fight against perched dragons alone counts under 'perched'.
       case 'hunt': (s.fauna[ev.fauna ?? 'perched'] ??= { tried: zeros(n), cleared: zeros(n) }).tried[ev.p]++; break;
+      case 'wander': r.map[ev.to].fauna = r.map[ev.from].fauna; delete r.map[ev.from].fauna; break;
+      case 'perch': for (const d of ev.ds) dragon(d).perch = ev.hex; break;
+      case 'recall': for (const d of ev.ds) delete dragon(d).perch; break;
       case 'cleared':
+        for (const d of ev.home ?? []) delete dragon(d).perch;
+        if (ev.won && ev.fauna) delete r.map[ev.hex].fauna;
         if (ev.won) s.fauna[ev.fauna ?? 'perched'].cleared[ev.p]++;
         if (ev.won && ev.fauna && BEASTS[ev.fauna]) r.slain[ev.fauna] = ev.p;
         break;

@@ -55,8 +55,8 @@ function mapText(g: PublicState): string[] {
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
   lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
   lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
-  lines.push('Perched dragons show as <ids>: the building there makes nothing while they stay.');
-  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it makes nothing): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  lines.push("Perched dragons show as <ids>: the building there is suppressed, as if it weren't there, while they stay.");
+  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
   for (const r of [...rows.keys()].sort((a, b) => a - b)) {
@@ -150,7 +150,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       });
       out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
-    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
+    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
     for (const u of you.upgradeProjects) {
@@ -243,7 +243,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you make: ${amounts(you.income)}.`);
-  out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed.`);
+  out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over your room, so you hatch no more until there's room` : ''}.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);
   for (const c of you.hand) out.push(`  ${cardText(c)}`);

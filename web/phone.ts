@@ -766,7 +766,9 @@ function tradeOpen(g: PublicState, me: Me): boolean {
 }
 
 // Your dragons at home, then the room left for more: one empty nest with the
-// count in words, so the row doesn't fill with unlabelled baskets.
+// count in words, so the row doesn't fill with unlabelled baskets. With more
+// dragons than room (a suppressed roost counts for nothing, #352), it says so
+// in red: you hatch no more until there's room, and that's all.
 // Tapping a dragon opens its card. Dragons the screen lists below are left
 // out; with none left, so is the roost.
 const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
@@ -776,8 +778,11 @@ function roost(g: PublicState, me: Me, listed: Set<string>): string {
   const all = g.dragons.filter((d) => d.owner === me.seat);
   const mine = all.filter((d) => !listed.has(d.id));
   const empty = Math.max(0, me.dragonCapacity - all.length);
-  if (!mine.length && (!empty || mine.length < all.length)) return '';
-  return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>` : ''}</div></section>`;
+  const over = all.length - me.dragonCapacity;
+  if (!mine.length && (!empty || mine.length < all.length) && over <= 0) return '';
+  const room = empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>`
+    : over > 0 ? `<span class="room over">Room for ${me.dragonCapacity} dragon${me.dragonCapacity === 1 ? '' : 's'}, ${over} over: hatch no more until there's room</span>` : '';
+  return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${room}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
   return `<button class="dtap${d.status === 'out' ? ' out' : ''}" data-dragon="${d.id}" aria-label="${esc(dragonName(d, g.dragons))}: open its card">${dragonChip(d, g.dragons, g.round)}</button>`;
@@ -1016,7 +1021,7 @@ function huntView(g: PublicState, me: Me): string {
   if (hunting!.perch) {
     if (!h.building) return '';
     return `<h3 class="huntname">Perch${on}</h3>
-      ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `The ${esc(h.building.name)} makes nothing while your dragons perch there. They don't raid, and stay until you recall them or they're knocked out.` })}`;
+      ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `The ${esc(h.building.name)} is suppressed, as if it weren't there, while your dragons perch there. They don't raid, and stay until you recall them or they're knocked out.` })}`;
   }
   const perched = h.perched.filter((x) => x.owner !== me.seat).map((x) => g.dragons.find((d) => d.id === x.d)!).filter(Boolean);
   if (!h.fauna && !perched.length) return '';
@@ -1094,8 +1099,8 @@ function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: s
   const b = h.building;
   if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
   const whose = b.owner === me.seat ? 'Your' : `${playerTag(b.owner, names)}'s`;
-  const stopped = h.fauna ? `<p class="hint">Makes nothing while the ${esc(h.fauna.name)} holds it.</p>`
-    : h.perched.length ? '<p class="hint">Makes nothing while a dragon perches on it.</p>' : '';
+  const stopped = h.fauna ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(h.fauna.name)} holds it.</p>`
+    : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
   const head = `<p class="pchead">${whose} <b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}</p>`;
   const now = doesLines(b.does);
   const more = upgrade ? doesLines(upgrade.after).filter((x) => !now.includes(x)) : [];
@@ -1583,7 +1588,7 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   on('perch', () => {
-    const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It makes nothing while they stay.</p>";
+    const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It's suppressed, as if it weren't there, while they stay.</p>";
     picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about };
     render();
   });

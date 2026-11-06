@@ -32,7 +32,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Table talk.** Anyone may talk at any time, to everyone or privately to one player. Promises bind no one; only accepted trades do.
 
-**Fauna.** Nothing is built on a hex with a beast, and a building under a beast makes nothing until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Rouse the Bear places a Cave Bear, Wake the Basilisk a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
+**Fauna.** Nothing is built on a hex with a beast, and a building under a beast is suppressed until the beast is cleared. Anyone may clear any beast. New beasts come only from cards (Rouse the Bear places a Cave Bear, Wake the Basilisk a Basilisk) on any land hex with no tower or beast: next to someone, or on their building. A beast a card placed gives no loot.
 
 **Elements.** Every dragon, defender, beast and great beast has an element: fire, ice, lightning, air, water or neutral. On the element wheel each element beats exactly one other:
 
@@ -49,7 +49,9 @@ water → fire → ice → air → lightning → water
 | lightning | water | air |
 | neutral | nothing | nothing |
 
-**Perched dragons.** A building with a dragon perched on it makes nothing, as under a beast. Several dragons may perch on one building, whoever owns them, and they fight together when someone clears it. Perched dragons eat, heal and grow as at home, and a hurt one keeps perching. Nothing stops a tower: no beast or dragon goes on one.
+**Perched dragons.** A building with a dragon perched on it is suppressed, as under a beast. Several dragons may perch on one building, whoever owns them, and they fight together when someone clears it. Perched dragons eat, heal and grow as at home, and a hurt one keeps perching. Nothing stops a tower: no beast or dragon goes on one.
+
+**Suppressed buildings.** A suppressed building counts as if it weren't there: it makes nothing, is worth no points, houses no dragons, and nothing counts it as adjacent. Only its hex stays taken: nothing is built there. With more dragons than room, you keep them all but can't hatch more until there's room.
 
 **Great beasts.** Each holds its hex and every hex adjacent to it: nothing is built there while it lives. Whoever slays one scores **4 points** for good, and it never comes back: a race. The Thunderbird is air; the Leviathan is water. Once the Thunderbird falls, each production building on or adjacent to its peak makes 2 more each round.
 

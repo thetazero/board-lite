@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { standInMove } from '../src/bot.ts';
-import { RuleError, apply, canRaid, faunaHexes, newGame, production, waitingOn, type Dragon, type Game } from '../src/engine.ts';
+import { RuleError, apply, buildableHexes, canRaid, dragonCapacity, faunaHexes, newGame, production, score, waitingOn, type Dragon, type Game } from '../src/engine.ts';
 import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -97,6 +97,55 @@ test('a perched building makes nothing, the dragon stays until recalled, and it 
   assert.equal(production(g, 0).livestock.dice.length, 1);
   assert.equal(canRaid(perched()), true);
   assert.throws(() => apply(g, 1, `recall ${d.id}`), RuleError); // not perched
+});
+
+test('a shut-down building is as if it were not there: it scores nothing, and counts for nothing adjacent (#352)', () => {
+  const { g, pasture } = perchGame();
+  // A Market of P1's beside the Pasture counts it as an adjacent production building.
+  const market = neighbors(pasture).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  g.buildings[market] = { type: 'market', owner: 0, upgrade: null, floors: 0 };
+  const gold = () => production(g, 0).gold.base;
+  const points = score(g, 0).buildings;
+  const goldBefore = gold();
+  assert.ok(goldBefore >= 1);
+  apply(g, 0, 'end');
+  const d = addDragon(g, 1, 2);
+  apply(g, 1, `perch ${pasture} ${d.id}`);
+  assert.equal(score(g, 0).buildings, points - 1); // the Pasture's 1 point is gone
+  assert.equal(gold(), goldBefore - 1); // and the Market no longer counts it
+  assert.equal(seatState(g, 0).totalPoints, score(g, 0).total);
+  apply(g, 1, `recall ${d.id}`);
+  assert.equal(score(g, 0).buildings, points);
+  assert.equal(gold(), goldBefore);
+  // A beast on it does the same, until it's cleared.
+  g.map[pasture].fauna = 'wolf_pack';
+  assert.equal(score(g, 0).buildings, points - 1);
+  assert.equal(gold(), goldBefore - 1);
+  delete g.map[pasture].fauna;
+  assert.equal(score(g, 0).buildings, points);
+});
+
+test('a suppressed roost houses no dragons, and too many dragons only stops hatching (#352)', () => {
+  const { g, pasture } = perchGame();
+  const roost = neighbors(g.towers[0]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  g.buildings[roost] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  const room = dragonCapacity(g, 0);
+  for (let i = 0; i < room; i++) addDragon(g, 0, 1);
+  // Nothing is built beside the Pasture through it while it's suppressed.
+  const beside = buildableHexes(g, 0, 'roost').filter((k) => neighbors(k).includes(pasture) && !neighbors(k).some((n) => n !== pasture && g.buildings[n]?.owner === 0));
+  apply(g, 0, 'end');
+  const d = addDragon(g, 1, 2);
+  apply(g, 1, `perch ${roost} ${d.id}`);
+  apply(g, 1, `perch ${pasture} ${addDragon(g, 1, 2).id}`);
+  assert.equal(dragonCapacity(g, 0), room - 2);
+  for (const k of beside) assert.ok(!buildableHexes(g, 0, 'roost').includes(k));
+  // P1 keeps every dragon; the phone and the CLI say they're over their room.
+  assert.equal(g.dragons.filter((x) => x.owner === 0).length, room);
+  const me = seatState(g, 0);
+  assert.ok(me.dragonsHoused > me.dragonCapacity);
+  const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
+  const view = seatView({ lobby: { code: 'T', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...me, name: 'P1' } }, 10);
+  assert.match(view, /2 over your room/);
 });
 
 test('nothing blocks a tower: no dragon perches there and no beast is placed there', () => {

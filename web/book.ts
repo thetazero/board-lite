@@ -147,8 +147,8 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
       ${entry(pic('terrain ocean', 'Ocean hex'), 'Ocean hex', text('Nothing is built on it.'), 'terrain ocean')}
       ${head('Borders and marks')}
       ${entry(pic('border', 'A border in your color'), 'A border in a player’s color', text('Runs round the hexes that player’s buildings stand on.'), 'border')}
-      ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('A beast holds it: it makes nothing until someone clears the beast.'), 'shut')}
-      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building makes nothing until its owner recalls it or it’s knocked out.'), 'perched')}
+      ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('A beast holds it: it’s suppressed, as if it weren’t there, until someone clears the beast.'), 'shut')}
+      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building is suppressed, as if it weren’t there, until its owner recalls it or it’s knocked out.'), 'perched')}
       ${b.greatBeasts.map((f) => entry(pic(`held ${f.key}`, `Held by the ${f.name}`), `A border in the ${f.name}’s color`, text(`The ${f.name} holds this hex: nothing is built here while the ${f.name} lives.`), `held ${f.key}`)).join('')}
       ${entry(pic('peak zone', 'A gold border'), 'A gold border', text(`On or adjacent to the Thunderbird’s peak, once the Thunderbird is slain: a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
   },
@@ -165,7 +165,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
   beasts(b) {
     const beast = (f: FaunaView, more: string) => entry(pic(`beast ${f.key}`, f.name), f.name,
       `<div class="bstats">${powerTag(f.power)}${statTag('Health', f.maxHp)}${statTag('Attack', esc(f.attack))}</div>${f.weak.length ? `<p class="btext">Weak to ${elemWords(f.weak)}</p>` : ''}${f.points !== undefined ? lootLine({}, 1.1, f.points) : lootLine(f.loot, 1.1)}${more ? text(more) : ''}`, `beast ${f.key}`);
-    return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under a beast makes nothing. Clear a beast with your dragons for its loot; a beast a card placed has none. In production each beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
+    return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under a beast is suppressed: it counts as if it weren’t there. Clear a beast with your dragons for its loot; a beast a card placed has none. In production each beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
       ${b.fauna.map((f) => beast(f, '')).join('')}
       ${head('Great beasts', 'Each holds its hex and every adjacent hex: nothing is built there while it lives. Each player gets 1 try at a great beast each round. Whoever slays it scores its points for good.')}
       ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center of the map.' : 'Lives in the ocean. In production it swims to another ocean hex, most likely a far one.')).join('')}`;
