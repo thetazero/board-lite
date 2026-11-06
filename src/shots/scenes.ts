@@ -1393,7 +1393,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
-    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
+    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good, and the freed peak\'s +2 pops up', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
   },
   {
     // After the Thunderbird falls: the peak is free and its ring is rich
