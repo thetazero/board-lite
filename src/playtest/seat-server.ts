@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import type { EventView, Snapshot } from '../state.ts';
 import { eventLine, seatStatus, seatView } from '../view.ts';
+import { MAP_IMAGE_KEY, mapImage } from '../mapimage.ts';
 
 const [roomUrl, token, movesFile] = process.argv.slice(2);
 const m = /^(https?:\/\/[^/]+)\/([A-Za-z]{4})\/?$/.exec(roomUrl ?? '');
@@ -63,18 +64,28 @@ async function act(command: string, why?: string): Promise<string> {
   return listen(0, 'Done.');
 }
 
+// A tool's result: plain text, or MCP content blocks (text and images).
+type Content = string | ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
+
 const WHY = { type: 'string', description: 'Private: one or two sentences on why you chose this. No other player ever sees it; it is kept for the people studying the game after it ends.' };
 
 const TOOLS = [
   {
     name: 'view',
-    description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board, recent events, and your options when it is your decision.',
+    description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board as a text map and as a picture, recent events, and your options when it is your decision.',
     inputSchema: { type: 'object', properties: { log: { type: 'number', description: 'How many recent events to include (default 25).' } } },
-    run: async (a: { log?: number }) => {
+    run: async (a: { log?: number }): Promise<Content> => {
       const r = await call(`/state${q({ token })}`);
       if (r.error) return `Error: ${r.error}`;
       await listen(0); // the view shows the recent events: don't repeat them on the next wait
-      return seatView(r as Snapshot, a.log ?? 25);
+      const s = r as Snapshot;
+      const text = seatView(s, a.log ?? 25);
+      // The board as a picture too (#384): the text map's rows don't line up as a hex grid.
+      if (!s.game || !s.you) return text;
+      return [
+        { type: 'text', text: `${text}\n\n${MAP_IMAGE_KEY}` },
+        { type: 'image', data: mapImage(s.game, s.you.seat).toString('base64'), mimeType: 'image/png' },
+      ];
     },
   },
   {
@@ -125,8 +136,8 @@ async function handle(req: { id?: number | string; method: string; params?: any 
       const tool = TOOLS.find((t) => t.name === req.params?.name);
       if (!tool) return send({ jsonrpc: '2.0', id: req.id, error: { code: -32602, message: `Unknown tool ${req.params?.name}` } });
       try {
-        const text = await (tool.run as (a: any) => string | Promise<string>)(req.params?.arguments ?? {});
-        return reply({ content: [{ type: 'text', text }] });
+        const out = await (tool.run as (a: any) => Content | Promise<Content>)(req.params?.arguments ?? {});
+        return reply({ content: typeof out === 'string' ? [{ type: 'text', text: out }] : out });
       } catch (e) {
         return reply({ content: [{ type: 'text', text: `Error: ${(e as Error).message}` }], isError: true });
       }

@@ -85,7 +85,7 @@ The seat server (`src/playtest/seat-server.ts <room-url> <token>`, an MCP server
 
 | Tool | Does |
 |---|---|
-| `view` | the seat's view (`node src/cli.ts view`): public board, own hand and resources, recent events, options |
+| `view` | the seat's view (`node src/cli.ts view`): public board, own hand and resources, recent events, options; plus a picture of the board (`src/mapimage.ts`), since the text map's rows don't line up as a hex grid: each hex in place with its coordinates, filled in its owner's color, beasts, and dots for who can build on each empty hex |
 | `act` | one decision command, exactly as in `docs/cli.md`, with a private `why` (see `seat-N.moves.txt`) |
 | `say` | talk: to the table, or with `to: "P2"` privately to one player |
 | `wait` | blocks up to 120 s until it's the seat's decision, someone talks, or the game ends; returns the new events |
