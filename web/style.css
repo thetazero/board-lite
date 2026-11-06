@@ -250,8 +250,7 @@ body.tv.fullscreen #fullscreen { display: none; }
 .st-out, .st-perched { font-style: normal; font-weight: 800; }
 .st-perched { color: var(--warn); }
 /* Hungry (#362): went hungry this round, or will at the next production. */
-.st-hungry, .st-ahead { font-style: normal; font-weight: 800; color: var(--warn); white-space: nowrap; }
-.st-ahead.maybe { font-weight: 600; font-style: italic; }
+.st-hungry { font-style: normal; font-weight: 800; color: var(--warn); white-space: nowrap; }
 .dchip .hunger { display: flex; flex-wrap: wrap; gap: 0 .6em; }
 .tvdragon b:has(.st-hungry) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .4em; white-space: normal; }
 .tvdragon b .st-hungry { font-size: .8em; line-height: 1.3; }

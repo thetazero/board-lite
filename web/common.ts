@@ -376,16 +376,17 @@ export function dragonChip(d: DragonView, all: DragonView[], round: number, ahea
   return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}${hunger ? `<span class="hunger">${hunger}</span>` : ''}</div></div>`;
 }
 
-// Whether a dragon eats (#362). "Hungry this round": it went hungry at this round's
-// production, so it didn't heal or grow; anyone can see that. `ahead`, only
-// on its owner's phone (livestock is hidden): it goes hungry at the next
-// production as things stand, for sure ('short') or unless the dice roll well.
+// Whether a dragon eats (#362), as one tag: "Hungry". Anyone can see that it
+// went hungry at this round's production, so it didn't heal or grow. `ahead`,
+// only on its owner's phone (livestock is hidden): it goes hungry at the next
+// production for sure ('short'), as things stand. 'maybe' (only if the dice
+// roll badly) gets no tag: a tag claims only what the rules make sure of.
 export type Hunger = 'short' | 'maybe';
 export function hungerTags(d: DragonView, ahead?: Hunger): string {
-  const now = d.hungry ? '<em class="st-hungry" title="It went hungry this round, so it didn\'t heal or grow.">Hungry this round</em>' : '';
-  const next = ahead === 'short' ? '<em class="st-ahead" title="You don\'t have the livestock to feed it at the next production.">Hungry next round</em>'
-    : ahead === 'maybe' ? '<em class="st-ahead maybe" title="It eats at the next production only if your livestock dice roll well.">May go hungry next round</em>' : '';
-  return now + next;
+  const next = ahead === 'short';
+  if (!d.hungry && !next) return '';
+  const why = [d.hungry ? 'It went hungry this round, so it didn\'t heal or grow.' : '', next ? 'You don\'t have the livestock to feed it at the next production.' : ''].filter(Boolean).join(' ');
+  return `<em class="st-hungry" title="${why}">Hungry</em>`;
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
