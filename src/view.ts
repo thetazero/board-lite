@@ -150,6 +150,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       });
       out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
+    if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (clear your own buildings one at a time, weakest first, each time sending all your raid-ready dragons; it stops when nothing is left or a fight is lost. Holding your buildings: ${you.autoClear.join(' ')})`);
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);

@@ -995,7 +995,7 @@ function checkRaidOver(g: Game): boolean {
 // perched dragons are knocked out and go home. If not, the beast stays,
 // healed; perched dragons keep their hits, and stay unless knocked out. A
 // player gets one try at a great beast a round.
-function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
+function clearHex(g: Game, p: number, k: string, ds: Dragon[]): boolean {
   const f = g.map[k].fauna ?? null;
   const great = f ? BEASTS[f] : undefined;
   if (great) {
@@ -1030,6 +1030,7 @@ function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
   else if (great) text = `The ${name} is slain. ${pname(p)} scores ${great.points} point${great.points === 1 ? '' : 's'}, for good.${f === 'thunderbird' ? ` Buildings on and adjacent to its peak make ${TUNING.peakBonus} more.` : ''}`;
   else text = `The ${name} at ${k} falls.${Object.keys(loot).length ? ` ${pname(p)} gains ${bundleText(loot)}.` : ''}${flown}`;
   log(g, text, { k: 'cleared', p, hex: k, fauna: f, name, won, gain: won ? loot : {}, ...(great && won ? { points: great.points } : {}), ...(home.length ? { home } : {}) });
+  return won;
 }
 
 // The dragons of players other than p perched on hex k: what p fights there.
@@ -1106,6 +1107,35 @@ export function huntable(g: Game, p: number): string[] {
   const beasts = faunaOnMap(g).filter((k) => !BEASTS[g.map[k].fauna!] || g.beastTried[p] !== g.round);
   const perched = [...new Set(g.dragons.filter((d) => d.perch && d.owner !== p).map((d) => d.perch!))];
   return [...new Set([...beasts, ...perched])].sort();
+}
+
+// What auto clear goes for, weakest first (the least combat power, then by
+// hex): player p's own buildings held by a beast of the fauna or by rivals'
+// perched dragons. A great beast's hex, and fauna beside a building, aren't
+// its targets (#374).
+export function autoClearTargets(g: Game, p: number): string[] {
+  const power = (k: string) => (g.map[k].fauna ? combatPower(faunaDef(g.map[k].fauna!)) : 0) + rivalsPerched(g, p, k).reduce((s, d) => s + dragonPower(d), 0);
+  return Object.keys(g.buildings)
+    .filter((k) => g.buildings[k].owner === p && !BEASTS[g.map[k].fauna ?? ''] && (g.map[k].fauna || rivalsPerched(g, p, k).length))
+    .map((k) => ({ k, power: power(k) }))
+    .sort((a, b) => a.power - b.power || (a.k < b.k ? -1 : 1))
+    .map((t) => t.k);
+}
+
+// Auto clear: clear player p's own buildings one at a time, weakest first,
+// each wave sending all p's raid-ready dragons, exactly as "clear" would. It
+// stops when nothing is left to clear, no dragon is raid-ready, or a wave
+// loses.
+function autoClear(g: Game, p: number) {
+  const ready = () => g.dragons.filter((d) => d.owner === p && canRaid(d));
+  if (!autoClearTargets(g, p).length) fail(`Nothing holds your buildings: there's nothing to auto clear.`);
+  if (!ready().length) fail(`You have no raid-ready dragon to send.`);
+  for (;;) {
+    const [k] = autoClearTargets(g, p);
+    const ds = ready();
+    if (!k || !ds.length) return;
+    if (!clearHex(g, p, k, ds)) return;
+  }
 }
 
 // ---------- commands ----------
@@ -1348,8 +1378,11 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       if (!ids.length) fail(`Send at least one dragon: clear ${k} d1 d4`);
       const ds = ids.map((id) => ownDragon(g, p, id));
       for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't fight (it must be hatched, not knocked out, and not perched).`);
-      return clearHex(g, p, k, ds);
+      clearHex(g, p, k, ds);
+      return;
     }
+    case 'autoclear':
+      return autoClear(g, p);
     case 'perch': {
       const coords = parseKey(args[0] ?? '');
       const k = coords ? key(...coords) : '';
@@ -1460,7 +1493,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
     }
   }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, perch, recall, merchants, offer, accept, decline, cancel, end.`);
+  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, autoclear, perch, recall, merchants, offer, accept, decline, cancel, end.`);
 }
 
 function raidCommand(g: Game, p: number, verb: string, args: string[]) {

@@ -809,6 +809,8 @@ function actionView(g: PublicState, me: Me): string {
   const beasts = g.map.filter((h) => h.fauna && me.huntable.includes(h.k));
   const clear = me.myTurn && me.huntable.length && me.raidReady.length
     ? `<button id="hunt" class="huntbtn">${[...new Set(beasts.map((h) => h.fauna!.key))].map((k) => icon(k, 1.6)).join('')} ${beasts.length === me.huntable.length ? 'Clear fauna' : 'Clear'}</button>` : '';
+  // Auto clear (#374): clearing your own buildings, weakest first, with every raid-ready dragon each time.
+  const auto = me.myTurn && me.autoClear.length && me.raidReady.length ? `<button id="autoclear" class="huntbtn">${icon('raid', 1.3)} Auto clear</button>` : '';
   const perch = me.myTurn && me.perchable.length && me.raidReady.length ? '<button id="perch" class="huntbtn">Perch</button>' : '';
   // Your perched dragons, each with its way home.
   const recall = me.myTurn ? me.perched.map((id) => {
@@ -820,7 +822,7 @@ function actionView(g: PublicState, me: Me): string {
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
   // End turn sits above an open panel, so a long one (Trade, with the merchants, runs past the
   // screen) never pushes it down under the hand.
-  return `${incoming}${mine}${tabs}${clear}${perch}${recall}${end}${content}`;
+  return `${incoming}${mine}${tabs}${clear}${auto}${perch}${recall}${end}${content}`;
 }
 
 // "1 dragon", "2 dragons".
@@ -1620,6 +1622,7 @@ function wire(g: PublicState, me: Me) {
     picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });
+  on('autoclear', () => send('autoclear'));
   on('perch', () => {
     const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It's suppressed, as if it weren't there, while they stay.</p>";
     picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about };
