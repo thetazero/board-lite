@@ -1056,6 +1056,16 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .fhead .bvs b { font-size: 1.4em; }
 .remote .battle { left: 2vw; right: 2vw; top: 36vh; bottom: 17vh; gap: 3vw; --k: clamp(.3em, min(calc(40vw / var(--sl)), calc(40vw / var(--sr)), calc(36vh / var(--mx))), 3em); }
 .remote .fledrow { bottom: 9vh; }
+/* A screen held upright: each side stands its figures one above another, in
+   columns of up to four (--rl, --rr; tv.ts), the first column nearest the
+   other side. --k as big as lets the wider side fit across and the tallest
+   column (--mx, with each figure's bar and name) fit up. */
+.battle.stack { top: 34vh; bottom: 17vh; align-items: center;
+  --k: clamp(.3em, min(calc(40vw / var(--sl)), calc(40vw / var(--sr)), calc((49vh - var(--rows) * 3.2em) / var(--mx))), 3em); }
+.battle.stack .bside { display: grid; grid-auto-flow: column; justify-content: start; align-content: center; align-items: end; justify-items: center; gap: .4em .8em; }
+.battle.stack .bl { grid-template-rows: repeat(var(--rl), auto); direction: rtl; }
+.battle.stack .br { grid-template-rows: repeat(var(--rr), auto); }
+.battle.stack .fig { direction: ltr; }
 .remote .bside { gap: .3em .4em; }
 .remote .fig-name { font-size: .7em; max-width: max(100%, 5em); }
 .remote .fig .dmg { font-size: .7em; }

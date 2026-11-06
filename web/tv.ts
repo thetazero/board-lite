@@ -621,11 +621,28 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const mx = Math.max(...left.map((x) => width(x.max, x.aspect) / x.aspect * 1.25), ...right.map((x) => width(x.u.max, x.aspect) / x.aspect * 1.25));
   // The stage drawn at the screen's shape, so a phone held upright isn't a crop of a wide one.
   const shape = Math.min(2.4, Math.max(0.4, innerWidth / Math.max(1, innerHeight)));
+  // A screen held upright has no room across for a row of figures: each side
+  // stands its figures one above another, as the raid's list does, and past
+  // STACK of them adds a column (the first nearest the other side).
+  const stack = shape < 1;
+  const STACK = 4;
+  const cols = (heights: number[], widths: number[]) => {
+    const n = Math.max(1, Math.ceil(heights.length / STACK)), per = Math.ceil(heights.length / n);
+    const cs = Array.from({ length: n }, (_, c) => ({ w: Math.max(0, ...widths.slice(c * per, (c + 1) * per)), h: sum(heights.slice(c * per, (c + 1) * per)) }));
+    return { rows: per, w: sum(cs.map((c) => c.w)), h: Math.max(...cs.map((c) => c.h)) };
+  };
+  const tall = (max: number, aspect: number) => width(max, aspect) / aspect * 1.25;
+  const lrank = [...right].sort((a, b) => a.u.max - b.u.max);
+  const cl = cols(left.map((x) => tall(x.max, x.aspect)), left.map((x) => width(x.max, x.aspect)));
+  const cr = cols(lrank.map((x) => tall(x.u.max, x.aspect)), lrank.map((x) => width(x.u.max, x.aspect)));
+  const fit = stack
+    ? `stack" style="--sl:${cl.w.toFixed(1)};--sr:${cr.w.toFixed(1)};--mx:${Math.max(cl.h, cr.h).toFixed(1)};--rows:${Math.max(cl.rows, cr.rows)};--rl:${cl.rows};--rr:${cr.rows}"`
+    : `" style="--sl:${sl.toFixed(1)};--sr:${sr.toFixed(1)};--mx:${mx.toFixed(1)}"`;
   const stage = fight3d ? fight3d.stageArt(place, Math.round(shape >= 1.78 ? 1600 : 900 * shape), Math.round(shape >= 1.78 ? 1600 / shape : 900)) : null;
   const html = `<div class="fightscene">${stage ? `<img class="backdrop" src="${stage}" alt="">` : backdrop(place)}
       <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
       <div class="outcome">${outcome}</div>
-      <div class="battle" style="--sl:${sl.toFixed(1)};--sr:${sr.toFixed(1)};--mx:${mx.toFixed(1)}"><div class="bside bl">${side}</div><div class="bside br">${foes}</div></div>
+      <div class="battle ${fit}><div class="bside bl">${side}</div><div class="bside br">${foes}</div></div>
       ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
