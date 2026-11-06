@@ -318,15 +318,19 @@ q::after { content: close-quote; }
 .production .pturn { padding: .2em .6em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production .who { font-size: 1.15em; margin-bottom: .15em; }
 /* A resource's row: its icon, the fixed amount, its dice, then the total once they land. */
+/* a card is no wider than the sheet: a row with many dice wraps instead (#333) */
+.production .pstage > * { min-width: 0; }
 .production .prow { display: flex; align-items: center; gap: .5em; min-height: 2.6em; opacity: 0; translate: -.8em 0; transition: opacity .3s ease-out, translate .3s ease-out; }
+.production .prow > svg, .production .eq { flex: none; }
 .production .prow.up { opacity: 1; translate: none; }
-.production .parts { display: inline-flex; align-items: center; gap: .1em; }
-.production .parts > i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
+.production .parts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .1em; min-width: 0; }
+.production .term { display: inline-flex; align-items: center; }
+.production .term > i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
 .production .base { min-width: 1em; text-align: center; }
 .production .eq { opacity: 0; transition: opacity .25s ease-out; }
 .production .prow.landed .eq { opacity: 1; }
 .production .chip.minus { color: var(--bad); }
-.production .parts .eat { display: inline-flex; align-items: center; gap: .1em; color: var(--bad); }
+.production .term .eat { display: inline-flex; align-items: center; gap: .1em; color: var(--bad); }
 .production .ptotal { margin-top: .3em; padding-top: .3em; border-top: 2px solid color-mix(in srgb, var(--pc) 45%, transparent); opacity: 0; transition: opacity .3s ease-out; }
 .production .ptotal.up { opacity: 1; }
 .production .psum { align-self: center; }
@@ -990,6 +994,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .endbox { padding: 0 0 1em; }
 .remote :is(.production, .result, .endbox) h1 { font-size: 1.6em; }
 .remote .production .pstage { font-size: 1.3em; }
+.remote .production .prow { gap: .35em; padding: .2em 0; }
+.remote .production .parts { row-gap: .25em; }
+.remote .production .die { width: 1.8em; height: 1.8em; margin: 0 .05em; }
+.remote .production .term > i, .remote .production .eq > i { margin: 0 .1em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }

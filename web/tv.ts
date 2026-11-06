@@ -452,10 +452,13 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   // A row: what's made, then what the dragons eat of it, in red with the dragon
   // icon ("1 + d4 − 1🐉 = 2"), then what's left.
   const row = (x: (typeof made)[number]['rows'][number]) => {
+    // Each term keeps its sign with it, so a long row wraps between terms
+    // ("+ 3" moves down whole) and never runs off a phone's screen (#333).
     const parts = [x.base || !x.dice.length ? `<b class="base">${x.base}</b>` : '', ...x.dice.map((d) => dieFace(d.sides, d.value, 'rolling'))].filter(Boolean);
-    const eat = x.eats ? `<i>−</i><span class="eat" title="your dragons eat this"><b>${x.eats}</b>${icon('dragon', 1.4)}</span>` : '';
+    const terms = parts.map((t, i) => `<span class="term">${i ? '<i>+</i>' : ''}${t}</span>`);
+    const eat = x.eats ? `<span class="term"><i>−</i><span class="eat" title="your dragons eat this"><b>${x.eats}</b>${icon('dragon', 1.4)}</span></span>` : '';
     const total = x.total < 0 ? `−${-x.total}` : x.total;
-    return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${parts.join('<i>+</i>')}${eat}</span>${x.dice.length || x.eats ? `<span class="eq"><i>=</i><b>${total}</b></span>` : ''}</li>`;
+    return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${terms.join('')}${eat}</span>${x.dice.length || x.eats ? `<span class="eq"><i>=</i><b>${total}</b></span>` : ''}</li>`;
   };
   const net = (m: (typeof made)[number]) => netChips({ ...m.got, livestock: (m.got.livestock ?? 0) - m.eat }, 1.4);
   const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${net(m)}</div></section>`).join('');
