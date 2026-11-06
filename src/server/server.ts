@@ -32,6 +32,7 @@ const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three
 const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
 const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
 const MAX_BODY = 4096;
+export const PING_MS = 15000; // web/common.ts's STALE_MS allows for a couple missed
 const RECAP_ID = /^[0-9a-f]{12}$/; // Room.recapId
 
 const TYPES: Record<string, string> = {
@@ -112,7 +113,10 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     const unsubscribe = room.subscribe(send);
     const disconnect = room.connect(tok);
     send();
-    const ping = setInterval(() => res.write(': ping\n\n'), 20000);
+    // A named event, not an SSE comment: the page hears it, so a stream that
+    // went quiet (dead under a restart or a network change, with no error)
+    // is noticed and opened again (web/common.ts, watch).
+    const ping = setInterval(() => res.write('event: ping\ndata: 1\n\n'), PING_MS);
     req.on('close', () => {
       clearInterval(ping);
       unsubscribe();
