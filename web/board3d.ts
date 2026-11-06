@@ -34,12 +34,8 @@ const GROUND = TOP + PLATE_H; // where a building stands on its plate
 // from top-down. Lower shows more of the models' fronts and
 // sides; straight down would flatten them.
 const CAMERA_TILT = 1.13;
-// How far the fight's camera looks down on a wide screen (radians; about
-// 36 degrees). The map's is CAMERA_TILT; the fight keeps lower, so the
-// places' walls and the fighters' faces still show. On a screen held
-// upright it looks down at CAMERA_TILT, as the map does, so the files going
-// back aren't squashed together.
-const STAGE_TILT = 0.63;
+// The map camera's field of view, up and down (degrees). A fight is seen through the same camera.
+const MAP_FOV = 26;
 
 // Paper colours. Terrain is the phone map's colours, so the two maps match.
 const WALL = '#f1e8d4';
@@ -1850,7 +1846,7 @@ export class Board3D {
   readonly el: HTMLDivElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(26, 16 / 9, 0.1, 200);
+  private camera = new THREE.PerspectiveCamera(MAP_FOV, 16 / 9, 0.1, 200);
   private sun: THREE.DirectionalLight;
   private world = new THREE.Group();
   private mapSig = '';
@@ -3346,6 +3342,7 @@ type Standing = {
 // 3, the Fire Giant 5.4 and the Titan 7: the bosses loom.
 const FIG_K = 1;
 const BOSS_LOOM = 1.35;
+const CROWN_PX = 44; // the crown over a head, at the scoring (style.css .fig-crown)
 const LUNGE_S = 0.3, FLINCH_S = 0.25, FALL_S = 0.5;
 const GREY = new THREE.Color('#8a8790');
 
@@ -3356,8 +3353,9 @@ const GREY = new THREE.Color('#8a8790');
 // stands in lines of up to six across, one behind another, and a boss (four
 // times any other defender's health) at the far end of its front line; on
 // one held upright, in files of up to four going back, side by side, and a
-// boss behind them. The camera looks down at it (STAGE_TILT, or
-// CAMERA_TILT upright) from as far back as lets every fighter, with room
+// boss behind them. It's seen through the map's camera (its field of view,
+// looking down at CAMERA_TILT), so it reads as the board does: nothing
+// stands in front of anything. The camera is as far back as lets every fighter, with room
 // for its plate, fit between `safe.top` and `safe.bottom` (fractions of the
 // height kept clear for the page's header and footer). Labels are the
 // page's (tv.ts), pinned over each model by anchor().
@@ -3365,7 +3363,7 @@ export class FightStage {
   readonly el: HTMLCanvasElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.1, 300);
+  private camera = new THREE.PerspectiveCamera(MAP_FOV, 16 / 9, 0.1, 600);
   private figs = new Map<string, Standing>();
   private clock = new THREE.Clock();
   private sun = new THREE.DirectionalLight('#fff1dc', 3.4);
@@ -3380,14 +3378,10 @@ export class FightStage {
   private left: Standing[] = [];
   private foes: Standing[] = [];
   private boss: Standing | null = null;
-  // How far it looks down: on a screen held upright, as steeply as the map
-  // (the files go back, and a shallower look would squash them together).
-  private tilt: number;
 
   constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }) {
     this.upright = upright;
     this.safe = safe;
-    this.tilt = upright ? CAMERA_TILT : STAGE_TILT;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -3515,7 +3509,7 @@ export class FightStage {
       // Behind its files, across the middle of its side.
       const xs = this.foes.map((f) => f.x);
       boss.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 1.2 + boss.rx;
-      boss.z = Math.min(0, ...this.foes.map((f) => f.z - f.rz - f.h / Math.tan(this.tilt) * 0.3)) - boss.rz - boss.label.h * boss.u;
+      boss.z = Math.min(0, ...this.foes.map((f) => f.z - f.rz - f.h / Math.tan(CAMERA_TILT) * 0.3)) - boss.rz - boss.label.h * boss.u;
     }
     const all = [...this.figs.values()];
     const shift = -3 - Math.min(...all.map((f) => f.z - f.rz));
@@ -3534,11 +3528,12 @@ export class FightStage {
     const per = this.upright ? 4 : 6;
     const lines: Standing[][] = [];
     for (let i = 0; i < fs.length; i += per) lines.push(fs.slice(i, i + per));
-    const back = 1 / Math.tan(this.tilt); // how far back a height reaches, looking down
+    const back = 1 / Math.tan(CAMERA_TILT); // how far back a height reaches, looking down
     const GAP = 0.4, MID = 1.2;
     const wide = (f: Standing) => Math.max(2 * f.rx, f.label.w * f.u);
     // Depth on the ground shows on the screen foreshortened, by the tilt's sine.
-    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => f.label.h * f.u)) * 1.1) / Math.sin(this.tilt) + 0.3;
+    // (A line's plates, and the crowns over the heads in front of them at the scoring.)
+    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => (f.label.h + CROWN_PX) * f.u)) * 1.1) / Math.sin(CAMERA_TILT) + 0.3;
     if (this.upright) {
       // Ranks line up across the files: each rank as far in front of the
       // one behind as its tallest figure needs to leave that one showing.
@@ -3557,7 +3552,7 @@ export class FightStage {
           f.x = -side * (x + w);
           f.z = zs[k] - front;
         });
-        x += 2 * w + GAP;
+        x += 2 * w + Math.max(GAP, 12 * Math.max(...file.map((f) => f.u)));
       }
     } else {
       let z = 0;
@@ -3566,7 +3561,7 @@ export class FightStage {
         for (const f of line) {
           f.x = -side * (x + wide(f) / 2);
           f.z = z;
-          x += wide(f) + GAP;
+          x += wide(f) + Math.max(GAP, 12 * f.u);
         }
         z -= Math.max(...line.map((f) => f.rz * 2 + f.h * back * 0.7)) + clear(line);
       }
@@ -3611,10 +3606,6 @@ export class FightStage {
   private fit() {
     const { w, h } = this.size;
     const aspect = w / h;
-    // On a screen narrower than the TV's, the view widens (most of the way)
-    // rather than cropping in, so a phone held upright still sees the place.
-    const vfov = aspect >= 1.6 ? 34 : (2 * Math.atan((Math.tan((17 * Math.PI) / 180) * 1.6 * 0.8) / aspect) * 180) / Math.PI;
-    this.camera.fov = Math.max(34, vfov);
     this.camera.aspect = aspect;
     const top = 1 - 2 * this.safe.top, bottom = -1 + 2 * this.safe.bottom;
     this.camera.clearViewOffset();
@@ -3622,9 +3613,9 @@ export class FightStage {
     const at = new THREE.Vector3(
       all.length ? (Math.min(...all.map((f) => f.x - f.rx)) + Math.max(...all.map((f) => f.x + f.rx))) / 2 : 0, 0,
       all.length ? (Math.min(...all.map((f) => f.z - f.rz)) + Math.max(...all.map((f) => f.z + f.rz))) / 2 : 0);
-    const dir = new THREE.Vector3(0, Math.sin(this.tilt), Math.cos(this.tilt));
+    const dir = new THREE.Vector3(0, Math.sin(CAMERA_TILT), Math.cos(CAMERA_TILT));
     // Room over each head for the crown, under its feet for its plate.
-    const over = (2 * 28) / h;
+    const over = (2 * CROWN_PX) / h;
     const v = new THREE.Vector3();
     // How much of the screen the fighters take, up and across, from `d` away.
     const extent = (d: number) => {
@@ -3645,6 +3636,8 @@ export class FightStage {
         lo = Math.min(lo, low - (2 * (f.label.h + 4)) / h);
         v.set(f.x, 0, f.z).project(this.camera);
         wide = Math.max(wide, Math.abs(v.x) + f.label.w / w);
+        // Room to fall, away from the other side (a boss falls back).
+        if (f !== this.boss) wide = Math.max(wide, Math.abs(v.set(f.x - f.side * f.h, 0, f.z).project(this.camera).x));
       }
       return { lo, hi, wide };
     };
@@ -3658,7 +3651,7 @@ export class FightStage {
       if (fits(mid)) hi = mid;
       else lo = mid;
     }
-    const d = Math.max(hi, 16);
+    const d = Math.max(hi, 22);
     // Then moved up or down the screen so what's drawn sits in the middle of the clear band.
     const e = extent(d);
     this.camera.setViewOffset(w, h, 0, (((top + bottom) - (e.hi + e.lo)) / 2) * (h / 2), w, h);
@@ -3696,7 +3689,7 @@ export class FightStage {
   strike(key: string) { const f = this.figs.get(key); if (f) f.strikeAt = this.clock.getElapsedTime(); }
   /** It flinches from a hit. */
   hit(key: string) { const f = this.figs.get(key); if (f) f.hitAt = this.clock.getElapsedTime(); }
-  /** It falls over onto its back, and greys. */
+  /** It falls over, away from the other side (a boss onto its back), and greys. */
   fall(key: string) { const f = this.figs.get(key); if (f && f.downAt < 0) f.downAt = this.clock.getElapsedTime(); }
 
   private frame() {
@@ -3710,10 +3703,12 @@ export class FightStage {
       const dn = f.downAt < 0 ? 0 : Math.min(1, (t - f.downAt) / FALL_S);
       const fall = dn * dn * (3 - 2 * dn);
       f.obj.position.set(f.x + f.side * (lunge - flinch * 0.15 * f.r), 0, f.z);
-      // Tipped back from the other side by a flinch; laid on its back by a
-      // fall, away from the room, so it falls on no one.
-      f.obj.rotation.z = f.side * flinch * 0.12;
-      f.obj.rotation.x = -fall * 1.45;
+      // Tipped back from the other side by a flinch; laid on its side by a
+      // fall, away from the other side, which reads from above. A boss falls
+      // onto its back instead, so it doesn't fall off the screen or onto its own.
+      const big = f === this.boss;
+      f.obj.rotation.z = f.side * (flinch * 0.12 + (big ? 0 : fall * 1.45));
+      f.obj.rotation.x = big ? -fall * 1.45 : 0;
       if (f.downAt >= 0 && dn <= 1) for (const { m, c } of f.mats) m.color.copy(c).lerp(GREY, fall * 0.7);
     }
     this.renderer.render(this.scene, this.camera);
