@@ -19,7 +19,7 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
 }
 
 // What a scoring kingdom is worth when it falls, and to whom: the raider with
-// the most power still fighting at the end. With `leader`, who that is now
+// the most power standing at the end. With `leader`, who that is now
 // (the most power sent; equal powers in turn order). Nothing for the others.
 export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; names: string[] } | null): string {
   if (!t.points) return '';

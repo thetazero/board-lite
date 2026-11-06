@@ -2,7 +2,7 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, PRODUCTION_CLASSES, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, autoClearTargets, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   madeResource, onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
@@ -378,12 +378,12 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const d = DRAGONS[c.key];
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
-    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
+    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon. Hatches as an egg and grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. Adult: Health ${adult.hp}, Attack ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) };
     return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? NO_ROOM : null };
   }
   const a = ACTIONS[c.key];
-  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep this card in your hand to score its points.' };
+  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'It’s never played.' };
   if (a.effect === 'gain_resource') return { ...base, text: a.text, needs: 'resource' };
   if (a.effect === 'grow_dragon') {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
@@ -398,7 +398,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
 }
 
 const NO_ROOM = 'No room for another dragon: build a roost first.';
-const noUpgradeHex = (u: UpgradeDef) => `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.`;
+const noUpgradeHex = (u: UpgradeDef) => `You have no ${PRODUCTION_CLASSES.every((c) => u.appliesTo.includes(c)) ? 'production building' : orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.`;
 const noHex = (b: BuildingDef) => `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings${b.beside ? ` and to ${besideText(b.beside)}` : ''}.`;
 // A building's card text, plus where it must go.
 const placeText = (b: BuildingDef) => `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}${b.beside ? ` Build adjacent to ${besideText(b.beside)}.` : ''}`;
