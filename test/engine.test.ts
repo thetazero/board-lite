@@ -809,6 +809,15 @@ test('a great beast holds the hexes around it: nothing is built there until it f
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock! + TUNING.peakBonus);
 });
 
+test('a hex a great beast holds stays held with other fauna on it, on the TV and in the CLI', () => {
+  const { g, ring } = beastGame();
+  g.map[ring].fauna = 'basilisk';
+  const hex = publicState(g).map.find((h) => h.k === ring)!;
+  assert.equal(hex.held, 'thunderbird');
+  assert.equal(publicState(g).map.find((h) => h.k === PEAK)!.held, undefined); // the beast's own hex has no border
+  assert.match(playerView(g, 0), new RegExp(`${ring}:[A-Z.~]\\{[^}]+\\}\\{x\\}`));
+});
+
 // #366: before a building goes on a hex, the phone shows what it would do
 // there, and whether the freed peak's bonus applies to it.
 test('placing a building shows what it would do on each hex, peak bonus or not', () => {

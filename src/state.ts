@@ -292,7 +292,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     map: Object.entries(g.map).map(([k, h]) => {
       const b = g.buildings[k];
       return {
-        ...(!h.fauna && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
+        ...(!(h.fauna && BEASTS[h.fauna]) && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,

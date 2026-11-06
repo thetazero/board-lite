@@ -63,7 +63,7 @@ function mapText(g: PublicState): string[] {
     const cells = rows.get(r)!.sort((a, b) => a.q - b.q).map((h) => {
       const b = h.building;
       const label = b ? `[${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}]` : '';
-      const held = h.fauna ? `{${faunaCode(h.fauna.key)}}` : h.held ? '{x}' : '';
+      const held = `${h.fauna ? `{${faunaCode(h.fauna.key)}}` : ''}${h.held ? '{x}' : ''}`;
       const perched = h.perched.length ? `<${h.perched.map((x) => x.d).join(' ')}>` : '';
       return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}${perched}`;
     });
