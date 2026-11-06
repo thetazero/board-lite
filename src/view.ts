@@ -55,14 +55,14 @@ function mapText(g: PublicState): string[] {
   const built = new Map(g.map.flatMap((h) => (h.building ? [[h.building.type, h.building.name] as const] : [])));
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
   lines.push('Map (axial q,r). M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean, ^ peak.');
-  lines.push(`[<owner><code>] a building, + upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
+  lines.push(`[<owner><code>] a building, + per upgrade: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
   lines.push(`<ids> perched dragons; {code} a beast${fauna.size ? ` (${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}`).join(', ')})` : ''}; {x} held by an adjacent great beast. A building under either is suppressed.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
   for (const r of [...rows.keys()].sort((a, b) => a - b)) {
     const cells = rows.get(r)!.sort((a, b) => a.q - b.q).map((h) => {
       const b = h.building;
-      const label = b ? `[${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}]` : '';
+      const label = b ? `[${b.owner + 1}${code(b.type)}${'+'.repeat(b.upgrades.length)}]` : '';
       const held = `${h.fauna ? `{${faunaCode(h.fauna.key)}}` : ''}${h.held ? '{x}' : ''}`;
       const perched = h.perched.length ? `<${h.perched.map((x) => x.d).join(' ')}>` : '';
       return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}${perched}`;

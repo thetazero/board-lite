@@ -1119,7 +1119,7 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
   const holder = h.suppressed ? h.fauna?.name ?? g.beasts.find((x) => x.key === h.held)?.name : undefined;
   const stopped = holder ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(holder)} holds it.</p>`
     : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
-  const name = `<b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}`;
+  const name = `<b>${esc(b.name)}</b>${b.upgradeName ? ` with ${b.upgrades.length === 1 ? 'a ' : ''}${esc(b.upgradeName)}` : ''}`;
   // An upgrade only goes on your own building, so its name alone says which,
   // and what changes sits on the same line.
   const parts = after ? changeParts(b.does, after) : [];

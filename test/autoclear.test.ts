@@ -25,7 +25,7 @@ function setup(seed = 5) {
   g.dragons = [];
   const land = neighbors(g.towers[0]).filter((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k]);
   const mine = land.slice(0, 4);
-  for (const k of mine) g.buildings[k] = { type: 'pasture', owner: 0, upgrade: null, floors: 0 };
+  for (const k of mine) g.buildings[k] = { type: 'pasture', owner: 0, upgrades: [], floors: 0 };
   const empty = mine.flatMap((k) => neighbors(k)).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k] && !mine.includes(k))!;
   return { g, mine, empty };
 }

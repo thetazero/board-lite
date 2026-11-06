@@ -161,7 +161,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     const classes = [...new Set(b.buildings.filter((x) => !x.basic).map((x) => x.cls))];
     const cards = classes.map((c) => `${head(CLASS_HEAD[c] ?? c)}${b.buildings.filter((x) => !x.basic && x.cls === c).map(one).join('')}`).join('');
     const ups = b.upgrades.map((u) => entry(pic(`upgrade ${u.key}`, u.name), u.name, `${text(`${u.text} Shown as a golden rim and a mark.${u.base ? ' Also a special project, at double the cost.' : ''}`)}${cost(u.cost)}`, `upgrade ${u.key}`)).join('');
-    return `${tower}${head('Basic buildings', 'Built without a card.')}${basics}${cards}${head('Upgrades', 'Each building takes 1 upgrade.')}${ups}`;
+    return `${tower}${head('Basic buildings', 'Built without a card.')}${basics}${cards}${head('Upgrades', 'A building may take any number.')}${ups}`;
   },
   beasts(b) {
     const beast = (f: FaunaView, more: string) => entry(pic(`beast ${f.key}`, f.name), f.name,

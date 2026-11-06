@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
-import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingYield, dragonCapacity, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -861,7 +861,7 @@ function beastGame() {
   rich(g, 0);
   const [ring] = neighbors(PEAK);
   const [beyond] = neighbors(ring).filter((n) => n !== PEAK && !neighbors(PEAK).includes(n));
-  g.buildings[beyond] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[beyond] = { type: 'roost', owner: 0, upgrades: [], floors: 0 };
   g.map[ring].terrain = 'meadow';
   delete g.map[ring].fauna;
   return { g, ring, beyond };
@@ -1163,7 +1163,7 @@ test('a building card shows what it makes now and with the upgrade', () => {
   keepAll(g);
   const k = neighbors(g.towers[0]).find((n) => g.map[n].terrain === 'mountain' && !g.map[n].fauna)
     ?? neighbors(g.towers[0]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna)!;
-  g.buildings[k] = { type: 'quarry', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
   g.players[0].hand.push({ id: 'cw', deck: 'building', key: 'workshop' });
   const hex = publicState(g, 10).map.find((h) => h.k === k)!;
   assert.deepEqual(hex.building!.does, { makes: { stone: { base: 0, dice: [4] } }, houses: 0, points: 1 });
@@ -1181,7 +1181,7 @@ test('a Workshop is also a special project, at double the card, and works like t
   keepAll(g);
   const p = g.turn;
   const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
-  g.buildings[k] = { type: 'quarry', owner: p, upgrade: null, floors: 0 };
+  g.buildings[k] = { type: 'quarry', owner: p, upgrades: [], floors: 0 };
   const card = { timber: 4, stone: 4, crystal: 2 };
   g.players[p].resources = { stone: 8, timber: 8, crystal: 3, livestock: 0, gold: 0 };
   // Short of the double cost: the phone says so, and the command is refused.
@@ -1198,12 +1198,42 @@ test('a Workshop is also a special project, at double the card, and works like t
   assert.throws(() => apply(g, p, `project workshop ${g.towers[p]}`), /Workshop can go on/);
   apply(g, p, `project workshop ${k}`);
   assert.deepEqual(g.players[p].resources, { stone: 8 - 2 * card.stone, timber: 8 - 2 * card.timber, crystal: 4 - 2 * card.crystal, livestock: 0, gold: 0 });
-  assert.equal(g.buildings[k].upgrade, 'workshop');
+  assert.deepEqual(g.buildings[k].upgrades, ['workshop']);
   assert.equal(buildingPoints(g, k), 1 + (UPGRADES.workshop.points ?? 0));
   assert.match(g.log.at(-1)!.text, /adds Workshop to their Quarry at .* as a special project\./);
-  assert.deepEqual(seatState(g, p).upgradeProjects[0].hexes, []);
-  assert.match(seatState(g, p).upgradeProjects[0].why!, /without an upgrade/);
   // Only base upgrades are special projects.
   rich(g, p);
   assert.throws(() => apply(g, p, `project nesting_grounds ${g.towers[p]}`), /Use: project </);
+});
+
+// #400: Workshops stack. A building takes any number of upgrades; the first
+// Workshop on it adds 2, each one after adds 1, and each is worth its point.
+test('Workshops stack on one building: +2, then +1 each, and a point each', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
+  g.buildings[k] = { type: 'quarry', owner: p, upgrades: [], floors: 0 };
+  const pt = UPGRADES.workshop.points ?? 0;
+  rich(g, p);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 2, dice: [4] } });
+  // Still a target, and the preview shows the second Workshop on top of the first.
+  const u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.deepEqual(u.hexes, [k]);
+  assert.deepEqual(u.after[k].makes, { stone: { base: 3, dice: [4] } });
+  assert.equal(u.after[k].points, 1 + 2 * pt);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(g.buildings[k].upgrades, ['workshop', 'workshop']);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 3, dice: [4] } });
+  assert.equal(publicState(g).map.find((x) => x.k === k)!.building!.upgradeName, '2 Workshops');
+  rich(g, p);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 4, dice: [4] } });
+  assert.equal(buildingPoints(g, k), 1 + 3 * pt);
+  assert.match(playerView(g, p), new RegExp(`Quarry\\+3 Workshops@${k}`));
+  // Nesting Grounds stack too: each houses 2 more.
+  const cap = dragonCapacity(g, p);
+  g.buildings[g.towers[p]].upgrades.push('nesting_grounds', 'nesting_grounds');
+  assert.equal(dragonCapacity(g, p), cap + 2 * (UPGRADES.nesting_grounds.dragonCapacity ?? 0));
 });

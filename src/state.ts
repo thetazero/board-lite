@@ -17,7 +17,7 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrades: string[] /* keys in UPGRADES */; upgradeName: string | null /* "Workshop", "2 Workshops" */; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it's suppressed while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain, and a building here is suppressed
@@ -299,7 +299,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
         ...(b && blocked(g, k) ? { suppressed: true as const } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrades: b.upgrades, upgradeName: upgradeNames(b.upgrades), floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
         perched: perchedOn(g, k).map((d) => ({ d: d.id, owner: d.owner, element: DRAGONS[d.key].element })),
       };
@@ -329,11 +329,20 @@ export function publicState(g: Game, logLines = 60): PublicState {
   };
 }
 
-function buildingDoes(g: Game, k: string, upgrade?: string): BuildingDoes {
+// A building's upgrades, named and counted: "Workshop", "2 Workshops".
+function upgradeNames(ups: string[]): string | null {
+  const keys = [...new Set(ups)];
+  return keys.map((u) => {
+    const n = ups.filter((x) => x === u).length, name = UPGRADES[u].name;
+    return n === 1 ? name : `${n} ${name.endsWith('s') ? name : `${name}s`}`;
+  }).join(', ') || null;
+}
+
+function buildingDoes(g: Game, k: string, upgrades?: string[]): BuildingDoes {
   const b = g.buildings[k];
   const def = b.type === 'tower' ? null : BUILDINGS[b.type];
   const note = def && (def.growthBonus || def.bankRate) ? def.text : undefined;
-  return { ...buildingYield(g, k, upgrade), ...(note ? { note } : {}) };
+  return { ...buildingYield(g, k, upgrades), ...(note ? { note } : {}) };
 }
 
 // What a building of `type` would do built by seat p at each of `hexes`: what
@@ -341,7 +350,7 @@ function buildingDoes(g: Game, k: string, upgrade?: string): BuildingDoes {
 function doesIfBuilt(g: Game, p: number, type: string, hexes: string[]): Record<string, BuildingDoes> {
   const def = BUILDINGS[type];
   return Object.fromEntries(hexes.map((k) => {
-    const there: Game = { ...g, buildings: { ...g.buildings, [k]: { type, owner: p, upgrade: null, floors: 0 } } };
+    const there: Game = { ...g, buildings: { ...g.buildings, [k]: { type, owner: p, upgrades: [], floors: 0 } } };
     const peak = onPeak(g, k) ? (madeResource(def) ? 'more' as const : 'none' as const) : undefined;
     return [k, { ...buildingDoes(there, k), ...(peak ? { peak } : {}) }];
   }));
@@ -371,7 +380,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
     const hexes = upgradeTargets(g, p, c.key);
-    const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, c.key)]));
+    const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, c.key])]));
     return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : noUpgradeHex(u) };
   }
   if (kind === 'dragon') {
@@ -398,7 +407,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
 }
 
 const NO_ROOM = 'No room for another dragon: build a roost first.';
-const noUpgradeHex = (u: UpgradeDef) => `You have no ${PRODUCTION_CLASSES.every((c) => u.appliesTo.includes(c)) ? 'production building' : orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.`;
+const noUpgradeHex = (u: UpgradeDef) => `You have no ${PRODUCTION_CLASSES.every((c) => u.appliesTo.includes(c)) ? 'production building' : orList(u.appliesTo.map((c) => CLASS_NAMES[c]))}.`;
 const noHex = (b: BuildingDef) => `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings${b.beside ? ` and to ${besideText(b.beside)}` : ''}.`;
 // A building's card text, plus where it must go.
 const placeText = (b: BuildingDef) => `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}${b.beside ? ` Build adjacent to ${besideText(b.beside)}.` : ''}`;
@@ -437,7 +446,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
       const u = UPGRADES[key];
       const cost = specialProjectCost(u.cost);
       const hexes = upgradeTargets(g, p, key);
-      const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, key)]));
+      const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, key])]));
       return { key, name: u.name, text: u.text, cost: res(cost), affordable: canAfford(pl, cost), hexes, after, why: (hexes.length ? null : noUpgradeHex(u)) ?? afford(pl, cost) };
     }),
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
