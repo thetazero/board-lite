@@ -765,6 +765,41 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'bail-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Four raiders against the strongest kingdom on offer, one with two
+    // dragons; two have chosen, two are still choosing; the fifth stays home.
+    setup: (g) => {
+      const t = g.turn;
+      const raiders = [0, 1, 2, 3].map((i) => (t + i) % 5);
+      for (const p of g.players.keys()) arm(g, p, p === raiders[1] ? [3, 2] : p === raiders[3] ? [1] : [2]);
+      toVote(g);
+      vote(g, byPower(g).at(-1)!);
+      toBail(g, raiders);
+      apply(g, raiders[0], 'fight');
+      apply(g, raiders[2], 'bail');
+    },
+    shots: () => [{ file: 'tv-raid-bail-5p', caption: 'TV, fight or bail (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
+  },
+  {
+    name: 'remote-bail-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toBail(g, [t, (t + 1) % 3]);
+      apply(g, t, 'fight');
+    },
+    shots: () => [{ file: 'tv-remote-bail-3p', caption: 'No TV: fight or bail on the table view', client: 'tv', table: true, sizes: true }],
+  },
+  {
     name: 'raid-result-3p',
     players: 3,
     seed: 1,
