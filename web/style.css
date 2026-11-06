@@ -98,12 +98,14 @@ small { color: var(--muted); }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
 /* Dice: one white paper shape per kind of die, the same blank (a die to roll,
-   "2" and a square for 2d6) and rolled (the shape with its number on it). */
+   "2" and a square for 2d6). A rolled die is that shape's flat face with its
+   number on it (dieFace). */
 .dicechip { display: inline-flex; align-items: center; gap: .05em; }
 .die { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.4em; height: 2.4em; margin: 0 .15em; color: #111; vertical-align: middle; line-height: 1; filter: drop-shadow(0 2px 0 #0007); }
-.die .dieicon { position: absolute; inset: 0; }
-.die b { position: relative; font-size: 1.2em; }
-.die[data-sides="4"] b { margin-top: .45em; font-size: 1em; }
+.die .dieicon { position: absolute; inset: 0; width: 100%; height: 100%; }
+.die b { position: relative; font-size: 1.15em; font-weight: 800; }
+.die[data-sides="4"] b { margin-top: .3em; font-size: 1em; }
+.die[data-sides="8"] b { font-size: 1em; }
 .die.rolling { animation: shake .18s infinite; }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
@@ -318,10 +320,14 @@ q::after { content: close-quote; }
 .production .pturn { padding: .2em .6em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production .who { font-size: 1.15em; margin-bottom: .15em; }
 /* A resource's row: its icon, the fixed amount, its dice, then the total once they land. */
+/* a card is never wider than the sheet (#333) */
+.production .pstage > * { min-width: 0; }
 .production .prow { display: flex; align-items: center; gap: .5em; min-height: 2.6em; opacity: 0; translate: -.8em 0; transition: opacity .3s ease-out, translate .3s ease-out; }
+.production .prow > svg, .production .eq { flex: none; }
 .production .prow.up { opacity: 1; translate: none; }
 .production .parts { display: inline-flex; align-items: center; gap: .1em; }
-.production .parts > i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
+.production .dice { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .3em; }
+.production .parts i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
 .production .base { min-width: 1em; text-align: center; }
 .production .eq { opacity: 0; transition: opacity .25s ease-out; }
 .production .prow.landed .eq { opacity: 1; }
@@ -994,6 +1000,15 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .endbox { padding: 0 0 1em; }
 .remote :is(.production, .result, .endbox) h1 { font-size: 1.6em; }
 .remote .production .pstage { font-size: 1.3em; }
+/* a resource's dice wrap under each other when the row runs out of room;
+   a faint line between resources keeps each one's dice together */
+.remote .production .prow { gap: .35em; padding: .35em 0; }
+.remote .production .prow + .prow { border-top: 1px solid color-mix(in srgb, var(--pc) 30%, transparent); }
+.remote .production .parts { flex: 1; min-width: 0; }
+.remote .production .dice { flex: 1; min-width: 0; gap: .3em .2em; }
+.remote .production .die { width: 1.9em; height: 1.9em; margin: 0; }
+.remote .production .parts i, .remote .production .eq > i { margin: 0 .1em; }
+.remote .production .ptotal { font-size: .85em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }

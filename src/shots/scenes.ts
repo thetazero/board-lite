@@ -779,6 +779,25 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-production-done-6p', caption: "TV: production ends with everyone's totals together (6 players)", client: 'tv', live: true, waitFor: '#overlay .production .psum.on', hold: true, waitMs: 500 }],
   },
   {
+    // A big producer on a phone's table view: 6 dice on every row (#333),
+    // set down wherever the terrain fits.
+    name: 'production-many-dice-2p',
+    players: 2,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      for (const type of ['quarry', 'lumber_camp', 'crystal_mine', 'pasture']) {
+        const free = Object.keys(g.map).sort().filter((k) => g.map[k].terrain === BUILDINGS[type].terrain && !g.buildings[k] && !g.map[k].fauna && !nearBeast(g.map, k));
+        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrade: null, floors: 0 };
+      }
+      toDiscard(g, [1]);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: (g) => g.log.slice(g.log.findLastIndex((e) => e.ev?.k === 'round')).some((e) => e.ev?.k === 'produce' && e.ev.p === 0 && (e.dice?.length ?? 0) >= 20),
+    shots: () => [{ file: 'tv-remote-production-many-dice-2p', caption: "No TV: production on a phone's table view, with 6 dice on every row", client: 'tv', table: true, live: true, waitFor: '#overlay .production .pturn.on .ptotal.up', hold: true, waitMs: 500, sizes: true }],
+  },
+  {
     name: 'late-6p',
     players: 6,
     seed: 1,
