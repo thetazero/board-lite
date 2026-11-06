@@ -244,9 +244,6 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you make: ${amounts(you.income)}.`);
-  const ids = (k: string) => Object.keys(you.hunger).filter((id) => you.hunger[id] === k);
-  const short = ids('short'), maybe = ids('maybe');
-  if (short.length || maybe.length) out.push(`At the next production, as things stand (your dragons eat oldest first): ${[short.length ? `${short.join(' ')} go${short.length === 1 ? 'es' : ''} hungry` : '', maybe.length ? `${maybe.join(' ')} go${maybe.length === 1 ? 'es' : ''} hungry unless your livestock dice roll well` : ''].filter(Boolean).join('; ')}. A hungry dragon doesn't heal or grow.`);
   out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over your room, so you hatch no more until there's room` : ''}.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);

@@ -176,10 +176,6 @@ export interface SeatState {
   // blocked: one of your buildings that makes it is shut down (a beast or a
   // perched dragon on it), so it brings in less than it could.
   income: Record<Resource, { base: number; dice: number[]; eat: number; blocked: boolean }>;
-  // Which of your dragons go hungry at the next production, as things stand
-  // (#362): 'short' even with the best dice, 'maybe' unless the dice roll
-  // well. Dragons left out are fed for sure. Hidden, as livestock is.
-  hunger: Record<string, 'short' | 'maybe'>;
   hand: CardView[];
   choice: CardView[]; // building cards drawn this round, to keep one
   handCap: number;
@@ -391,21 +387,6 @@ const noHex = (b: BuildingDef) => `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain
 // A building's card text, plus where it must go.
 const placeText = (b: BuildingDef) => `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}${b.beside ? ` Build adjacent to ${besideText(b.beside)}.` : ''}`;
 
-// Seat p's dragons that go hungry at the next production if nothing changes
-// before it: they eat oldest first, 1 livestock each, from what p
-// has plus what p makes (src/engine.ts, the round's production).
-function hungerAhead(g: Game, p: number, make: { base: number; dice: number[] }): SeatState['hunger'] {
-  const have = g.players[p].resources.livestock + make.base;
-  const least = Math.floor((have + make.dice.length) / TUNING.livestockPerDragon);
-  const most = Math.floor((have + make.dice.reduce((s, n) => s + n, 0)) / TUNING.livestockPerDragon);
-  const out: SeatState['hunger'] = {};
-  g.dragons.filter((d) => d.owner === p).forEach((d, i) => {
-    if (i >= most) out[d.id] = 'short';
-    else if (i >= least) out[d.id] = 'maybe';
-  });
-  return out;
-}
-
 export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const pl = g.players[p];
   const s = score(g, p);
@@ -424,7 +405,6 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     dragonsHoused: housed,
     dragonCapacity: dragonCapacity(g, p),
     income,
-    hunger: hungerAhead(g, p, income.livestock),
     hand: pl.hand.map((c) => cardView(g, p, c)),
     choice: pl.choice.map((c) => cardView(g, p, c)),
     handCap: TUNING.handCap,

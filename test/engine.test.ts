@@ -464,31 +464,18 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
 
-test('a player sees which dragons go hungry before production, and everyone sees which went hungry after (#362)', () => {
+test('everyone sees which dragons went hungry at production (#362)', () => {
   const g = newGame(2, 7);
   hatchAll(g);
   advanceToRaidVote(g);
   const a = g.dragons[0];
   const p = a.owner;
   const tower = TUNING.towerProduction.livestock ?? 0;
-  // Four dragons and no livestock in stock: the tower's livestock feeds the
-  // first; with a pasture, its die (1 to 4) feeds the second for sure and
-  // the rest only if it rolls well.
+  // Four dragons and no livestock in stock: the tower's livestock feeds the first.
   g.dragons.unshift({ ...a, id: 'd97' });
   g.dragons.push({ ...a, id: 'd98' }, { ...a, id: 'd99' });
   const mine = g.dragons.filter((d) => d.owner === p).map((d) => d.id);
   g.players[p].resources.livestock = 0;
-  assert.deepEqual(seatState(g, p).hunger, Object.fromEntries(mine.slice(tower).map((id) => [id, 'short'])), 'with no dice, past the tower\'s livestock they go hungry for sure');
-  const hex = Object.keys(g.map).find((x) => !g.buildings[x] && !g.map[x].fauna && g.map[x].terrain === 'meadow')!;
-  g.buildings[hex] = { type: 'pasture', owner: p, upgrade: null, floors: 0 };
-  assert.deepEqual(seatState(g, p).income.livestock.dice, [4]);
-  const h = seatState(g, p).hunger;
-  assert.equal(h[mine[0]], undefined, 'the first eats for sure');
-  assert.equal(h[mine[tower]], undefined, 'and so does the next, on the die\'s least');
-  assert.equal(h[mine[tower + 1]], 'maybe', 'the one after only if the die rolls well');
-  assert.match(playerView(g, p), /At the next production, as things stand/);
-  delete g.buildings[hex];
-  // After production, everyone sees which went hungry.
   while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const seen = publicState(g, 1000).dragons.filter((d) => d.owner === p).map((d) => d.hungry);
