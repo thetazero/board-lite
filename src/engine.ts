@@ -28,7 +28,7 @@ export interface Dragon {
   stage: number; // 0 egg, 1 hatchling, 2 young, 3 adult
   growth: number;
   damage: number; // at its stage's health, it's knocked out
-  // The rival's building it perches on, if any: that building makes nothing
+  // The rival's building it perches on, if any: that building is suppressed
   // until the dragon is recalled or driven off.
   perch?: string;
 }
@@ -262,8 +262,8 @@ export function perchedOn(g: Game, k: string): Dragon[] {
   return g.dragons.filter((d) => d.perch === k);
 }
 
-// Is the building on hex k making nothing? A beast or a perched dragon on it
-// stops it. Nothing stops a tower.
+// Is the building on hex k shut down, making and scoring nothing? A beast or
+// a perched dragon on it stops it. Nothing stops a tower.
 export function blocked(g: Game, k: string): boolean {
   return g.buildings[k]?.type !== 'tower' && (!!g.map[k]?.fauna || perchedOn(g, k).length > 0);
 }
@@ -297,8 +297,11 @@ function ownDragon(g: Game, p: number, id: string | undefined): Dragon {
 
 // ---------- derived values ----------
 
+// Player p's buildings that count: a suppressed one (a beast or a perched
+// dragon on it) is as if it weren't there, except that nothing is built on
+// its hex (#352).
 function ownedBuildings(g: Game, p: number): [string, Building][] {
-  return Object.entries(g.buildings).filter(([, b]) => b.owner === p);
+  return Object.entries(g.buildings).filter(([k, b]) => b.owner === p && !blocked(g, k));
 }
 
 export function buildingClass(b: Building): BuildingClass[] {
@@ -307,9 +310,10 @@ export function buildingClass(b: Building): BuildingClass[] {
 
 // Does this hex count for an effect that counts `what`? Its terrain does, and
 // so does the class of any building on it, whoever owns it ('production' is
-// any of the four resource classes).
+// any of the four resource classes), unless a beast or a perched dragon shuts
+// it down: then it counts as if it weren't there (#352).
 function counts(g: Game, k: string, what: Counted): boolean {
-  const b = g.buildings[k];
+  const b = blocked(g, k) ? undefined : g.buildings[k];
   const classes = what === 'production' ? PRODUCTION_CLASSES : [what as BuildingClass];
   return g.map[k]?.terrain === what || (!!b && buildingClass(b).some((c) => classes.includes(c)));
 }
@@ -394,7 +398,8 @@ export function onPeak(g: Game, k: string): boolean {
 // fixed amount plus dice, per resource, only those it makes), how many dragons
 // it houses, and its points. Given an upgrade, as it would be with that one
 // instead (what placing an upgrade card shows before you confirm). It ignores
-// a beast or a perched dragon on it: that stops the making, not the building.
+// a beast or a perched dragon on it: that stops the making and the points,
+// not the building.
 export interface BuildingYield {
   makes: Partial<Record<Resource, { base: number; dice: number[] }>>;
   houses: number;
@@ -429,7 +434,6 @@ export function buildingYield(g: Game, k: string, upgrade: string | null = g.bui
 export function production(g: Game, p: number): Record<Resource, { base: number; dice: number[] }> {
   const out = Object.fromEntries(RESOURCES.map((r) => [r, { base: 0, dice: [] as number[] }])) as Record<Resource, { base: number; dice: number[] }>;
   for (const [k] of ownedBuildings(g, p)) {
-    if (blocked(g, k)) continue; // a building under a beast or a perched dragon makes nothing
     for (const [r, m] of Object.entries(buildingYield(g, k).makes) as [Resource, { base: number; dice: number[] }][]) {
       out[r].base += m.base;
       out[r].dice.push(...m.dice);
@@ -1171,7 +1175,7 @@ function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined
   if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it first.`);
   if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from an adjacent hex: slay it first.`);
   if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on a ${TERRAIN_NOUN[def.terrain]}; ${k} is a ${TERRAIN_NOUN[hex.terrain]}.`);
-  if (!neighbors(k).some((n) => g.buildings[n]?.owner === p)) fail(`${k} isn't adjacent to any of your buildings.`);
+  if (!neighbors(k).some((n) => g.buildings[n]?.owner === p && !blocked(g, n))) fail(`${k} isn't adjacent to any of your buildings.`);
   if (def.beside && !neighbourCount(g, k, def.beside)) fail(`A ${def.name} must go adjacent to ${besideText(def.beside)}; ${k} isn't.`);
   return k;
 }
@@ -1339,7 +1343,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       for (const d of ds) if (!canRaid(d)) fail(`${d.id} can't perch (it must be hatched, not knocked out, and not perched).`);
       for (const d of ds) d.perch = k;
       const b = g.buildings[k];
-      return log(g, `${pname(p)}'s ${ids.join(' ')} ${ids.length === 1 ? 'perches' : 'perch'} on ${pname(b.owner)}'s ${BUILDINGS[b.type].name} at ${k}: it makes nothing while they stay.`, { k: 'perch', p, hex: k, ds: ids, on: b.type, owner: b.owner });
+      return log(g, `${pname(p)}'s ${ids.join(' ')} ${ids.length === 1 ? 'perches' : 'perch'} on ${pname(b.owner)}'s ${BUILDINGS[b.type].name} at ${k}: it's suppressed while they stay.`, { k: 'perch', p, hex: k, ds: ids, on: b.type, owner: b.owner });
     }
     case 'recall': {
       const ids = [...new Set(args)];

@@ -57,13 +57,14 @@ Playtests showed that refusing to trade and taking land first were the only ways
 
 The owner (2026-11-04, #217): "what yorue missing is a very interesting dynamic, if I want to block two tiles I need to split my dragons, but then they can be picked off." Their rules:
 
-- On your turn a dragon may perch on a rival's building instead of raiding or clearing. While one perches there, the building makes nothing, as under a beast. It stays until its owner recalls it or it's driven off.
+- On your turn a dragon may perch on a rival's building instead of raiding or clearing. While one perches there, the building is suppressed, as under a beast. It stays until its owner recalls it or it's driven off.
+- A suppressed building (a beast or a perched dragon on it) counts as if it weren't there, except that its hex stays taken (#352). The owner: "I want perching to be more viable", "it should be basically as if it were not there". More dragons than room only stops hatching: "no penalty is necessary beyond that".
 - Anyone can attack perched dragons, in the same fight as fauna. Several dragons may perch on one building, from different players too, and they fight together.
 - Perched dragons take damage and heal as anywhere else: "no insta heal like fauna because they are not fauna". A hurt one keeps blocking while it heals.
 - It sits alongside Rouse the Bear and Wake the Basilisk ("alongside"): a rule added without one cut, the owner's call.
 - Nothing can block the wizard tower, neither dragons nor fauna, "to avoid softlock".
 
-Filled in provisionally (reasoning in the PR for #217): a dragon perches only if it's raid-ready, and a recalled one may raid that round if it isn't knocked out; a perched dragon is driven off by being knocked out, and goes home; clearing a hex fights everything holding it at once (a beast that wandered onto a perched building fights beside the dragons there); your own perched dragons are never your foes, so you can't clear a hex where only yours perch; a perched building keeps its points and dragon room, as under a beast.
+Filled in provisionally (reasoning in the PR for #217): a dragon perches only if it's raid-ready, and a recalled one may raid that round if it isn't knocked out; a perched dragon is driven off by being knocked out, and goes home; clearing a hex fights everything holding it at once (a beast that wandered onto a perched building fights beside the dragons there); your own perched dragons are never your foes, so you can't clear a hex where only yours perch; a perched building keeps its points and dragon room, as under a beast (until #352).
 
 ### Great beasts
 

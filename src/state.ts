@@ -19,7 +19,7 @@ export interface HexView {
   terrain: string;
   building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
-  perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
+  perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it's suppressed while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
   peak?: 'held' | 'free'; // the Thunderbird's peak
   peakZone?: boolean; // on or next to the freed peak: a production building here makes more

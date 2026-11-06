@@ -1794,13 +1794,14 @@ const CASCADE_S = 0.3, CASCADE_MAX = 8;
 // The shortest way from one heading to another.
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
-// A building on its plate, as it stands on a hex (shut: a beast holds it).
+// A building on its plate, as it stands on a hex (shut: a beast or a perched dragon holds it).
 function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
   const g = plate(b.upgrade, tileColor(terrain));
   const { model: parts, offset } = buildingModel(b);
   const model = bake(parts);
-  // Shut down by a beast: the building goes to dull grey paper (its border
-  // keeps its owner's colour) and sits back, so the beast in front is whole.
+  // Shut down by a beast or a perched dragon: the building goes to dull grey
+  // paper (its border keeps its owner's colour) and sits back, so what's in
+  // front of it is whole.
   if (shut) {
     model.traverse((o) => {
       if (o instanceof THREE.Mesh) o.material = shutPaper(o.material as THREE.MeshLambertMaterial);
@@ -1952,7 +1953,9 @@ export class Board3D {
     if (regrow) this.regrowDecor();
     for (const h of g.map) {
       const b = h.building;
-      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${h.fauna ? 'shut' : ''}` : '';
+      // Shut down (a beast or a perched dragon on it): it makes nothing and is worth no points, so it goes grey.
+      const shut = !!h.fauna || h.perched.length > 0;
+      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${shut ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
@@ -1965,9 +1968,9 @@ export class Board3D {
         }
       }
       if (!b) continue;
-      const obj = this.placed(this.buildingGroup(b, h.terrain, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, !!h.fauna), h);
+      const obj = this.placed(this.buildingGroup(b, h.terrain, SEAWARD.has(b.type) ? this.seaward(g.map, h) : 0, shut), h);
       // Pop up from the page when it's new; a new floor or upgrade pops up too
-      // (a beast arriving or leaving only greys or colours it).
+      // (a beast or a perched dragon arriving or leaving only greys or colours it).
       const fresh = animate && (!had || had.sig.split('|')[0] !== b.type || had.sig.split('|').slice(0, 4).join('|') !== bsig.split('|').slice(0, 4).join('|'));
       const at = fresh ? next(h.k) : -1e9;
       this.built.set(h.k, { sig: bsig, obj, born: at });
@@ -2722,7 +2725,7 @@ function portraitScene(p: Portrait): THREE.Scene {
     scene.add(part(geo.top, color), part(geo.sides, mix(color, '#fbf6ea', 0.6), { crease: false }));
     scene.add(bake(group(decor(hex, 0))));
   }
-  if (building) scene.add(buildingPiece(building, p.terrain, 0, !!p.beast));
+  if (building) scene.add(buildingPiece(building, p.terrain, 0, !!p.beast || !!p.dragon));
   if (p.border) {
     const geo = territoryGeometry([hex]);
     if (geo) {
