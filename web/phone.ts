@@ -1091,10 +1091,29 @@ function doesLines(d: Does): string[] {
   if (d.points) out.push(`Worth ${d.points} point${d.points > 1 ? 's' : ''}.`);
   return out.length ? out : ['Makes nothing.'];
 }
+// The same, for a building and an upgrade on it: each number the upgrade
+// changes reads before → after ("Makes 5 → 7 stone each round. Worth 1 → 2
+// points."), so the player sees the change, not two descriptions to compare.
+// A change is marked (CHANGED … END) to keep it on one line, with what it counts
+// and the punctuation after it; hexDetail turns the marks into markup.
+const CHANGED = '\ue000', END = '\ue001';
+function changeLines(a: Does, b: Does): string[] {
+  const to = (x: string | number, y: string | number, what: string) => (x === y ? `${x} ${what}` : `${CHANGED}${x} → ${y} ${what}${END}`);
+  const out: string[] = [];
+  const none = { base: 0, dice: [] as number[] };
+  const res = RESOURCES.filter((r) => a.makes[r] || b.makes[r]);
+  const amount = (r: string, m?: { base: number; dice: number[] }) => amountText(r, m ?? none).replace(` ${r}`, '') || '0';
+  const made = res.map((r, i) => to(amount(r, a.makes[r]), amount(r, b.makes[r]), r + (i < res.length - 1 ? ',' : '')));
+  if (made.length) out.push(`Makes ${made.join(' ')} each round.`);
+  if (a.houses || b.houses) out.push(`Houses ${to(a.houses, b.houses, `dragon${b.houses === 1 ? '' : 's'}.`)}`);
+  if (b.note) out.push(b.note);
+  if (a.points || b.points) out.push(`Worth ${to(a.points, b.points, `point${b.points === 1 ? '' : 's'}.`)}`);
+  return out.length ? out : ['Makes nothing.'];
+}
 const said = (lines: string[]) => iconText(esc(lines.join(' ')));
-// The hex picked for a beast or an upgrade: whose building it is, what it does
-// now, and (for an upgrade) what changes with it.
-function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: string; after: Does }): string {
+// The hex picked for a beast or an upgrade: whose building it is and what it
+// does, with (for an upgrade) each change as before → after.
+function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): string {
   const h = g.map.find((x) => x.k === k)!;
   const b = h.building;
   if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
@@ -1102,10 +1121,8 @@ function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: s
   const stopped = h.fauna ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(h.fauna.name)} holds it.</p>`
     : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
   const head = `<p class="pchead">${whose} <b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}</p>`;
-  const now = doesLines(b.does);
-  const more = upgrade ? doesLines(upgrade.after).filter((x) => !now.includes(x)) : [];
-  const after = more.length ? `<p class="pcafter"><b>With the ${esc(upgrade!.name)}:</b> ${said(more)}</p>` : '';
-  return `${head}<p>${said(now)}</p>${after}${stopped}`;
+  const does = after ? changeLines(b.does, after) : doesLines(b.does);
+  return `${head}<p>${said(does).replaceAll(CHANGED, '<span class="nobr">').replaceAll(END, '</span>').replaceAll('→', '<span class="pcto">→</span>')}</p>${stopped}`;
 }
 
 // What a pick is for, under the map: the card (or basic building) being placed,
@@ -1315,7 +1332,7 @@ function pickHexFor(c: CardView) {
   // Placing a beast or an upgrade shows what the hex does before it's final (#246).
   const now = () => ({ g: snap!.game!, me: snap!.you! });
   const after = (k: string) => (now().me.hand.find((x) => x.id === c.id) ?? c).after?.[k];
-  const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: c.name, after: after(k)! }) }
+  const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k)) }
     : c.fauna ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k) } : undefined;
   picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about, confirm };
   openCard = null;
@@ -1547,7 +1564,7 @@ function wire(g: PublicState, me: Me) {
     // As placing the card: what the building does with it shows before it's final (#246).
     const now = () => ({ g: snap!.game!, me: snap!.you! });
     const after = (k: string) => (now().me.upgradeProjects.find((x) => x.key === u.key) ?? u).after[k];
-    const confirm = { verb: 'Upgrade', detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: u.name, after: after(k)! }) };
+    const confirm = { verb: 'Upgrade', detail: (k: string) => hexDetail(now().g, now().me, k, after(k)) };
     picking = { title: `Choose a building for the ${u.name}`, hexes: u.hexes, command: (h) => `project ${u.key} ${h}`, about, confirm };
     render();
   });
