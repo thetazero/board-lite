@@ -1115,7 +1115,8 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
   const b = h.building;
   if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
   const whose = b.owner === me.seat ? 'Your ' : `${playerTag(b.owner, names)}'s `;
-  const stopped = h.fauna ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(h.fauna.name)} holds it.</p>`
+  const holder = h.suppressed ? h.fauna?.name ?? g.beasts.find((x) => x.key === h.held)?.name : undefined;
+  const stopped = holder ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(holder)} holds it.</p>`
     : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
   const name = `<b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}`;
   // An upgrade only goes on your own building, so its name alone says which,

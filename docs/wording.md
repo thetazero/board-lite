@@ -45,7 +45,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
 | **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
 | **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it's suppressed |
-| **suppressed** (a building) | shut down, blocked, disabled | A building under a beast or a perched dragon: it counts as if it weren't there, but nothing is built on its hex |
+| **suppressed** (a building) | shut down, blocked, disabled | A building under a beast, held by a great beast, or with a dragon perched on it: it counts as if it weren't there, but nothing is built on its hex |
 | **recall** (a perched dragon) | bring back, return, withdraw | Bringing a perched dragon home on your turn |
 | **slay** (a great beast) | kill, defeat | Clearing the Thunderbird or the Leviathan: a great beast is slain, for good |
 | **knocked out** | fainted, KO'd, dead, out | A dragon at 0 health: it can't fight until it heals. Greyed out wherever it's drawn |

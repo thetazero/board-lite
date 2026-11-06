@@ -1457,6 +1457,33 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-beast-hold-fauna-3p', caption: 'TV: a Basilisk beside the Thunderbird, on a hex it holds: still ringed', client: 'tv', waitMs: 4800 }],
   },
   {
+    // The Leviathan surfacing by a port holds it (#370): the port is
+    // suppressed, its hex dark grey, the feed says so, and its owner's
+    // merchants are back to 4:1 for timber until the Leviathan moves off.
+    name: 'leviathan-port-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const at = Object.keys(g.map).find((x) => g.map[x].fauna === 'leviathan')!;
+      const waters = leviathanWaters(g.map, 3);
+      const harbor = Object.keys(g.map).sort().find((x) => g.map[x].terrain === 'harbor' && !g.buildings[x] && !g.map[x].fauna && neighbors(x).some((n) => waters.includes(n)))!;
+      // No other beast near it, so the Leviathan's hold is all that greys it.
+      for (const n of [harbor, ...neighbors(harbor), ...neighbors(harbor).flatMap(neighbors)]) if (g.map[n]?.fauna && !BEASTS[g.map[n].fauna!]) delete g.map[n].fauna;
+      g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrade: null, floors: 0 };
+      g.players[g.turn].resources.timber = Math.max(g.players[g.turn].resources.timber, 6);
+      // It has just surfaced beside the port, as in production, and the feed says so.
+      const to = neighbors(harbor).find((x) => waters.includes(x))!;
+      delete g.map[at].fauna;
+      g.map[to].fauna = 'leviathan';
+      g.log.push({ round: g.round, text: `The Leviathan dives at ${at} and surfaces at ${to}.`, ev: { k: 'wander', from: at, to, fauna: 'leviathan', name: BEASTS.leviathan.name } });
+    },
+    shots: (g) => [
+      { file: 'tv-leviathan-port-3p', caption: "TV: the Leviathan holds a Timber Port: it's suppressed, its hex dark grey", client: 'tv', waitMs: 4800 },
+      { file: 'phone-bank-leviathan-port-3p', caption: 'Phone: the merchants while the Leviathan holds your Timber Port: timber at 4:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+    ],
+  },
+  {
     // The same fight, at its end.
     name: 'beasts-slain-3p',
     players: 3,

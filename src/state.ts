@@ -20,7 +20,8 @@ export interface HexView {
   building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it's suppressed while one is there
-  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
+  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain, and a building here is suppressed
+  suppressed?: true; // its building is suppressed (a beast on it or holding it, or a perched dragon): it counts as if it weren't there
   peak?: 'held' | 'free'; // the Thunderbird's peak
   peakZone?: number; // on or next to the freed peak: a production building here makes this many more each round
 }
@@ -295,6 +296,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(!(h.fauna && BEASTS[h.fauna]) && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
+        ...(b && blocked(g, k) ? { suppressed: true as const } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
