@@ -22,7 +22,7 @@ board-lite is running on port 8080.
 
 1. **TV:** open the TV address full screen (F11). It shows the room's QR code, address and 4-letter code. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
 2. **Phones:** scan the QR code (or type the address), type a name, tap **Join**. The name is remembered.
-3. **Start:** with 2 to 6 players, press **Start game** on the TV or the first player's phone. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons.
+3. **Start:** with 2 to 6 players, press **Start game** on the TV or the first player's phone. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 
@@ -47,11 +47,13 @@ The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/rec
 
 ## Playing with no TV
 
-On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others. One phone and a few bots is a whole game.
+On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others, and the address to open on a TV if one turns up later. One phone and a few bots is a whole game.
 
 Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet.
 
 The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, scenes cut to it only from then on, and You stays on.
+
+**Switching between a TV and no TV:** whether the table has a TV isn't fixed when the room is made. Open the TV on the room (`/tv?room=<code>`) at any time, in the lobby or mid-game, and it's the table's TV from then on: the phones say to watch it, and scenes play there. If no other TV is watching, it also gets the TV's buttons (**Start game**, **Add a bot**). Close it, and 20 seconds later (time for a TV to reload) the table goes on with no TV: each phone shows the table itself, as above. No one changes seats, and the game goes on where it was.
 
 When the game ends, the table plays the same summary as the TV, as a scene the phone cuts to, and ends on the final scores with **Watch again** and **Open the recap** (the recap page) in place of the QR code. Every phone's own end screen has **Open the recap** too, with a TV or without.
 

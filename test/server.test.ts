@@ -408,6 +408,56 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
   }
 });
 
+test('a TV can come and go at any time: opening one gives the table a TV, and it goes on without one once the TV is gone', async () => {
+  const room = new Room('TVTV', { dir, remote: true, tvGoneMs: 30, botDelayMs: 60000 });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  assert.equal(room.lobby().remote, true, 'made with no TV');
+  const table = room.connect(null); // a phone's table view is no TV
+  assert.equal(room.lobby().remote, true);
+  let tv = room.connect(null, true); // in the lobby
+  assert.equal(room.lobby().remote, false);
+  room.start(seats[0].token, 3);
+  tv();
+  tv = room.connect(null, true); // a reload: no switch in between
+  await sleep(60);
+  assert.equal(room.lobby().remote, false);
+  tv();
+  assert.equal(room.lobby().remote, false, 'a TV that just went may be reloading');
+  await sleep(60);
+  assert.equal(room.lobby().remote, true, 'mid-game, the table goes on with no TV');
+  assert.equal(JSON.parse(readFileSync(room.file.replace(/\.json$/, '.seats.json'), 'utf8')).remote, true, 'saved, for a restart');
+  const back = room.connect(null, true); // and back again, mid-game, the same seats
+  assert.equal(room.lobby().remote, false);
+  assert.equal(room.snapshot(seats[1].token).seat, 1);
+  back();
+  table();
+  room.close();
+});
+
+test('a TV opened on a room with no TV watching becomes its TV, with its buttons', async () => {
+  const { server, rooms } = startServer(0, { dir });
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, string>;
+  const ctrl = new AbortController();
+  try {
+    const { code } = await post('/api/rooms', { remote: true });
+    const room = rooms.get(code)!;
+    await post(`/api/rooms/${code}/join`, { name: 'Ada' });
+    const { hostToken } = await post(`/api/rooms/${code}/tv`, {});
+    assert.ok(room.canStart(hostToken), 'it can add bots and start');
+    const es = await fetch(`${base}/api/rooms/${code}/events?tv`, { signal: ctrl.signal });
+    await es.body!.getReader().read();
+    assert.equal(room.lobby().remote, false, 'watching as a TV gives the table a TV');
+    assert.deepEqual(await post(`/api/rooms/${code}/tv`, {}), {}, 'a second TV has no buttons');
+  } finally {
+    ctrl.abort();
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
 test('one game, any client: a CLI player and a bot at a server-hosted table', async () => {
   const { server, rooms } = startServer(0, { dir, botDelayMs: 0 });
   await new Promise((r) => server.once('listening', r));

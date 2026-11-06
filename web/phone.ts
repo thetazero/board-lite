@@ -381,8 +381,10 @@ function invite(c: string): string {
   }
   const host = local && lan ? `${lan.lan[0] ?? lan.tailscale[0] ?? location.hostname}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}` : location.host;
   const url = `${host}/${c}`;
+  // A TV can join the table at any time, and then it's a game with a TV.
   return `<div class="invite">${qrSvg(`${location.protocol}//${url}`, 'the room\'s address')}
-    <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>`;
+    <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>
+    <p class="hint tvhint">On a TV, open <b class="url">${esc(`${host}/tv?room=${c}`)}</b> to play there.</p>`;
 }
 
 // ---------- the table ----------
@@ -397,6 +399,8 @@ function invite(c: string): string {
 // In a game with a TV the frame is only made when Table is first tapped, so a
 // phone at the TV doesn't load a second board or cut away from the hand; there
 // the server's scene doesn't hold the table, and You says to watch the TV.
+// A TV can come or go at any time (src/server/room.ts, Room.hasTv), and the
+// phone follows.
 const table = (() => {
   let wrap: HTMLElement | null = null;
   let sw: HTMLElement | null = null;
@@ -405,6 +409,8 @@ const table = (() => {
   let auto = false; // showing the table because a cutscene cut to it
   let framed = false; // the frame says its cutscene is playing
   let held = false; // the server says a scene is playing: there's nothing to do on the You side
+  let noTv = false; // the table is playing with no TV
+  let tapped = false; // the player opened Table by hand
   const set = (v: boolean) => {
     on = v;
     document.body.classList.toggle('table-on', v);
@@ -441,9 +447,24 @@ const table = (() => {
       held = v;
       update();
     },
+    // `remote`: no TV. The table can get a TV or lose it mid-game: with no TV
+    // the table loads now; once a TV is back, a table nobody tapped goes, so
+    // the phone stops cutting away from the hand.
     show(c: string, remote: boolean) {
-      if (wrap && room === c) return;
+      if (wrap && room === c) {
+        if (remote === noTv) return;
+        noTv = remote;
+        document.body.classList.toggle('remote', remote);
+        if (remote) frame();
+        else if (!tapped) {
+          wrap.innerHTML = '';
+          framed = auto = false;
+          if (on) set(false);
+        }
+        return update();
+      }
       this.hide();
+      noTv = remote;
       room = c;
       wrap = document.createElement('div');
       wrap.className = 'tableview';
@@ -455,7 +476,10 @@ const table = (() => {
       sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
       sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
         auto = false;
-        if (b.dataset.view === 'table') frame();
+        if (b.dataset.view === 'table') {
+          tapped = true;
+          frame();
+        }
         set(b.dataset.view === 'table');
       }));
       document.body.append(wrap, sw);
@@ -469,7 +493,7 @@ const table = (() => {
       sw?.remove();
       wrap = sw = null;
       room = '';
-      on = auto = framed = held = false;
+      on = auto = framed = held = tapped = noTv = false;
       document.body.classList.remove('has-table', 'remote', 'table-on');
     },
   };

@@ -44,7 +44,8 @@ export async function post(path: string, body: Record<string, unknown>): Promise
 // While the server is down it keeps trying (a restart brings the room back
 // under the same code); `onGone` is called if the server is up and the room
 // isn't there any more, and it stops trying.
-export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void, onGone?: () => void): () => void {
+// `tv`: the watcher is a TV page (not a phone's table view), so the table plays with a TV while it watches.
+export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void, onGone?: () => void, tv = false): () => void {
   let es: EventSource | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -53,7 +54,7 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     clearTimeout(retry);
     es?.close();
     heard = Date.now();
-    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : ''}`));
+    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : tv ? '?tv' : ''}`));
     mine.onmessage = (e) => {
       heard = Date.now();
       onStatus(true);
