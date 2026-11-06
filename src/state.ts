@@ -5,7 +5,7 @@
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
-  onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  madeResource, onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
@@ -31,6 +31,9 @@ export interface HexView {
 // goes on it.
 export interface BuildingDoes extends BuildingYield {
   note?: string;
+  // Placing a building on or next to the freed peak (doesIfBuilt): 'more' if
+  // it makes the peak's bonus there, 'none' if it makes no resource to add it to.
+  peak?: 'more' | 'none';
 }
 
 export interface FaunaView extends UnitView {
@@ -157,7 +160,7 @@ export interface CardView {
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
   fauna?: FaunaView; // fauna cards: the beast it sends
-  after?: Record<string, BuildingDoes>; // upgrade cards: what each of `hexes` would do with it
+  after?: Record<string, BuildingDoes>; // upgrade cards: what each of `hexes` would do with it; building cards: what it would do built there
   dragon?: { growth: number; targeting: string; stages: DragonStageView[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
@@ -180,7 +183,7 @@ export interface SeatState {
   handCap: number;
   myTurn: boolean;
   deciding: boolean;
-  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean; why: string | null }[]; // built without a card
+  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes> /* what it would do on each of `hexes` */; onTower: boolean; why: string | null }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean; why: string | null };
   // Upgrades added without the card, as a special project (the Workshop): on
   // which of your buildings, and what each would do with it.
@@ -330,6 +333,17 @@ function buildingDoes(g: Game, k: string, upgrade?: string): BuildingDoes {
   return { ...buildingYield(g, k, upgrade), ...(note ? { note } : {}) };
 }
 
+// What a building of `type` would do built by seat p at each of `hexes`: what
+// the phone shows for a hex before the building goes on it (#366).
+function doesIfBuilt(g: Game, p: number, type: string, hexes: string[]): Record<string, BuildingDoes> {
+  const def = BUILDINGS[type];
+  return Object.fromEntries(hexes.map((k) => {
+    const there: Game = { ...g, buildings: { ...g.buildings, [k]: { type, owner: p, upgrade: null, floors: 0 } } };
+    const peak = onPeak(g, k) ? (madeResource(def) ? 'more' as const : 'none' as const) : undefined;
+    return [k, { ...buildingDoes(there, k), ...(peak ? { peak } : {}) }];
+  }));
+}
+
 // A card as a seat sees it, with what playing it now needs and, if it can't
 // be played now, why.
 function cardView(g: Game, p: number, c: Card): CardView {
@@ -349,7 +363,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const hexes = b.onTower ? [] : buildableHexes(g, p, c.key);
     const text = placeText(b);
     const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, perCount(g, k, b, p)])) : undefined;
-    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? noHex(b) : null };
+    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), after: doesIfBuilt(g, p, c.key, hexes), blocked: !b.onTower && !hexes.length ? noHex(b) : null };
   }
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
@@ -413,7 +427,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
       const b = BUILDINGS[k];
       const hexes = buildableHexes(g, p, k);
       const why = (!b.onTower && !hexes.length ? noHex(b) : null) ?? afford(pl, b.cost);
-      return { key: k, cls: b.class, name: b.name, text: placeText(b), cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, onTower: !!b.onTower, why };
+      return { key: k, cls: b.class, name: b.name, text: placeText(b), cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, after: doesIfBuilt(g, p, k, hexes), onTower: !!b.onTower, why };
     }),
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
     upgradeProjects: PROJECT_UPGRADES.map((key) => {
