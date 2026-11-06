@@ -107,11 +107,11 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     res.end(JSON.stringify(value));
   }
 
-  function events(req: IncomingMessage, res: ServerResponse, room: Room, tok: string | null) {
+  function events(req: IncomingMessage, res: ServerResponse, room: Room, tok: string | null, query: URLSearchParams) {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     const send = () => res.write(`data: ${JSON.stringify(room.snapshot(tok))}\n\n`);
     const unsubscribe = room.subscribe(send);
-    const disconnect = room.connect(tok);
+    const disconnect = room.connect(tok, tok === null && query.has('tv'));
     send();
     // A named event, not an SSE comment: the page hears it, so a stream that
     // went quiet (dead under a restart or a network change, with no error)
@@ -132,7 +132,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     if (parts[0] === 'rulebook' && req.method === 'GET') return json(res, 200, rulebook());
     if (parts[0] === 'recaps' && parts.length === 2 && req.method === 'GET') return recap(res, parts[1]);
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
-    // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone, for a game with no TV
+    // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone or the CLI, for a game with no TV (yet: a TV can open it any time)
     if (parts.length === 1 && req.method === 'POST') {
       const remote = (await body(req)).remote === true;
       const room = new Room(Room.newCode((c) => rooms.has(c), opts.dir), { ...opts, remote });
@@ -142,7 +142,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     }
     const room = getRoom(parts[1] ?? '');
     const action = parts[2];
-    if (action === 'events' && req.method === 'GET') return events(req, res, room, query.get('token'));
+    if (action === 'events' && req.method === 'GET') return events(req, res, room, query.get('token'), query);
     // For clients that hold no stream open (the CLI, Claude seats): the same snapshot, on request.
     if (req.method === 'GET' && action === 'state') return json(res, 200, room.state(query.get('token') ?? ''));
     if (req.method === 'GET' && action === 'wait') {
@@ -182,6 +182,11 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       case 'standin': // a player who's away: a bot plays for them until they're back
         room.standInFor(tok, Number(b.seat));
         return json(res, 200, {});
+      case 'tv':
+        // A TV opening the room while no other TV watches it becomes the
+        // room's TV, with its buttons: a room made with no TV gets one, and a
+        // TV that lost its token (another browser) takes over.
+        return json(res, 200, room.tvWatching ? {} : { hostToken: room.hostToken });
       case 'start':
         room.start(tok);
         return json(res, 200, {});
@@ -301,5 +306,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`Room ${room.code} is open.`);
     console.log(`  At a terminal:  node src/cli.ts join ${url} <name>`);
     console.log(`  Claude players: node src/playtest/run.ts --room ${url} --models opus,haiku`);
+    console.log(`  On a TV, any time: http://localhost:${port}/tv?room=${room.code}`);
   });
 }

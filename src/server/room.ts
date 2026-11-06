@@ -23,6 +23,10 @@ import { scenesMs, scenesOf } from '../../web/scenes.ts';
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
 export const AWAY_MS = 60000; // a seat with no phone or CLI request for this long is away
+// The table plays with a TV while a TV page watches the room, and goes on
+// without one once the last TV has been gone this long: long enough for a TV
+// to reload or ride out a network blip without the phones switching back and forth.
+export const TV_GONE_MS = 20000;
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
 // Each finished game's recap (src/recap.ts), kept after its room is gone so
 // its link still opens. The file name is the recap's id.
@@ -69,7 +73,8 @@ export interface RoomOptions {
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
   awayMs?: number; // defaults to AWAY_MS (tests shorten it)
-  remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
+  remote?: boolean; // made with no TV (from a phone or the CLI); whether there's a TV changes as TVs come and go (Room.hasTv)
+  tvGoneMs?: number; // defaults to TV_GONE_MS (tests shorten it)
   recaps?: string; // where finished games' recaps go (recapsDir)
   now?: () => number; // the clock a recap is dated by (the screenshots fix it)
   recapId?: string; // and its id (the screenshots fix it too, so the QR code is the same each run)
@@ -79,7 +84,7 @@ export interface RoomOptions {
 interface SavedRoom {
   code: string;
   hostToken: string;
-  remote: boolean;
+  remote: boolean; // no TV, when last saved
   seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
 }
 
@@ -115,6 +120,14 @@ export class Room {
   private screens = 0; // open event streams with no seat: TVs
   private sceneUntil = 0; // ms epoch
   private sceneTimer: NodeJS.Timeout | null = null;
+  // Whether the table plays with a TV: with one, scenes play on it and phones
+  // say to watch it; without, each phone shows the table itself. A TV page
+  // opening the room turns it on, whenever that is (lobby or mid-game); the
+  // last TV staying gone for TV_GONE_MS turns it off. The room's other
+  // screens (a phone's table view, the screenshots) don't count.
+  private tvs = 0; // open event streams from TV pages
+  private hasTv: boolean;
+  private tvTimer: NodeJS.Timeout | null = null;
 
   constructor(code: string, opts: RoomOptions = {}) {
     this.code = code;
@@ -123,7 +136,8 @@ export class Room {
     // Hosted again after a restart: the same TV, the same players in the same seats.
     const saved = readSaved(seatsFile(this.file));
     this.hostToken = saved?.hostToken ?? token();
-    this.opts = saved ? { ...opts, remote: saved.remote } : opts;
+    this.opts = opts;
+    this.hasTv = saved ? !saved.remote : !opts.remote;
     if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
     if (existsSync(this.file)) {
       this.cached = load(this.file);
@@ -134,6 +148,8 @@ export class Room {
       }
     }
     this.saveSeats();
+    // Hosted again with a TV: it has a while to reconnect, like any TV that goes away.
+    if (saved && this.hasTv) this.tvGone();
   }
 
   /** The code a game file was hosted under before, if its seats were saved. */
@@ -160,7 +176,7 @@ export class Room {
   }
 
   private saveSeats() {
-    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !!this.opts.remote, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
     const text = JSON.stringify(saved);
     if (text === this.savedSeats) return;
     this.savedSeats = text;
@@ -538,7 +554,7 @@ export class Room {
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       file: this.file,
-      remote: !!this.opts.remote,
+      remote: !this.hasTv,
     };
   }
 
@@ -560,10 +576,16 @@ export class Room {
     return () => this.listeners.delete(fn);
   }
 
-  connect(tok: string | null): () => void {
+  // A stream with no seat is a screen; `tv` says it's a TV page (not a
+  // phone's table view).
+  connect(tok: string | null, tv = false): () => void {
     if (tok === null) {
       this.screens++;
-      return () => void this.screens--;
+      if (tv) this.tvCame();
+      return () => {
+        this.screens--;
+        if (tv && --this.tvs === 0) this.tvGone();
+      };
     }
     const s = this.seats.find((x) => x.token === tok);
     if (!s) return () => {};
@@ -574,6 +596,31 @@ export class Room {
       s.connected--;
       this.changed();
     };
+  }
+
+  /** Whether a TV is watching the room right now (not just a while ago). */
+  get tvWatching(): boolean {
+    return this.tvs > 0;
+  }
+
+  private tvCame() {
+    this.tvs++;
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.tvTimer = null;
+    if (this.hasTv) return;
+    this.hasTv = true;
+    this.changed();
+  }
+
+  private tvGone() {
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.tvTimer = setTimeout(() => {
+      this.tvTimer = null;
+      if (this.tvs > 0 || !this.hasTv) return;
+      this.hasTv = false;
+      this.changed();
+    }, this.opts.tvGoneMs ?? TV_GONE_MS);
+    this.tvTimer.unref();
   }
 
   changed() {
@@ -588,7 +635,8 @@ export class Room {
     if (this.botTimer) clearTimeout(this.botTimer);
     if (this.sceneTimer) clearTimeout(this.sceneTimer);
     if (this.awayTimer) clearTimeout(this.awayTimer);
-    this.botTimer = this.sceneTimer = this.awayTimer = null;
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.botTimer = this.sceneTimer = this.awayTimer = this.tvTimer = null;
     this.listeners.clear();
   }
 }

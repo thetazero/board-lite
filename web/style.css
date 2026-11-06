@@ -1020,6 +1020,8 @@ body:has(.talkbar.open) .viewswitch { display: none; }
 .invite svg.qr { width: 7.5em; height: 7.5em; flex: none; }
 .invite p { margin: 0; display: flex; flex-direction: column; gap: .2em; }
 .invite .url { font-weight: 800; word-break: break-all; }
+.tvhint { margin: .5em 0 0; font-size: .9em; }
+.tvhint .url { color: var(--text); word-break: break-all; }
 .hostline { display: flex; flex-direction: column; gap: .5em; border-top: 1px dashed var(--line); padding-top: 1em; text-align: center; }
 .hostline p { margin: 0; color: var(--muted); }
 

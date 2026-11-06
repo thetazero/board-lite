@@ -1,4 +1,6 @@
 // The TV: the shared board. Shows everything public, never anyone's hand.
+// Opening it on any room, in the lobby or mid-game, makes it that table's TV;
+// closing it, the table goes on with no TV (src/server/room.ts, Room.hasTv).
 // Lobby -> board, with overlays for production dice, the raid and the end.
 // With ?remote, it's the table view inside a phone of a game with no TV
 // (phone.ts): the flat map, laid out for a phone, and it tells the phone when
@@ -70,6 +72,16 @@ async function boot() {
     const room = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!room) code = '';
     isHost = !!room?.host;
+    // No TV watching this room (one made from a phone, or this TV's token is
+    // in another browser): this one becomes its TV, buttons and all.
+    if (room && !isHost) {
+      const r = await post(`/api/rooms/${code}/tv`, {}).catch(() => null);
+      if (r?.hostToken) {
+        hostToken = String(r.hostToken);
+        isHost = true;
+        localStorage.setItem(`tv:${code}`, hostToken);
+      }
+    }
   }
   if (!code) {
     const r = await post('/api/rooms', {});
@@ -81,7 +93,8 @@ async function boot() {
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
   // A room the server no longer has (forgotten after hours idle): open a new one.
-  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'));
+  // As a TV: while it watches, the table plays with a TV.
+  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), true);
 }
 
 function onSnapshot(s: Snapshot) {
