@@ -477,8 +477,10 @@ const table = (() => {
 
 // ---------- the game ----------
 
+// A second tap on a button whose command is still on its way is a double tap,
+// and dropped, except the merchants' Trade: each tap trades again (#331).
 function send(command: string) {
-  if (outbox[outbox.length - 1] === command) return;
+  if (outbox[outbox.length - 1] === command && !command.startsWith('merchants ')) return;
   outbox.push(command);
   if (!sending) void flush();
 }
@@ -761,11 +763,11 @@ function myDragon(d: DragonView, g: PublicState): string {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => (o.to === null ? o.from !== me.seat && !o.passed.includes(me.seat) : o.to === me.seat)).map((o) => `
-    <div class="offer in">${playerTag(o.from, names)} offers ${o.to === null ? 'anyone ' : ''}<b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
+    <div class="offer in" data-key="offer ${o.id}">${playerTag(o.from, names)} offers ${o.to === null ? 'anyone ' : ''}<b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
       ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');
   const mine = g.offers.filter((o) => o.from === me.seat).map((o) => `
-    <div class="offer out">You offer ${o.to === null ? 'anyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
+    <div class="offer out" data-key="offer ${o.id}">You offer ${o.to === null ? 'anyone' : playerTag(o.to, names)} <b>${iconText(esc(o.give))}</b> for <b>${iconText(esc(o.get))}</b> <button class="small" data-cancel="${o.id}">Withdraw</button>${o.passed.length ? `<p class="declined">Declined by ${o.passed.map((p) => playerTag(p, names)).join(', ')}</p>` : ''}</div>`).join('');
   // Build and Trade (with the merchants) open over the table and close again; the hand is always below.
   const tabs = `<nav class="tabs">
     ${me.myTurn ? `<button data-tab="more" class="${tab === 'more' ? 'on' : ''}">Build</button>` : ''}
@@ -782,7 +784,7 @@ function actionView(g: PublicState, me: Me): string {
   const recall = me.myTurn ? me.perched.map((id) => {
     const d = g.dragons.find((x) => x.id === id)!;
     const b = g.map.find((h) => h.k === d.perch)?.building;
-    return `<div class="proj">${dragonBadge(d, 32)}<span class="what"><b>${esc(dragonName(d, g.dragons))}</b><small>Perched on ${b ? `${playerTag(b.owner, names)}'s ${esc(b.name)}` : d.perch}</small></span><button data-recall="${id}">Recall</button></div>`;
+    return `<div class="proj" data-key="perched ${id}">${dragonBadge(d, 32)}<span class="what"><b>${esc(dragonName(d, g.dragons))}</b><small>Perched on ${b ? `${playerTag(b.owner, names)}'s ${esc(b.name)}` : d.perch}</small></span><button data-recall="${id}">Recall</button></div>`;
   }).join('') : '';
   // An offer to you needs your answer before your turn can end.
   const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');

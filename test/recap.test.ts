@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
-import { newGame, score, standings } from '../src/engine.ts';
+import { newGame, score, standings, titleValues } from '../src/engine.ts';
 import { buildRecap } from '../src/recap.ts';
 import { Room } from '../src/server/room.ts';
 import { startServer } from '../src/server/server.ts';
@@ -30,6 +30,13 @@ test("a recap tells the race round by round, ends on the final scores, and lists
   assert.deepEqual(r.race[0], [0, 0, 0, 0]);
   assert.deepEqual(r.race.at(-1), g.players.map((_, p) => score(g, p).total), 'the last row is the final scores, cards in hand too');
   assert.deepEqual(r.standings.map((s) => s.p), standings(g).map((s) => s.p));
+  // Dragon power, from the start to the end, as Strongest Dragon Army counts it.
+  assert.equal(r.power!.length, g.round + 1);
+  assert.deepEqual(r.power!.at(-1), titleValues(g, 'army'));
+  assert.ok(r.power!.some((row) => row.some((v) => v > 0)), 'dragons grow');
+  // What production made, each round from round 1, as the log says.
+  assert.equal(r.made!.length, g.round);
+  assert.ok(r.made!.every((row) => row.every((v) => v >= 0)) && r.made!.flat().some((v) => v > 0));
   for (const s of r.standings) assert.equal(s.buildings + s.titles + s.beasts + s.raids + s.hidden, s.total);
   assert.ok(r.moments.length > 0);
   assert.ok(r.moments.every((m, i) => m.round >= 1 && m.round <= g.round && (i === 0 || r.moments[i - 1].round <= m.round)), 'in round order');

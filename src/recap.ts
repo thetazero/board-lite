@@ -41,8 +41,13 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
   moments.sort((a, b) => a.round - b.round || Number(a.k === 'title') - Number(b.k === 'title'));
   // Points round by round, rebuilt from the log as the table saw them (cards
   // in hand are secret until the end), then the final scores, all revealed.
-  const seen = gameStats(g, { seats: [] }).points.map((row) => row.map((x) => x.public));
+  const stats = gameStats(g, { seats: [] });
+  const seen = stats.points.map((row) => row.map((x) => x.public));
   const race = [g.players.map(() => 0), ...seen.slice(0, -1), g.players.map((_, p) => score(g, p).total)];
+  // What each player's production made, round by round: every resource, the
+  // dice as they rolled.
+  const made = Array.from({ length: g.round }, () => g.players.map(() => 0));
+  for (const e of g.log) if (e.ev?.k === 'produce' && e.round >= 1) made[e.round - 1][e.ev.p] += Object.values(e.ev.got).reduce((a, b) => a + (b ?? 0), 0);
   return {
     v: 1,
     id,
@@ -51,6 +56,8 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
     pointsToWin: TUNING.pointsToWin,
     names: g.players.map((_, p) => names[p] ?? `P${p + 1}`),
     race,
+    power: stats.power,
+    made,
     standings: order.map((s) => {
       const sc = score(g, s.p);
       return { p: s.p, place: s.place, tied: s.tied, tiebreak: s.tiebreak, total: s.total, buildings: sc.buildings, titles: sc.titles, beasts: sc.beasts, raids: sc.raids, hidden: sc.hidden };

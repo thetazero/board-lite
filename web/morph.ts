@@ -6,9 +6,16 @@
 // keeping every element that's still wanted, so its CSS transitions run and
 // its running animations carry on.
 //
-// Elements are matched by key, then by place: an element with a key (an id,
-// data-key, or a hand card's data-card) only ever stands for the same thing,
-// and an element with no key is reused for the next element of the same tag.
+// Elements are matched by key, then by kind: an element with a key (an id,
+// data-key, or a hand card's data-card) only ever stands for the same thing.
+// One with no key is reused for the next element of its kind: the same tag
+// and data-* attributes (a button's data-step, data-to, data-accept: what
+// tapping it does), or, with none, the same tag and first class. So when
+// something comes or goes above them (an offer, a line saying why, the
+// roost), the buttons below stay the elements they were, not each rewritten
+// into the one before it while it's being tapped (#331). An element no kind
+// matches is reused only if it has no data-* of its own and nothing else
+// wants it: a hint, a line of text.
 // A screen that changes gets a new data-key, so it's built fresh (and its
 // entry animation plays) rather than morphed out of the last one.
 //
@@ -37,12 +44,32 @@ export function morph(root: Element, html: string) {
   children(root, t.content, leaving);
 }
 
+// What an element with no key stands for (see above). Null for a text node.
+function kindOf(n: Node): string | null {
+  if (!(n instanceof Element)) return null;
+  const data = [...n.attributes].filter((a) => a.name.startsWith('data-') && a.name !== 'data-leave').map((a) => `${a.name}=${a.value}`).sort();
+  return data.length ? `${n.tagName} ${data.join(' ')}` : `${n.tagName} .${n.classList[0] ?? ''}`;
+}
+const hasData = (n: Element) => [...n.attributes].some((a) => a.name.startsWith('data-'));
+
 function children(from: Element, to: ParentNode, leaving: Map<Element, DOMRect>) {
   const keyed = new Map<string, Element>();
+  const kinds = new Map<string, Element[]>(); // the unkeyed elements there, by kind, in order
   for (const c of from.children) {
     const k = keyOf(c);
-    if (k && !keyed.has(k)) keyed.set(k, c);
+    if (k) {
+      if (!keyed.has(k)) keyed.set(k, c);
+    } else {
+      const kind = kindOf(c)!;
+      kinds.set(kind, [...(kinds.get(kind) ?? []), c]);
+    }
   }
+  // How many of each kind the new page has: those beyond it are spare.
+  const wanted = new Map<string, number>();
+  for (const w of to.children) if (!keyOf(w)) wanted.set(kindOf(w)!, (wanted.get(kindOf(w)!) ?? 0) + 1);
+  const spare: Element[] = [];
+  for (const [kind, els] of kinds) for (const el of els.splice(wanted.get(kind) ?? 0)) if (!hasData(el)) spare.push(el);
+  spare.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
   let cur: ChildNode | null = from.firstChild;
   for (const want of [...to.childNodes]) {
     const k = keyOf(want);
@@ -51,7 +78,13 @@ function children(from: Element, to: ParentNode, leaving: Map<Element, DOMRect>)
       match = keyed.get(k) ?? null;
       if (match && (match as Element).tagName !== (want as Element).tagName) match = null;
       if (match) keyed.delete(k);
-    } else if (cur && !keyOf(cur) && cur.nodeType === want.nodeType && (cur.nodeType !== 1 || (cur as Element).tagName === (want as Element).tagName)) {
+    } else if (want instanceof Element) {
+      match = kinds.get(kindOf(want)!)?.shift() ?? null;
+      if (!match && !hasData(want)) {
+        const i = spare.findIndex((el) => el.tagName === want.tagName);
+        if (i >= 0) match = spare.splice(i, 1)[0];
+      }
+    } else if (cur && cur.nodeType === want.nodeType && !(cur instanceof Element)) {
       match = cur;
     }
     if (!match) {
