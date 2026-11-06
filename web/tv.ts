@@ -135,9 +135,9 @@ function seatNews(before: Snapshot, now: Snapshot) {
     const was = before.lobby.seats[i];
     if (!was || s.kind !== 'player') return;
     const who = esc(s.name);
-    if (s.left && !was.left) note(`${who} quits. A bot plays for them.`);
-    else if (s.standIn && !was.standIn) note(`${who} is away. A bot plays for them.`);
-    else if (!s.standIn && was.standIn) note(`${who} is back.`);
+    if (s.left && !was.left) note(`${who} quits: a bot plays for them`);
+    else if (s.standIn && !was.standIn) note(`${who} is away: a bot plays for them`);
+    else if (!s.standIn && was.standIn) note(`${who} is back`);
   });
 }
 
@@ -170,7 +170,7 @@ function renderLobby() {
     + (l.seating ? '' : Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join(''));
   const canStart = l.seats.length >= l.minPlayers;
   const first = firstPlayer(l);
-  const hint = l.seating ? `The game goes on once every seat is taken${isHost ? ' (a bot can take one)' : ''}.`
+  const hint = l.seating ? 'The game goes on once every seat is taken.'
     : !canStart ? `Waiting for ${l.minPlayers - l.seats.length} more player${l.minPlayers - l.seats.length > 1 ? 's' : ''} (a bot counts).`
     : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')
     : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
@@ -268,7 +268,7 @@ function everyoneQuit(l: Snapshot['lobby']): boolean {
 function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   if (!seat?.standIn) return '';
   if (everyoneQuit(snap!.lobby)) return '<span class="seatnote">Quit</span>';
-  return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: a bot plays for them</span>`;
+  return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: bot plays</span>`;
 }
 
 let shown: PublicState | null = null; // the state the board is drawn from
@@ -393,7 +393,7 @@ function raidPips(g: PublicState): string {
 
 // Whether the table sees each choice as it's made, in words.
 const SECRET = '<span class="tag">Secret</span>';
-const OPEN = '<span class="tag">Everyone sees it</span>';
+const OPEN = '<span class="tag">Public</span>';
 
 // One dragon in a raider's row: lit if sent, faint if it could go but isn't.
 function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
@@ -609,7 +609,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
 // The Thunderbird's fall frees its peak: the rule pops up under the points,
 // on the gold token the board then shows on each of the peak's hexes (#354).
 function peakBoon(n: number): string {
-  return `<div class="boon"><span class="ptoken">+${n}</span><span>Production buildings on and adjacent to its peak make ${n} more each round.</span></div>`;
+  return `<div class="boon"><span class="ptoken">+${n}</span><span>Each round, on and adjacent to its peak</span></div>`;
 }
 
 // Each fighting dragon's health as its fight started, by id: drawn after the
@@ -906,7 +906,7 @@ function summaryStep() {
     $('overlay').querySelector<HTMLElement>('.summary')!.dataset.step = `race-${step.upTo}`;
   } else {
     const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
-      <h1>Where the points came from</h1>
+      <h1>Points</h1>
       ${breakdownHtml(r)}
       <button id="skip">Skip</button></div>`);
     if (box) $('skip').onclick = stopSummary;
@@ -927,7 +927,7 @@ function recapUrl(id: string): string {
 function showFinal(g: PublicState) {
   const w = g.standings![0].p;
   const qr = remote ? '' : recap ? `<div class="recapqr">${qrSvg(`http://${recapUrl(recap.id)}`, "the game's recap")}
-      <div class="step">Scan for the game's recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
+      <div class="step">Scan for the recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
   showOverlay('end', 'end', `<div class="endbox${qr ? ' with-recap' : ''}" data-step="final" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
       <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
       <div class="endbody">${standingsHtml(g, names)}${qr}</div>

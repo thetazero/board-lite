@@ -70,4 +70,4 @@ End of round, if over 7 cards: `discard c4 c9`.
 
 ## Hex coordinates
 
-Hexes are axial `q,r`. The six neighbours of `q,r` are `q+1,r`, `q-1,r`, `q,r+1`, `q,r-1`, `q+1,r-1` and `q-1,r+1`. The map in a view prints one row per `r`, each cell as `q,r:<terrain>[<owner><building>]`; your options list the open hexes where each of your building cards can go.
+Hexes are axial `q,r`. The six neighbours of `q,r` are `q+1,r`, `q-1,r`, `q,r+1`, `q,r-1`, `q+1,r-1` and `q-1,r+1`. The map in a view prints one row per `r`, each cell as `q,r:<terrain>[<owner><building>]`; your options list the hexes where each of your building cards can go.

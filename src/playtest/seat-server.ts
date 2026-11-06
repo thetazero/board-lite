@@ -85,7 +85,7 @@ const TOOLS = [
   },
   {
     name: 'say',
-    description: 'Talk to the table. Without "to", everyone hears it; with "to" (e.g. "P2"), only that player does. Allowed any time, even when it is not your decision. Talk binds no one: only accepted offers do.',
+    description: 'Talk to the table, any time. With "to" (like "P2"), only that player hears it. Promises bind no one; only accepted offers do.',
     inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' }, why: WHY }, required: ['message'] },
     run: (a: { message: string; to?: string; why?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`, a.why),
   },

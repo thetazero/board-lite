@@ -180,15 +180,15 @@ export function lastRoundHtml(g: PublicState, names: string[], me?: { seat: numb
   const goal = g.pointsToWin;
   const who = g.players.map((p, i) => ({ i, n: i === me?.seat ? me.total : p.publicPoints })).filter((x) => x.n >= goal);
   if (!who.length) return '';
-  const pts = (n: number) => `${n} points`;
+  const pts = (n: number) => `${n}${icon('points', 1.1)}`;
   if (who.length > 1) {
-    const tags = who.map((x, k) => (x.i === me?.seat ? (k ? 'you' : 'You') : playerTag(x.i, names)));
-    return `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more, so this is the last round.`;
+    const tags = who.map((x) => (x.i === me?.seat ? 'you' : playerTag(x.i, names)));
+    return `Last round: ${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more`;
   }
   const [x] = who;
-  if (x.i !== me?.seat) return `${playerTag(x.i, names)} has ${pts(x.n)}, so this is the last round.`;
-  const hidden = g.players[x.i].publicPoints < goal ? ' with the cards in your hand' : '';
-  return `You have ${pts(x.n)}${hidden}, so this is the last round.`;
+  if (x.i !== me?.seat) return `Last round: ${playerTag(x.i, names)} has ${pts(x.n)}`;
+  const hidden = g.players[x.i].publicPoints < goal ? ' with your hand' : '';
+  return `Last round: you have ${pts(x.n)}${hidden}`;
 }
 
 // ---------- icons ----------
@@ -301,7 +301,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': {
       const d = g.dragons.find((x) => x.id === ev.d);
-      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][ev.stage]}` : '';
+      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} ${['', 'hatches', 'is now young', 'is now an adult'][ev.stage]}` : '';
     }
     case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${whose(ev.p)} tower ${buildingChip('tower', ev.p)} rises to ${ev.floors} floor${ev.floors === 1 ? '' : 's'}`;
@@ -535,7 +535,7 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
 // How the winner won a tie, if they did.
 export function tiebreakNote(g: PublicState): string {
   const w = g.standings![0];
-  return w.tiebreak === 'gold' ? `Wins the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+  return w.tiebreak === 'gold' ? `Tie: most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Tie: earliest in turn order' : '';
 }
 
 // A toast or note fades as it goes (style.css, .toast.gone), then leaves; at

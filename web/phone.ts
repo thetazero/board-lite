@@ -263,9 +263,9 @@ function noteOffers(g: PublicState, seat: number) {
 
 function offerAnswer(ev: PublicState['log'][number]['ev'], seat: number): string {
   if (!ev || !('from' in ev) || ev.from !== seat) return '';
-  if (ev.k === 'trade') return `P${ev.to + 1} accepts your offer: you give ${ev.give} for ${ev.get}.`;
-  if (ev.k === 'decline') return `P${ev.p + 1} declines your offer of ${ev.give} for ${ev.get}.`;
-  if (ev.k === 'expire') return `Your offer to ${ev.to === null ? 'anyone' : `P${ev.to + 1}`} expires: ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'trade') return `P${ev.to + 1} accepts: ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'decline') return `P${ev.p + 1} declines: ${ev.give} for ${ev.get}.`;
+  if (ev.k === 'expire') return `Your offer expires: ${ev.give} for ${ev.get}.`;
   return '';
 }
 
@@ -339,7 +339,7 @@ function renderLobby() {
     ? `<li class="open" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>Open seat</span></li>`
     : `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
       ${host && i !== me ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
-  const hint = l.seating ? `The game goes on once every seat is taken${host ? ' (a bot can take one)' : ''}.`
+  const hint = l.seating ? `The game goes on once every seat is taken.`
     : host ? '' : `${first ? esc(first) : 'The first player'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
   morph(app, screen('lobby', `
@@ -768,7 +768,7 @@ function tradeOpen(g: PublicState, me: Me): boolean {
 // Your dragons at home, then the room left for more: one empty nest with the
 // count in words, so the row doesn't fill with unlabelled baskets. With more
 // dragons than room (a suppressed roost counts for nothing, #352), it says so
-// in red: you hatch no more until there's room, and that's all.
+// in red, as numbers: you hatch no more until there's room, and that's all.
 // Tapping a dragon opens its card. Dragons the screen lists below are left
 // out; with none left, so is the roost.
 const NEST = `<svg class="nest" viewBox="-12 -12 24 24" role="img" aria-label="room for a dragon"><title>room for a dragon</title>
@@ -781,7 +781,7 @@ function roost(g: PublicState, me: Me, listed: Set<string>): string {
   const over = all.length - me.dragonCapacity;
   if (!mine.length && (!empty || mine.length < all.length) && over <= 0) return '';
   const room = empty ? `<span class="room">${NEST}Room for ${empty} more dragon${empty === 1 ? '' : 's'}</span>`
-    : over > 0 ? `<span class="room over">Room for ${me.dragonCapacity} dragon${me.dragonCapacity === 1 ? '' : 's'}, ${over} over: hatch no more until there's room</span>` : '';
+    : over > 0 ? `<span class="room over">${all.length} dragon${all.length === 1 ? '' : 's'}, room for ${me.dragonCapacity}</span>` : '';
   return `<section class="roost"><div class="nests">${mine.map((d) => myDragon(d, g)).join('')}${room}</div></section>`;
 }
 function myDragon(d: DragonView, g: PublicState): string {
@@ -996,7 +996,7 @@ function tradeView(g: PublicState, me: Me): string {
   // ones rise out of the fan and are named here.
   const offered = me.hand.filter((c) => trade.cards.has(c.id));
   const cards = me.hand.length
-    ? `<p class="tpick">${offered.length ? `${icon('cards', 1.2)} ${offered.map((c) => `<b>${esc(c.name)}</b>`).join(', ')}` : '<small>Tap cards in your hand to offer them too.</small>'}</p>`
+    ? `<p class="tpick">${offered.length ? `${icon('cards', 1.2)} ${offered.map((c) => `<b>${esc(c.name)}</b>`).join(', ')}` : '<small>Tap cards in your hand to add them.</small>'}</p>`
     : '';
   const any = Object.values(trade.give).some(Boolean) || trade.cards.size || Object.values(trade.get).some(Boolean);
   // On your turn the merchants come first: it's the shorter form, and the one used most.
@@ -1005,7 +1005,7 @@ function tradeView(g: PublicState, me: Me): string {
       <h3>Offer a trade to</h3><div class="row who">${who}</div>
       <div class="tgrid"><span></span><h3>You give</h3><h3>You get</h3>${rows}</div>
       ${cards}
-      ${act('Send offer', 'id="offer"', any ? null : 'Your offer is empty: choose what you give or get.', 'primary')}
+      ${act('Send offer', 'id="offer"', any ? null : 'Empty offer: choose what you give or get.', 'primary')}
     </section>`;
 }
 
@@ -1022,7 +1022,7 @@ function huntView(g: PublicState, me: Me): string {
   if (hunting!.perch) {
     if (!h.building) return '';
     return `<h3 class="huntname">Perch${on}</h3>
-      ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `The ${esc(h.building.name)} is suppressed, as if it weren't there, while your dragons perch there. They don't raid, and stay until you recall them or they're knocked out.` })}`;
+      ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: `The ${esc(h.building.name)} is suppressed, as if it weren't there, while they perch. Perched dragons don't raid.` })}`;
   }
   const perched = h.perched.filter((x) => x.owner !== me.seat).map((x) => g.dragons.find((d) => d.id === x.d)!).filter(Boolean);
   if (!h.fauna && !perched.length) return '';
@@ -1033,7 +1033,7 @@ function huntView(g: PublicState, me: Me): string {
   const beast = h.fauna ? `${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}` : '';
   const ds = perched.map((d) => `<div class="foe"><span class="foe-pic">${dragonBadge(d, 40)}</span><span class="foe-body"><b class="foe-name">${playerTag(d.owner, names)} ${esc(dragonName(d, g.dragons))}</b><span class="foe-stats">${statTag('Health', `${d.hp}/${d.maxHp}`)}${statTag('Attack', esc(d.attack))}</span>${d.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(d.weak)}</span>` : ''}</span></div>`).join('');
   return `<h3 class="huntname">${title}${on}</h3><section class="ptarget">${powerTag(power, 'big')}${beast}${ds ? `<div class="foes">${ds}</div>` : ''}</section>
-    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? 'You get 1 try each round.' : undefined })}`;
+    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? '1 try each round' : undefined })}`;
 }
 
 // Choosing dragons to send into a fight, the same on every screen that asks
@@ -1228,7 +1228,7 @@ function raidView(g: PublicState, me: Me): string {
     const chose = me.myChoice;
     // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
     const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
-    const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
+    const split = others ? '<p class="hint">Fighters split the loot by power.</p>' : '';
     return `${targetPanel(raid.target!, lead)}${sentHead}
       <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}${split}
@@ -1264,7 +1264,7 @@ function discardView(me: Me): string {
   const picks = me.hand.filter((c) => selected.has(c.id));
   const tray = picks.map((c) => cardFace(c, me, false, '', ' traycard')).join('') + '<div class="slot"></div>'.repeat(Math.max(0, n - picks.length));
   const left = n - picks.length;
-  const why = left ? `Your hand limit is ${me.handCap}: choose ${left}${picks.length ? ' more' : ''} card${left === 1 ? '' : 's'} to discard.` : null;
+  const why = left ? `Hand limit ${me.handCap}: choose ${left}${picks.length ? ' more' : ''}.` : null;
   const hint = picks.length ? '' : '<p class="hint">Tap a card in your hand to choose it. Hold a card to read it.</p>';
   return `<div class="discardtray">${tray}</div>${act(`Discard ${n} card${n === 1 ? '' : 's'}`, 'id="discard"', why)}${hint}`;
 }
@@ -1275,14 +1275,11 @@ function discardView(me: Me): string {
 // decision) is left on screen.
 function gameOver(g: PublicState, me: Me): string {
   const w = g.standings![0].p;
-  const mine = g.standings!.find((s) => s.p === me.seat)!;
-  const place = ['1st', '2nd', '3rd', '4th', '5th', '6th'][mine.place - 1];
   const note = tiebreakNote(g);
   return `<div class="pover" style="--pc:${PLAYER_COLORS[w]}">
     <div class="hero">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]))}</div>
     <h1>${w === me.seat ? 'You win!' : `${playerTag(w, names)} wins!`}</h1>
     ${note ? `<p class="tiebreak">${note}</p>` : ''}
-    ${w === me.seat ? '' : `<p class="mine">You finish ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
     ${standingsHtml(g, names, me.seat)}
     ${snap?.recap ? `<a class="button big" href="/recap/${snap.recap}" target="_blank" rel="noopener">Open the recap</a>` : ''}
     <button id="newgame" class="primary big">New game</button>
@@ -1521,7 +1518,7 @@ function renderTalk() {
   const lines = me.talk;
   const mine = (text: string) => text.startsWith(`P${me.seat + 1} `);
   const atBottom = talk.list.scrollHeight - talk.list.scrollTop - talk.list.clientHeight < 40;
-  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>No one has said anything yet. Players who aren\'t in the room (like Claude) only hear what you send here.</small></li>';
+  talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>No messages yet. Players not in the room (like Claude) only see what\'s sent here.</small></li>';
   if (atBottom) talk.list.scrollTop = talk.list.scrollHeight;
   const last = lines.at(-1);
   if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
@@ -1611,14 +1608,13 @@ function wire(g: PublicState, me: Me) {
   on('hunt', () => {
     const beastsOnly = me.huntable.every((k) => !snap!.game!.map.find((h) => h.k === k)?.perched.some((x) => x.owner !== me.seat));
     const about = beastsOnly
-      ? '<p class="hint pabout">Tap a beast, then choose the dragons to send against it. If it falls, the hex is empty and its loot is yours.</p>'
-      : '<p class="hint pabout">Tap a hex, then choose the dragons to send against its beast and any rival dragons perched there. Perched dragons knocked out go home.</p>';
+      ? ''
+      : '<p class="hint pabout">You fight its beast and any rival dragons perched there.</p>';
     picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
     render();
   });
   on('perch', () => {
-    const about = "<p class=\"hint pabout\">Tap a rival's building, then choose the dragons to perch there. It's suppressed, as if it weren't there, while they stay.</p>";
-    picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about };
+    picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about: '' };
     render();
   });
   bind('[data-recall]', (el) => send(`recall ${el.dataset.recall}`));

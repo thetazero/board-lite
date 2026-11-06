@@ -23,7 +23,7 @@ function charts(r: Recap): string {
 function page(r: Recap): string {
   const w = r.standings[0];
   const when = new Date(r.ended).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
-  const tiebreak = w.tiebreak === 'gold' ? 'Wins the tie with the most gold' : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+  const tiebreak = w.tiebreak === 'gold' ? 'Tie: most gold' : w.tiebreak === 'turn order' ? 'Tie: earliest in turn order' : '';
   const moments = momentsHtml(r);
   return `<div class="sheet" style="--pc:${PLAYER_COLORS[w.p]}">
     ${winnerScene(PLAYER_COLORS[w.p], r.names.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
