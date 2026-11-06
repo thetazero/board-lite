@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 import { promisify } from 'node:util';
-import { candidateCommands } from '../src/bot.ts';
+import { candidateCommands, endingTarget, playToEnd } from '../src/bot.ts';
 import { apply, newGame, waitingOn } from '../src/engine.ts';
 import { Room, RoomError } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
@@ -30,7 +30,9 @@ test('phones can play a whole game through a room, and see only their own hand',
   const g = room.game!;
   const rng = { state: 5 };
   let steps = 0;
-  while (g.phase !== 'over' && steps++ < 20000) {
+  // playToEnd: bot play can stall short of the win target; this ends it whatever the tuning.
+  playToEnd(g, () => {
+    steps++;
     const p = waitingOn(g)[0];
     for (const cmd of candidateCommands(g, p, rng)) {
       try {
@@ -53,7 +55,7 @@ test('phones can play a whole game through a room, and see only their own hand',
       const tv = JSON.stringify(room.snapshot(null));
       assert.ok(!tv.includes('"hand"') && !tv.includes('"resources"'), 'the TV sees no hands or resources');
     }
-  }
+  });
   assert.equal(g.phase, 'over');
   assert.equal(load(room.file).phase, 'over', 'the game is saved as it goes');
   const end = room.snapshot(seats[0].token);
@@ -106,11 +108,16 @@ test('a room of bots plays itself to the end', { timeout: 120_000 }, async (t) =
   const room = new Room('BOTS', { botDelayMs: 0, dir });
   room.addBot();
   room.addBot();
-  const maxMoves = 20_000; // a 3-bot game takes well under this
+  const maxMoves = 100_000; // a 3-bot game takes well under this
   let moves = 0;
+  // Bot play can stall short of the win target: as playToEnd does, it drops to
+  // the leader's points late in the game, so this ends whatever the tuning.
+  const target = TUNING.pointsToWin;
+  t.after(() => (TUNING.pointsToWin = target));
   const ended = new Promise<void>((resolve, reject) => {
     t.mock.method(console, 'error', (...args: unknown[]) => reject(new Error(args.map(String).join(' '))));
     room.subscribe(() => {
+      if (room.game) TUNING.pointsToWin = endingTarget(room.game, target);
       if (room.game?.phase === 'over') resolve();
       else if (++moves > maxMoves) reject(new Error(`the game was not over after ${maxMoves} moves`));
     });

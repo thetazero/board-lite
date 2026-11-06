@@ -26,7 +26,7 @@ board-lite is running on port 8080.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 
-**Reconnecting:** a phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. On another phone, open the room's address and tap your name.
+**Reconnecting:** a phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. A page whose connection goes quiet (no word from the server for 40 seconds, though it pings every 15) connects again by itself, so it never sits on an old moment of the game until someone reloads it. On another phone, open the room's address and tap your name.
 
 **Nobody stalls the table:**
 
@@ -52,6 +52,8 @@ On the join form (the server's bare address), type your name and tap **New game*
 Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet.
 
 The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, scenes cut to it only from then on, and You stays on.
+
+When the game ends, the table plays the same summary as the TV, as a scene the phone cuts to, and ends on the final scores with **Watch again** and **Open the recap** (the recap page) in place of the QR code. Every phone's own end screen has **Open the recap** too, with a TV or without.
 
 ## Playing from the command line
 

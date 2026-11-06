@@ -1016,7 +1016,12 @@ function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o
   const sent = [...chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
   const note = o.note ? `<p class="hint">${o.note}</p>` : '';
   const buttons = o.locked ? '' : `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button>${o.out}</div>`;
-  return `${o.locked ? '' : `<h3 class="ask">Choose dragons to send</h3>`}${list}${note}${buttons}`;
+  // With 2 or more to choose from, a tick on the prompt's line, in the column of
+  // the dragons' own, chooses them all in one tap (or, all chosen, none).
+  const all = n > 0 && n === me.raidReady.length;
+  const ask = '<h3 class="ask">Choose dragons to send</h3>';
+  const head = me.raidReady.length > 1 ? `<div class="askrow">${ask}<button id="${attr}all" class="allpick${all ? ' on' : ''}">Choose all<i class="tick"></i></button></div>` : ask;
+  return `${o.locked ? '' : head}${list}${note}${buttons}`;
 }
 
 // Picking a hex: the map, what you're placing and Cancel, on one screen. The
@@ -1205,8 +1210,10 @@ function discardView(me: Me): string {
   return `<div class="discardtray">${tray}</div>${act(`Discard ${n} card${n === 1 ? '' : 's'}`, 'id="discard"', why)}${hint}`;
 }
 
-// The end: the winner's moment, then where everyone finished. Nothing from the
-// game in progress (resources, income, the last decision) is left on screen.
+// The end: the winner's moment, where everyone finished, and a link to the
+// game's recap page (the summary the TV or the table view plays, to keep or
+// share). Nothing from the game in progress (resources, income, the last
+// decision) is left on screen.
 function gameOver(g: PublicState, me: Me): string {
   const w = g.standings![0].p;
   const mine = g.standings!.find((s) => s.p === me.seat)!;
@@ -1218,6 +1225,7 @@ function gameOver(g: PublicState, me: Me): string {
     ${note ? `<p class="tiebreak">${note}</p>` : ''}
     ${w === me.seat ? '' : `<p class="mine">You finish ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
     ${standingsHtml(g, names, me.seat)}
+    ${snap?.recap ? `<a class="button big" href="/recap/${snap.recap}" target="_blank" rel="noopener">Open the recap</a>` : ''}
     <button id="newgame" class="primary big">New game</button>
   </div>`;
 }
@@ -1548,6 +1556,10 @@ function wire(g: PublicState, me: Me) {
     else hunting!.chosen.add(id);
     render();
   });
+  on('hunterall', () => {
+    hunting!.chosen = hunting!.chosen.size === me.raidReady.length ? new Set() : new Set(me.raidReady);
+    render();
+  });
   on('huntgo', () => {
     const cmd = `${hunting!.perch ? 'perch' : 'clear'} ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
     hunting = null;
@@ -1630,6 +1642,12 @@ function wire(g: PublicState, me: Me) {
     if (cur.has(id)) cur.delete(id);
     else cur.add(id);
     commitDraft = [...cur];
+    render();
+    send(`commit ${commitDraft.join(' ') || 'none'}`);
+  });
+  on('commitall', () => {
+    const cur = commitDraft ?? g.raid!.commits[me.seat];
+    commitDraft = cur.length === me.raidReady.length ? [] : [...me.raidReady];
     render();
     send(`commit ${commitDraft.join(' ') || 'none'}`);
   });

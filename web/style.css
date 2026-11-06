@@ -54,7 +54,7 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
 .pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
-.fhead, .fightscene .outcome, .fled, .fig-name, .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
+.fhead, .fightscene .outcome, .fled, .fig-name, .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
@@ -66,17 +66,19 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
    hard edge below; pressed, it lies flat. Plain is cream card, primary blue,
-   ghost the table's own night card (a kraft tab on a sheet), chosen gold. */
-button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); border: 0; border-radius: 2px; padding: .5em .9em; cursor: pointer;
+   ghost the table's own night card (a kraft tab on a sheet), chosen gold.
+   A link that leaves the game (a.button) looks the same. */
+button, a.button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); border: 0; border-radius: 2px; padding: .5em .9em; cursor: pointer;
   --edge: var(--paper-edge); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a66; transition: transform .08s, box-shadow .08s; }
-button:active:not(:disabled) { transform: translateY(.14em); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .02em 0 var(--edge), 0 .06em .1em #0b081a66; }
+button:active:not(:disabled), a.button:active { transform: translateY(.14em); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .02em 0 var(--edge), 0 .06em .1em #0b081a66; }
 button:disabled { opacity: .45; cursor: default; box-shadow: 0 .06em 0 var(--edge); }
-button.primary { --text: #fff; --muted: #e3e9ff; --edge: #213f8a; color: #fff; background: var(--grain), var(--mottle), linear-gradient(180deg, #4d7bdf, #3c68cb); box-shadow: inset 0 1px 0 #ffffff40, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; text-shadow: 0 1px 0 #0003; }
-button.primary:active:not(:disabled) { box-shadow: inset 0 1px 0 #ffffff40, 0 .02em 0 var(--edge); }
+button.primary, a.button.primary { --text: #fff; --muted: #e3e9ff; --edge: #213f8a; color: #fff; background: var(--grain), var(--mottle), linear-gradient(180deg, #4d7bdf, #3c68cb); box-shadow: inset 0 1px 0 #ffffff40, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; text-shadow: 0 1px 0 #0003; }
+button.primary:active:not(:disabled), a.button.primary:active { box-shadow: inset 0 1px 0 #ffffff40, 0 .02em 0 var(--edge); }
 button.ghost { --text: var(--paper); --edge: #15112a; color: var(--paper); background: var(--table-grain), var(--mottle), linear-gradient(180deg, #4b4279, #3d3567); box-shadow: inset 0 1px 0 #ffffff24, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; }
 :is(.talkbar, .panel, .pmap) button.ghost { --text: var(--ink); --edge: #a38a5c; color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #e6d7b6, #d8c59e); box-shadow: inset 0 1px 0 #fffbf080, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a55; }
 button.small { padding: .2em .5em; font-size: .85em; }
-button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
+button.big, a.button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
+a.button { display: inline-block; box-sizing: border-box; text-align: center; text-decoration: none; }
 input, select { font: inherit; background: var(--grain), #fffaf0; border: 1px solid var(--paper-edge); border-radius: 2px; padding: .5em; box-shadow: inset 0 .12em .2em #0002; }
 small { color: var(--muted); }
 /* Headings and banners in the cards' book face. */
@@ -98,12 +100,14 @@ small { color: var(--muted); }
 .wait { color: var(--muted); }
 .none { color: var(--muted); font-style: italic; }
 /* Dice: one white paper shape per kind of die, the same blank (a die to roll,
-   "2" and a square for 2d6) and rolled (the shape with its number on it). */
+   "2" and a square for 2d6). A rolled die is that shape's flat face with its
+   number on it (dieFace). */
 .dicechip { display: inline-flex; align-items: center; gap: .05em; }
 .die { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.4em; height: 2.4em; margin: 0 .15em; color: #111; vertical-align: middle; line-height: 1; filter: drop-shadow(0 2px 0 #0007); }
-.die .dieicon { position: absolute; inset: 0; }
-.die b { position: relative; font-size: 1.2em; }
-.die[data-sides="4"] b { margin-top: .45em; font-size: 1em; }
+.die .dieicon { position: absolute; inset: 0; width: 100%; height: 100%; }
+.die b { position: relative; font-size: 1.15em; font-weight: 800; }
+.die[data-sides="4"] b { margin-top: .3em; font-size: 1em; }
+.die[data-sides="8"] b { font-size: 1em; }
 .die.rolling { animation: shake .18s infinite; }
 @keyframes shake { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 
@@ -318,10 +322,14 @@ q::after { content: close-quote; }
 .production .pturn { padding: .2em .6em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production .who { font-size: 1.15em; margin-bottom: .15em; }
 /* A resource's row: its icon, the fixed amount, its dice, then the total once they land. */
+/* a card is never wider than the sheet (#333) */
+.production .pstage > * { min-width: 0; }
 .production .prow { display: flex; align-items: center; gap: .5em; min-height: 2.6em; opacity: 0; translate: -.8em 0; transition: opacity .3s ease-out, translate .3s ease-out; }
+.production .prow > svg, .production .eq { flex: none; }
 .production .prow.up { opacity: 1; translate: none; }
 .production .parts { display: inline-flex; align-items: center; gap: .1em; }
-.production .parts > i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
+.production .dice { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .3em; }
+.production .parts i, .production .eq > i { font-style: normal; color: var(--muted); margin: 0 .2em; }
 .production .base { min-width: 1em; text-align: center; }
 .production .eq { opacity: 0; transition: opacity .25s ease-out; }
 .production .prow.landed .eq { opacity: 1; }
@@ -337,7 +345,7 @@ q::after { content: close-quote; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }
 .endbox .tiebreak { margin: 0 0 .3em; color: var(--muted); font-size: 1.2em; }
 .endbox .standings { font-size: 1.5em; margin: .5em 2em; }
-.endbox button { font-size: 1.4em; margin-top: .6em; }
+.endbox :is(button, a.button) { font-size: 1.4em; margin-top: .6em; }
 .endbox .endactions { display: flex; gap: .8em; justify-content: center; }
 /* With the recap's QR code beside the standings, for anyone to scan on the way out. */
 .endbox .endbody { display: flex; align-items: center; justify-content: center; gap: 1.5em; margin: 0 2em; }
@@ -805,12 +813,16 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
 /* A dragon to send: a box at the row's end that ticks when tapped, so the row reads as a choice. */
 .dragon.pick > span { flex: 1; }
-.dragon .tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
-.dragon.on .tick { border-color: var(--ink); background: var(--ink); }
-.dragon.on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
+.tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
+:is(.dragon, .allpick).on .tick { border-color: var(--ink); background: var(--ink); }
+:is(.dragon, .allpick).on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
 /* A choice's prompt ("Choose a resource to gain"), then its options (phone.ts, choose) */
 .ask { margin: .3em 0 0; font-size: 1.05em; }
-.pbody > .ask, .zoomacts .ask { color: var(--paper); }
+.pbody > .ask, .zoomacts .ask, .pbody > .askrow .ask { color: var(--paper); }
+/* "Choose dragons to send" with its "Choose all" tick at the line's end, in the dragons' column of ticks. */
+.askrow { display: flex; align-items: center; justify-content: space-between; gap: .6em; margin-top: .3em; }
+.askrow .ask { margin: 0; }
+button.allpick, button.allpick.on { flex: none; white-space: nowrap; display: flex; align-items: center; gap: .5em; padding: .3em .9em; background: none; box-shadow: none; color: var(--paper); font-weight: 600; }
 .choose { display: flex; flex-direction: column; gap: .3em; }
 .choose .row { justify-content: center; }
 .choose .dragon { flex: 1 1 100%; }
@@ -822,7 +834,8 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .pover h1 { margin: .5em 1rem 0; font-size: 2em; }
 .pover .tiebreak, .pover .mine { margin: .2em 1rem 0; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: .25em; }
 .pover .standings { font-size: 1.2em; margin: .8em 1rem; }
-.pover button { margin: 0 1rem; width: auto; }
+.pover :is(button, a.button) { margin: 0 1rem; width: auto; }
+.pover a.button + button { margin-top: .8em; }
 
 /* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
 body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100% tall, or the padding sits at the first screen's bottom, not after the page */
@@ -1035,8 +1048,28 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .endbox { padding: 0 0 1em; }
 .remote :is(.production, .result, .endbox) h1 { font-size: 1.6em; }
 .remote .production .pstage { font-size: 1.3em; }
+/* a resource's dice wrap under each other when the row runs out of room;
+   a faint line between resources keeps each one's dice together */
+.remote .production .prow { gap: .35em; padding: .35em 0; }
+.remote .production .prow + .prow { border-top: 1px solid color-mix(in srgb, var(--pc) 30%, transparent); }
+.remote .production .parts { flex: 1; min-width: 0; }
+.remote .production .dice { flex: 1; min-width: 0; gap: .3em .2em; }
+.remote .production .die { width: 1.9em; height: 1.9em; margin: 0; }
+.remote .production .parts i, .remote .production .eq > i { margin: 0 .1em; }
+.remote .production .ptotal { font-size: .85em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
+.remote .endbox .endbody { margin: 0; }
+.remote .endbox :is(button, a.button) { font-size: 1.1em; }
+.remote .endbox .endactions { flex-wrap: wrap; padding: 0 .6em; }
+/* The summary on a phone: the race over what happened, one above the other. */
+.remote .summary { width: 100%; padding: .6em .8em 3.6em; }
+.remote .summary h1 { font-size: 1.6em; }
+.remote .summary .sumbody { grid-template-columns: minmax(0, 1fr); gap: .8em; min-height: 0; }
+.remote .summary .told { font-size: 1em; }
+.remote .summary > button { right: .8em; bottom: .8em; }
+.remote .summary.points-step { width: 100%; padding-bottom: 3.6em; }
+.remote .summary.points-step .breakdown { font-size: 1.05em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }
 .remote .raidbox h1 { font-size: 1.7em; }
 .remote .target { min-width: 0; width: 100%; padding: .6em .8em; }

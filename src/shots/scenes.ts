@@ -74,7 +74,7 @@ const MAX_STEPS = 30000;
 // The TV's summary at the end of a game, played from step n (from the end if
 // negative), once the TV has the recap.
 const summaryAt = (n: number) => `new Promise((done) => {
-  const go = () => document.querySelector('.endbox.with-recap') ? done(window.summaryAt(${n})) : setTimeout(go, 30);
+  const go = () => document.querySelector('.endbox #replay') ? done(window.summaryAt(${n})) : setTimeout(go, 30);
   go();
 })`;
 
@@ -625,6 +625,7 @@ export const SCENES: Scene[] = [
       return [
         { file: 'tv-raid-commit-4p', caption: 'TV, raid commitments (4 players)', client: 'tv' },
         { file: 'phone-raid-commit-4p', caption: 'Phone: committing dragons (one tapped)', client: 'phone', seat: choosing, clicks: ['[data-commit]'] },
+        { file: 'phone-raid-commit-all-4p', caption: 'Phone: committing dragons (Choose all tapped)', client: 'phone', seat: choosing, clicks: ['#commitall'] },
         { file: 'phone-raid-dragon-4p', caption: 'Phone, raid: a dragon in the roost tapped open', client: 'phone', seat: choosing, clicks: ['.roost [data-dragon]'] },
       ];
     },
@@ -812,6 +813,25 @@ export const SCENES: Scene[] = [
     live: bots((g) => g.phase === 'action'),
     liveEnd: allRolled,
     shots: () => [{ file: 'tv-production-done-6p', caption: "TV: production ends with everyone's totals together (6 players)", client: 'tv', live: true, waitFor: '#overlay .production .psum.on', hold: true, waitMs: 500 }],
+  },
+  {
+    // A big producer on a phone's table view: 6 dice on every row (#333),
+    // set down wherever the terrain fits.
+    name: 'production-many-dice-2p',
+    players: 2,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      for (const type of ['quarry', 'lumber_camp', 'crystal_mine', 'pasture']) {
+        const free = Object.keys(g.map).sort().filter((k) => g.map[k].terrain === BUILDINGS[type].terrain && !g.buildings[k] && !g.map[k].fauna && !nearBeast(g.map, k));
+        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrade: null, floors: 0 };
+      }
+      toDiscard(g, [1]);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: (g) => g.log.slice(g.log.findLastIndex((e) => e.ev?.k === 'round')).some((e) => e.ev?.k === 'produce' && e.ev.p === 0 && (e.dice?.length ?? 0) >= 20),
+    shots: () => [{ file: 'tv-remote-production-many-dice-2p', caption: "No TV: production on a phone's table view, with 6 dice on every row", client: 'tv', table: true, live: true, waitFor: '#overlay .production .pturn.on .ptotal.up', hold: true, waitMs: 500, sizes: true }],
   },
   {
     name: 'late-6p',
@@ -1583,7 +1603,9 @@ export const SCENES: Scene[] = [
     until: (g) => g.phase === 'over',
     shots: (g) => [
       { file: 'phone-remote-over-4p', caption: 'No TV: the end, on your own view', client: 'phone', seat: g!.winner! },
-      { file: 'tv-remote-over-4p', caption: 'No TV: the final scores on the table view', client: 'tv', table: true, sizes: true },
+      { file: 'tv-remote-over-4p', caption: "No TV: the final scores on the table view, with a link to the game's recap", client: 'tv', table: true, sizes: true },
+      { file: 'tv-remote-recap-race-4p', caption: 'No TV, at the end: the points race on the table view, here round 12', client: 'tv', table: true, sizes: true, run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
+      { file: 'tv-remote-recap-points-4p', caption: "No TV, at the end: where everyone's points came from, on the table view", client: 'tv', table: true, run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
     ],
   },
 ];

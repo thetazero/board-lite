@@ -20,8 +20,19 @@ export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#
 
 // ---------- server ----------
 
+const POST_MS = 15000;
+// The server pings every stream every 15 s (src/server/server.ts, PING_MS). A
+// stream that hears nothing for longer than this is dead without saying so (a
+// server restart or a network change can leave one open on this end), and is
+// opened again: otherwise the page shows an old moment of the game, and a vote
+// or a turn never shows up until a reload.
+const STALE_MS = 40000;
+
 export async function post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // A request that never comes back (the server restarted under it, the
+  // network dropped it) gives up, rather than holding up every tap after it.
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(POST_MS) })
+    .catch(() => { throw new Error("The server didn't answer: try again."); });
   const data = await res.json().catch(() => ({ error: 'The server sent a bad reply.' }));
   if (!res.ok) throw new Error(String(data.error ?? 'Something went wrong.'));
   return data;
@@ -37,20 +48,25 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
   let es: EventSource | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
+  let heard = 0; // when the stream last said anything, a snapshot or a ping
   const open = () => {
     clearTimeout(retry);
     es?.close();
-    es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : ''}`);
-    es.onmessage = (e) => {
+    heard = Date.now();
+    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : ''}`));
+    mine.onmessage = (e) => {
+      heard = Date.now();
       onStatus(true);
       onSnapshot(JSON.parse(e.data));
     };
-    es.onerror = async () => {
+    mine.addEventListener('ping', () => void (heard = Date.now()));
+    mine.onerror = async () => {
+      if (es !== mine) return; // a stream already replaced
       onStatus(false);
-      es?.close();
+      mine.close();
       if (closed) return;
-      const status = await fetch(`/api/rooms/${code}`).then((r) => r.status, () => 0);
-      if (closed) return;
+      const status = await fetch(`/api/rooms/${code}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.status, () => 0);
+      if (closed || es !== mine) return;
       if (status === 400 && onGone) {
         stop();
         return onGone();
@@ -64,6 +80,14 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     else if (!closed && Date.now() - hiddenAt > 3000) open();
   };
   const online = () => !closed && open();
+  // Checked often, so a dead stream is caught soon after it goes quiet. That
+  // includes one still connecting (a request that hangs); one that failed
+  // (closed) is already being retried.
+  const check = setInterval(() => {
+    if (closed || !es || es.readyState === EventSource.CLOSED || Date.now() - heard <= STALE_MS) return;
+    onStatus(false);
+    open();
+  }, 5000);
   document.addEventListener('visibilitychange', seen);
   addEventListener('online', online);
   open();
@@ -71,6 +95,7 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
   function stop() {
     closed = true;
     clearTimeout(retry);
+    clearInterval(check);
     es?.close();
     document.removeEventListener('visibilitychange', seen);
     removeEventListener('online', online);
@@ -394,8 +419,17 @@ export function hpFill(hp: number, max: number): { width: string; color: string 
 }
 
 // A rolled die: the same white shape as a die to roll, with what it landed on.
+// A rolled die: one flat face with its number, an edge under it for depth.
+// The number is the <b>, so the production card can tumble it.
+const FACE: Record<number, string> = {
+  4: 'M0 -8.2 L8.6 6.6 L-8.6 6.6 Z',
+  6: 'M-7.4 -7.4 H7.4 V7.4 H-7.4 Z',
+  8: 'M0 -9 L8.2 0 L0 9 L-8.2 0 Z',
+};
 export function dieFace(sides: number, value: number, cls = ''): string {
-  return `<span class="die ${cls}" data-sides="${sides}">${icon(`d${sides}face`, 2.4, 'dieicon')}<b>${value}</b></span>`;
+  const d = FACE[sides] ?? FACE[6];
+  const svg = `<svg class="dieicon" viewBox="-10 -10 20 20" aria-hidden="true"><path d="${d}" transform="translate(0 1.6)" fill="#a39a86" stroke="#a39a86" stroke-width="2.6" stroke-linejoin="round"/><path d="${d}" fill="#fffaf0" stroke="#fffaf0" stroke-width="2.6" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#c9bfa9" stroke-width=".6" stroke-linejoin="round" transform="scale(1.18)"/></svg>`;
+  return `<span class="die ${cls}" data-sides="${sides}" title="${sides}-sided die">${svg}<b>${value}</b></span>`;
 }
 
 // ---------- hex map ----------
