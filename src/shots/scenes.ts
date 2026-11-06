@@ -1125,6 +1125,25 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // Dragons that went hungry at this round's production (#362): each seat
+    // has more dragons than livestock.
+    name: 'hungry-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = [g.turn, 1 - g.turn];
+      arm(g, a, [1, 2, 2, 3]);
+      arm(g, b, [1, 2, 3]);
+      for (const p of [a, b]) g.dragons.filter((d) => d.owner === p).slice(2).forEach((d) => (d.hungry = true));
+    },
+    shots: (g) => [
+      { file: 'tv-hungry-2p', caption: 'TV: dragons that went hungry this round', client: 'tv' },
+      { file: 'phone-hungry-2p', caption: 'Phone: your dragons that went hungry this round', client: 'phone', seat: g!.turn },
+      { file: 'phone-hungry-zoom-2p', caption: 'Phone: a hungry dragon tapped open', client: 'phone', seat: 1 - g!.turn, clicks: ['.roost [data-dragon]:nth-child(3)'] },
+    ],
+  },
+  {
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,

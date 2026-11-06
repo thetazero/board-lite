@@ -249,6 +249,12 @@ body.tv.fullscreen #fullscreen { display: none; }
 .grow { color: var(--muted); letter-spacing: -.05em; }
 .st-out, .st-perched { font-style: normal; font-weight: 800; }
 .st-perched { color: var(--warn); }
+/* Hungry (#362): went hungry at this round's production. */
+.st-hungry { font-style: normal; font-weight: 800; color: var(--warn); white-space: nowrap; }
+.dchip .hunger { display: flex; flex-wrap: wrap; gap: 0 .6em; }
+.tvdragon b:has(.st-hungry) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .4em; white-space: normal; }
+.tvdragon b .st-hungry { font-size: .8em; line-height: 1.3; }
+.card.big .dhunger { display: flex; flex-wrap: wrap; gap: 0 .6em; padding: 0 .3em; }
 /* A knocked-out dragon is greyed: it can't fight until it heals. Its tag stays bright. */
 .st-out { align-self: flex-start; background: var(--bad); color: #fff; padding: .05em .45em; border-radius: .3em; }
 .out svg { filter: grayscale(1); opacity: .35; }

@@ -42,7 +42,8 @@ function dragonLine(d: DragonView): string {
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
   const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
   const status = d.canRaid ? `can raid, clear or perch${d.hp < d.maxHp ? ' (hurt: heals instead of growing)' : ''}` : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled` : 'knocked out: cannot fight until it heals';
-  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
+  const hungry = d.hungry ? ', went hungry this round: did not heal or grow' : '';
+  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}${hungry}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
 function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
