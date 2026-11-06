@@ -104,7 +104,8 @@ export type GameEvent =
   // beast first; a perched dragon's carries its id as `d`. `fauna` and `name`
   // are the beast's, or null and the first perched dragon's name.
   // `hps`: each of `ds`'s health as the fight starts (as for `fight`).
-  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string; el?: string }[] }
+  // `first`: who won the coin flip and strikes first each combat round (absent in old saves: the dragons).
+  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string; el?: string }[]; first?: Side }
   | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
   | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
   | { k: 'recall'; p: number; ds: string[] }
@@ -127,7 +128,8 @@ export type GameEvent =
   | { k: 'hold'; p: number } // holds back
   // `hps`: each of `ds`'s health as the fight starts, lined up with `ds`, so a
   // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
-  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[] } // el: each defender's element (absent in old saves)
+  // `first`: who won the coin flip and strikes first each combat round (absent in old saves: the dragons).
+  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[]; first?: Side } // el: each defender's element (absent in old saves)
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'held' } // unable: no dragon was raid-ready; held: everyone held back
@@ -136,6 +138,9 @@ export type GameEvent =
   | { k: 'final'; totals: number[]; winner: number }
   | { k: 'talk' }
   | { k: 'mine' }; // a private line for the player it went to
+
+// Which side of a fight strikes first: the sent dragons, or what they attack.
+export type Side = 'dragons' | 'defenders';
 
 export type Title = 'army' | 'tower' | 'hoard';
 export const TITLE_NAMES: Record<Title, string> = { army: 'Strongest Dragon Army', tower: 'Tallest Tower', hoard: 'Largest Hoard' };
@@ -819,9 +824,10 @@ function resolveChoices(g: Game) {
   }
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
-  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })) });
+  const first = coinFlip(g);
+  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins. ${firstText(first, 'the defenders')}`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })), first });
   // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
-  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round);
+  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round, first);
 }
 
 // A hatched dragon's health now: its life stage's, less the hits it carries.
@@ -887,10 +893,29 @@ function defenderHit(g: Game, u: Battle['units'][number]) {
   if (u.hp === 0) delete d.perch;
 }
 
-function combatRound(g: Game, b: Battle, round: number) {
+// Who strikes first in a fight: a coin flip, once for the whole fight.
+function coinFlip(g: Game): Side {
+  return roll(g.rng, 2) === 1 ? 'dragons' : 'defenders';
+}
+
+// The log's line for the flip; `them` names what the dragons attack, one
+// beast or dragon unless `many`.
+function firstText(first: Side, them: string, many = true): string {
+  return first === 'dragons' ? 'Coin flip: the dragons strike first.' : `Coin flip: ${them} ${many ? 'strike' : 'strikes'} first.`;
+}
+
+// One combat round: the side that won the fight's coin flip strikes first,
+// then the other, with what it has left standing.
+function combatRound(g: Game, b: Battle, round: number, first: Side) {
   const lines: string[] = [];
   const hits: Hit[] = [];
-  // Dragons strike first.
+  if (first === 'defenders') defendersStrike(g, b, lines, hits);
+  dragonsStrike(g, b, lines, hits);
+  if (first === 'dragons') defendersStrike(g, b, lines, hits);
+  log(g, `Combat round ${round}: ${lines.join('; ')}.`, { k: 'combat', round, hits });
+}
+
+function dragonsStrike(g: Game, b: Battle, lines: string[], hits: Hit[]) {
   for (const id of b.fighters) {
     const d = dragonById(g, id);
     const st = stageStats(d)!;
@@ -905,7 +930,9 @@ function combatRound(g: Game, b: Battle, round: number) {
       hits.push({ d: d.id, u: ui, by: 'dragon', dmg, down: u.hp === 0, ...(dmg > roll ? { beats: true as const } : {}) });
     }
   }
-  // Then the defenders.
+}
+
+function defendersStrike(g: Game, b: Battle, lines: string[], hits: Hit[]) {
   for (const [ui, u] of b.units.entries()) {
     if (u.hp <= 0) continue;
     const def = unitDef(g, u);
@@ -919,7 +946,6 @@ function combatRound(g: Game, b: Battle, round: number) {
       hits.push({ d: d.id, u: ui, by: 'unit', dmg, down, ...(dmg > roll ? { beats: true as const } : {}) });
     }
   }
-  log(g, `Combat round ${round}: ${lines.join('; ')}.`, { k: 'combat', round, hits });
 }
 
 export function unitsText(g: Game): string {
@@ -1012,10 +1038,12 @@ function clearHex(g: Game, p: number, k: string, ds: Dragon[]): boolean {
   const b: Battle = { units, fighters: ds.map((d) => d.id) };
   const name = f ? faunaDef(f).name : dragonName(perched[0]);
   const foes = [...(f ? [`the ${name}`] : []), ...perched.map((d) => `${pname(d.owner)}'s ${dragonName(d)} (${d.id})`)].join(' and ');
-  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}.`, {
-    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}), el: unitDef(g, u).element })),
+  const first = coinFlip(g);
+  const them = units.length > 1 ? 'the defenders' : f ? `the ${name}` : `${pname(perched[0].owner)}'s ${dragonName(perched[0])}`;
+  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}. ${firstText(first, them, units.length > 1)}`, {
+    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}), el: unitDef(g, u).element })), first,
   });
-  for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round);
+  for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round, first);
   const won = b.units.every((u) => u.hp <= 0);
   const home = perched.filter((d) => !d.perch).map((d) => d.id);
   const loot = f ? faunaLoot(g, k) : {};
