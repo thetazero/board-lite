@@ -812,6 +812,28 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-raid-choose-5p', caption: 'TV, fight or hold back (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
   },
   {
+    // Late in a game: two raiders send 8 dragons each, one sends 4, against
+    // Cinderkeep, whose sheet is tall; long names; a few dragons are hurt.
+    name: 'choose-many-3p',
+    players: 3,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      const many = [3, 3, 3, 2, 3, 3, 2, 3];
+      for (const p of g.players.keys()) arm(g, p, p === (t + 1) % 3 ? [3, 2, 3, 3] : many);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      toChoice(g, [0, 1, 2]);
+      const hurt = g.dragons.filter((d) => d.stage === 3);
+      hurt[2].damage = 3;
+      hurt[9].damage = 8;
+      apply(g, t, 'fight');
+    },
+    shots: () => [{ file: 'tv-raid-choose-many-3p', caption: 'TV, fight or hold back: 8 dragons each for two raiders, on Cinderkeep', client: 'tv', sizes: true }],
+  },
+  {
     name: 'remote-choose-3p',
     players: 3,
     seed: 1,
