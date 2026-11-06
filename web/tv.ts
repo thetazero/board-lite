@@ -238,7 +238,7 @@ function doing(g: PublicState, p: number): string {
   if (g.phase === 'action') return g.turn === p ? 'Taking a turn' : 'Answering an offer';
   if (g.phase === 'discard') return 'Discarding';
   // The card step shows nothing: everyone keeps a card at once, and the phone asks (#229).
-  if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'Voting' : g.raid?.step === 'commit' ? 'Sending dragons' : 'Fighting or bailing';
+  if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'Voting' : g.raid?.step === 'commit' ? 'Sending dragons' : 'Fighting or holding back';
   return '';
 }
 
@@ -401,7 +401,7 @@ function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
   return `<span class="rd${sent ? ' sent' : ''}" title="${name}">${dragonBadge(d, 60)}${sent ? `${hpBar(d.hp, d.maxHp)}<small>${name}</small>` : ''}</span>`;
 }
 
-// Whether a raider has chosen to fight or bail, never which: a card laid face
+// Whether a raider has chosen to fight or hold back, never which: a card laid face
 // down once they have, an empty place for it while they're choosing.
 function choiceMark(done: boolean): string {
   return done ? '<span class="choice done"><i></i>Chosen</span>' : '<span class="choice"><i></i>Choosing</span>';
@@ -409,8 +409,8 @@ function choiceMark(done: boolean): string {
 
 // The raiders' power, each player's share in their colour, pushing against the
 // kingdom's from the other end; past the middle, the raiders usually win
-// (rules.md, combat power). It counts everyone in, as no one has bailed yet
-// that the table knows of.
+// (rules.md, combat power). It counts everyone in, as no one has held back
+// yet that the table knows of.
 function balance(sides: { p: number; power: number }[], foe: number): string {
   const ours = sides.reduce((s, x) => s + x.power, 0);
   const segs = sides.map((x) => `<i style="--pc:${PLAYER_COLORS[x.p]};flex:${x.power}"></i>`).join('');
@@ -441,13 +441,13 @@ function renderRaid(g: PublicState) {
       return `<li class="raider${home ? ' out' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${ds}</span>${sent.size ? powerTag(sum(raid.commits[p])) : ''}${able.length ? check(raid.ready[p]) : ''}</li>`;
     };
     body = `<h1>${icon('raid', 1.1)} Commit ${OPEN}${raidPips(g)}</h1>${arena(names.map((_, p) => row(p)).join(''))}`;
-  } else if (raid.step === 'bail') {
+  } else if (raid.step === 'choose') {
     // Who's in, with what, and whether they've chosen (never what they chose):
     // a face-down card once they have, an empty place while they're choosing.
     // Above them, the power they'd bring together against the kingdom's.
     const ins = names.flatMap((_, p) => (raid.commits[p].length ? [p] : []));
     const rows = ins.map((p) => `<li class="raider${raid.decided[p] ? ' chosen' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${choiceMark(raid.decided[p])}</li>`).join('');
-    body = `<h1>${icon('raid', 1.1)} Fight or bail ${SECRET}${raidPips(g)}</h1>${balance(ins.map((p) => ({ p, power: sum(raid.commits[p]) })), raid.target!.power)}${arena(rows, 'bail')}`;
+    body = `<h1>${icon('raid', 1.1)} Fight or hold back ${SECRET}${raidPips(g)}</h1>${balance(ins.map((p) => ({ p, power: sum(raid.commits[p]) })), raid.target!.power)}${arena(rows, 'deciding')}`;
   }
   // A new step (or the next raid) rises in; ticks within a step update in place.
   showOverlay('raid', `raid ${g.round} ${g.raidsLeft} ${raid.step}`, `<div class="raidbox">${body}</div>`);
@@ -551,32 +551,32 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
 // attacker's element colour to what it hits, bursting when that element
 // beats the target's; the knocked out fall. Then who won and what they took,
 // and for a kingdom that scores, a beat of its own: the crown comes down on
-// the player with the most power standing, then their points. Whoever bailed
-// is shown flown home, in a corner.
+// the player with the most power standing, then their points. Whoever held
+// back is shown in a corner, out of the fight but still in for the loot.
 type Combat = Extract<EventView['ev'], { k: 'combat' }>;
 function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fresh: EventView[]): Banner {
   const e = fresh[sc.at];
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
-  // This raid's bails: the ones logged since its commitments locked (maybe
-  // in an earlier update than the fight's, so from the whole log).
+  // Who held back in this raid: the ones logged since its commitments locked
+  // (maybe in an earlier update than the fight's, so from the whole log).
   const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
-  const bailed = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'bail' ? [x.ev.p] : []));
+  const held = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [x.ev.p] : []));
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
-  // A bailer's dragons are the ones they last committed before the lock.
+  // Their dragons are the ones they last committed before the lock.
   const sentBy = (p: number) => g.log.slice(0, lockAt + 1).findLast((x) => x.ev?.k === 'commit' && x.ev.p === p)?.ev as Extract<EventView['ev'], { k: 'commit' }> | undefined;
-  const fled = bailed.map((p) => {
+  const back = held.map((p) => {
     const ds = (sentBy(p)?.ds ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
-    return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
+    return `<div class="heldback" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<small>Holds back</small></div>`;
   }).join('');
   const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power still fighting</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
-  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), fled, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms);
+  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), back, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
 // A fight for a hex: one player's dragons against what holds it (a beast,
@@ -627,7 +627,7 @@ const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
 const STEEL = '#c9ced6';
 
 type Foe = { name: string; hp: number; max: number; d?: DragonView; el?: string };
-function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number): Banner {
+function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, held: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number): Banner {
   const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
   // A figure: its health over its head, the figure standing on its shadow
   // (in its owner's colour, for a dragon), and its name at its feet.
@@ -693,7 +693,7 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
-      ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
+      ${held ? `<div class="backrow">${held}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {

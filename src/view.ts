@@ -76,7 +76,7 @@ export function targetText(t: TargetView): string {
   // Identical defenders once, counted: "Knights x4 (...)".
   const groups = new Map<string, number>();
   for (const u of t.units) { const k = `${u.name} (${unitStats(u)})`; groups.set(k, (groups.get(k) ?? 0) + 1); }
-  return `${t.name} (Power ${t.power}): ${[...groups].map(([k, n]) => (n > 1 ? k.replace(' (', ` x${n} (`) : k)).join(', ')}; loot ${resText(t.loot)}${t.points ? `; ${plural(t.points, 'point')} to the most power still fighting` : ''}`;
+  return `${t.name} (Power ${t.power}): ${[...groups].map(([k, n]) => (n > 1 ? k.replace(' (', ` x${n} (`) : k)).join(', ')}; loot ${resText(t.loot)}${t.points ? `; ${plural(t.points, 'point')} to the most power standing` : ''}`;
 }
 
 export function faunaText(f: FaunaView): string {
@@ -107,8 +107,8 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
     raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'none'}${raid.ready[q] ? ', ready' : ''}`));
   } else {
     out.push(`Locked in: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-    out.push(`Fight or bail, in secret: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
-    if (you?.myChoice) out.push(`  You ${you.myChoice}.`);
+    out.push(`Fight or hold back, in secret: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
+    if (you?.myChoice) out.push(`  You ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
   }
   return out;
 }
@@ -153,6 +153,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       });
       out.push(`clear <hex> <dragon ids...>   (fight its beast and rivals' perched dragons to the end; 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
     }
+    if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: ${you.autoClear.join(' ')})`);
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Hexes: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (perched: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card, cost ${resText(you.eggProject.cost)})`);
@@ -181,7 +182,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     out.push(`commit <dragon ids...>   (raid-ready: ${you.raidReady.join(' ')}; "commit none" for none; replaces what you sent)`);
     out.push('ready   (lock in)');
   }
-  if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
+  if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 

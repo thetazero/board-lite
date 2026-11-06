@@ -4,7 +4,7 @@
 
 import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, PRODUCTION_CLASSES, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, autoClearTargets, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
   madeResource, onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
@@ -20,7 +20,8 @@ export interface HexView {
   building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it's suppressed while one is there
-  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
+  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain, and a building here is suppressed
+  suppressed?: true; // its building is suppressed (a beast on it or holding it, or a perched dragon): it counts as if it weren't there
   peak?: 'held' | 'free'; // the Thunderbird's peak
   peakZone?: number; // on or next to the freed peak: a production building here makes this many more each round
 }
@@ -82,11 +83,11 @@ export interface TargetView {
   units: UnitView[];
   loot: Res;
   power: number; // the defenders' combat power, summed
-  points?: number; // what it scores, when it falls, for the most power still fighting
+  points?: number; // what it scores, when it falls, for the most power standing
 }
 
 export interface RaidView {
-  step: 'vote' | 'commit' | 'bail';
+  step: 'vote' | 'commit' | 'choose';
   candidates: TargetView[];
   votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   voters: boolean[]; // who votes: only players with a raid-ready dragon
@@ -94,7 +95,7 @@ export interface RaidView {
   target: TargetView | null; // units carry current health once the fight starts
   commits: string[][];
   ready: boolean[];
-  decided: boolean[]; // fight-or-bail chosen (not what)
+  decided: boolean[]; // fight or hold back chosen (not what)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
 }
@@ -190,12 +191,13 @@ export interface SeatState {
   upgradeProjects: { key: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes>; why: string | null }[];
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
+  autoClear: string[]; // my buildings auto clear would clear, weakest first: under fauna (not a great beast) or rivals' perched dragons
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
   perched: string[]; // my perched dragons, to recall
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
-  myChoice: 'fight' | 'bail' | null;
+  myChoice: 'fight' | 'hold' | null;
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
@@ -295,6 +297,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
         ...(!(h.fauna && BEASTS[h.fauna]) && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
         ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
+        ...(b && blocked(g, k) ? { suppressed: true as const } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
@@ -439,6 +442,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     }),
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
+    autoClear: autoClearTargets(g, p),
     perchable: perchHexes(g, p),
     perched: g.dragons.filter((d) => d.owner === p && d.perch).map((d) => d.id),
     cantAccept: Object.fromEntries(g.offers.filter((o) => offerFor(o, p)).flatMap((o) => { const why = acceptProblem(g, o, p); return why ? [[o.id, why]] : []; })),

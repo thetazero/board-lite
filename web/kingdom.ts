@@ -19,12 +19,12 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
 }
 
 // What a scoring kingdom is worth when it falls, and to whom: the raider with
-// the most power still fighting at the end. With `leader`, who that is now
+// the most power standing at the end. With `leader`, who that is now
 // (the most power sent; equal powers in turn order). Nothing for the others.
 export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; names: string[] } | null): string {
   if (!t.points) return '';
   const now = leader ? ` <span class="leads">${playerTag(leader.p, leader.names)} leads</span>` : '';
-  return `<div class="loot worth"><span class="loot-label">Worth</span><span class="chip">${t.points}${icon('points', size)}</span><small>to the most power still fighting</small>${now}</div>`;
+  return `<div class="loot worth"><span class="loot-label">Worth</span><span class="chip">${t.points}${icon('points', size)}</span><small>to the most power standing</small>${now}</div>`;
 }
 
 // Who would score a kingdom's points if the fight ended now: the most power

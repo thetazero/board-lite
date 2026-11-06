@@ -24,10 +24,10 @@ The game should read like a well-edited board game: the box's rulebook, the card
 | **At a glance** (previews, stat lines) | Numbers and icons, no sentence; a change is before → after. | "5 → 7 [stone]", "1 → 2 [point]" |
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. Every choice among several options has one, and each option's button still carries the verb ("Gain", not a bare icon). | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear", "Choose a resource to gain" |
-| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or bail", "End of round" |
+| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or hold back", "End of round" |
 | **Status** (what someone is doing, on a TV panel or the phone's top bar) | Sentence case, present tense, short: a present participle for what a player is doing. The TV's top bar names the phase (a heading), never a sentence. | "Taking a turn", "Voting", "Discarding" |
 | **State tag** (a dragon or building, at a glance) | Sentence case, one to four words: why it's out of play. A number in a tag says what it counts, and the tag claims only what the rules make sure of. | "Knocked out", "Perched" |
-| **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax bails", "No one raids" |
+| **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax holds back", "No one raids" |
 | **Why you can't** (a greyed card, an error) | A statement of the reason, then, if there's a fix, a colon and an imperative. Full stop. Every greyed-out button has one, under it, in the words the refused command would use, except on the phone for a cost you can't pay: the cost beside the greyed button already says it. | "No room for another dragon: build a roost first.", "You can't afford 2 stone.", "Build it on your turn." |
 | **Rules** (`docs/rules.md`) | Second person, present tense, as above; "may" for a choice, no "should", and "must" only where breaking it is possible and matters. | "On your turn, you may play an action card." |
 
@@ -45,7 +45,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
 | **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
 | **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it's suppressed |
-| **suppressed** (a building) | shut down, blocked, disabled | A building under a beast or a perched dragon: it counts as if it weren't there, but nothing is built on its hex |
+| **suppressed** (a building) | shut down, blocked, disabled | A building under a beast, held by a great beast, or with a dragon perched on it: it counts as if it weren't there, but nothing is built on its hex |
 | **recall** (a perched dragon) | bring back, return, withdraw | Bringing a perched dragon home on your turn |
 | **slay** (a great beast) | kill, defeat | Clearing the Thunderbird or the Leviathan: a great beast is slain, for good |
 | **knocked out** | fainted, KO'd, dead, out | A dragon at 0 health: it can't fight until it heals. Greyed out wherever it's drawn |
@@ -53,7 +53,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **beast**, **fauna** | animal, monster | One wild creature on a hex is a beast; all of them, and the rules about them, are fauna |
 | **kingdom** | target, town | What a raid attacks. "target" only in the vote ("vote for a target") |
 | **falls** / **holds** | is defeated, wins, survives | A kingdom's or a beast's fate after a fight |
-| **bail** | flee, retreat, leave | Pulling out of a raid before the fight |
+| **hold back** | bail, hide, sit out, stay back | A committed player keeping their dragons out of a raid's combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
 | **no one** | nobody | No player |
 | **the merchants** | the bank, the market | Who you trade resources with at a fixed rate (4:1, or a port's 2:1). "Market" is a building, so it isn't this |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |
