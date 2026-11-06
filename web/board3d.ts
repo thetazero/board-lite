@@ -1488,6 +1488,7 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
 
 // Where an upgrade's mark stands: the plate's front-left corner, toward the room.
 const UPGRADE_AT: [number, number] = [-0.56, 0.4];
+const UPGRADE_STEP: [number, number] = [0.32, 0.2]; // from one upgrade's mark to the next's
 
 // What each upgrade puts beside the building it's on, as its card and icon
 // show it (icons.ts): a workshop's cog, nesting grounds' nest
@@ -1537,16 +1538,17 @@ function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry 
   geo.rotateX(-Math.PI / 2); // lie flat, its depth going up
   return geo;
 }
-function plate(upgrade: string | null, ground: string): THREE.Group {
+function plate(upgrades: string[], ground: string): THREE.Group {
   const g = new THREE.Group();
   g.add(part(cyl(0.76, 0.76, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
-  if (upgrade) {
-    g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
-    const mark = bake(upgradeMark(upgrade));
+  if (upgrades.length) g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
+  // One mark per upgrade (Workshops stack, #400), each the next along the front edge.
+  upgrades.forEach((u, i) => {
+    const mark = bake(upgradeMark(u));
     mark.scale.setScalar(1.6);
-    mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
+    mark.position.set(UPGRADE_AT[0] + i * UPGRADE_STEP[0], GROUND, UPGRADE_AT[1] + i * UPGRADE_STEP[1]);
     g.add(mark);
-  }
+  });
   return g;
 }
 
@@ -1844,7 +1846,7 @@ const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.co
 const SHUT_GROUND = '#4a474d';
 let shutTop: THREE.BufferGeometry | null = null;
 function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-  const g = plate(b.upgrade, shut ? SHUT_GROUND : tileColor(terrain));
+  const g = plate(b.upgrades, shut ? SHUT_GROUND : tileColor(terrain));
   // Shut down: the tile goes dark too, a cap of ash paper over its folded top
   // (just above the tile's own small lift), under its owner's border.
   if (shut) g.add(part((shutTop ??= tileGeometry().top), SHUT_GROUND, { at: [0, 0.012, 0], crease: false }));
@@ -2006,7 +2008,7 @@ export class Board3D {
       const b = h.building;
       // Suppressed (a beast on it or holding it, or a perched dragon): it makes nothing and is worth no points, so it goes grey.
       const shut = !!h.suppressed;
-      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${shut ? 'shut' : ''}` : '';
+      const bsig = b ? `${b.type}|${b.owner}|${b.upgrades.join('+')}|${b.floors}|${shut ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
@@ -2313,14 +2315,14 @@ export class Board3D {
     const towers = new Map<number, THREE.Vector3>();
     for (const h of g.map) {
       const b = h.building;
-      if (!b || !(PERCHES[b.type] || b.upgrade === 'nesting_grounds')) continue;
+      if (!b || !(PERCHES[b.type] || b.upgrades.includes('nesting_grounds'))) continue;
       const [x, z] = hexXZ(h.q, h.r);
       const center = new THREE.Vector3(x, 0, z);
       if (b.type === 'tower') towers.set(b.owner, center);
       const n = b.type === 'tower' ? 1 : b.type === 'roost' ? 2 : 1;
       const list = perches.get(b.owner) ?? [];
       (PERCHES[b.type] ?? []).slice(0, n).forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: b.type === 'hatchery' }));
-      if (b.upgrade === 'nesting_grounds') NESTING_PERCHES.forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: false }));
+      if (b.upgrades.includes('nesting_grounds')) NESTING_PERCHES.forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: false }));
       perches.set(b.owner, list);
     }
     const want = new Map<string, { pos: THREE.Vector3; face: number; home: THREE.Vector3 }>();
@@ -2758,7 +2760,7 @@ function portraitScene(p: Portrait): THREE.Scene {
   scene.add(sun, sun.target);
   const k = `p${p.terrain}${p.building ?? ''}${p.beast ?? ''}`;
   const owner = p.owner ?? 0;
-  const building = p.building ? { type: p.building, cls: '', name: '', owner, upgrade: p.upgrade ?? null, upgradeName: null, floors: p.floors ?? 0, does: { makes: {}, houses: 0, points: 0 } } : null;
+  const building = p.building ? { type: p.building, cls: '', name: '', owner, upgrades: p.upgrade ? [p.upgrade] : [], upgradeName: null, floors: p.floors ?? 0, does: { makes: {}, houses: 0, points: 0 } } : null;
   const hex: HexView = {
     k, q: 0, r: 0, terrain: p.terrain, building, perched: [],
     fauna: p.beast ? { key: p.beast, name: '', hp: 1, maxHp: 1, attack: '', power: 0, element: 'neutral', weak: [], loot: {} } : null,

@@ -95,7 +95,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     ...g,
     players: g.players.map((pl) => ({ ...pl, hand: [] })),
     map: Object.fromEntries(Object.entries(g.map).map(([k, h]) => { const { fauna: _, ...rest } = h; return [k, fauna[k] ? { ...rest, fauna: fauna[k] } : rest]; })),
-    buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrade: null, floors: 0 }])),
+    buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrades: [], floors: 0 }])),
     dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => { const { perch: _, ...rest } = d; return { ...rest, stage: TUNING.startingDragonStage }; }),
     titles: { army: null, tower: null, hoard: null }, slain: {}, raidPoints: g.players.map(() => 0),
   };
@@ -124,7 +124,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         break;
       }
       case 'build':
-        r.buildings[ev.hex] = { type: ev.b, owner: ev.p, upgrade: null, floors: 0 };
+        r.buildings[ev.hex] = { type: ev.b, owner: ev.p, upgrades: [], floors: 0 };
         bump(s.built, ev.b, ev.p, n);
         if (ev.project) bump(s.projects, ev.b, ev.p, n);
         break;
@@ -134,7 +134,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         if (ev.project) bump(s.projects, 'tower_floor', ev.p, n);
         break;
       case 'upgrade':
-        r.buildings[ev.hex].upgrade = ev.u;
+        r.buildings[ev.hex].upgrades.push(ev.u);
         bump(s.upgraded, ev.u, ev.p, n);
         if (ev.project) bump(s.projects, ev.u, ev.p, n);
         break;

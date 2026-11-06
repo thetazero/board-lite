@@ -308,7 +308,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'upgrade': return `${who(ev.p)} adds ${a(ev.name)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'perch': {
       const b = g.map.find((h) => h.k === ev.hex)?.building;
-      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrade ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
+      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrades[0] ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
     }
     case 'recall': return `${who(ev.p)} recalls ${ev.ds.map((id) => dragon(id)).join('')} home`;
     case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
@@ -343,11 +343,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'wander': {
       const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;
-      if (b && b.type !== 'tower') return `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}`;
+      if (b && b.type !== 'tower') return `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrades[0] ?? null, 26, b.cls)} ${esc(b.name)}`;
       // The Leviathan surfacing holds the hexes adjacent to it: each building there is suppressed (#370).
       const there = g.map.some((h) => h.k === ev.to && h.fauna?.key === ev.fauna);
       const held = !there ? [] : g.map.filter((h) => h.held === ev.fauna && h.suppressed && h.building).map((h) => h.building!);
-      return held.length ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} holds ${held.map((x) => `${whose(x.owner)} ${buildingChip(x.type, x.owner, x.upgrade, 26, x.cls)} ${esc(x.name)}`).join(', ')}` : '';
+      return held.length ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} holds ${held.map((x) => `${whose(x.owner)} ${buildingChip(x.type, x.owner, x.upgrades[0] ?? null, 26, x.cls)} ${esc(x.name)}`).join(', ')}` : '';
     }
     default: return '';
   }
@@ -493,7 +493,8 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
       const r = size * 0.62;
       // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey (the hex's rim keeps its owner).
       cells.push(`<g transform="translate(${x} ${y})"${h.suppressed ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
-      if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
+      // One badge per upgrade, overlapping toward the middle (Workshops stack, #400).
+      b.upgrades.forEach((u, i) => cells.push(`<g transform="translate(${x + r * 0.85 - i * size * 0.3} ${y - r * 0.85})">${upgradeBadge(u, size * 0.3)}</g>`));
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
     // A great beast's hold on the hexes round it, and the freed peak's richer ground.

@@ -103,7 +103,7 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
   const { g, pasture } = perchGame();
   // A Market of P1's beside the Pasture counts it as an adjacent production building.
   const market = neighbors(pasture).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-  g.buildings[market] = { type: 'market', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[market] = { type: 'market', owner: 0, upgrades: [], floors: 0 };
   const gold = () => production(g, 0).gold.base;
   const points = score(g, 0).buildings;
   const goldBefore = gold();
@@ -128,7 +128,7 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
 test('a suppressed roost houses no dragons, and too many dragons only stops hatching (#352)', () => {
   const { g, pasture } = perchGame();
   const roost = neighbors(g.towers[0]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-  g.buildings[roost] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[roost] = { type: 'roost', owner: 0, upgrades: [], floors: 0 };
   const room = dragonCapacity(g, 0);
   for (let i = 0; i < room; i++) addDragon(g, 0, 1);
   // Nothing is built beside the Pasture through it while it's suppressed.

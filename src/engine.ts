@@ -17,7 +17,7 @@ export interface Card {
 export interface Building {
   type: string; // 'tower' or a BUILDINGS key
   owner: number;
-  upgrade: string | null;
+  upgrades: string[]; // keys into UPGRADES, in the order added; a building takes any number
   floors: number; // tower only
 }
 
@@ -363,7 +363,7 @@ function towerHouses(floors: number): number {
 export function dragonCapacity(g: Game, p: number): number {
   let cap = towerHouses(g.buildings[g.towers[p]]?.floors ?? 0);
   for (const { def, n } of placed(g, p)) cap += (def.dragonCapacity ?? 0) * n;
-  for (const [, b] of ownedBuildings(g, p)) if (b.upgrade) cap += UPGRADES[b.upgrade].dragonCapacity ?? 0;
+  for (const [, b] of ownedBuildings(g, p)) for (const u of b.upgrades) cap += UPGRADES[u].dragonCapacity ?? 0;
   return cap;
 }
 
@@ -388,11 +388,11 @@ export function madeResource(def: BuildingDef): Resource | null {
 }
 
 // Points a building at hex k is worth: a flat number, never multiplied by
-// what's adjacent, plus its upgrade's. Production buildings, point cards
+// what's adjacent, plus its upgrades'. Production buildings, point cards
 // (monuments) and a Workshop are worth points; the tower and its floors are not.
-export function buildingPoints(g: Game, k: string, upgrade: string | null = g.buildings[k].upgrade): number {
+export function buildingPoints(g: Game, k: string, upgrades: string[] = g.buildings[k].upgrades): number {
   const b = g.buildings[k];
-  const up = upgrade ? UPGRADES[upgrade]?.points ?? 0 : 0;
+  const up = upgrades.reduce((n, u) => n + (UPGRADES[u]?.points ?? 0), 0);
   if (b.type === 'tower') return up;
   return (BUILDINGS[b.type].points ?? 0) + up;
 }
@@ -404,8 +404,8 @@ export function onPeak(g: Game, k: string): boolean {
 
 // What one building does each round, wherever it stands: what it makes (a
 // fixed amount plus dice, per resource, only those it makes), how many dragons
-// it houses, and its points. Given an upgrade, as it would be with that one
-// instead (what placing an upgrade card shows before you confirm). It ignores
+// it houses, and its points. Given a list of upgrades, as it would be with
+// those instead (what placing an upgrade card shows before you confirm). It ignores
 // a beast or a perched dragon on it: that stops the making and the points,
 // not the building.
 export interface BuildingYield {
@@ -414,9 +414,10 @@ export interface BuildingYield {
   points: number;
 }
 
-export function buildingYield(g: Game, k: string, upgrade: string | null = g.buildings[k].upgrade): BuildingYield {
+export function buildingYield(g: Game, k: string, upgrades: string[] = g.buildings[k].upgrades): BuildingYield {
   const b = g.buildings[k];
-  const up = upgrade ? UPGRADES[upgrade] : null;
+  const ups = upgrades.map((u) => UPGRADES[u]);
+  const upHouses = ups.reduce((n, u) => n + (u.dragonCapacity ?? 0), 0);
   const makes: BuildingYield['makes'] = {};
   const add = (r: Resource, base: number, die?: number) => {
     if (!base && !die) return;
@@ -426,16 +427,17 @@ export function buildingYield(g: Game, k: string, upgrade: string | null = g.bui
   };
   if (b.type === 'tower') {
     for (const r of RESOURCES) add(r, TUNING.towerProduction[r] ?? 0);
-    return { makes, houses: towerHouses(b.floors) + (up?.dragonCapacity ?? 0), points: 0 };
+    return { makes, houses: towerHouses(b.floors) + upHouses, points: 0 };
   }
   const def = BUILDINGS[b.type];
   const n = times(g, k, def);
   if (def.produces) add(def.produces.resource, def.produces.base, def.produces.die);
   for (const r of RESOURCES) add(r, (def.makes?.[r] ?? 0) * n);
   const made = madeResource(def);
-  if (made && up?.baseBonus) add(made, up.baseBonus);
+  // The first of an upgrade on a building adds its baseBonus; each after it, its stackBonus.
+  if (made) upgrades.forEach((u, i) => { const d = UPGRADES[u]; add(made, (upgrades.indexOf(u) === i ? d.baseBonus : d.stackBonus ?? d.baseBonus) ?? 0); });
   if (made && onPeak(g, k)) add(made, TUNING.peakBonus);
-  return { makes, houses: (def.dragonCapacity ?? 0) * n + (up?.dragonCapacity ?? 0), points: buildingPoints(g, k, upgrade) };
+  return { makes, houses: (def.dragonCapacity ?? 0) * n + upHouses, points: buildingPoints(g, k, upgrades) };
 }
 
 // Public production: fixed amount plus a list of dice, per resource.
@@ -545,7 +547,7 @@ export function newGame(players: number, seed: number): Game {
   for (let p = 0; p < players; p++) {
     const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
     g.players.push({ resources, hand: [], choice: [] });
-    g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrade: null, floors: 0 };
+    g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrades: [], floors: 0 };
     g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0 });
   }
   log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins.`, { k: 'begin', players });
@@ -1261,14 +1263,14 @@ function placeBuilding(g: Game, p: number, type: string, k: string, project = fa
     g.buildings[k].floors++;
     log(g, `${pname(p)} adds a floor to their tower (now ${g.buildings[k].floors})${project ? ' as a special project' : ''}.`, { k: 'floor', p, floors: g.buildings[k].floors, ...(project ? { project } : {}) });
   } else {
-    g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+    g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
     log(g, `${pname(p)} builds a ${def.name} at ${k}${project ? ' as a special project' : ''}.`, { k: 'build', p, b: type, name: def.name, hex: k, ...(project ? { project } : {}) });
   }
 }
 
 export function upgradeTargets(g: Game, p: number, up: string): string[] {
   return ownedBuildings(g, p)
-    .filter(([, b]) => !b.upgrade && buildingClass(b).some((c) => UPGRADES[up].appliesTo.includes(c)))
+    .filter(([, b]) => buildingClass(b).some((c) => UPGRADES[up].appliesTo.includes(c)))
     .map(([k]) => k)
     .sort();
 }
@@ -1283,7 +1285,7 @@ function upgradeCheck(g: Game, p: number, up: string, typed: string | undefined)
 }
 
 function placeUpgrade(g: Game, p: number, up: string, k: string, project = false) {
-  g.buildings[k].upgrade = up;
+  g.buildings[k].upgrades.push(up);
   const b = g.buildings[k];
   const name = UPGRADES[up].name;
   log(g, `${pname(p)} adds ${name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}${project ? ' as a special project' : ''}.`, { k: 'upgrade', p, u: up, name, on: b.type, hex: k, ...(project ? { project } : {}) });

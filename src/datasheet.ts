@@ -73,7 +73,7 @@ function production(): string {
     const p = b.produces!;
     return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
-  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost(workshop.cost))}.` : ''}` : '';
+  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round${workshop.stackBonus !== undefined ? `, and each more ${workshop.name} on the same building ${workshop.stackBonus} more` : ''}.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost(workshop.cost))}.` : ''}` : '';
   return `## Basic production buildings
 
 Anyone may build these, no card needed.

@@ -166,7 +166,7 @@ function arm(g: Game, p: number, stages: number[]) {
   while (dragonCapacity(g, p) < stages.length) {
     const k = buildableHexes(g, p, 'roost').sort()[0];
     if (!k) throw new Error(`arm: no room for a roost for P${p + 1}`);
-    g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+    g.buildings[k] = { type: 'roost', owner: p, upgrades: [], floors: 0 };
   }
   const keys = Object.keys(DRAGONS);
   stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0 }));
@@ -182,7 +182,7 @@ function producers(g: Game, p: number, n: number) {
     if (i >= keys.length * n) throw new Error(`producers: no room for P${p + 1}'s`);
     const k = buildableHexes(g, p, keys[i % keys.length])[0];
     if (!k) continue;
-    g.buildings[k] = { type: keys[i % keys.length], owner: p, upgrade: null, floors: 0 };
+    g.buildings[k] = { type: keys[i % keys.length], owner: p, upgrades: [], floors: 0 };
     placed++;
   }
 }
@@ -248,7 +248,7 @@ function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)
     if (i > 50) throw new Error('buildingsAtLeast: no room');
     const p = seats[i % seats.length];
     const k = buildableHexes(g, p, 'roost').sort()[0];
-    if (k) g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+    if (k) g.buildings[k] = { type: 'roost', owner: p, upgrades: [], floors: 0 };
   }
 }
 
@@ -260,7 +260,7 @@ function pointsToWin(g: Game, p: number) {
   for (let i = 0; score(g, p).public < TUNING.pointsToWin; i++) {
     const at = worth.flatMap((type) => buildableHexes(g, p, type).sort().slice(0, 1).map((k) => ({ type, k })))[0];
     if (i > 50) throw new Error('pointsToWin: no room');
-    if (at) g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
+    if (at) g.buildings[at.k] = { type: at.type, owner: p, upgrades: [], floors: 0 };
     else g.raidPoints[p] += TUNING.pointsToWin - score(g, p).public;
   }
 }
@@ -282,7 +282,7 @@ const card = (id: string) => `[data-card="${id}"]`;
 function blockedReasons(g: Game, p: number) {
   const seen = new Map<string, { id: string; key: string }>();
   for (const c of seatState(g, p).hand) {
-    const reason = c.blocked?.replace(/No empty [\w ]+ is adjacent/, 'No empty hex is adjacent').replace(/no [\w ,]+ without an upgrade/, 'no building without an upgrade');
+    const reason = c.blocked?.replace(/No empty [\w ]+ is adjacent/, 'No empty hex is adjacent');
     if (reason && !seen.has(reason)) seen.set(reason, { id: c.id, key: c.key });
   }
   return [...seen.values()];
@@ -372,6 +372,7 @@ export const SCENES: Scene[] = [
   {
     // #350: a Workshop as a special project. The acting player has a quarry
     // and can afford double the card, so Upgrade opens the choice of building.
+    // The quarry already has 2 Workshops, so a third adds 1 (#400).
     name: 'workshop-project-3p',
     players: 3,
     seed: 1,
@@ -381,11 +382,12 @@ export const SCENES: Scene[] = [
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 12));
       const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
       g.map[k].terrain = 'mountain';
-      g.buildings[k] = { type: 'quarry', owner: p, upgrade: null, floors: 0 };
+      g.buildings[k] = { type: 'quarry', owner: p, upgrades: ['workshop', 'workshop'], floors: 0 };
     },
     shots: (g) => [
+      { file: 'tv-workshops-3p', caption: 'TV: a quarry with 2 Workshops, a mark for each', client: 'tv', waitMs: 4800 },
       { file: 'phone-workshop-project-3p', caption: 'Phone: special projects, with the Workshop affordable', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
-      { file: 'phone-workshop-project-pick-3p', caption: "Phone: the Workshop project's Upgrade tapped and a building picked, before confirming", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-upproject=workshop]', '[data-hex]'] },
+      { file: 'phone-workshop-project-pick-3p', caption: "Phone: the Workshop project's Upgrade tapped and a building picked, before confirming", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-upproject=workshop]', `[data-hex="${Object.keys(g!.buildings).find((k) => g!.buildings[k].type === 'quarry' && g!.buildings[k].owner === g!.turn)}"]`] },
     ],
   },
   {
@@ -433,7 +435,7 @@ export const SCENES: Scene[] = [
       const owner = g.turn;
       const ks = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => dist(a, g.towers[owner]) - dist(b, g.towers[owner]) || a.localeCompare(b));
       g.players[owner].resources.timber = Math.max(g.players[owner].resources.timber, 6);
-      ['timber_port', 'stone_port', 'crystal_port', 'livestock_port'].forEach((type, i) => ks[i] && (g.buildings[ks[i]] = { type, owner, upgrade: null, floors: 0 }));
+      ['timber_port', 'stone_port', 'crystal_port', 'livestock_port'].forEach((type, i) => ks[i] && (g.buildings[ks[i]] = { type, owner, upgrades: [], floors: 0 }));
     },
     shots: (g) => {
       return [
@@ -460,7 +462,7 @@ export const SCENES: Scene[] = [
       for (const p of [0, 1]) {
         for (const [type, terrain] of want) {
           const k = near(p, (k) => (terrain ? g.map[k].terrain === terrain : !['ocean', 'harbor'].includes(g.map[k].terrain)));
-          if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+          if (k) g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
         }
         Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 9));
       }
@@ -493,7 +495,7 @@ export const SCENES: Scene[] = [
       ];
       for (const p of [0, 1]) for (const [type, ok] of want[p]) {
         const k = near(p, ok);
-        if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+        if (k) g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
       }
       giveHand(g, g.turn, PRODUCTION_CARDS);
     },
@@ -521,18 +523,20 @@ export const SCENES: Scene[] = [
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
         [['crystal_port', (k) => g.map[k].terrain === 'harbor', null], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        // (the quarry gets a second Workshop below: they stack, #400)
         [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, null], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
         const k = near(p, ok);
-        if (k) g.buildings[k] = { type, owner: p, upgrade, floors: 0 };
+        if (k) g.buildings[k] = { type, owner: p, upgrades: upgrade ? [upgrade] : [], floors: 0 };
       }
       g.buildings[g.towers[0]].floors = 2;
-      g.buildings[g.towers[1]].upgrade = 'nesting_grounds';
+      for (const b of Object.values(g.buildings)) if (b.type === 'quarry' && b.owner === 0) b.upgrades.push('workshop');
+      g.buildings[g.towers[1]].upgrades = ['nesting_grounds'];
       giveHand(g, g.turn, CIVIC_CARDS);
     },
     shots: (g) => [
-      { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
+      { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building (2 Workshops on one quarry)', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
@@ -928,7 +932,7 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       for (const type of ['quarry', 'lumber_camp', 'crystal_mine', 'pasture']) {
         const free = Object.keys(g.map).sort().filter((k) => g.map[k].terrain === BUILDINGS[type].terrain && !g.buildings[k] && !g.map[k].fauna && !nearBeast(g.map, k));
-        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrade: null, floors: 0 };
+        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrades: [], floors: 0 };
       }
       toDiscard(g, [1]);
     },
@@ -1105,7 +1109,7 @@ export const SCENES: Scene[] = [
       g.dragons.filter((d) => d.owner === t)[1].damage = 3;
       if (!upgradeTargets(g, t, 'workshop').length) {
         const [type, k] = ['pasture', 'quarry', 'lumber_camp', 'crystal_mine'].map((b) => [b, buildableHexes(g, t, b).sort()[0]]).find(([, k]) => k)!;
-        g.buildings[k] = { type, owner: t, upgrade: null, floors: 0 };
+        g.buildings[k] = { type, owner: t, upgrades: [], floors: 0 };
       }
       giveHand(g, t, PLAYABLE);
       for (const r of Object.keys(g.players[t].resources)) g.players[t].resources[r as 'gold'] = 20;
@@ -1144,9 +1148,9 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       const t = g.turn;
       for (const [k, b] of Object.entries(g.buildings)) {
-        if (b.owner !== t || b.upgrade) continue;
+        if (b.owner !== t || b.upgrades.length) continue;
         const u = Object.keys(UPGRADES).find((u) => upgradeTargets(g, t, u).includes(k));
-        if (u) b.upgrade = u;
+        if (u) b.upgrades = [u];
       }
       arm(g, t, []);
       arm(g, t, Array(dragonCapacity(g, t)).fill(3));
@@ -1478,7 +1482,7 @@ export const SCENES: Scene[] = [
       const harbor = Object.keys(g.map).sort().find((x) => g.map[x].terrain === 'harbor' && !g.buildings[x] && !g.map[x].fauna && neighbors(x).some((n) => waters.includes(n)))!;
       // No other beast near it, so the Leviathan's hold is all that greys it.
       for (const n of [harbor, ...neighbors(harbor), ...neighbors(harbor).flatMap(neighbors)]) if (g.map[n]?.fauna && !BEASTS[g.map[n].fauna!]) delete g.map[n].fauna;
-      g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrade: null, floors: 0 };
+      g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrades: [], floors: 0 };
       g.players[g.turn].resources.timber = Math.max(g.players[g.turn].resources.timber, 6);
       // It has just surfaced beside the port, as in production, and the feed says so.
       const to = neighbors(harbor).find((x) => waters.includes(x))!;
@@ -1512,7 +1516,7 @@ export const SCENES: Scene[] = [
       huntPeak(g);
       const ring = neighbors(PEAK).find((k) => !g.buildings[k])!;
       g.map[ring].terrain = 'meadow';
-      g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
+      g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrades: [], floors: 0 };
     },
     shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
   },
@@ -1529,7 +1533,7 @@ export const SCENES: Scene[] = [
       huntPeak(g);
       const ring = neighbors(PEAK).filter((k) => !g.buildings[k]);
       g.map[ring[0]].terrain = 'meadow';
-      g.buildings[ring[0]] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
+      g.buildings[ring[0]] = { type: 'pasture', owner: g.turn, upgrades: [], floors: 0 };
       g.map[ring[1]].terrain = 'meadow';
       giveHand(g, g.turn, ['hatchery']);
       for (const r of Object.keys(g.players[g.turn].resources)) g.players[g.turn].resources[r as 'gold'] = 20;
@@ -1851,7 +1855,7 @@ function besideTower(g: Game, q: number, type: 'pasture' | 'lumber_camp'): strin
   const k = neighbors(g.towers[q]).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x))!;
   delete g.map[k].fauna;
   g.map[k].terrain = type === 'pasture' ? 'meadow' : 'forest';
-  g.buildings[k] = { type, owner: q, upgrade: null, floors: 0 };
+  g.buildings[k] = { type, owner: q, upgrades: [], floors: 0 };
   return k;
 }
 
@@ -1876,7 +1880,7 @@ function perchers(g: Game) {
 function roostBeside(g: Game, q: number): string {
   const k = [g.towers[q], ...neighbors(g.towers[q])].flatMap((t) => neighbors(t)).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x) && neighbors(x).some((n) => g.buildings[n]?.owner === q))!;
   delete g.map[k].fauna;
-  g.buildings[k] = { type: 'roost', owner: q, upgrade: null, floors: 0 };
+  g.buildings[k] = { type: 'roost', owner: q, upgrades: [], floors: 0 };
   return k;
 }
 
