@@ -151,7 +151,17 @@ Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round. Also added withou
 
 ## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes), 5p radius 6 (127 land hexes), 6p radius 6 (127 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+
+Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+| Players | Towers | From the centre | Land within 3 steps | Land nearest each tower |
+|---|---|---|---|---|
+| 2 | 3,0 -3,0 | 3 | 23 | 31 |
+| 3 | 3,0 0,-3 -3,3 | 3 | 23 | 20 |
+| 4 | 4,0 4,-4 -4,0 -4,4 | 4 | 23 | 23 |
+| 5 | 4,-1 3,-4 -2,-2 -4,2 -1,4 | 4 | 33 | 24–28 |
+| 6 | 5,0 5,-5 0,-5 -5,0 -5,5 0,5 | 5 | 23 | 21 |
 
 | Terrain | For | Share of land |
 |---|---|---|

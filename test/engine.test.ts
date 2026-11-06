@@ -751,6 +751,27 @@ test('combat power: dragons and kingdoms carry one number, and a side adds up', 
 // The map as generated, before the first production lets fauna wander.
 const startingMap = (players: number, seed: number) => ({ map: generateMap({ state: seed }, players), towers: towerSpots(players) });
 
+test('every seat starts with as much land as the others', () => {
+  for (let players = 2; players <= 6; players++) {
+    const R = mapRadius(players);
+    const towers = towerSpots(players).map((k) => parseKey(k)!);
+    const land: [number, number][] = [];
+    for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (distance(q, r) <= R) land.push([q, r]);
+    const within3 = towers.map(([a, b]) => land.filter(([q, r]) => distance(q - a, r - b) <= 3).length);
+    assert.equal(new Set(within3).size, 1, `${players}p: land within 3 steps ${within3}`);
+    assert.equal(new Set(towers.map(([q, r]) => distance(q, r))).size, 1, `${players}p: towers at different distances from the centre`);
+    // Land nearest each tower, ties split: within a fifth of each other.
+    const near = towers.map(() => 0);
+    for (const [q, r] of land) {
+      const d = towers.map(([a, b]) => distance(q - a, r - b));
+      const m = Math.min(...d);
+      const ties = d.filter((x) => x === m).length;
+      d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
+    }
+    assert.ok(Math.max(...near) <= 1.2 * Math.min(...near), `${players}p: land nearest each tower ${near.map((x) => x.toFixed(1))}`);
+  }
+});
+
 test('the starting map has fauna, at least 2 steps from every tower, stronger further out', () => {
   for (let players = 2; players <= 6; players++) {
     const g = startingMap(players, 3);
