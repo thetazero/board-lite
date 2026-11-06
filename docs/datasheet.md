@@ -147,7 +147,7 @@ Anyone may build these, no card needed.
 | Crystal Mine | crystal field | 4 stone, 4 timber, 3 livestock | d4 crystal (avg 2.5) |
 | Pasture | meadow | 3 stone, 4 timber, 4 crystal | d4 livestock (avg 2.5) |
 
-Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round.
+Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round. Also added without the card, as a special project, for 8 stone, 8 timber, 4 crystal.
 
 ## Land
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
 import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
-import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
 import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, towerSpots } from '../src/map.ts';
@@ -1075,4 +1075,37 @@ test('a building card shows what it makes now and with the upgrade', () => {
   const tower = publicState(g, 10).map.find((h) => h.k === g.towers[0])!.building!.does;
   assert.equal(tower.houses, TUNING.towerDragonCapacity);
   assert.deepEqual(production(g, 0).stone, { base: (TUNING.towerProduction.stone ?? 0), dice: [4] });
+});
+
+// #350: a Workshop without the card, as a special project, for double the card.
+test('a Workshop is also a special project, at double the card, and works like the card', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
+  g.buildings[k] = { type: 'quarry', owner: p, upgrade: null, floors: 0 };
+  const card = { timber: 4, stone: 4, crystal: 2 };
+  g.players[p].resources = { stone: 8, timber: 8, crystal: 3, livestock: 0, gold: 0 };
+  // Short of the double cost: the phone says so, and the command is refused.
+  let u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.deepEqual(u.hexes, [k]);
+  assert.match(u.why!, /^You can't afford .*crystal.*\.$/);
+  assert.throws(() => apply(g, p, `project workshop ${k}`), RuleError);
+  g.players[p].resources.crystal = 4;
+  u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.equal(u.why, null);
+  assert.deepEqual(u.after[k].makes, { stone: { base: 2, dice: [4] } });
+  assert.match(playerView(g, p), /project workshop <hex>/);
+  // Not on a building it can't go on (the tower), nor twice on one building.
+  assert.throws(() => apply(g, p, `project workshop ${g.towers[p]}`), /Workshop can go on/);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(g.players[p].resources, { stone: 8 - 2 * card.stone, timber: 8 - 2 * card.timber, crystal: 4 - 2 * card.crystal, livestock: 0, gold: 0 });
+  assert.equal(g.buildings[k].upgrade, 'workshop');
+  assert.equal(buildingPoints(g, k), 1 + (UPGRADES.workshop.points ?? 0));
+  assert.match(g.log.at(-1)!.text, /adds Workshop to their Quarry at .* as a special project\./);
+  assert.deepEqual(seatState(g, p).upgradeProjects[0].hexes, []);
+  assert.match(seatState(g, p).upgradeProjects[0].why!, /without an upgrade/);
+  // Only base upgrades are special projects.
+  rich(g, p);
+  assert.throws(() => apply(g, p, `project nesting_grounds ${g.towers[p]}`), /special project is a base dragon egg/);
 });

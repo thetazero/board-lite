@@ -10,7 +10,7 @@ import {
   ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
-import { besideText, bundleText } from './engine.ts';
+import { besideText, bundleText, specialProjectCost } from './engine.ts';
 import { mapRadius } from './map.ts';
 
 
@@ -73,7 +73,7 @@ function production(): string {
     const p = b.produces!;
     return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
-  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.` : '';
+  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost(workshop.cost))}.` : ''}` : '';
   return `## Basic production buildings
 
 Anyone may build these, no card needed.

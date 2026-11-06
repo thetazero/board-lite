@@ -153,6 +153,9 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
     if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it makes nothing while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
+    for (const u of you.upgradeProjects) {
+      if (u.hexes.length) out.push(`project ${u.key} <hex>   (${u.name}, no card needed: ${u.text} Costs ${resText(u.cost)}; on: ${u.hexes.join(' ')})${afford(u)}`);
+    }
     out.push(`merchants <give resource> <get resource> [times]   (stone, timber, crystal or livestock, not gold; your rates: ${rateText(you.bankRates)})`);
     out.push(`offer <player|anyone> give <items> get <items>   (items: "2 stone", card ids like "c12"; to anyone: the first to accept trades)`);
     for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);

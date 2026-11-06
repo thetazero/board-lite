@@ -159,7 +159,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     const basics = b.buildings.filter((x) => x.basic).map(one).join('');
     const classes = [...new Set(b.buildings.filter((x) => !x.basic).map((x) => x.cls))];
     const cards = classes.map((c) => `${head(CLASS_HEAD[c] ?? c)}${b.buildings.filter((x) => !x.basic && x.cls === c).map(one).join('')}`).join('');
-    const ups = b.upgrades.map((u) => entry(pic(`upgrade ${u.key}`, u.name), u.name, `${text(`${u.text} On the board: a golden rim, and a mark beside the building.`)}${cost(u.cost)}`, `upgrade ${u.key}`)).join('');
+    const ups = b.upgrades.map((u) => entry(pic(`upgrade ${u.key}`, u.name), u.name, `${text(`${u.text} On the board: a golden rim, and a mark beside the building.${u.base ? ' Also added as a special project, for double the cost.' : ''}`)}${cost(u.cost)}`, `upgrade ${u.key}`)).join('');
     return `${tower}${head('Basic buildings', 'Built without a card.')}${basics}${cards}${head('Upgrades', 'Each building takes 1 upgrade.')}${ups}`;
   },
   beasts(b) {

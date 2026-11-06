@@ -363,6 +363,25 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // #350: a Workshop as a special project. The acting player has a quarry
+    // and can afford double the card, so Upgrade opens the choice of building.
+    name: 'workshop-project-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      const p = g.turn;
+      Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 12));
+      const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
+      g.map[k].terrain = 'mountain';
+      g.buildings[k] = { type: 'quarry', owner: p, upgrade: null, floors: 0 };
+    },
+    shots: (g) => [
+      { file: 'phone-workshop-project-3p', caption: 'Phone: special projects, with the Workshop affordable', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
+      { file: 'phone-workshop-project-pick-3p', caption: "Phone: the Workshop project's Upgrade tapped and a building picked, before confirming", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-upproject=workshop]', '[data-hex]'] },
+    ],
+  },
+  {
     // The egg can be afforded, so Hatch opens the choice of its element.
     name: 'egg-3p',
     players: 3,
