@@ -11,7 +11,7 @@ import {
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText, specialProjectCost } from './engine.ts';
-import { mapRadius } from './map.ts';
+import { distance, mapRadius, parseKey, towerSpots } from './map.ts';
 
 
 // ---------- plain numbers ----------
@@ -101,12 +101,36 @@ function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
   const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
-  const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
+  const counts = [2, 3, 4, 5, 6];
+  const size = counts.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
 The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
 
+Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+${table(['Players', 'Towers', 'From the centre', 'Land within 3 steps', 'Land nearest each tower'], counts.map(towerRow))}
+
 ${table(['Terrain', 'For', 'Share of land'], rows)}`;
+}
+
+// Each seat's land at the start: within 3 steps of its tower, and nearest its
+// tower (a hex as near two towers counts half to each).
+function towerRow(p: number): string[] {
+  const R = mapRadius(p);
+  const towers = towerSpots(p).map((k) => parseKey(k)!);
+  const land: [number, number][] = [];
+  for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (distance(q, r) <= R) land.push([q, r]);
+  const near = towers.map(() => 0);
+  for (const [q, r] of land) {
+    const d = towers.map(([a, b]) => distance(q - a, r - b));
+    const m = Math.min(...d);
+    const ties = d.filter((x) => x === m).length;
+    d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
+  }
+  const span = (xs: number[]) => { const lo = Math.min(...xs), hi = Math.max(...xs); return lo === hi ? `${lo}` : `${lo}–${hi}`; };
+  const within3 = towers.map(([a, b]) => land.filter(([q, r]) => distance(q - a, r - b) <= 3).length);
+  return [`${p}`, towerSpots(p).join(' '), span(towers.map(([q, r]) => distance(q, r))), span(within3), span(near.map((x) => Math.round(x)))];
 }
 
 function growth(gt: number, perRound: number, stage: number) {

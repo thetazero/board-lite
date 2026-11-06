@@ -342,6 +342,13 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'early-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    shots: () => [{ file: 'tv-early-5p', caption: 'TV, early game (5 players, round 2): where the five towers stand', client: 'tv' }],
+  },
+  {
     name: 'early-3p',
     players: 3,
     seed: 1,

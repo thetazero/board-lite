@@ -33,10 +33,16 @@ export function mapRadius(players: number): number {
   return players <= 3 ? 4 : players === 4 ? 5 : 6;
 }
 
-// Tower spots: corners of the ring one in from the edge, spread by player count.
-const CORNERS: Record<number, number[]> = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
+// Tower spots, fixed by player count, so each seat has as much land around it
+// as the others. With 2, 3, 4 or 6 players: corners of the ring one in from
+// the coast. Five can't share six corners fairly (#376: the two seats beside
+// the empty one got half as much land again), so they spread evenly around the
+// ring 4 from the centre, each with the same land within 3 steps.
+const CORNERS: Record<number, number[]> = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
+const FIVE = ['4,-1', '3,-4', '-2,-2', '-4,2', '-1,4'];
 
 export function towerSpots(players: number): string[] {
+  if (players === 5) return FIVE;
   const d = mapRadius(players) - 1;
   return CORNERS[players].map((i) => key(DIRECTIONS[i][0] * d, DIRECTIONS[i][1] * d));
 }
