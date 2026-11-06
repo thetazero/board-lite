@@ -1092,24 +1092,20 @@ function doesLines(d: Does): string[] {
   if (d.points) out.push(`Worth ${d.points} point${d.points > 1 ? 's' : ''}.`);
   return out.length ? out : ['Makes nothing.'];
 }
-// The same, for a building and an upgrade on it: each number the upgrade
-// changes reads before → after ("Makes 5 → 7 stone each round. Worth 1 → 2
-// points."), so the player sees the change, not two descriptions to compare.
-// A change is marked (CHANGED … END) to keep it on one line, with what it counts
-// and the punctuation after it; hexDetail turns the marks into markup.
-const CHANGED = '\ue000', END = '\ue001';
-function changeLines(a: Does, b: Does): string[] {
-  const to = (x: string | number, y: string | number, what: string) => (x === y ? `${x} ${what}` : `${CHANGED}${x} → ${y} ${what}${END}`);
+// What an upgrade changes on a building, one short item per number, before →
+// after, with the icon for what it counts: "5 → 7 stone", "1 → 2 points",
+// "Houses 1 → 3 dragons". Only what changes; the card under the map says why.
+function changeParts(a: Does, b: Does): string[] {
   const out: string[] = [];
   const none = { base: 0, dice: [] as number[] };
-  const res = RESOURCES.filter((r) => a.makes[r] || b.makes[r]);
   const amount = (r: string, m?: { base: number; dice: number[] }) => amountText(r, m ?? none).replace(` ${r}`, '') || '0';
-  const made = res.map((r, i) => to(amount(r, a.makes[r]), amount(r, b.makes[r]), r + (i < res.length - 1 ? ',' : '')));
-  if (made.length) out.push(`Makes ${made.join(' ')} each round.`);
-  if (a.houses || b.houses) out.push(`Houses ${to(a.houses, b.houses, `dragon${b.houses === 1 ? '' : 's'}.`)}`);
-  if (b.note) out.push(b.note);
-  if (a.points || b.points) out.push(`Worth ${to(a.points, b.points, `point${b.points === 1 ? '' : 's'}.`)}`);
-  return out.length ? out : ['Makes nothing.'];
+  for (const r of RESOURCES) {
+    const [x, y] = [amount(r, a.makes[r]), amount(r, b.makes[r])];
+    if (x !== y) out.push(`${x} → ${y} ${r}`);
+  }
+  if (a.houses !== b.houses) out.push(`Houses ${a.houses} → ${b.houses} dragon${b.houses === 1 ? '' : 's'}`);
+  if (a.points !== b.points) out.push(`${a.points} → ${b.points} point${b.points === 1 ? '' : 's'}`);
+  return out;
 }
 const said = (lines: string[]) => iconText(esc(lines.join(' ')));
 // The hex picked for a beast or an upgrade: whose building it is and what it
@@ -1118,12 +1114,18 @@ function hexDetail(g: PublicState, me: SeatState, k: string, after?: Does): stri
   const h = g.map.find((x) => x.k === k)!;
   const b = h.building;
   if (!b) return '<p class="pchead"><b>An empty hex</b></p><p>Nothing is built here.</p>';
-  const whose = b.owner === me.seat ? 'Your' : `${playerTag(b.owner, names)}'s`;
+  const whose = b.owner === me.seat ? 'Your ' : `${playerTag(b.owner, names)}'s `;
   const stopped = h.fauna ? `<p class="hint">Suppressed, as if it weren't there, while the ${esc(h.fauna.name)} holds it.</p>`
     : h.perched.length ? `<p class="hint">Suppressed, as if it weren't there, while a dragon perches on it.</p>` : '';
-  const head = `<p class="pchead">${whose} <b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}</p>`;
-  const does = after ? changeLines(b.does, after) : doesLines(b.does);
-  return `${head}<p>${said(does).replaceAll(CHANGED, '<span class="nobr">').replaceAll(END, '</span>').replaceAll('→', '<span class="pcto">→</span>')}</p>${stopped}`;
+  const name = `<b>${esc(b.name)}</b>${b.upgradeName ? ` with a ${esc(b.upgradeName)}` : ''}`;
+  // An upgrade only goes on your own building, so its name alone says which,
+  // and what changes sits on the same line.
+  const parts = after ? changeParts(b.does, after) : [];
+  if (parts.length) {
+    const delta = parts.map((x) => `<span class="nobr">${iconText(esc(x)).replace('→', '<span class="pcto">→</span>')}</span>`).join('');
+    return `<p class="pchead pcdelta">${name}${delta}</p>${stopped}`;
+  }
+  return `<p class="pchead">${whose}${name}</p><p>${said(doesLines(b.does))}</p>${stopped}`;
 }
 
 // The hex picked for a building before it's built: what it would do there,

@@ -1178,6 +1178,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .pchosen p { margin: .1em 0; line-height: 1.35; }
 .pchosen .pchead { font-size: 1.05em; }
 .pchosen .pcto { color: var(--accent); font-weight: 700; } /* an upgrade's before → after */
+.pchosen .pcdelta > .nobr { margin-left: 1em; } /* the name, then each change, spaced on one line */
 /* a name on the last-round banner, darkened to read on its yellow */
 :is(.topbar .goal.last, .lastround) .ptag { color: color-mix(in oklab, var(--pc) 50%, #1a1218); }
 
