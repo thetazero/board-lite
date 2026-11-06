@@ -183,7 +183,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 ## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power standing (see Raids).
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
@@ -256,7 +256,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Points |
 |---|---|---|---|---|---|---|

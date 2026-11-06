@@ -82,11 +82,11 @@ export interface TargetView {
   units: UnitView[];
   loot: Res;
   power: number; // the defenders' combat power, summed
-  points?: number; // what it scores, when it falls, for the most power still fighting
+  points?: number; // what it scores, when it falls, for the most power standing
 }
 
 export interface RaidView {
-  step: 'vote' | 'commit' | 'bail';
+  step: 'vote' | 'commit' | 'choose';
   candidates: TargetView[];
   votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   voters: boolean[]; // who votes: only players with a raid-ready dragon
@@ -94,7 +94,7 @@ export interface RaidView {
   target: TargetView | null; // units carry current health once the fight starts
   commits: string[][];
   ready: boolean[];
-  decided: boolean[]; // fight-or-bail chosen (not what)
+  decided: boolean[]; // fight or hold back chosen (not what)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
 }
@@ -195,7 +195,7 @@ export interface SeatState {
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
-  myChoice: 'fight' | 'bail' | null;
+  myChoice: 'fight' | 'hold' | null;
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }

@@ -54,14 +54,14 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
 .pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
-.fhead, .fightscene .outcome, .fled, .fig-name, .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
+.fhead, .fightscene .outcome, .heldback, .fig-name, .talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
 }
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .fhead, .fightscene .outcome, .fled, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .fhead, .fightscene .outcome, .heldback, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) :is(.ptag, .pname) { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
 /* Icons drawn for the night table get a thin ink outline on paper (livestock is cream). */
-:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .mylog, .fhead, .fightscene .outcome, .fled, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
+:is(.pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .mylog, .fhead, .fightscene .outcome, .heldback, .talkbar, .mehead, .ally, .pover .standings, button:not(.primary)) .ricon { filter: drop-shadow(0 0 .5px #2b2228) drop-shadow(0 0 .5px #2b2228); }
 .panel, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv, .ally, .sent, .pmap, .pover .standings { background: var(--sheet); box-shadow: var(--lift); border-radius: 2px; }
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
@@ -505,13 +505,13 @@ body.recap-page { font-size: 16px; }
 .home { display: inline-flex; align-items: center; gap: .4em; font-size: 1.1em; }
 .home.none { font-style: italic; opacity: .55; font-size: .95em; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
-/* Fight or bail (tv.ts renderRaid): the raiders' rows line up in columns
+/* Fight or hold back (tv.ts renderRaid): the raiders' rows line up in columns
    (name, dragons, power, choice); a raider who has chosen shows a card face
    down in their colour, one still choosing an empty dashed place for it. */
-.arena.bail .raiders { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; gap: .5em 0; min-width: 0; }
-.arena.bail .raider { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: 1em; padding: .35em .9em .35em 1em; transition: transform .3s, box-shadow .3s; }
-.arena.bail .raider .rds { justify-content: flex-start; }
-.arena.bail .raider .power { font-size: 1.05em; white-space: nowrap; }
+.arena.deciding .raiders { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; gap: .5em 0; min-width: 0; }
+.arena.deciding .raider { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: 1em; padding: .35em .9em .35em 1em; transition: transform .3s, box-shadow .3s; }
+.arena.deciding .raider .rds { justify-content: flex-start; }
+.arena.deciding .raider .power { font-size: 1.05em; white-space: nowrap; }
 .choice { display: inline-flex; flex-direction: column; align-items: center; gap: .25em; font-size: .55em; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 6em; }
 .choice i { display: block; width: 3em; height: 4.2em; border-radius: .3em; border: .18em dashed color-mix(in oklab, var(--ink) 35%, transparent); animation: choosing 1.6s ease-in-out infinite; }
 .choice.done { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
@@ -622,9 +622,9 @@ body.recap-page { font-size: 16px; }
 .fig-crown .crown { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 .5em #f5c542); }
 .fig.king .fig-crown { opacity: 1; translate: -50% -110%; }
 .fig.king .fig-art { filter: drop-shadow(0 0 .6em color-mix(in oklab, var(--pc) 60%, #fff)); }
-/* Whoever bailed, flown home, in a corner. */
-.fledrow { position: absolute; left: 1.5vw; bottom: 1.5vh; display: flex; flex-direction: column; gap: .3em; }
-.fled { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; background: var(--sheet); color: var(--ink); border-radius: 2px; box-shadow: var(--lift); }
+/* Whoever held back, in a corner: out of the fight, still in for the loot. */
+.backrow { position: absolute; left: 1.5vw; bottom: 1.5vh; display: flex; flex-direction: column; gap: .3em; }
+.heldback { display: flex; align-items: center; gap: .5em; padding: .2em .8em; font-size: 1.2em; background: var(--sheet); color: var(--ink); border-radius: 2px; box-shadow: var(--lift); }
 .tag { display: inline-flex; vertical-align: middle; font-size: .6em; }
 
 /* The log, drawn: a row of icons per thing that happened */
@@ -1137,15 +1137,15 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .balance .bbar { grid-area: bar; }
 .remote .balance .bside { grid-area: us; align-items: flex-start; justify-self: start; text-align: left; }
 .remote .balance .bside.foe { grid-area: foe; align-items: flex-end; justify-self: end; text-align: right; }
-.remote .arena.bail .raiders { grid-template-columns: auto auto 1fr auto; }
-.remote .arena.bail .raider { column-gap: .5em; padding: .3em .5em; }
-.remote .arena.bail .raider .power { justify-self: end; }
+.remote .arena.deciding .raiders { grid-template-columns: auto auto 1fr auto; }
+.remote .arena.deciding .raider { column-gap: .5em; padding: .3em .5em; }
+.remote .arena.deciding .raider .power { justify-self: end; }
 .remote .choice { min-width: 4.5em; }
 .remote .fhead { top: 1vh; flex-wrap: wrap; gap: .4em; padding: 0 .5em; }
 .remote .fhead h2 { font-size: 1.2em; max-width: none; }
 .remote .fhead .bvs b { font-size: 1.4em; }
 .remote .battle { left: 2vw; right: 2vw; top: 36vh; bottom: 17vh; gap: 3vw; --k: clamp(.3em, min(calc(40vw / var(--sl)), calc(40vw / var(--sr)), calc(36vh / var(--mx))), 3em); }
-.remote .fledrow { bottom: 9vh; }
+.remote .backrow { bottom: 9vh; }
 /* A screen held upright: each side stands its figures one above another, in
    columns of up to four (tv.ts), the first column nearest the other side.
    Every column of a side has its rows (--rl, --rr) of the same height, so a
@@ -1175,7 +1175,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
 .remote .outcome .boon { font-size: 1em; }
 .remote .outcome .score { font-size: 1.1em; flex-wrap: wrap; }
-.remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
+.remote .heldback { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
 /* A dragon in the roost is a button: tap it for its card. */
 .dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
 .dtap:active:not(:disabled) { transform: translateY(.08em); box-shadow: none; }
