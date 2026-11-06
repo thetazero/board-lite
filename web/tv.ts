@@ -1,4 +1,6 @@
 // The TV: the shared board. Shows everything public, never anyone's hand.
+// Opening it on any room, in the lobby or mid-game, makes it that table's TV;
+// closing it, the table goes on with no TV (src/server/room.ts, Room.hasTv).
 // Lobby -> board, with overlays for production dice, the raid and the end.
 // With ?remote, it's the table view inside a phone of a game with no TV
 // (phone.ts): the flat map, laid out for a phone, and it tells the phone when
@@ -70,6 +72,16 @@ async function boot() {
     const room = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!room) code = '';
     isHost = !!room?.host;
+    // No TV watching this room (one made from a phone, or this TV's token is
+    // in another browser): this one becomes its TV, buttons and all.
+    if (room && !isHost) {
+      const r = await post(`/api/rooms/${code}/tv`, {}).catch(() => null);
+      if (r?.hostToken) {
+        hostToken = String(r.hostToken);
+        isHost = true;
+        localStorage.setItem(`tv:${code}`, hostToken);
+      }
+    }
   }
   if (!code) {
     const r = await post('/api/rooms', {});
@@ -81,7 +93,8 @@ async function boot() {
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
   // A room the server no longer has (forgotten after hours idle): open a new one.
-  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'));
+  // As a TV: while it watches, the table plays with a TV.
+  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), true);
 }
 
 function onSnapshot(s: Snapshot) {
@@ -1019,4 +1032,28 @@ function toast(e: unknown) {
   setTimeout(() => fadeAway(t), 3500);
 }
 
+// Full screen, for setting the TV up: a button in the top corner while the
+// page isn't full screen. It's always there in the lobby; in a game it shows
+// only while the mouse moves, so it never sits over the board for long.
+// Not in a phone's table view, nor in a browser that can't go full screen.
+function fullscreenButton() {
+  if (remote || !document.fullscreenEnabled) return;
+  const b = document.createElement('button');
+  b.id = 'fullscreen';
+  b.className = 'ghost';
+  b.textContent = 'Full screen';
+  b.onclick = () => void document.documentElement.requestFullscreen().catch(toast);
+  document.body.append(b);
+  // (F11 fills the screen without the page knowing: the button stays, and
+  // pressing it changes nothing a player sees.)
+  document.addEventListener('fullscreenchange', () => document.body.classList.toggle('fullscreen', !!document.fullscreenElement));
+  let still = 0;
+  addEventListener('pointermove', () => {
+    document.body.classList.add('pointing');
+    clearTimeout(still);
+    still = setTimeout(() => document.body.classList.remove('pointing'), 3000);
+  });
+}
+
+fullscreenButton();
 boot().catch(toast);

@@ -1323,7 +1323,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       if (cardKind(c) !== 'building') fail(`${cardName(c)} is not a building card.`);
       const k = placeCheck(g, p, c.key, args[1]);
       pay(pl, BUILDINGS[c.key].cost);
-      pl.hand.splice(pl.hand.indexOf(c), 1);
+      discardCard(g, p, c);
       return placeBuilding(g, p, c.key, k);
     }
     case 'upgrade': {
@@ -1331,7 +1331,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       if (cardKind(c) !== 'upgrade') fail(`${cardName(c)} is not an upgrade card.`);
       const k = upgradeCheck(g, p, c.key, args[1]);
       pay(pl, UPGRADES[c.key].cost);
-      pl.hand.splice(pl.hand.indexOf(c), 1);
+      discardCard(g, p, c);
       return placeUpgrade(g, p, c.key, k);
     }
     case 'clear': {

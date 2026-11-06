@@ -13,7 +13,7 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 ## Decks
 
-There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
+There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. A card goes to its deck's discards when it's built, played or discarded, so a copy's count doesn't cap how many of it can be on the board. When a deck runs out, its discards are shuffled into a new one.
 
 ### Building deck: 42 cards
 

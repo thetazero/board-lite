@@ -169,6 +169,11 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 svg.token { flex: none; }
 .lobby-actions { display: flex; gap: 1em; font-size: 1.3em; }
 .hint { color: var(--muted); }
+/* Full screen (tv.ts): top right, over the lobby's sky or the board's goal;
+   in a game only while the mouse moves. */
+#fullscreen { display: none; position: fixed; top: .8em; right: 1em; z-index: 50; font-size: 1.2em; }
+body.tv:has(#app > .lobby) #fullscreen, body.tv.pointing #fullscreen { display: block; }
+body.tv.fullscreen #fullscreen { display: none; }
 
 /* The board is read from a couch about 3 m away: nothing on it is smaller
    than 1.1em of the TV's base size (about 22px at 1080p). */
@@ -1015,6 +1020,8 @@ body:has(.talkbar.open) .viewswitch { display: none; }
 .invite svg.qr { width: 7.5em; height: 7.5em; flex: none; }
 .invite p { margin: 0; display: flex; flex-direction: column; gap: .2em; }
 .invite .url { font-weight: 800; word-break: break-all; }
+.tvhint { margin: .5em 0 0; font-size: .9em; }
+.tvhint .url { color: var(--text); word-break: break-all; }
 .hostline { display: flex; flex-direction: column; gap: .5em; border-top: 1px dashed var(--line); padding-top: 1em; text-align: center; }
 .hostline p { margin: 0; color: var(--muted); }
 
