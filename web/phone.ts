@@ -1210,8 +1210,10 @@ function discardView(me: Me): string {
   return `<div class="discardtray">${tray}</div>${act(`Discard ${n} card${n === 1 ? '' : 's'}`, 'id="discard"', why)}${hint}`;
 }
 
-// The end: the winner's moment, then where everyone finished. Nothing from the
-// game in progress (resources, income, the last decision) is left on screen.
+// The end: the winner's moment, where everyone finished, and a link to the
+// game's recap page (the summary the TV or the table view plays, to keep or
+// share). Nothing from the game in progress (resources, income, the last
+// decision) is left on screen.
 function gameOver(g: PublicState, me: Me): string {
   const w = g.standings![0].p;
   const mine = g.standings!.find((s) => s.p === me.seat)!;
@@ -1223,6 +1225,7 @@ function gameOver(g: PublicState, me: Me): string {
     ${note ? `<p class="tiebreak">${note}</p>` : ''}
     ${w === me.seat ? '' : `<p class="mine">You finish ${place}${mine.tied ? ' (tied)' : ''} with ${mine.total}${icon('points', 1.1)}</p>`}
     ${standingsHtml(g, names, me.seat)}
+    ${snap?.recap ? `<a class="button big" href="/recap/${snap.recap}" target="_blank" rel="noopener">Open the recap</a>` : ''}
     <button id="newgame" class="primary big">New game</button>
   </div>`;
 }
