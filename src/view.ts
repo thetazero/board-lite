@@ -42,7 +42,8 @@ function dragonLine(d: DragonView): string {
   const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
   const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
   const status = d.canRaid ? `can raid, clear or perch${d.hp < d.maxHp ? ' (hurt: heals instead of growing)' : ''}` : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled` : 'knocked out: cannot fight until it heals';
-  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
+  const hungry = d.hungry ? ', went hungry this round: did not heal or grow' : '';
+  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}${hungry}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
 }
 
 function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
@@ -243,6 +244,9 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you make: ${amounts(you.income)}.`);
+  const ids = (k: string) => Object.keys(you.hunger).filter((id) => you.hunger[id] === k);
+  const short = ids('short'), maybe = ids('maybe');
+  if (short.length || maybe.length) out.push(`At the next production, as things stand (your dragons eat oldest first): ${[short.length ? `${short.join(' ')} go${short.length === 1 ? 'es' : ''} hungry` : '', maybe.length ? `${maybe.join(' ')} go${maybe.length === 1 ? 'es' : ''} hungry unless your livestock dice roll well` : ''].filter(Boolean).join('; ')}. A hungry dragon doesn't heal or grow.`);
   out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over your room, so you hatch no more until there's room` : ''}.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);

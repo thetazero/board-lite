@@ -1069,6 +1069,35 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // Dragons going hungry (#362): each seat has more dragons than livestock.
+    // The first seat makes a livestock die, so some of theirs eat only if it
+    // rolls well; the second makes no livestock but the tower's, so theirs
+    // past the first go hungry for sure. Some went hungry this round already.
+    name: 'hungry-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = [g.turn, 1 - g.turn];
+      for (const p of [a, b]) {
+        for (const [k, x] of Object.entries(g.buildings)) if (x.owner === p && BUILDINGS[x.type]?.class === 'pasture') delete g.buildings[k];
+        g.players[p].resources.livestock = 0;
+      }
+      g.buildings[buildableHexes(g, a, 'pasture').sort()[0]] = { type: 'pasture', owner: a, upgrade: null, floors: 0 };
+      arm(g, a, [1, 2, 2, 3]);
+      arm(g, b, [1, 2, 3]);
+      for (const p of [a, b]) g.dragons.filter((d) => d.owner === p).slice(2).forEach((d) => ((d as Dragon & { hungry?: boolean }).hungry = true));
+      const want = [[a, 'maybe'], [b, 'short']] as const;
+      for (const [p, k] of want) if (!Object.values(seatState(g, p).hunger ?? {}).includes(k)) throw new Error(`hungry-2p: P${p + 1} has no dragon that goes hungry ${k}`);
+    },
+    shots: (g) => [
+      { file: 'tv-hungry-2p', caption: 'TV: dragons that went hungry this round', client: 'tv' },
+      { file: 'phone-hungry-maybe-2p', caption: 'Phone: dragons that eat next round only if the livestock die rolls well', client: 'phone', seat: g!.turn },
+      { file: 'phone-hungry-short-2p', caption: 'Phone: dragons that go hungry next round for sure', client: 'phone', seat: 1 - g!.turn },
+      { file: 'phone-hungry-zoom-2p', caption: 'Phone: a hungry dragon tapped open', client: 'phone', seat: 1 - g!.turn, clicks: ['.roost [data-dragon]:nth-child(3)'] },
+    ],
+  },
+  {
     // One of every card again, in a game where each reason a card can't be played comes up.
     name: 'blocked-3p',
     players: 3,

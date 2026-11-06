@@ -367,11 +367,25 @@ export function dragonBadge(d: DragonView, size = 30): string {
 
 // A dragon with its stage, growth, combat power, and its health or why it is
 // staying home. `all` numbers same-named dragons.
-export function dragonChip(d: DragonView, all: DragonView[], round: number): string {
+// `ahead`: on its owner's phone, whether it goes hungry at the next production.
+export function dragonChip(d: DragonView, all: DragonView[], round: number, ahead?: Hunger): string {
   const state = dragonState(d, round);
+  const hunger = hungerTags(d, ahead);
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
-  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
+  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}${hunger ? `<span class="hunger">${hunger}</span>` : ''}</div></div>`;
+}
+
+// Whether a dragon eats (#362). "Hungry this round": it went hungry at this round's
+// production, so it didn't heal or grow; anyone can see that. `ahead`, only
+// on its owner's phone (livestock is hidden): it goes hungry at the next
+// production as things stand, for sure ('short') or unless the dice roll well.
+export type Hunger = 'short' | 'maybe';
+export function hungerTags(d: DragonView, ahead?: Hunger): string {
+  const now = d.hungry ? '<em class="st-hungry" title="It went hungry this round, so it didn\'t heal or grow.">Hungry this round</em>' : '';
+  const next = ahead === 'short' ? '<em class="st-ahead" title="You don\'t have the livestock to feed it at the next production.">Hungry next round</em>'
+    : ahead === 'maybe' ? '<em class="st-ahead maybe" title="It eats at the next production only if your livestock dice roll well.">May go hungry next round</em>' : '';
+  return now + next;
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
