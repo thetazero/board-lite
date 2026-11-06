@@ -369,6 +369,11 @@ q::after { content: close-quote; }
 .summary .chart svg { display: block; width: 100%; height: auto; }
 .summary .told { font-size: 1.4em; }
 .summary.points-step { width: min(80vw, 70em); padding-bottom: 4em; }
+.summary.growth-step { padding-bottom: 4em; }
+.summary .growth { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5em; }
+.summary .growth figure { margin: 0; }
+.summary .growth figcaption { font-family: var(--serif); font-weight: 700; font-size: 1.6em; margin-bottom: .2em; }
+.summary .growth svg { display: block; width: 100%; height: auto; }
 .summary.points-step .breakdown { font-size: 1.6em; }
 
 .race { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -1119,6 +1124,8 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .summary .told { font-size: 1em; }
 .remote .summary > button { right: .8em; bottom: .8em; }
 .remote .summary.points-step { width: 100%; padding-bottom: 3.6em; }
+.remote .summary .growth { grid-template-columns: minmax(0, 1fr); gap: .6em; }
+.remote .summary .growth figcaption { font-size: 1.1em; }
 .remote .summary.points-step .breakdown { font-size: 1.05em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }
 .remote .raidbox h1 { font-size: 1.7em; }

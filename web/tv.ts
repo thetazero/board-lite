@@ -15,7 +15,7 @@ import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D, Fighter } from './board3d.ts';
 import { qrSvg } from './qr.ts';
-import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
+import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
 
@@ -826,7 +826,8 @@ function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, color: string
 
 // When the game ends in front of it, the TV plays the game's recap
 // (src/recap.ts): the points race drawn a round at a time with what happened
-// in each, then where everyone's points came from, then the final scores with
+// in each, then everyone's dragon power and production over the game, then
+// where everyone's points came from, then the final scores with
 // a QR code to the recap page, for anyone to keep or share. A TV opened on a
 // game that's already over goes straight to the scores (Watch again plays it).
 // The table view in a game with no TV does the same, as a scene the phone cuts
@@ -837,8 +838,9 @@ let recapAsked = '';
 let summary: { step: number; timer: number } | null = null;
 let summaryPlayed = false;
 
-type SummaryStep = { kind: 'race'; upTo: number; ms: number } | { kind: 'points'; ms: number };
+type SummaryStep = { kind: 'race'; upTo: number; ms: number } | { kind: 'growth'; ms: number } | { kind: 'points'; ms: number };
 const RACE_MS = 24000; // the race at most, however long the game
+const GROWTH_MS = 9000;
 const POINTS_MS = 8000;
 
 function summarySteps(r: Recap): SummaryStep[] {
@@ -848,7 +850,9 @@ function summarySteps(r: Recap): SummaryStep[] {
   const want = Array.from({ length: last }, (_, i) => (told(i + 1) ? 1600 + 600 * Math.min(told(i + 1), 4) : 600));
   const sum = want.reduce((a, b) => a + b, 0);
   const scale = Math.min(1, RACE_MS / sum);
-  return [...want.map((ms, i) => ({ kind: 'race' as const, upTo: i + 1, ms: Math.max(250, ms * scale) })), { kind: 'points', ms: POINTS_MS }];
+  // Dragon power and production, whole, for a recap that kept them.
+  const growth: SummaryStep[] = r.power && r.made?.length ? [{ kind: 'growth', ms: GROWTH_MS }] : [];
+  return [...want.map((ms, i) => ({ kind: 'race' as const, upTo: i + 1, ms: Math.max(250, ms * scale) })), ...growth, { kind: 'points', ms: POINTS_MS }];
 }
 
 function showEnd(g: PublicState) {
@@ -907,6 +911,15 @@ function summaryStep() {
     told.innerHTML = momentsHtml({ ...r, moments: r.moments.filter((m) => recent.includes(m.round)) });
     told.querySelector(`.moments > li:last-child`)?.classList.toggle('now', recent.at(-1) === step.upTo);
     $('overlay').querySelector<HTMLElement>('.summary')!.dataset.step = `race-${step.upTo}`;
+  } else if (step.kind === 'growth') {
+    const box = showOverlay('end', 'end growth', `<div class="summary growth-step" data-step="growth">
+      <h1>Dragon power and production</h1>
+      <div class="growth">
+        <figure><figcaption>Dragon power</figcaption>${powerSvg(r, { width: 700, height: 460 })}</figure>
+        <figure><figcaption>Resources made each round</figcaption>${madeSvg(r, { width: 700, height: 460 })}</figure>
+      </div>
+      <button id="skip">Skip</button></div>`);
+    if (box) $('skip').onclick = stopSummary;
   } else {
     const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
       <h1>Points</h1>

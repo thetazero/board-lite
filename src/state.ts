@@ -493,13 +493,15 @@ export interface RecapStanding {
   hidden: number; // Secret Hoard cards in hand
 }
 
-// What happened that's worth telling, by round. Titles only when the holder
-// at a round's end differs from the round before (they can change hands
-// several times in a round); kingdoms only when they fall.
+// What happened that's worth telling, by round: the game's turning points,
+// not its routine. Titles only when the holder at a round's end differs from
+// the round before (they can change hands several times in a round); great
+// beasts when slain; a kingdom's fall only when it scores points or is the
+// strongest kingdom to fall yet (recaps from before #375 have every fall).
 export type Moment = { round: number } & (
   | { k: 'title'; t: Title; name: string; p: number }
   | { k: 'beast'; p: number; key: string; name: string; points: number }
-  | { k: 'fall'; name: string; ps: number[]; points?: number; scorer?: number } // scorer: who took a scoring kingdom's points
+  | { k: 'fall'; name: string; ps: number[]; points?: number; scorer?: number; times?: number } // scorer: who took a scoring kingdom's points; times: how often it fell that round to them, if more than once
 );
 
 export interface Recap {

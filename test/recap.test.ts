@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
+import { TARGETS, targetPower } from '../src/data.ts';
 import { newGame, score, standings, titleValues } from '../src/engine.ts';
 import { buildRecap } from '../src/recap.ts';
 import { Room } from '../src/server/room.ts';
@@ -46,6 +47,13 @@ test("a recap tells the race round by round, ends on the final scores, and lists
     const holders = titles.filter((m) => m.t === t).map((m) => m.p);
     assert.ok(holders.every((p, i) => i === 0 || p !== holders[i - 1]), `${t} changes hands each time it's told`);
   }
+  // Kingdoms: only the turning points, not every fall. A fall that scores no
+  // points is told only when it's the strongest kingdom to fall yet.
+  const falls = g.log.filter((e) => e.ev?.k === 'raidEnd' && e.ev.won && !e.to);
+  const powerOf = (name: string) => targetPower(Object.keys(TARGETS).find((k) => TARGETS[k].name === name)!);
+  const plain = r.moments.filter((m) => m.k === 'fall' && m.scorer === undefined).map((m) => m.k === 'fall' ? powerOf(m.name) : 0);
+  assert.ok(plain.every((v, i) => i === 0 || v > plain[i - 1]), 'each plain fall told is a stronger kingdom than the last');
+  assert.ok(falls.length > r.moments.filter((m) => m.k === 'fall').length, 'routine falls are left out');
   assert.ok(JSON.stringify(r).length < 20000, 'small enough to keep and share');
 });
 
