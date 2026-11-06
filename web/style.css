@@ -499,12 +499,39 @@ body.recap-page { font-size: 16px; }
 .raider .rds { flex: 1; display: flex; gap: .4em; align-items: center; }
 .raider.out { opacity: .55; }
 .rd { display: inline-flex; flex-direction: column; align-items: center; gap: .1em; opacity: .28; }
-.rd.sent { opacity: 1; filter: drop-shadow(0 0 .3em var(--pc)); }
+.rd.sent { opacity: 1; filter: drop-shadow(0 0 .3em var(--pc)); display: inline-flex; flex-wrap: nowrap; } /* not the phone's .sent row, which wraps */
 .rd .hpbar { width: 2.2em; height: .35em; }
 .rd small { font-size: .55em; color: var(--text); white-space: nowrap; }
 .home { display: inline-flex; align-items: center; gap: .4em; font-size: 1.1em; }
 .home.none { font-style: italic; opacity: .55; font-size: .95em; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
+/* Fight or bail (tv.ts renderRaid): the raiders' rows line up in columns
+   (name, dragons, power, choice); a raider who has chosen shows a card face
+   down in their colour, one still choosing an empty dashed place for it. */
+.arena.bail .raiders { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; gap: .5em 0; min-width: 0; }
+.arena.bail .raider { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: 1em; padding: .35em .9em .35em 1em; transition: transform .3s, box-shadow .3s; }
+.arena.bail .raider .rds { justify-content: flex-start; }
+.arena.bail .raider .power { font-size: 1.05em; white-space: nowrap; }
+.choice { display: inline-flex; flex-direction: column; align-items: center; gap: .25em; font-size: .55em; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 6em; }
+.choice i { display: block; width: 3em; height: 4.2em; border-radius: .3em; border: .18em dashed color-mix(in oklab, var(--ink) 35%, transparent); animation: choosing 1.6s ease-in-out infinite; }
+.choice.done { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
+.choice.done i { border: .2em solid #f7f0de; animation: none; transform: rotate(-6deg);
+  background: repeating-linear-gradient(45deg, #fff2 0 .25em, transparent .25em .5em), var(--pc);
+  box-shadow: 0 0 0 .08em #0004, .12em .18em .25em #0006; }
+@keyframes choosing { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .choice i { animation: none; } }
+/* The two sides' power, end to end: the raiders' shares in their colours
+   against the kingdom's; a notch marks the middle, past which the raiders
+   usually win. */
+.balance { display: grid; grid-template-columns: auto minmax(10em, 1fr) auto; align-items: center; gap: 1em; width: min(100%, 60em); margin: .2em auto 1.1em; font-size: 1.3em; color: #f7f0de; }
+.balance .bside { display: flex; flex-direction: column; align-items: flex-end; gap: .1em; }
+.balance .bside.foe { align-items: flex-start; }
+.balance .bside small { font-size: .6em; color: #cfc6dd; white-space: nowrap; }
+.balance .power { font-size: 1.2em; white-space: nowrap; }
+.bbar { position: relative; display: flex; height: 1.1em; border-radius: .55em; overflow: hidden; background: #0005; box-shadow: inset 0 0 0 .1em #f7f0de55, 0 .1em .4em #0007; }
+.bbar i { display: block; min-width: .3em; background: var(--pc); border-right: .08em solid #1a121866; }
+.bbar i.foe { background: repeating-linear-gradient(-45deg, #0002 0 .3em, transparent .3em .6em), #8c2a20; border: 0; }
+.bbar .mid { position: absolute; left: 50%; top: -.1em; bottom: -.1em; width: .18em; margin-left: -.09em; background: #f7f0de; box-shadow: 0 0 .2em #000a; }
 /* A fight, on its own stage (#326, tv.ts battle): the TV cuts from the map to
    the place's backdrop, full screen; the dragons stand on the left facing the
    defenders on the right, each a paper figure at its size (--s, the square
@@ -572,6 +599,11 @@ body.recap-page { font-size: 16px; }
 .outcome h1 { margin: .3em 0 .2em; font-family: var(--serif); font-size: 2.3em; }
 .spoils { display: flex; gap: 2em; justify-content: center; font-size: 1.6em; }
 .spoils > span { display: inline-flex; align-items: center; gap: .3em; }
+/* The freed peak's rule, popping up on its gold token after the points. */
+.outcome .boon { display: flex; align-items: center; justify-content: center; gap: .6em; max-width: 30em; margin: .55em auto 0; padding-top: .5em; border-top: 1px solid var(--paper-edge); font-size: 1.35em; text-align: left; }
+.outcome.show .boon { animation: boon .5s .9s cubic-bezier(.3, 1.6, .5, 1) both; }
+.ptoken { flex: none; display: inline-grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 50%; background: #e7b43f; color: #3a2710; font-family: var(--serif); font-weight: 700; font-size: 1.15em; box-shadow: 0 2px 0 #b88a2a, var(--lift); }
+@keyframes boon { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
 /* The scoring beat: the crown comes down on the most power standing, on
    their dragons and their name, then the points. */
 .outcome .score { display: flex; align-items: center; justify-content: center; gap: .5em; margin-top: .5em; padding-top: .45em; border-top: 1px solid var(--paper-edge); font-size: 1.6em; opacity: 0; transition: opacity .4s; }
@@ -770,6 +802,7 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .offer.out { background: transparent; box-shadow: none; border: 2px dashed #f3ead766; --text: var(--paper); --muted: var(--muted); color: var(--paper); }
 .offer.out .ricon { filter: none; }
 .offer.out .ptag { color: var(--pc); }
+.offer.in .open { margin: .2em 0 .4em; font-size: .9em; color: var(--muted); }
 .offer.out .declined { margin: .3em 0 0; font-size: .9em; color: var(--muted); }
 .proj { display: flex; align-items: center; gap: .5em; margin: .35em 0; }
 .proj b { min-width: 7em; margin-right: .4em; }
@@ -1093,6 +1126,14 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .arena { flex-direction: column; gap: .6em; }
 .remote .arena .vs { display: none; }
 .remote .raiders { font-size: 1em; min-width: 0; width: 100%; }
+.remote .balance { font-size: 1em; gap: .3em .5em; margin-bottom: .6em; grid-template-columns: 1fr 1fr; grid-template-areas: "bar bar" "us foe"; }
+.remote .balance .bbar { grid-area: bar; }
+.remote .balance .bside { grid-area: us; align-items: flex-start; justify-self: start; text-align: left; }
+.remote .balance .bside.foe { grid-area: foe; align-items: flex-end; justify-self: end; text-align: right; }
+.remote .arena.bail .raiders { grid-template-columns: auto auto 1fr auto; }
+.remote .arena.bail .raider { column-gap: .5em; padding: .3em .5em; }
+.remote .arena.bail .raider .power { justify-self: end; }
+.remote .choice { min-width: 4.5em; }
 .remote .fhead { top: 1vh; flex-wrap: wrap; gap: .4em; padding: 0 .5em; }
 .remote .fhead h2 { font-size: 1.2em; flex-wrap: wrap; justify-content: center; }
 .remote .fhead .bvs b { font-size: 1.4em; }
@@ -1125,6 +1166,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .fig .dmg { font-size: .7em; }
 .remote .fightscene .outcome { top: 13vh; min-width: 0; width: 94vw; padding: .2em .6em .6em; font-size: .85em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
+.remote .outcome .boon { font-size: 1em; }
 .remote .outcome .score { font-size: 1.1em; flex-wrap: wrap; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
 /* A dragon in the roost is a button: tap it for its card. */

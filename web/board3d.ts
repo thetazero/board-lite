@@ -344,7 +344,7 @@ function decor(h: HexView, seaward: number): THREE.Group {
   const g = new THREE.Group();
   const built = crowded(h);
   if (h.held) g.add(hexBorder(HOLD_COLORS[h.held] ?? '#555'));
-  if (h.peakZone) g.add(hexBorder(GOLD));
+  if (h.peakZone) g.add(hexBorder(GOLD), bonusToken(h.peakZone, !!h.building, !!h.peak && !h.building));
   // Spots around the hex: the middle is kept for a building or a beast.
   const spot = (min: number, max: number): [number, number] => {
     const a = r() * Math.PI * 2, d = min + r() * (max - min);
@@ -914,6 +914,50 @@ function hexBorder(color: string): THREE.Group {
     g.add(part(box(0.58, 0.025, 0.075), color, { at: [Math.cos(a) * 0.74, TILE_H + 0.045, Math.sin(a) * 0.74], rot: [0, -(a + Math.PI / 2), 0], crease: false }));
   }
   return g;
+}
+
+// The freed peak's bonus, printed on each of its hexes like a board game's
+// number token: a gold paper disc with "+2" inked on it, lying at the hex's
+// front edge (on the summit, its top), where nothing hides it. With the gold border it
+// reads at a glance: these hexes make 2 more (#354).
+function bonusToken(n: number, built: boolean, summit: boolean): THREE.Group {
+  const R = 0.25, H = 0.04, y = TILE_H + TILE_LIFT + 0.04; // over the fold, so its crease never cuts it
+  const ink = new THREE.Mesh(new THREE.CircleGeometry(R * 0.92, 24), inkMat(`+${n}`));
+  ink.rotation.x = -Math.PI / 2;
+  ink.position.y = H / 2 + 0.002;
+  const g = group(part(cyl(R, R, H, 12), GOLD), ink);
+  if (summit) {
+    // On the freed summit, where the Thunderbird perched: the mountain hides
+    // the hex's front, so the token is pinned to the top, facing the room.
+    g.position.set(0, TOP + PEAK_H - 0.08, 0.06);
+    g.rotation.x = 0.75;
+    g.scale.setScalar(1.25);
+  } else {
+    g.position.set(built ? 0.34 : 0, y, built ? 0.5 : 0.48);
+    g.rotation.x = 0.12; // tipped a little to the camera, on the tile's fold
+  }
+  return g;
+}
+
+// Ink on paper: text drawn on a transparent sheet, for a token's face.
+const INKS = new Map<string, THREE.MeshLambertMaterial>();
+function inkMat(text: string): THREE.MeshLambertMaterial {
+  let m = INKS.get(text);
+  if (m) return m;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#3a2710';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = 'bold 76px "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif';
+  x.fillText(text, 64, 70);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  m = new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false });
+  INKS.set(text, m);
+  return m;
 }
 
 function nest(): THREE.Mesh {
@@ -1795,8 +1839,15 @@ const CASCADE_S = 0.3, CASCADE_MAX = 8;
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 // A building on its plate, as it stands on a hex (shut: a beast or a perched dragon holds it).
+// A shut-down building's whole hex: dark ash, so it reads at a glance from
+// across the room, darker than any terrain (mountains are a light grey).
+const SHUT_GROUND = '#4a474d';
+let shutTop: THREE.BufferGeometry | null = null;
 function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-  const g = plate(b.upgrade, tileColor(terrain));
+  const g = plate(b.upgrade, shut ? SHUT_GROUND : tileColor(terrain));
+  // Shut down: the tile goes dark too, a cap of ash paper over its folded top
+  // (just above the tile's own small lift), under its owner's border.
+  if (shut) g.add(part((shutTop ??= tileGeometry().top), SHUT_GROUND, { at: [0, 0.012, 0], crease: false }));
   const { model: parts, offset } = buildingModel(b);
   const model = bake(parts);
   // Shut down by a beast or a perched dragon: the building goes to dull grey
@@ -2642,7 +2693,7 @@ export interface Portrait {
   beast?: string; // a beast on the hex (on the building, if there is one)
   dragon?: { element: string; stage: number }; // a dragon at home on the hex
   held?: string; // the hex is held by this great beast (its border)
-  peakZone?: boolean; // the freed peak's gold border
+  peakZone?: number; // the freed peak's gold border and token: what a production building here makes more
   border?: boolean; // the owner's territory border round the hex
 }
 
@@ -2713,7 +2764,7 @@ function portraitScene(p: Portrait): THREE.Scene {
     fauna: p.beast ? { key: p.beast, name: '', hp: 1, maxHp: 1, attack: '', power: 0, element: 'neutral', weak: [], loot: {} } : null,
     ...(p.held ? { held: p.held } : {}),
     ...(p.beast === 'thunderbird' ? { peak: 'held' as const } : {}),
-    ...(p.peakZone ? { peakZone: true } : {}),
+    ...(p.peakZone ? { peakZone: p.peakZone } : {}),
   };
   if (p.terrain === 'ocean') {
     // The open sea, cut to the hex: the sheet the map lies on.

@@ -818,6 +818,26 @@ test('a hex a great beast holds stays held with other fauna on it, on the TV and
   assert.match(playerView(g, 0), new RegExp(`${ring}:[A-Z.~]\\{[^}]+\\}\\{x\\}`));
 });
 
+// #366: before a building goes on a hex, the phone shows what it would do
+// there, and whether the freed peak's bonus applies to it.
+test('placing a building shows what it would do on each hex, peak bonus or not', () => {
+  const { g, ring } = beastGame();
+  delete g.map[PEAK].fauna;
+  g.slain.thunderbird = 1;
+  g.players[0].hand.push({ id: 'ch', deck: 'building', key: 'hatchery' });
+  const s = seatState(g, 0);
+  const pasture = s.basics.find((b) => b.key === 'pasture')!;
+  assert.ok(pasture.hexes.includes(ring));
+  assert.deepEqual(pasture.after[ring], { makes: { livestock: { base: TUNING.peakBonus, dice: [4] } }, houses: 0, points: 1, peak: 'more' });
+  const hatchery = s.hand.find((c) => c.id === 'ch')!;
+  assert.ok(hatchery.hexes.includes(ring));
+  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, note: BUILDINGS.hatchery.text, peak: 'none' });
+  // Away from the peak, no word of it; and nothing is built by asking.
+  const far = pasture.hexes.find((k) => k !== PEAK && !neighbors(PEAK).includes(k));
+  if (far) assert.equal(pasture.after[far].peak, undefined);
+  assert.equal(g.buildings[ring], undefined);
+});
+
 test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {
   const { g } = beastGame();
   const d = g.dragons.find((x) => x.owner === 0)!;
