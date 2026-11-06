@@ -997,7 +997,8 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-game-over-4p', caption: "TV: final scores, with a QR code to the game's recap", client: 'tv' },
       { file: 'tv-recap-race-4p', caption: 'TV, at the end: the points race, drawn a round at a time (here round 12), with what happened lately', client: 'tv', run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
-      { file: 'tv-recap-race-end-4p', caption: 'TV, at the end: the whole race', client: 'tv', run: summaryAt(-2), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+      { file: 'tv-recap-race-end-4p', caption: 'TV, at the end: the whole race', client: 'tv', run: summaryAt(-3), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+      { file: 'tv-recap-growth-4p', caption: "TV, at the end: everyone's dragon power and production over the game", client: 'tv', run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
       { file: 'tv-recap-points-4p', caption: "TV, at the end: where everyone's points came from", client: 'tv', run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
       { file: 'phone-recap-page', caption: "The recap page the TV's QR code opens", client: 'phone', path: (room) => `/recap/${room.recapId}`, waitFor: '.recap-page .sheet' },
       { file: 'phone-game-over-winner', caption: 'Phone: the winner', client: 'phone', seat: g!.winner!, sizes: true },
@@ -1807,6 +1808,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-remote-over-4p', caption: 'No TV: the end, on your own view', client: 'phone', seat: g!.winner! },
       { file: 'tv-remote-over-4p', caption: "No TV: the final scores on the table view, with a link to the game's recap", client: 'tv', table: true, sizes: true },
       { file: 'tv-remote-recap-race-4p', caption: 'No TV, at the end: the points race on the table view, here round 12', client: 'tv', table: true, sizes: true, run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
+      { file: 'tv-remote-recap-growth-4p', caption: "No TV, at the end: everyone's dragon power and production, on the table view", client: 'tv', table: true, sizes: true, run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
       { file: 'tv-remote-recap-points-4p', caption: "No TV, at the end: where everyone's points came from, on the table view", client: 'tv', table: true, run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
     ],
   },

@@ -4,7 +4,7 @@
 // and all), so it outlives the room and can be served from anywhere: the
 // local server today, a website later, as the same file.
 
-import { TUNING } from './data.ts';
+import { TUNING, targetPower } from './data.ts';
 import { TITLE_NAMES, score, standings, type Game, type Title } from './engine.ts';
 import { gameStats } from './playtest/stats.ts';
 import type { Moment, Recap } from './state.ts';
@@ -17,6 +17,7 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
   const held: Record<Title, number | null> = { army: null, tower: null, hoard: null };
   let roundTitles: Partial<Record<Title, number | null>> = {};
   let round = 0;
+  let strongest = 0; // the power of the strongest kingdom that has fallen
   const closeRound = () => {
     for (const [t, p] of Object.entries(roundTitles) as [Title, number | null][]) {
       if (p === null || p === held[t]) continue;
@@ -34,7 +35,22 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
     if (!ev || e.to) continue;
     if (ev.k === 'title') roundTitles[ev.t] = ev.p;
     else if (ev.k === 'cleared' && ev.won && ev.points) moments.push({ round, k: 'beast', p: ev.p, key: ev.fauna ?? '', name: ev.name, points: ev.points });
-    else if (ev.k === 'raidEnd' && ev.won) moments.push({ round, k: 'fall', name: ev.name, ps: ev.winners, ...(ev.scorer !== undefined ? { points: ev.points, scorer: ev.scorer } : {}) });
+    else if (ev.k === 'raidEnd' && ev.won) {
+      // A kingdom's fall is news when it scores points, or when it's the
+      // strongest kingdom to fall yet: the table reaching a new rung of the
+      // ladder. The same kingdoms falling again and again is the game's routine.
+      const power = targetPower(ev.t);
+      const first = power > strongest;
+      strongest = Math.max(strongest, power);
+      if (ev.scorer === undefined && !first) continue;
+      // The same kingdom falling again in a round to the same scorer is one line.
+      const again = ev.scorer !== undefined && moments.find((m) => m.round === round && m.k === 'fall' && m.name === ev.name && m.scorer === ev.scorer);
+      if (again && again.k === 'fall') {
+        again.points = (again.points ?? 0) + (ev.points ?? 0);
+        again.times = (again.times ?? 1) + 1;
+        again.ps = [...new Set([...again.ps, ...ev.winners])].sort((a, b) => a - b);
+      } else moments.push({ round, k: 'fall', name: ev.name, ps: ev.winners, ...(ev.scorer !== undefined ? { points: ev.points, scorer: ev.scorer } : {}) });
+    }
   }
   closeRound();
   // A title move goes after the round's fights, which are what usually move it.

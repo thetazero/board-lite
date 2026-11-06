@@ -19,7 +19,7 @@ export function momentHtml(m: Moment, names: string[]): string {
   if (m.k === 'title') return `${playerTag(m.p, names)} takes <b>${esc(m.name)}</b>`;
   if (m.k === 'beast') return `${playerTag(m.p, names)} slays the <b>${esc(m.name)}</b> <span class="gain">+${m.points}${icon('points', 1)}</span>`;
   const scored = m.scorer !== undefined ? `: ${playerTag(m.scorer, names)} <span class="gain">+${m.points}${icon('points', 1)}</span>` : '';
-  return `<b>${esc(m.name)}</b> falls to ${tags(m.ps, names)}${scored}`;
+  return `<b>${esc(m.name)}</b> falls${m.times ? ` ${m.times} times` : ''} to ${tags(m.ps, names)}${scored}`;
 }
 
 // Who a moment is about, for its marks on the race.
