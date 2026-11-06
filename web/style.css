@@ -760,12 +760,16 @@ body.phone.hand-below.has-hand.hand-tucked { padding-bottom: 3.6em; }
 .dragon { display: flex; align-items: center; gap: .6em; text-align: left; width: 100%; }
 /* A dragon to send: a box at the row's end that ticks when tapped, so the row reads as a choice. */
 .dragon.pick > span { flex: 1; }
-.dragon .tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
-.dragon.on .tick { border-color: var(--ink); background: var(--ink); }
-.dragon.on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
+.tick { flex: none; width: 1.5em; height: 1.5em; border: .14em solid var(--paper-edge); border-radius: 3px; background: #fffaf0; box-shadow: inset 0 .1em .15em #0002; display: grid; place-items: center; }
+:is(.dragon, .allpick).on .tick { border-color: var(--ink); background: var(--ink); }
+:is(.dragon, .allpick).on .tick::after { content: ''; width: .38em; height: .72em; margin-top: -.18em; border: solid #fcd660; border-width: 0 .2em .2em 0; transform: rotate(45deg); }
 /* A choice's prompt ("Choose a resource to gain"), then its options (phone.ts, choose) */
 .ask { margin: .3em 0 0; font-size: 1.05em; }
-.pbody > .ask, .zoomacts .ask { color: var(--paper); }
+.pbody > .ask, .zoomacts .ask, .pbody > .askrow .ask { color: var(--paper); }
+/* "Choose dragons to send" with its "Choose all" tick at the line's end, in the dragons' column of ticks. */
+.askrow { display: flex; align-items: center; justify-content: space-between; gap: .6em; margin-top: .3em; }
+.askrow .ask { margin: 0; }
+button.allpick, button.allpick.on { flex: none; white-space: nowrap; display: flex; align-items: center; gap: .5em; padding: .3em .9em; background: none; box-shadow: none; color: var(--paper); font-weight: 600; }
 .choose { display: flex; flex-direction: column; gap: .3em; }
 .choose .row { justify-content: center; }
 .choose .dragon { flex: 1 1 100%; }
