@@ -11,7 +11,7 @@ import {
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
-import type { Board3D } from './board3d.ts';
+import type { Board3D, Fighter } from './board3d.ts';
 import { qrSvg } from './qr.ts';
 import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
@@ -34,6 +34,18 @@ let seenLog = -1; // highest log index already animated
 // The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
 let board3d: Board3D | null | undefined;
 let Board3DClass: typeof Board3D | null = null; // loaded only on a real TV: three.js is the heaviest thing on the page
+// The fight's stage and figures, folded from the board's models (board3d.ts);
+// null without WebGL, when the fight is drawn in flat paper (arena.ts).
+let fight3d: typeof import('./board3d.ts') | null = null;
+async function load3d(): Promise<typeof import('./board3d.ts') | null> {
+  try {
+    const m = await import('./board3d.ts');
+    return m.Board3D.supported() ? m : null;
+  } catch (e) {
+    console.error('No 3D board:', e);
+    return null;
+  }
+}
 const remote = new URLSearchParams(location.search).has('remote');
 
 async function boot() {
@@ -43,10 +55,15 @@ async function boot() {
     // Inside a phone: watch the room, never make one.
     document.body.classList.add('remote');
     board3d = null;
+    // It shows the TV's fights, so it folds their figures too: three.js
+    // loads behind the table, never holding it up (a fight before it's in is
+    // drawn flat).
+    void load3d().then((m) => (fight3d = m));
     return watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
   }
   // If three.js can't load, the TV still runs, on the flat map.
-  Board3DClass = await import('./board3d.ts').then((m) => m.Board3D, (e) => (console.error('No 3D board:', e), null));
+  fight3d = await load3d();
+  Board3DClass = fight3d?.Board3D ?? null;
   hostToken = localStorage.getItem(`tv:${code}`) ?? '';
   if (code) {
     const room = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -577,20 +594,35 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const fig = (key: string, size: number, art: string, name: string, hp: number, max: number, cls: string, pc?: string, order?: number) =>
     `<div class="fig ${cls}" ${key} style="--s:${size.toFixed(2)}${pc ? `;--pc:${pc}` : ''}${order !== undefined ? `;order:${order}` : ''}">
       <span class="fig-crown">${crown()}</span>${hpBar(hp, max)}<span class="fig-body">${art}</span><b class="fig-name">${esc(name)}</b></div>`;
-  const side = dragons.map((d) => fig(`data-d="${d.id}" data-p="${d.owner}"`, figSize(d.maxHp), dragonFigure(d.element), dragonLabel(d, g.dragons), hp0(d), d.maxHp, 'fig-d', PLAYER_COLORS[d.owner])).join('');
+  // Each figure's picture: the board's origami model of it (board3d.ts),
+  // or, without WebGL, a flat paper cut-out (arena.ts). `aspect` is its
+  // width over its height.
+  const art = (f: Fighter, facing: 1 | -1, flat: () => string): { html: string; aspect: number } => {
+    const a = fight3d ? fight3d.fighterArt(f, facing) : null;
+    return a ? { html: `<img class="fig-art fig-3d" src="${a.url}" alt="">`, aspect: a.aspect } : { html: flat(), aspect: 1.25 };
+  };
+  const unitKey = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, '_');
+  const left = dragons.map((d) => ({ d, max: d.maxHp, ...art({ dragon: { element: d.element, stage: d.stage } }, 1, () => dragonFigure(d.element)) }));
+  const right = units.map((u) => ({ u, ...art(u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, -1, () => (u.d ? dragonFigure(u.d.element) : unitFigure(unitKey(u.name)))) }));
+  // A figure's width: its area goes with its full health, whatever its shape.
+  const width = (max: number, aspect: number) => figSize(max) * Math.sqrt(aspect / 1.25);
+  const side = left.map(({ d, html: a, aspect }) => fig(`data-d="${d.id}" data-p="${d.owner}"`, width(d.maxHp, aspect), a, dragonLabel(d, g.dragons), hp0(d), d.maxHp, 'fig-d', PLAYER_COLORS[d.owner])).join('');
   // The biggest defenders stand at the back, the smallest nearest the dragons.
   const rank = units.map((u, i) => i).sort((a, b) => units[a].max - units[b].max || a - b);
-  const foes = units.map((u, i) => u.d
-    ? fig(`data-u="${i}"`, figSize(u.max), dragonFigure(u.d.element), u.name, u.hp, u.max, 'fig-u fig-d', PLAYER_COLORS[u.d.owner], rank.indexOf(i))
-    : fig(`data-u="${i}"`, figSize(u.max), unitFigure(u.name.toLowerCase().replace(/[^a-z]+/g, '_')), u.name, u.hp, u.max, 'fig-u', undefined, rank.indexOf(i))).join('');
+  const foes = right.map(({ u, html: a, aspect }, i) => u.d
+    ? fig(`data-u="${i}"`, width(u.max, aspect), a, u.name, u.hp, u.max, 'fig-u fig-d', PLAYER_COLORS[u.d.owner], rank.indexOf(i))
+    : fig(`data-u="${i}"`, width(u.max, aspect), a, u.name, u.hp, u.max, 'fig-u', undefined, rank.indexOf(i))).join('');
   // How big a figure is drawn: as big as fits the more crowded side across,
-  // and the biggest figure up; a very crowded side takes two rows.
+  // and the tallest figure up; a very crowded side takes two rows.
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const across = (xs: number[]) => { const s = sum(xs); return s > 34 ? s / 2 : s; };
-  const sl = across(dragons.map((d) => figSize(d.maxHp)));
-  const sr = across(units.map((u) => figSize(u.max)));
-  const mx = Math.max(...dragons.map((d) => figSize(d.maxHp)), ...units.map((u) => figSize(u.max)));
-  const html = `<div class="fightscene">${backdrop(place)}
+  const sl = across(left.map((x) => width(x.max, x.aspect)));
+  const sr = across(right.map((x) => width(x.u.max, x.aspect)));
+  const mx = Math.max(...left.map((x) => width(x.max, x.aspect) / x.aspect * 1.25), ...right.map((x) => width(x.u.max, x.aspect) / x.aspect * 1.25));
+  // The stage drawn at the screen's shape, so a phone held upright isn't a crop of a wide one.
+  const shape = Math.min(2.4, Math.max(0.4, innerWidth / Math.max(1, innerHeight)));
+  const stage = fight3d ? fight3d.stageArt(place, Math.round(shape >= 1.78 ? 1600 : 900 * shape), Math.round(shape >= 1.78 ? 1600 / shape : 900)) : null;
+  const html = `<div class="fightscene">${stage ? `<img class="backdrop" src="${stage}" alt="">` : backdrop(place)}
       <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
       <div class="outcome">${outcome}</div>
       <div class="battle" style="--sl:${sl.toFixed(1)};--sr:${sr.toFixed(1)};--mx:${mx.toFixed(1)}"><div class="bside bl">${side}</div><div class="bside br">${foes}</div></div>

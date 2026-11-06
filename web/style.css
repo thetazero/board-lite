@@ -500,6 +500,8 @@ body.recap-page { font-size: 16px; }
 .fightscene { position: fixed; inset: 0; overflow: hidden; color: var(--text); }
 .overlay > .fightscene.enter { animation: fadein .4s ease-out; }
 .fightscene .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The folded diorama (board3d.ts stageArt): cropped to the screen, its ground kept. */
+.fightscene img.backdrop { object-fit: cover; object-position: 50% 100%; }
 .fhead { position: absolute; top: 2.2vh; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 1.2em; }
 .fhead h2 { margin: 0; font-family: var(--serif); font-size: 2.4em; display: flex; gap: .4em; align-items: center; background: var(--sheet); color: var(--ink); padding: .2em .9em; border-radius: 2px; box-shadow: var(--lift); }
 .fhead .bvs { background: var(--sheet); color: var(--ink-soft); border-radius: 2px; box-shadow: var(--lift); padding: .15em .7em .3em; min-width: 3.5em; }
@@ -519,7 +521,7 @@ body.recap-page { font-size: 16px; }
 .fig-art { display: block; width: 100%; height: auto; filter: drop-shadow(.12em .2em .1em #0007); }
 .fig-u .fig-body { transform-origin: 85% 100%; }
 /* A rival's dragon perched on the hex faces the raiders. */
-.fig-u.fig-d .fig-art { transform: scaleX(-1); }
+.fig-u.fig-d .fig-art:not(.fig-3d) { transform: scaleX(-1); }
 .fig-name { margin-top: .5em; font-size: clamp(.75em, calc(var(--s) * var(--k) * .17), 1.25em); line-height: 1.1; text-align: center; background: var(--sheet); color: color-mix(in oklab, var(--pc, var(--ink)) 72%, #1a1218); padding: .1em .45em; border-radius: 2px; box-shadow: 0 .1em 0 var(--paper-edge), 0 .2em .4em #0005; max-width: max(100%, 7em); }
 .fig-u:not(.fig-d) .fig-name { color: var(--ink); }
 /* The attacker lunges at what it hits, and what's hit flinches. */
