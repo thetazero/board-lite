@@ -625,6 +625,7 @@ export const SCENES: Scene[] = [
       return [
         { file: 'tv-raid-commit-4p', caption: 'TV, raid commitments (4 players)', client: 'tv' },
         { file: 'phone-raid-commit-4p', caption: 'Phone: committing dragons (one tapped)', client: 'phone', seat: choosing, clicks: ['[data-commit]'] },
+        { file: 'phone-raid-commit-all-4p', caption: 'Phone: committing dragons (Choose all tapped)', client: 'phone', seat: choosing, clicks: ['#commitall'] },
         { file: 'phone-raid-dragon-4p', caption: 'Phone, raid: a dragon in the roost tapped open', client: 'phone', seat: choosing, clicks: ['.roost [data-dragon]'] },
       ];
     },
