@@ -8,7 +8,7 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -413,6 +413,21 @@ function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
   return `<span class="rd${sent ? ' sent' : ''}" title="${name}">${dragonBadge(d, 60)}${sent ? `${hpBar(d.hp, d.maxHp)}<small>${name}</small>` : ''}</span>`;
 }
 
+// A raider's dragons in brief, for however many they sent: one picture per
+// element with how many of it (drawn at its biggest stage), and their health
+// added up in one bar. The power beside it says how strong they are together.
+function dragonSummary(ds: DragonView[]): string {
+  const groups = Object.keys(ELEMENT_COLORS).flatMap((e) => {
+    const of = ds.filter((d) => d.element === e);
+    if (!of.length) return [];
+    const top = of.reduce((a, b) => (b.stage > a.stage ? b : a));
+    return [`<span class="rgroup" title="${of.map((d) => esc(d.name)).join(', ')}"><b>${of.length}</b>${dragonBadge(top, 56)}</span>`];
+  });
+  const hp = ds.reduce((s, d) => s + d.hp, 0);
+  const max = ds.reduce((s, d) => s + d.maxHp, 0);
+  return `<span class="rsum">${groups.join('')}<span class="rhp">${statTag('Health', `${hp}/${max}`)}${hpBar(hp, max)}</span></span>`;
+}
+
 // Whether a raider has chosen to fight or hold back, never which: a card laid face
 // down once they have, an empty place for it while they're choosing.
 function choiceMark(done: boolean): string {
@@ -458,7 +473,7 @@ function renderRaid(g: PublicState) {
     // a face-down card once they have, an empty place while they're choosing.
     // Above them, the power they'd bring together against the kingdom's.
     const ins = names.flatMap((_, p) => (raid.commits[p].length ? [p] : []));
-    const rows = ins.map((p) => `<li class="raider${raid.decided[p] ? ' chosen' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${choiceMark(raid.decided[p])}</li>`).join('');
+    const rows = ins.map((p) => `<li class="raider${raid.decided[p] ? ' chosen' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${dragonSummary(raid.commits[p].map(dragonById))}</span>${powerTag(sum(raid.commits[p]))}${choiceMark(raid.decided[p])}</li>`).join('');
     body = `<h1>${icon('raid', 1.1)} Fight or hold back ${SECRET}${raidPips(g)}</h1>${balance(ins.map((p) => ({ p, power: sum(raid.commits[p]) })), raid.target!.power)}${arena(rows, 'deciding')}`;
   }
   // A new step (or the next raid) rises in; ticks within a step update in place.

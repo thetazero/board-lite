@@ -519,6 +519,14 @@ body.recap-page { font-size: 16px; }
 .arena.deciding .raider { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: 1em; padding: .35em .9em .35em 1em; transition: transform .3s, box-shadow .3s; }
 .arena.deciding .raider .rds { justify-content: flex-start; }
 .arena.deciding .raider .power { font-size: 1.05em; white-space: nowrap; }
+/* A raider's dragons in brief: a count and a picture per element, then their health added up. */
+.rsum { display: grid; grid-template-columns: repeat(5, max-content); justify-content: start; align-items: center; gap: .1em .7em; }
+.rgroup { display: inline-flex; align-items: center; gap: .15em; font-size: 1.1em; }
+.rgroup b { font-weight: 800; }
+.rgroup svg { width: 1.7em; height: 1.7em; filter: drop-shadow(0 0 .2em color-mix(in oklab, var(--pc) 60%, transparent)); }
+.rhp { grid-column: 1 / -1; display: flex; align-items: center; gap: .5em; font-size: .75em; }
+.rhp .stat { margin: 0; }
+.rhp .hpbar { flex: 1; max-width: 12em; min-width: 5em; height: .45em; }
 .choice { display: inline-flex; flex-direction: column; align-items: center; gap: .25em; font-size: .55em; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 6em; }
 .choice i { display: block; width: 3em; height: 4.2em; border-radius: .3em; border: .18em dashed color-mix(in oklab, var(--ink) 35%, transparent); animation: choosing 1.6s ease-in-out infinite; }
 .choice.done { color: color-mix(in oklab, var(--pc) 72%, #1a1218); }
