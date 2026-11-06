@@ -1,6 +1,6 @@
 # Wording: how board-lite talks
 
-Every word a player reads (the TV, the phone, the cards, `docs/rules.md`, the CLI's view and errors) follows this guide. It's based on how published board games word their cards, rulebooks and player aids; the research is in the PR that added it (#75), and the sources are listed at the end.
+Every word a player reads (the TV, the phone, the cards, `docs/rules.md`, the CLI's view and errors) follows this guide.
 
 The game should read like a well-edited board game: the box's rulebook, the cards in your hand and the reference card by your seat all use the same few words, the same way, in the same voice.
 
@@ -10,13 +10,18 @@ The game should read like a well-edited board game: the box's rulebook, the card
 2. **Tell people what to do with imperatives.** Card text and buttons are commands: "Gain 2 gold.", "Place a Wolf Pack on…", "Build", "Choose a hex for the Quarry." Don't ask the player a question to tell them what to do ("Send the Cave Bear where?", "Who's going?"), and don't say "you should" or "you can now".
 3. **Same thing, same words.** One name for each thing, used everywhere: a card's verb is its button's verb and its log line's verb; a rules step's name is its heading on the TV and the phone. A different word means a different thing.
 4. **Numbers as numerals.** "Gain 2 gold", "1 extra step", "First to 20 points wins". Not "two gold", not "one more raid". (A sentence doesn't start with a numeral, and "one of your dragons" is a pronoun, not a count.)
-5. **Plain and short.** Cut words until the meaning would change. No "it" or "they" whose thing isn't on the same line. An exclamation mark only for the game's end ("Ada wins!").
+5. **Plain and short.** Every word costs the player attention: more text, less read. Cut words until the meaning would change. An exclamation mark only for the game's end ("Ada wins!").
+
+## The rulebook is different
+
+`docs/rules.md` is where a player goes to understand a rule, so it isn't terse: full sentences, every case covered. Because it exists, everything else can be short.
 
 ## Kinds of text
 
 | Kind | Form | Examples |
 |---|---|---|
-| **Card text** | One or two sentences, capitalized and full-stopped. An effect you carry out is an imperative ("Gain 3 of one resource other than gold."); a lasting effect is a present-tense statement ("Makes 1 timber each round for each adjacent forest hex.", "Worth 1 point while in your hand."). | Windfall, Lumber Camp, Secret Hoard |
+| **Card text** (on the card) | One or two sentences, capitalized and full-stopped. An effect you carry out is an imperative; a lasting effect is a present-tense statement. | Windfall, Lumber Camp, Secret Hoard |
+| **At a glance** (previews, stat lines) | Numbers and icons, no sentence; a change is before → after. | "5 → 7 [stone]", "1 → 2 [point]" |
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. Every choice among several options has one, and each option's button still carries the verb ("Gain", not a bare icon). | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear", "Choose a resource to gain" |
 | **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or bail", "End of round" |
@@ -64,7 +69,7 @@ Spelling is American ("harbor", "color"), to match the terrain and code names th
 
 ## Icons
 
-Few icons, for the things the game names over and over: the five resources, points, and a dragon for what your dragons eat beside the livestock they eat it from ("1 − 1🐉") (the owner, 2026-11-03: "use icons for core resources, there should not be that many icons"; 2026-11-05, on the dragons' livestock: "it should be on same row with a dragon icon"). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
+Few kinds of icon, used freely: the five resources, points, and a dragon for what your dragons eat ("1 − 1🐉") (the owner: "the cardinality of icons should not be that high, the number should be."). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
 
 ## Checks before you add text
 
@@ -72,17 +77,6 @@ Few icons, for the things the game names over and over: the five resources, poin
 - Is a "?" telling the player what to do? Make it an imperative.
 - Is there an "it" or "they" whose thing isn't named nearby?
 - Is there a number written as a word, or a term from the "Not" column above?
+- Would a number and an icon do instead?
 - Does the TV say the same thing the phone says, in the same words?
 - Is an icon standing for a word that isn't a resource, points or the dragons eating? Write the word.
-
-## Sources
-
-What published games do, which these rules follow:
-
-- **Second person, present tense, active voice; "may" for choices, "must" for requirements.** The Catan rulebook (25th anniversary edition, Catan GmbH / Catan Studio, 2020): "On your turn, you can do the following… You must roll for resource production", "You may trade resource cards with other players", "If you roll a '7,' no one receives any resources. Then you must move the robber", "If you have 10 or more victory points during your turn, the game ends and you are the winner!" [PDF](https://cdn.shopify.com/s/files/1/0024/8617/3749/files/catan-25th-rules_eng-200313.pdf)
-- **A house style guide: "you", numerals, "gain", no "should", introduce terms before using them.** Stonemaier Games' rulebook style guide (Jamey Stegmaier): address a single player in active voice ("Whenever you gain resources, place them on your player mat."), "Use numerals whenever possible (but not at the beginning of a sentence)", use "gain" not "take" for the supply, "Remove all instances of 'should'", use singular "they", and one term per thing ("A 'mat' is unique to a player. A 'board' is available to all players."). [stonemaiergames.com](https://stonemaiergames.com/?p=14043)
-- **Card text as terse imperatives and statements.** Dominion (Donald X. Vaccarino, Rio Grande Games): Workshop "Gain a card costing up to $4."; Witch "+2 Cards. Each other player gains a Curse."; Village "+1 Card +2 Actions". [Dominion Strategy card list](https://dominionstrategy.com/card-lists/dominion-card-list/), [wiki](https://wiki.dominionstrategy.com/index.php/Village)
-- **Templating: the same effect always gets the same words, and different words mean a different effect.** SlugFest Games, "RulesFest: Templating and Why it's Useful": "if two cards are worded differently, it is because the game designers intend for the cards to function differently." [slugfestgames.com](https://slugfestgames.com/?p=1469). Wizards of the Coast keep a written card text style guide for Magic for the same reason: "It's all about increasing consistency over time." (Mark Rosewater, "Text Me Maybe", 2013) [magic.wizards.com](https://magic.wizards.com/en/news/making-magic/text-me-maybe-2013-12-19)
-- **Standardize terms in a glossary, apply capitalization and formatting rules consistently.** Meeple Mountain, "Top Six Rules for Writing Rulebooks": "focus on making all the terminology consistent throughout your rulebook", "Overall your goal for rulebook writing is clarity and consistency." [meeplemountain.com](https://www.meeplemountain.com/top-six/top-six-rules-for-writing-rulebooks)
-- **Timed powers in a capitalized lead-in, then imperative text.** Wingspan (Elizabeth Hargrave, Stonemaier Games): "ONCE BETWEEN TURNS: When another player takes the 'gain food' action, gain 1 [food] from the birdfeeder at the end of their turn." [Board Game Arena help](https://en.doc.boardgamearena.com/Gamehelpwingspan)
-- **"Adjacent" as the board-game word for touching hexes.** Catan: "the owners of adjacent settlements and cities do not receive resources" (rulebook above).
