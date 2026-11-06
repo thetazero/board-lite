@@ -666,7 +666,43 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-points-result-3p', caption: 'TV: Cinderkeep falls, and the most power standing scores its point', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
+    shots: () => [{ file: 'tv-points-result-3p', caption: 'TV: Cinderkeep falls, and the crown comes down on the most power standing, then its point', client: 'tv', live: true, waitFor: '#overlay .scored', waitMs: 600 }],
+  },
+  {
+    // The same fight on Cinderkeep, mid-replay: its Fire Giant looms over the Knights (#326).
+    name: 'points-fight-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = turnOrder(g);
+      for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      toBail(g, [a, b]);
+      apply(g, b, 'fight');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-points-fight-3p', caption: "TV: a fight on Cinderkeep mid-replay, on its own stage: the Fire Giant looms, a hit bolts across in its attacker's colour", client: 'tv', live: true, waitMs: 2500 }],
+  },
+  {
+    // Titan's Throne, mid-replay: the Titan, the biggest figure in the game, over its Griffins and Knights.
+    name: 'titan-fight-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = turnOrder(g);
+      for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3, 3] : p === b ? [3, 3, 3, 3] : [0]);
+      toVote(g);
+      g.raid!.candidates[0] = 'titans_throne';
+      vote(g, 'titans_throne');
+      toBail(g, [a, b]);
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-titan-fight-3p', caption: "TV: a fight on Titan's Throne mid-replay: the Titan looms over everything", client: 'tv', live: true, waitMs: 2900 }],
   },
   {
     name: 'bail-3p',
@@ -706,7 +742,7 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, health bars falling as the hits land", client: 'tv', live: true, waitMs: 2700 }],
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, on the kingdom's own stage: a hit lands, a Militia falls", client: 'tv', live: true, waitMs: 2150 }],
   },
   {
     // The same raid, on a raider's phone while the TV replays it.

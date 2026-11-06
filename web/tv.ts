@@ -8,13 +8,14 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
-import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, unitIcon, voterTag } from './kingdom.ts';
+import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
+import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
 import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
-import { FIGHT_LEAD_MS, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
+import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -492,10 +493,15 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   return { html: `<div class="production"><h1>Round ${round}</h1>${body}</div>`, ms, play, top: { round, phase: 'Production' } };
 }
 
-// The whole fight at once (there is no retreat), replayed blow by blow: the
-// dragons on one side, the defenders on the other, a stroke from each attacker
-// to what it hits, health bars falling as the hits land, then who won and what
-// they took. Whoever bailed is shown flown home, under the fighters.
+// The whole fight at once (there is no retreat), replayed blow by blow on its
+// own stage (#326): the TV cuts from the map to the kingdom's backdrop, the
+// dragons on the left facing its defenders on the right, each a figure drawn
+// at its size. Each hit lunges from its attacker with a bolt in the
+// attacker's element colour to what it hits, bursting when that element
+// beats the target's; the knocked out fall. Then who won and what they took,
+// and for a kingdom that scores, a beat of its own: the crown comes down on
+// the player with the most power standing, then their points. Whoever bailed
+// is shown flown home, in a corner.
 type Combat = Extract<EventView['ev'], { k: 'combat' }>;
 function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fresh: EventView[]): Banner {
   const e = fresh[sc.at];
@@ -513,17 +519,19 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     const ds = (sentBy(p)?.ds ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
     return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
   }).join('');
+  const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}${p === end.scorer ? ` +${end.points} ${icon('points', 1.6)}` : ''}</span>`).join('')}</div>`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
-  return battle(g, head, dragons, startHp(ev.ds, ev.hps), fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);
+  const units = ev.units.map((u) => ({ ...u, max: u.hp }));
+  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), fled, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms);
 }
 
 // A fight for a hex: one player's dragons against what holds it (a beast,
 // great or not, and any rival dragons perched there), to the end, played out
-// like a raid's, then what they got for it. Every fight in the game gets this
-// replay, so the table sees it happen.
+// like a raid's, on the hex's terrain, then what they got for it. Every fight
+// in the game gets this replay, so the table sees it happen.
 function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh: EventView[]): Banner {
   const ev = fresh[sc.at].ev as Extract<EventView['ev'], { k: 'hunt' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
@@ -537,13 +545,14 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
     : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
-  const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? `${icon(ev.fauna, 1.4)} ${esc(ev.name)}` : 'Perched dragons'}`;
+  const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? esc(ev.name) : 'Perched dragons'}`;
   // Saves from before perching carry one beast and no units.
   const units = (ev.units ?? [{ name: ev.name, hp: ev.hp }]).map((u) => {
     const d = u.d ? g.dragons.find((x) => x.id === u.d) : undefined;
-    return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d };
+    return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
-  return battle(g, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, undefined, sc.ms);
+  const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
+  return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms);
 }
 
 // Each fighting dragon's health as its fight started, by id: drawn after the
@@ -553,22 +562,45 @@ function startHp(ds: string[], hps: number[] | undefined): Map<string, number> {
   return new Map(hps ? ds.map((id, i) => [id, hps[i]]) : []);
 }
 
-function battle(g: PublicState, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: { name: string; hp: number; max?: number; d?: DragonView }[], rounds: Combat[], outcome: string, top: Banner['top'], ms: number): Banner {
+// A figure's size: its full health's square root, so its area goes with its
+// health. A Knight (12) is about 3.5, an adult dragon (20 to 30) 4.5 to 5.5,
+// the Fire Giant (96) nearly 10 and the Titan (160) over 12: the bosses loom.
+const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
+// Defenders without an element (old saves) and neutral ones strike in steel.
+const STEEL = '#c9ced6';
+
+type Foe = { name: string; hp: number; max: number; d?: DragonView; el?: string };
+function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number): Banner {
   const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
-  const side = dragons.map((d) => `<div class="fighter" data-d="${d.id}" style="--pc:${PLAYER_COLORS[d.owner]}">${dragonBadge(d, 56)}<b>${esc(dragonLabel(d, g.dragons))}</b>${hpBar(hp0(d), d.maxHp)}</div>`).join('');
+  // A figure: its health over its head, the figure standing on its shadow
+  // (in its owner's colour, for a dragon), and its name at its feet.
+  const fig = (key: string, size: number, art: string, name: string, hp: number, max: number, cls: string, pc?: string, order?: number) =>
+    `<div class="fig ${cls}" ${key} style="--s:${size.toFixed(2)}${pc ? `;--pc:${pc}` : ''}${order !== undefined ? `;order:${order}` : ''}">
+      <span class="fig-crown">${crown()}</span>${hpBar(hp, max)}<span class="fig-body">${art}</span><b class="fig-name">${esc(name)}</b></div>`;
+  const side = dragons.map((d) => fig(`data-d="${d.id}" data-p="${d.owner}"`, figSize(d.maxHp), dragonFigure(d.element), dragonLabel(d, g.dragons), hp0(d), d.maxHp, 'fig-d', PLAYER_COLORS[d.owner])).join('');
+  // The biggest defenders stand at the back, the smallest nearest the dragons.
+  const rank = units.map((u, i) => i).sort((a, b) => units[a].max - units[b].max || a - b);
   const foes = units.map((u, i) => u.d
-    ? `<div class="fighter unit" data-u="${i}" style="--pc:${PLAYER_COLORS[u.d.owner]}">${dragonBadge(u.d, 56)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.max ?? u.hp)}</div>`
-    : `<div class="fighter unit" data-u="${i}">${unitIcon(u.name, 2.2)}<b>${esc(u.name)}</b>${hpBar(u.hp, u.hp)}</div>`).join('');
-  const html = `<div class="result fight">
-      <h2>${head}</h2>
-      <div class="battle"><div class="bside">${side}${fled}</div><div class="bvs"><small>round</small><b class="cround"></b></div><div class="bside foes">${foes}</div></div>
-      <div class="outcome">${outcome}</div></div>`;
+    ? fig(`data-u="${i}"`, figSize(u.max), dragonFigure(u.d.element), u.name, u.hp, u.max, 'fig-u fig-d', PLAYER_COLORS[u.d.owner], rank.indexOf(i))
+    : fig(`data-u="${i}"`, figSize(u.max), unitFigure(u.name.toLowerCase().replace(/[^a-z]+/g, '_')), u.name, u.hp, u.max, 'fig-u', undefined, rank.indexOf(i))).join('');
+  // How big a figure is drawn: as big as fits the more crowded side across,
+  // and the biggest figure up; a very crowded side takes two rows.
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const across = (xs: number[]) => { const s = sum(xs); return s > 34 ? s / 2 : s; };
+  const sl = across(dragons.map((d) => figSize(d.maxHp)));
+  const sr = across(units.map((u) => figSize(u.max)));
+  const mx = Math.max(...dragons.map((d) => figSize(d.maxHp)), ...units.map((u) => figSize(u.max)));
+  const html = `<div class="fightscene">${backdrop(place)}
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
+      <div class="outcome">${outcome}</div>
+      <div class="battle" style="--sl:${sl.toFixed(1)};--sr:${sr.toFixed(1)};--mx:${mx.toFixed(1)}"><div class="bside bl">${side}</div><div class="bside br">${foes}</div></div>
+      ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {
     const hp = new Map<string, [number, number]>();
     dragons.forEach((d) => hp.set(`d${d.id}`, [hp0(d), d.maxHp]));
-    units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max ?? u.hp]));
+    units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max]));
     const box = (key: string) => el.querySelector<HTMLElement>(key[0] === 'u' ? `[data-u="${key.slice(1)}"]` : `[data-d="${key.slice(1)}"]`);
     const battle = el.querySelector<HTMLElement>('.battle')!;
     hits.forEach((h, n) => setTimeout(() => {
@@ -578,14 +610,15 @@ function battle(g: PublicState, head: string, dragons: DragonView[], start: Map<
       const now = h.down ? 0 : Math.max(0, cur - h.dmg);
       hp.set(to, [now, max]);
       const a = box(from), t = box(to);
+      // The attacker's element colour: a dragon's, or a defender's (steel if it has none).
+      const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : ELEMENT_COLORS[units[h.u]?.el ?? ''] ?? STEEL;
+      // The attacker lunges at what it hits.
       a?.classList.remove('strike'); void a?.offsetWidth; a?.classList.add('strike');
       if (a && t) {
-        // The stroke: from the attacker's inner edge to the target's, in the
-        // dragon's element colour, or the defenders' steel.
-        const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : '#c9ced6';
-        // The last stroke fades out under the new one, never just blinks off.
+        // The bolt: from the attacker to the target, in the attacker's
+        // colour. The last one fades out under the new one, never just blinks off.
         battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
-        battle.append(beam(battle, a, t, h.by === 'dragon', c));
+        battle.append(beam(battle, a.querySelector('.fig-body')!, t.querySelector('.fig-body')!, c));
       }
       if (t) {
         // The bar drains to its new width (style.css eases it) rather than
@@ -594,27 +627,39 @@ function battle(g: PublicState, head: string, dragons: DragonView[], start: Map<
         const { width, color } = hpFill(now, max);
         fill.style.width = width;
         fill.style.background = color;
+        t.classList.remove('hit'); void t.offsetWidth; t.classList.add('hit');
         // Hits can land faster than a number reads. A new one doesn't cut the
         // last: that one moves up a line, smaller, and fades, so a −4 sits
         // over a −8 and never beside it as one −48. Only those two are up at
-        // once, so none rises into the fighter above.
+        // once.
         t.querySelectorAll<HTMLElement>('.dmg').forEach((old) => {
           if (old.classList.contains('gone')) return old.remove();
           old.style.setProperty('--slot', '1');
           fade(old, 450);
         });
+        // A hit whose element beats its target's bursts in the attacker's colour.
         const pop = document.createElement('span');
-        pop.className = 'dmg';
-        pop.textContent = `−${h.dmg}`;
+        pop.className = h.beats ? 'dmg beats' : 'dmg';
+        pop.style.setProperty('--bc', c);
+        pop.innerHTML = `${h.beats ? burst() : ''}<b>−${h.dmg}</b>`;
         t.append(pop);
         pop.addEventListener('animationend', (e) => { if (e.target === pop && e.animationName === 'dmg') pop.remove(); });
         if (now <= 0) t.classList.add('down');
       }
     }, FIGHT_LEAD_MS + n * step));
+    const shown = outcomeAt(hits.length);
     setTimeout(() => {
       battle.querySelectorAll('.beam:not(.gone)').forEach((b) => fade(b));
       el.querySelector('.outcome')!.classList.add('show');
-    }, FIGHT_LEAD_MS + hits.length * step + 400);
+    }, shown);
+    if (scorer === null) return;
+    // The scoring beat: the crown comes down on the scorer's dragons still
+    // standing, and on their name; then their points.
+    setTimeout(() => {
+      el.classList.add('crowned');
+      el.querySelectorAll<HTMLElement>(`.fig[data-p="${scorer}"]:not(.down)`).forEach((f) => f.classList.add('king'));
+    }, shown + CROWN_AT_MS);
+    setTimeout(() => el.classList.add('scored'), shown + CROWN_AT_MS + POINTS_AT_MS);
   };
   return { html, ms, play, top };
 }
@@ -625,11 +670,13 @@ function fade(x: Element, ms = 250) {
   setTimeout(() => x.remove(), ms);
 }
 
-// A line from one fighter's facing edge to another's, drawn over the battle.
-function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, rightward: boolean, color: string): HTMLElement {
+// A bolt from one figure to another, drawn over the battle: from the
+// attacker's facing edge to the target's, at chest height.
+function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, color: string): HTMLElement {
   const o = battle.getBoundingClientRect(), ra = a.getBoundingClientRect(), rt = t.getBoundingClientRect();
-  const x1 = (rightward ? ra.right : ra.left) - o.left, y1 = ra.top + ra.height / 2 - o.top;
-  const x2 = (rightward ? rt.left : rt.right) - o.left, y2 = rt.top + rt.height / 2 - o.top;
+  const rightward = ra.left < rt.left;
+  const x1 = (rightward ? ra.right - ra.width * 0.15 : ra.left + ra.width * 0.15) - o.left, y1 = ra.top + ra.height * 0.4 - o.top;
+  const x2 = (rightward ? rt.left + rt.width * 0.2 : rt.right - rt.width * 0.2) - o.left, y2 = rt.top + rt.height * 0.45 - o.top;
   const b = document.createElement('div');
   b.className = 'beam';
   b.style.cssText = `left:${x1}px;top:${y1}px;width:${Math.hypot(x2 - x1, y2 - y1)}px;transform:rotate(${Math.atan2(y2 - y1, x2 - x1)}rad);--bc:${color}`;

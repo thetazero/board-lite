@@ -81,7 +81,7 @@ export interface LogEntry {
 
 // One hit in a raid fight: dragon `d` and defender `u` (an index into the
 // target's units); `by` says which of them struck, `down` that the one hit fell.
-export interface Hit { d: string; u: number; by: 'dragon' | 'unit'; dmg: number; down: boolean }
+export interface Hit { d: string; u: number; by: 'dragon' | 'unit'; dmg: number; down: boolean; beats?: true } // beats: the attacker's element beats the target's (double damage)
 
 // The log's events as data. The text is for the CLI and Claude players; the
 // TV and phones draw these instead.
@@ -104,7 +104,7 @@ export type GameEvent =
   // beast first; a perched dragon's carries its id as `d`. `fauna` and `name`
   // are the beast's, or null and the first perched dragon's name.
   // `hps`: each of `ds`'s health as the fight starts (as for `fight`).
-  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string }[] }
+  | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string; el?: string }[] }
   | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
   | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
   | { k: 'recall'; p: number; ds: string[] }
@@ -127,7 +127,7 @@ export type GameEvent =
   | { k: 'bail'; p: number }
   // `hps`: each of `ds`'s health as the fight starts, lined up with `ds`, so a
   // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
-  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number }[] }
+  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[] } // el: each defender's element (absent in old saves)
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'bailed' } // unable: no dragon was raid-ready
@@ -812,7 +812,7 @@ function resolveBail(g: Game) {
   }
   raid.fighters = fighters.flatMap((p) => raid.commits[p]);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
-  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp })) });
+  log(g, `Fighting: ${fighters.map(pname).join(', ')}. The attack on ${TARGETS[raid.target!].name} begins.`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })) });
   // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
   for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round);
 }
@@ -890,11 +890,12 @@ function combatRound(g: Game, b: Battle, round: number) {
     for (const ui of pickTargets(g, b, d, st.targets)) {
       const u = b.units[ui];
       const def = unitDef(g, u);
-      const dmg = elementalDamage(rollAttack(g, st), DRAGONS[d.key].element, def.element);
+      const roll = rollAttack(g, st);
+      const dmg = elementalDamage(roll, DRAGONS[d.key].element, def.element);
       u.hp = Math.max(0, u.hp - dmg);
       if (u.d) defenderHit(g, u);
       lines.push(`${d.id} hits ${def.name} #${ui + 1} for ${dmg}${u.hp === 0 ? ' (defeated)' : ''}`);
-      hits.push({ d: d.id, u: ui, by: 'dragon', dmg, down: u.hp === 0 });
+      hits.push({ d: d.id, u: ui, by: 'dragon', dmg, down: u.hp === 0, ...(dmg > roll ? { beats: true as const } : {}) });
     }
   }
   // Then the defenders.
@@ -903,11 +904,12 @@ function combatRound(g: Game, b: Battle, round: number) {
     const def = unitDef(g, u);
     for (let t = 0; t < def.targets && b.fighters.length; t++) {
       const d = dragonById(g, pick(g.rng, b.fighters));
-      const dmg = elementalDamage(rollAttack(g, def), def.element, DRAGONS[d.key].element);
+      const roll = rollAttack(g, def);
+      const dmg = elementalDamage(roll, def.element, DRAGONS[d.key].element);
       d.damage += dmg;
       const down = knockedOut(b, d);
       lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${down ? ' (knocked out, limps home)' : ''}`);
-      hits.push({ d: d.id, u: ui, by: 'unit', dmg, down });
+      hits.push({ d: d.id, u: ui, by: 'unit', dmg, down, ...(dmg > roll ? { beats: true as const } : {}) });
     }
   }
   log(g, `Combat round ${round}: ${lines.join('; ')}.`, { k: 'combat', round, hits });
@@ -1002,7 +1004,7 @@ function clearHex(g: Game, p: number, k: string, ds: Dragon[]) {
   const name = f ? faunaDef(f).name : dragonName(perched[0]);
   const foes = [...(f ? [`the ${name}`] : []), ...perched.map((d) => `${pname(d.owner)}'s ${dragonName(d)} (${d.id})`)].join(' and ');
   log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}.`, {
-    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}) })),
+    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}), el: unitDef(g, u).element })),
   });
   for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round);
   const won = b.units.every((u) => u.hp <= 0);
