@@ -26,6 +26,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
    - **Fight or bail**: each committed player secretly chooses. Bailing costs nothing, but you get no loot. This is your only way out: once the fight starts there is no retreat, and the hits a dragon takes stay on it while it heals. The more dragons fight, the faster the defenders fall and the fewer hits each takes.
    - **Combat**, in rounds: each fighting dragon hits as many defenders as its targets number, rolling its dice against each, picking defenders by its card's targeting rule. Then each defender hits random dragons. Every hit, either way, follows the **element wheel**: a hit from an element that beats what it hits deals double damage. A dragon at 0 health is knocked out and goes home. Rounds repeat until every defender or every dragon has fallen.
    - **Loot**: if every defender falls, the players with dragons still fighting split the loot by the combat power each still has fighting, rounded down. What's left over is handed out 1 at a time, the most power first (equal powers in this round's turn order), carrying on from one resource to the next: 3 equal players splitting 2 livestock and 2 gold get 1 livestock, 1 livestock, then 1 gold, and the first player gets the last gold. After every raid, each kingdom that didn't fall adds 1 gold to its loot, and the one that fell goes back to its printed loot.
+   - **Points**: the two strongest kingdoms, Cinderkeep and Titan's Throne, are also worth points (1 and 2) each time they fall. The player with the most combat power still fighting at the end scores them (a dragon counts its stage's power, hurt or not; equal powers in this round's turn order).
 
 **End of round.** Anyone holding more than 7 cards discards down to 7, choosing which; you can't discard at any other time. If anyone has 50 or more points, the highest total wins (ties: most gold, then earliest in this round's turn order).
 
@@ -63,6 +64,7 @@ Dragons are worth no points; they count toward Strongest Dragon Army.
 - Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): 2 each. Each goes adjacent to at least one of what its card names: a monument (a tower is one), a crystal field hex, an ocean hex or a trade building. No other building is worth points: not the tower, not its floors.
 - Secret Hoard cards: 2 each while in hand (hidden until the end).
 - Great beasts: 4 each to whoever slays it, for good.
+- Kingdoms: Cinderkeep 1 and Titan's Throne 2, each time one falls, to the player with the most combat power still fighting.
 - Titles, 7 each: Strongest Dragon Army (most combat power across your dragons, at least 55; eggs count 0), Tallest Tower (most floors, at least 4) and Largest Hoard (most gold, at least 20). Tower floors (6 stone and 4 gold, no card) are worth no points but count toward Tallest Tower, and each houses 1 more dragon. The holder keeps a title on a tie.
 
 ## Cards

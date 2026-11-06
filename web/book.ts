@@ -12,7 +12,7 @@
 import type { BookBuilding, FaunaView, Rulebook } from '../src/state.ts';
 import type { Portrait } from './board3d.ts';
 import { ELEMENT_COLORS, STAGE_LABEL, elemIcon, elemWords, esc, iconText, powerTag, resChips, statTag } from './common.ts';
-import { foeStack, lootLine } from './kingdom.ts';
+import { foeStack, lootLine, pointsLine } from './kingdom.ts';
 import { cardArt, frameColor } from './art.ts';
 
 export const BOOK_TABS = { board: 'Board', buildings: 'Buildings', beasts: 'Beasts', dragons: 'Dragons', elements: 'Elements', kingdoms: 'Kingdoms', cards: 'Cards' } as const;
@@ -187,7 +187,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
   },
   kingdoms(b) {
     return `<p class="bintro">Raids attack these. A kingdom that doesn’t fall adds 1 gold to its loot after every raid.</p>
-      ${b.kingdoms.map((t) => `<section class="ptarget bking" data-key="b king ${t.key}"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.6)}${lootLine(t.loot, 1.2)}</section>`).join('')}`;
+      ${b.kingdoms.map((t) => `<section class="ptarget bking" data-key="b king ${t.key}"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.6)}${lootLine(t.loot, 1.2)}${pointsLine(t, 1.2)}</section>`).join('')}`;
   },
   cards(b) {
     return `<p class="bintro">Action cards. Building cards and upgrades are under Buildings, dragon cards under Dragons.</p>

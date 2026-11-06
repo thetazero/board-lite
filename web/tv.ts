@@ -8,7 +8,7 @@ import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '.
 import {
   ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
-import { foeStack, kingdomCard, lootLine, unitIcon, voterTag } from './kingdom.ts';
+import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, unitIcon, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import type { Board3D } from './board3d.ts';
 import { qrSvg } from './qr.ts';
@@ -344,8 +344,8 @@ function talkLine(text: string, g: PublicState): string {
 
 // The raid takes over the screen while it runs. Every step is the same
 // arena: the raiders on the left, the kingdom's defenders on the right.
-function targetCard(t: TargetView): string {
-  return `<div class="target"><h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}${lootLine(t.loot, 1.6)}</div>`;
+function targetCard(t: TargetView, leader: number | null = null): string {
+  return `<div class="target"><h2>${esc(t.name)} ${powerTag(t.power, 'big')}</h2>${foeStack(t.units, 2.6)}${lootLine(t.loot, 1.6)}${pointsLine(t, 1.6, leader === null ? null : { p: leader, names })}</div>`;
 }
 
 function check(done: boolean): string {
@@ -376,7 +376,7 @@ function renderRaid(g: PublicState) {
   if (!raid) return;
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragonById(id).power, 0);
-  const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!)}</div>`;
+  const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!, pointsLeader(g, raid.commits))}</div>`;
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
@@ -514,7 +514,7 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
   }).join('');
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}${p === end.scorer ? ` +${end.points} ${icon('points', 1.6)}` : ''}</span>`).join('')}</div>`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   return battle(g, head, dragons, startHp(ev.ds, ev.hps), fled, ev.units, rounds, outcome, { round: e.round, phase: 'Raid' }, sc.ms);

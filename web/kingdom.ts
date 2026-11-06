@@ -2,7 +2,7 @@
 // you vote on. The TV, its table view (no TV) and the phone all vote on the
 // same card, so the choice looks the same wherever it's made.
 
-import type { Res, TargetView, UnitView } from '../src/state.ts';
+import type { PublicState, Res, TargetView, UnitView } from '../src/state.ts';
 import { elemWords, esc, playerTag, powerTag, resChips, statTag } from './common.ts';
 import { icon } from './icons.ts';
 
@@ -15,7 +15,25 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
   const tag = opts.tag ?? 'div';
   const lead = leadsVote(votes, power, i, n);
   return `<${tag} class="target cand${lead ? ' lead' : ''}${opts.cls ? ` ${opts.cls}` : ''}"${opts.attrs ? ` ${opts.attrs}` : ''}><h2>${esc(t.name)}</h2>
-    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${voters(votes, power, i, names)}</${tag}>`;
+    <div class="cand-fight">${powerShield(t.power, 4.4)}${foeIcons(t.units, 3)}</div>${lootLine(t.loot, 1.7)}${pointsLine(t, 1.7)}${voters(votes, power, i, names)}</${tag}>`;
+}
+
+// What a scoring kingdom is worth when it falls, and to whom: the raider with
+// the most power still fighting at the end. With `leader`, who that is now
+// (the most power sent; equal powers in turn order). Nothing for the others.
+export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; names: string[] } | null): string {
+  if (!t.points) return '';
+  const now = leader ? ` <span class="leads">${playerTag(leader.p, leader.names)} leads</span>` : '';
+  return `<div class="loot worth"><span class="loot-label">Worth</span><span class="chip">${t.points}${icon('points', size)}</span><small>to the most power standing</small>${now}</div>`;
+}
+
+// Who would score a kingdom's points if the fight ended now: the most power
+// sent (commits[p] is each player's dragons, power[id] each dragon's), equal
+// powers in turn order. Null if no one has sent any.
+export function pointsLeader(g: PublicState, commits: string[][]): number | null {
+  const power = commits.map((ids) => ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0));
+  const best = Math.max(0, ...power);
+  return best ? g.turnOrder.find((p) => power[p] === best) ?? null : null;
 }
 
 // Combat power drawn: the number on a shield, for where it has to read from across the room.

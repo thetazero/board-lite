@@ -223,6 +223,7 @@ svg.token { flex: none; }
 .ptrack i.s1 { background: color-mix(in srgb, var(--pc) 55%, #1a1218); }
 .ptrack i.s2 { background: color-mix(in srgb, var(--pc) 50%, #fff); }
 .ptrack i.s3 { background: color-mix(in srgb, var(--pc) 30%, #1a1218); }
+.ptrack i.s4 { background: color-mix(in srgb, var(--pc) 25%, #fff); }
 .pwhy span { display: inline-flex; align-items: center; gap: .25em; white-space: nowrap; }
 .pwhy span i { width: .7em; height: .7em; border-radius: 2px; }
 .ptrack.full .pbar { box-shadow: 0 0 0 .12em var(--accent); }
@@ -394,7 +395,7 @@ q::after { content: close-quote; }
 @keyframes grow-bar { from { transform: scaleX(0); } }
 .breakdown .part { flex-basis: 0; display: flex; align-items: center; justify-content: center; min-width: 1.4em; font-size: .7em; font-weight: 800; color: #fff; box-shadow: inset -2px 0 0 #fff6; }
 .breakdown .total { text-align: right; white-space: nowrap; }
-.part.buildings { background: #7a5c3e; } .part.titles { background: #c4951c; } .part.beasts { background: #6a4bb0; } .part.hand { background: #8a8296; }
+.part.buildings { background: #7a5c3e; } .part.titles { background: #c4951c; } .part.beasts { background: #6a4bb0; } .part.kingdoms { background: #b0443a; } .part.hand { background: #8a8296; }
 .partkey { display: flex; flex-wrap: wrap; gap: .4em 1.2em; justify-content: center; color: var(--ink-soft); font-size: 1.1em; }
 .partkey i { display: inline-block; width: .9em; height: .9em; border-radius: 2px; margin-right: .35em; vertical-align: -.1em; }
 
@@ -456,6 +457,9 @@ body.recap-page { font-size: 16px; }
 .weak { color: var(--good); }
 .loot { margin-top: .5em; font-size: 1.2em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .3em; }
 .loot-label { font-size: .75em; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: .2em; }
+.loot.worth { margin-top: .2em; }
+.loot.worth small { font-size: .65em; color: var(--muted); }
+.loot.worth .leads { font-size: .7em; display: inline-flex; align-items: center; gap: .25em; }
 .elem { color: color-mix(in oklab, var(--ec) 50%, var(--text)); }
 .status { margin-top: 1em; font-size: 1.4em; display: flex; gap: 1em; justify-content: center; align-items: center; flex-wrap: wrap; }
 /* A kingdom's defenders: a picture per kind, how many, health, attack, and what it is weak to */
@@ -1042,11 +1046,13 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 /* The phone's open panels come in rather than appear. */
 .pbody > :is(.panel, .offer) { animation: enter .25s ease-out; }
 /* The vote on a phone-sized card (the table view, the phone): loot down the right, so a wide card isn't half empty. */
-:is(.remote, body.phone) .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "voters voters"; align-items: center; gap: .3em .8em; }
+:is(.remote, body.phone) .cand { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name name" "fight loot" "worth worth" "voters voters"; align-items: center; gap: .3em .8em; }
 :is(.remote, body.phone) .cand h2 { grid-area: name; }
 :is(.remote, body.phone) .cand .cand-fight { grid-area: fight; flex-wrap: nowrap; }
 :is(.remote, body.phone) .cand .loot { grid-area: loot; justify-self: end; flex-direction: column; align-items: flex-end; gap: .1em; }
 :is(.remote, body.phone) .cand .loot .chip { margin-right: 0; }
+/* what a scoring kingdom is worth: a row of its own under the fight and the loot */
+:is(.remote, body.phone) .cand .loot.worth { grid-area: worth; justify-self: start; flex-direction: row; align-items: center; gap: .1em .3em; }
 :is(.remote, body.phone) .cand .voters { grid-area: voters; }
 /* The hex tapped while placing a beast or an upgrade: whose building it is and what it does, before the confirm. */
 .pchosen { margin: 0; min-height: 3.6em; }

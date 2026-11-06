@@ -183,7 +183,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 ## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
@@ -251,19 +251,23 @@ Defenders:
 | Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice |
 | Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air |
 | Sea Serpent | 8 | 14 | 2×1d4 (5) | water |
+| Fire Giant | 50 | 96 | 2×2d12 (26) | fire |
+| Titan | 79 | 160 | 2×3d12 (39) | lightning |
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
-| Kingdom | Defenders | Power | Total health | Avg damage a round | Loot |
-|---|---|---|---|---|---|
-| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold |
-| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold |
-| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold |
-| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold |
-| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold |
-| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold |
+| Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Points |
+|---|---|---|---|---|---|---|
+| Hamlet of Brindle | Militia, Militia | **8** | 10 | 5 | 2 livestock, 1 gold | — |
+| Archer's Hold | Archers, Archers, Archers, Militia | **19** | 23 | 13 | 4 timber, 4 gold | — |
+| Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold | — |
+| Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold | — |
+| Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold | — |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold | — |
+| Cinderkeep | Fire Giant, Knights, Knights, Knights | **71** | 132 | 39.5 | 16 crystal, 16 livestock, 62 gold | 1 |
+| Titan's Throne | Titan, Storm Griffin, Storm Griffin, Storm Griffin, Knights, Knights, Knights | **121** | 226 | 66 | 18 stone, 18 timber, 17 crystal, 190 gold | 2 |
 
 Healing: a hurt dragon heals 7 health at each production it's fed, instead of growing. It fights with the health it has left; only a knocked-out one (0 health) can't fight, and its next fed production brings it back. From knocked out to whole, a base dragon takes: hatchling 1, young 2, adult 3 rounds of not growing; the Frost Wyrm, the toughest adult, 5.
 
@@ -305,8 +309,8 @@ How much of each resource every card in both decks costs in total (each card cou
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|
-| stone | 150 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (1 of 6 kingdoms) |
-| timber | 143 | 17% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (1 of 6 kingdoms) |
-| crystal | 328 | 39% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (1 of 6 kingdoms) |
-| livestock | 158 | 19% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (2 of 6 kingdoms), clearing fauna |
-| gold | 62 | 7% | Market, raid loot (6 of 6 kingdoms), clearing fauna |
+| stone | 150 | 18% | tower 1, Quarry, Cliff Works, Stonemason, raid loot (2 of 8 kingdoms) |
+| timber | 143 | 17% | tower 1, Lumber Camp, Woodcutter's Hut, Sawmill, Driftwood Yard, raid loot (2 of 8 kingdoms) |
+| crystal | 328 | 39% | tower 1, Crystal Mine, Crystal Spire, Gem Cutter, Smelter, raid loot (3 of 8 kingdoms) |
+| livestock | 158 | 19% | tower 1, Pasture, Shepherd's Fold, Drovers' Barn, Fishery, raid loot (3 of 8 kingdoms), clearing fauna |
+| gold | 62 | 7% | Market, raid loot (8 of 8 kingdoms), clearing fauna |

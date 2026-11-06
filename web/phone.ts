@@ -9,7 +9,7 @@ import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Sna
 import {
   ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
-import { foeStack, kingdomCard, lootLine, voterTag } from './kingdom.ts';
+import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
@@ -1127,8 +1127,9 @@ function fitMap(g: PublicState) {
 // ---- raid ----
 
 // The kingdom under attack, drawn: its defenders by kind and its loot.
-function targetPanel(t: TargetView): string {
-  return `<section class="ptarget"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.8)}${lootLine(t.loot, 1.4)}</section>`;
+// A kingdom that scores also shows what it's worth, and who leads for it.
+function targetPanel(t: TargetView, leader: number | null = null): string {
+  return `<section class="ptarget"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.8)}${lootLine(t.loot, 1.4)}${pointsLine(t, 1.4, leader === null ? null : { p: leader, names })}</section>`;
 }
 
 // Each raid step is its choices as buttons. A choice once made stays on screen,
@@ -1145,10 +1146,11 @@ function raidView(g: PublicState, me: Me): string {
     return worth + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names,
       { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
+  const lead = pointsLeader(g, raid.commits);
   if (raid.step === 'commit') {
-    if (!me.raidReady.length) return targetPanel(raid.target!); // nobody fit to go: the roost above shows why
+    if (!me.raidReady.length) return targetPanel(raid.target!, lead); // nobody fit to go: the roost above shows why
     const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
-    return `${targetPanel(raid.target!)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
+    return `${targetPanel(raid.target!, lead)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
   }
   if (raid.step === 'bail') {
     const mine = raid.commits[me.seat];
@@ -1157,13 +1159,13 @@ function raidView(g: PublicState, me: Me): string {
       ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.commits[p]))}</div>`] : [])).join('');
     // Under the kingdom, the dragons sent against it: yours first, under "You", then each other player's.
     const sentHead = `<h3 class="ask">Dragons sent</h3>`;
-    if (!mine.length) return `${targetPanel(raid.target!)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
+    if (!mine.length) return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
     // Alone, the loot is all yours, so Fight shows it; shared, how much is yours depends on who fights.
     const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
     const split = others ? '<p class="hint">Everyone who fights splits the loot by power.</p>' : '';
-    return `${targetPanel(raid.target!)}${sentHead}
+    return `${targetPanel(raid.target!, lead)}${sentHead}
       <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}${split}
       <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>

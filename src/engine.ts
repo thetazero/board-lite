@@ -129,7 +129,7 @@ export type GameEvent =
   // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
   | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number }[] }
   | { k: 'combat'; round: number; hits: Hit[] }
-  | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[] } // shares and power line up with winners
+  | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'bailed' } // unable: no dragon was raid-ready
   | { k: 'again' }
   | { k: 'begin'; players: number }
@@ -160,6 +160,7 @@ export interface Game {
   hoard: Record<string, number>;
   titles: Record<Title, number | null>;
   slain: Record<string, number>; // great beasts slain, and by whom
+  raidPoints: number[]; // each player's points from kingdoms that score (#321)
   beastTried: number[]; // the last round each player fought a great beast
   winner: number | null;
   nextId: number;
@@ -468,6 +469,7 @@ export interface Score {
   monuments: number; // the monument cards' share of those
   titles: number;
   beasts: number; // great beasts slain
+  raids: number; // kingdoms that score, taken
   hidden: number;
   public: number;
   total: number;
@@ -482,8 +484,9 @@ export function score(g: Game, p: number): Score {
   const titles = (Object.values(g.titles).filter((h) => h === p).length) * TUNING.titlePoints;
   const hidden = g.players[p].hand.reduce((s, c) => s + (ACTIONS[c.key]?.effect === 'hidden_point' ? ACTIONS[c.key].amount ?? 0 : 0), 0);
   const beasts = Object.entries(g.slain).filter(([, by]) => by === p).reduce((s, [k]) => s + BEASTS[k].points, 0);
-  const pub = buildings + titles + beasts;
-  return { buildings, monuments, titles, beasts, hidden, public: pub, total: pub + hidden };
+  const raids = g.raidPoints?.[p] ?? 0;
+  const pub = buildings + titles + beasts + raids;
+  return { buildings, monuments, titles, beasts, raids, hidden, public: pub, total: pub + hidden };
 }
 
 // ---------- setup ----------
@@ -518,6 +521,7 @@ export function newGame(players: number, seed: number): Game {
     hoard: Object.fromEntries(Object.keys(TARGETS).map((t) => [t, 0])),
     titles: { army: null, tower: null, hoard: null },
     slain: {},
+    raidPoints: Array(players).fill(0),
     beastTried: Array(players).fill(0),
     winner: null,
     nextId: 1,
@@ -934,6 +938,13 @@ export function splitLoot(loot: Bundle, power: number[], order: number[] = power
   return shares;
 }
 
+// Who has the most power (power[p], 0 for not fighting); equal powers go in
+// `order`, the round's turn order. Undefined if no one has any.
+export function pointsLeader(power: number[], order: number[]): number | undefined {
+  const best = Math.max(0, ...power);
+  return best ? order.find((p) => power[p] === best) : undefined;
+}
+
 function checkRaidOver(g: Game): boolean {
   const raid = g.raid!;
   if (raid.units.every((u) => u.hp <= 0)) {
@@ -941,10 +952,20 @@ function checkRaidOver(g: Game): boolean {
     const power = g.players.map((_, p) => raid.fighters.reduce((s, id) => { const d = dragonById(g, id); return s + (d.owner === p ? dragonPower(d) : 0); }, 0));
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
-    const shares = splitLoot(loot, power, turnOrder(g));
+    const order = turnOrder(g);
+    const shares = splitLoot(loot, power, order);
     for (const p of winners) gain(g.players[p], shares[p]);
     const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
-    log(g, `${TARGETS[raid.target!].name} falls. ${take}.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]) });
+    // A kingdom that scores gives its points to the most power still
+    // fighting; equal powers go in turn order, as the loot's odd ones do.
+    const points = TARGETS[raid.target!].points;
+    const scorer = points ? pointsLeader(power, order) : undefined;
+    if (points && scorer !== undefined) {
+      g.raidPoints ??= g.players.map(() => 0);
+      g.raidPoints[scorer] += points;
+    }
+    const scored = points && scorer !== undefined ? ` ${pname(scorer)} has the most power standing and scores ${points} point${points === 1 ? '' : 's'}.` : '';
+    log(g, `${TARGETS[raid.target!].name} falls. ${take}.${scored}`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]), ...(points && scorer !== undefined ? { points, scorer } : {}) });
     finishRaid(g, raid.target!);
     return true;
   }

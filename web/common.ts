@@ -11,7 +11,7 @@ export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as 
 
 // The lobby and the join form show the goal before there's a game to read it from.
 // It must match TUNING.pointsToWin in src/data.ts; test/server.test.ts checks it does.
-export const POINTS_TO_WIN = 30;
+export const POINTS_TO_WIN = 50;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
 export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
@@ -133,6 +133,7 @@ function pointParts(p: PlayerPoints): { label: string; n: number }[] {
     { label: 'Monuments', n: p.monuments },
     { label: 'Titles', n: p.titles },
     { label: 'Great beasts', n: p.beasts },
+    { label: 'Kingdoms', n: p.raids },
   ].filter((x) => x.n > 0);
 }
 
@@ -301,7 +302,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
     case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
     case 'raidEnd': return ev.won
-      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}`).join(', ')}`
+      ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}${p === ev.scorer ? ` +${ev.points} ${icon('points', 1.2)}` : ''}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;

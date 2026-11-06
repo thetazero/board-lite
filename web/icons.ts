@@ -309,6 +309,26 @@ const ICONS: Record<string, Facet[]> = {
     ['#7fb6e6', P([[2, 6], [6, 7.5], [2, 7.2], [-2, 7.5]])],
   ],
 
+  // A fire giant's head: a crown of flame over a craggy face.
+  fire_giant: [
+    ['#ffb02e', P([[-8, -3], [-6.5, -10], [-3.5, -5], [0, -10], [3.5, -5], [6.5, -10], [8, -3]])],
+    ['#e5484d', P([[-6, -3], [-4.5, -7.5], [-2, -4], [0, -7.5], [2, -4], [4.5, -7.5], [6, -3]])],
+    ['#b8573a', P([[-7, -3], [0, -3.5], [0, 10], [-5, 8.5], [-7.5, 3]])],
+    ['#7d3622', P([[0, -3.5], [7, -3], [7.5, 3], [5, 8.5], [0, 10]])],
+    ['#ffd23f', P([[-4.6, -0.2], [-1.4, 0.4], [-1.4, 1.6], [-4.6, 1.2]])],
+    ['#ffd23f', P([[1.4, 0.4], [4.6, -0.2], [4.6, 1.2], [1.4, 1.6]])],
+    ['#3a160d', P([[-3, 5], [3, 5], [2, 6.4], [-2, 6.4]])],
+  ],
+  // A titan's helmed head, a lightning bolt across it.
+  titan: [
+    ['#c9ced8', P([[-7.5, -4], [0, -9.5], [0, 10], [-6.5, 7]])],
+    ['#7f8796', P([[0, -9.5], [7.5, -4], [6.5, 7], [0, 10]])],
+    ['#22262e', P([[-5.5, -1], [5.5, -1], [5.5, 1], [-5.5, 1]])],
+    ['#a9b0bb', P([[-0.5, 1], [0.5, 1], [0.5, 10], [-0.5, 10]])],
+    ['#ffe14d', P([[4, -10], [-2.5, -1.5], [1, -1.5], [-4, 9], [4.5, -3], [1, -3]])],
+    ['#d4a800', P([[1, -3], [4.5, -3], [-4, 9]])],
+  ],
+
   // ---- the fauna: wild beasts holding hexes of the map ----
   // A grey wolf's head, ears up.
   wolf_pack: [
@@ -384,7 +404,7 @@ export const ICON_NAMES = Object.keys(ICONS);
 
 const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'tallest tower', hoard: 'largest hoard', d4: 'four-sided die', d6: 'six-sided die', d8: 'eight-sided die', d4face: 'four-sided die', d6face: 'six-sided die', d8face: 'eight-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds',
-  militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent',
+  militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent', fire_giant: 'Fire Giant', titan: 'Titan',
   wolf_pack: 'Wolf Pack', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).

@@ -34,7 +34,7 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
     if (!ev || e.to) continue;
     if (ev.k === 'title') roundTitles[ev.t] = ev.p;
     else if (ev.k === 'cleared' && ev.won && ev.points) moments.push({ round, k: 'beast', p: ev.p, key: ev.fauna ?? '', name: ev.name, points: ev.points });
-    else if (ev.k === 'raidEnd' && ev.won) moments.push({ round, k: 'fall', name: ev.name, ps: ev.winners });
+    else if (ev.k === 'raidEnd' && ev.won) moments.push({ round, k: 'fall', name: ev.name, ps: ev.winners, ...(ev.scorer !== undefined ? { points: ev.points, scorer: ev.scorer } : {}) });
   }
   closeRound();
   // A title move goes after the round's fights, which are what usually move it.
@@ -53,7 +53,7 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
     race,
     standings: order.map((s) => {
       const sc = score(g, s.p);
-      return { p: s.p, place: s.place, tied: s.tied, tiebreak: s.tiebreak, total: s.total, buildings: sc.buildings, titles: sc.titles, beasts: sc.beasts, hidden: sc.hidden };
+      return { p: s.p, place: s.place, tied: s.tied, tiebreak: s.tiebreak, total: s.total, buildings: sc.buildings, titles: sc.titles, beasts: sc.beasts, raids: sc.raids, hidden: sc.hidden };
     }),
     moments,
   };

@@ -20,7 +20,7 @@ Hard ceilings, set provisionally by the orchestrator at the owner's request ("tr
 - No cap on building or upgrade types. The owner, 2026-11-03: "the 10 building limit is stupid and the exact opposite of what I want, I want lots of fun variety." (The 6-upgrade cap went with it, as an orchestrator call in the same spirit.) Variety comes as many cards within a few classes.
 - At most 12 distinct non-dragon action card effects.
 - A dragon card is: element, growth time, stats per life stage, and one targeting rule. Nothing else.
-- At most 6 raid unit types, each just stats plus an element.
+- At most 8 raid unit types, each just stats plus an element. (6 until #321, raised for the two point-scoring kingdoms' leaders, the Fire Giant and the Titan: the owner asked for "some new strong enemies that are 2/3rds of the CP here... a single unit".)
 - At most 3 kinds of fauna, each just stats, an element, and its loot.
 - At most 2 great beasts, each just stats, an element, its points, and where it lives.
 - Any card's text is one short sentence.
@@ -115,7 +115,8 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
   - Hidden points on action cards, kept in hand until the end (they count toward the 7-card cap). Secret Hoard is worth 2 (1 until #134): the owner, "fair since it hogs slots in your hand".
   - Titles that change hands, like Catan's "longest road": strongest dragon army, tallest tower, largest hoard (#109), 7 points each (6 until #316, 3 until the point-scale PR of #134, 2 before). The army title goes to the most combat power across a player's dragons (most dragon points until #134). Kept to these three. Largest territory is dropped: "it just intensifies ecomic snowball, while talesr tower is: 1. literally visually cool 2. a side quest/resource sink" (owner, 2026-11-03). Tower floors count toward the tower title, and each houses 1 dragon (#323; the owner: "yes 1 dragon capacity per floor pls", so the tower isn't only a title chase).
   - Titles take real investment. The owner, of the army and territory titles: "strongest army and largest territory need a larger threshold".
-  - Raids give loot only, no points. Great beasts aren't raids: slaying one is worth 4 points (2 until #134, 1 until #80).
+  - Great beasts: slaying one is worth 4 points (2 until #134, 1 until #80).
+  - The top two kingdoms (#321): Cinderkeep (about 70 combat power) scores 1 point and Titan's Throne (about 120) 2, every time one falls, for the raider with the most combat power still fighting at the end, counted at each dragon's stage power, not weighted by health. Every other raid gives loot only. The owner: "how to make late game dragons give VPs, that push you over the edge to victory. at around 1 VP a round max", "how about most CP left standing?", "correct it should not be healthy weighted, no new rule". It's a way to score that needs no land: at 50 points, bot games stalled with the board full and the leader at 40–46. Each is led by one strong unit worth about two thirds of its power (the Fire Giant 50, the Titan 79), "so it's actually a real challenge with casualties", but not so hard a big army can't take it alone. No cap: "if you can grind through 140CP worth of stuff in a round good for you". Their loot follows the same curve as the rest ("lots of loot, scaling just as before"), so voting for one is a choice between loot for everyone and points for the biggest army: "gold glut is the point? this is a dragon game."
 
 ## Buildings
 
