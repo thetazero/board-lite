@@ -98,3 +98,19 @@ test("no recap until the game is over", () => {
   assert.equal(room.snapshot(null).recap ?? null, null);
   room.close();
 });
+
+test("the recap's charts leave room at the right for the longest name and its number", async () => {
+  const { madeSvg, powerSvg, raceSvg } = await import('../web/recap-view.ts');
+  const g = finished(3, 4);
+  const r = buildRecap(g, ['Maximilianus', 'Wilhelmina W', 'tom donnelly', 'Ada'], 'abc', new Date(0));
+  for (const svg of [raceSvg(r, { width: 600, height: 400 }), powerSvg(r, { width: 600, height: 300 }), madeSvg(r, { width: 600, height: 300 })]) {
+    const W = Number(svg.match(/viewBox="0 0 (\d+)/)![1]);
+    for (const [, x, name, n] of svg.matchAll(/<text class="who"[^>]* x="([\d.]+)"[^>]*>([^<]*) <tspan class="pts">(\d+)</g)) {
+      // Heavy 22px letters run about 12 wide on average (Maximilianus 156 measures 192 on a phone): the label ends inside the chart.
+      assert.ok(Number(x) + 13 * `${name} ${n}`.length <= W, `${name} ${n} fits`);
+    }
+  }
+  // The three charts line up: the same room on the right.
+  const right = (svg: string) => Number(svg.match(/<line class="grid" x1="[\d.]+" x2="([\d.]+)"/)![1]);
+  assert.equal(right(raceSvg(r, { width: 600 })), right(powerSvg(r, { width: 600 })));
+});

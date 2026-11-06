@@ -46,6 +46,22 @@ interface Lines {
   marks?: (x: (round: number) => number, y: (v: number) => number, upTo: number) => string[];
 }
 
+// About how wide a line's end label is, in viewBox units at .race .who's
+// 22px, heavy weight: generous, so a long name's number is never cut off.
+function labelWidth(text: string): number {
+  let w = 0;
+  for (const ch of text) w += /[MW]/.test(ch) ? 21 : /[A-Z]/.test(ch) ? 16 : /[mw]/.test(ch) ? 19 : /[ijlI.,'!|: ]/.test(ch) ? 7 : 14;
+  return w;
+}
+
+// Room on the right for the names at the lines' ends: the longest name with
+// the widest number any of the charts ends on, so they all line up.
+function rightMargin(r: Recap): number {
+  const top = Math.max(0, ...r.race.flat(), ...(r.power ?? []).flat(), ...(r.made ?? []).flat());
+  const num = '0'.repeat(String(top).length);
+  return Math.max(150, ...r.names.map((n) => 14 + labelWidth(`${n} ${num}`) + 8));
+}
+
 /**
  * Everyone's lines over the rounds, the leader on top, each ending in a dot
  * and their name and number. With `upTo`, only that far: the TV draws it a
@@ -56,7 +72,7 @@ function linesSvg(r: Recap, c: Lines, opts: RaceOptions): string {
   const H = opts.height ?? 520;
   const { last, from } = c;
   const upTo = Math.min(opts.upTo ?? last, last);
-  const L = 44, R = 150, T = 18, B = 58; // margins: values on the left, names on the right, rounds below
+  const L = 44, R = rightMargin(r), T = 18, B = 58; // margins: values on the left, names on the right, rounds below
   const top = Math.max(1, c.goal?.v ?? 0, ...c.rows.flat());
   const step = niceStep(top);
   const yMax = Math.ceil((top + step / 5) / step) * step;

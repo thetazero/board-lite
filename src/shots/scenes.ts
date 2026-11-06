@@ -1007,6 +1007,19 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // The recap's charts with the longest names: each line's name and number fit at its end.
+    name: 'over-long-4p',
+    players: 4,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.phase === 'over',
+    shots: (g) => [
+      { file: 'phone-recap-page-long', caption: 'The recap page with long names: every chart shows each name and number in full', client: 'phone', path: (room) => `/recap/${room.recapId}`, waitFor: '.recap-page .sheet' },
+      { file: 'tv-recap-growth-long-4p', caption: 'TV, at the end: dragon power and production with long names', client: 'tv', run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
+      { file: 'tv-recap-race-end-long-4p', caption: 'TV, at the end: the whole race with long names', client: 'tv', run: summaryAt(-3), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+    ],
+  },
+  {
     name: 'over-6p',
     players: 6,
     // Seed 1's bots stopped finishing once tower floors housed dragons (#323).
