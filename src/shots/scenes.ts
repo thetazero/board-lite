@@ -74,7 +74,7 @@ const MAX_STEPS = 30000;
 // The TV's summary at the end of a game, played from step n (from the end if
 // negative), once the TV has the recap.
 const summaryAt = (n: number) => `new Promise((done) => {
-  const go = () => document.querySelector('.endbox.with-recap') ? done(window.summaryAt(${n})) : setTimeout(go, 30);
+  const go = () => document.querySelector('.endbox #replay') ? done(window.summaryAt(${n})) : setTimeout(go, 30);
   go();
 })`;
 
@@ -1548,7 +1548,9 @@ export const SCENES: Scene[] = [
     until: (g) => g.phase === 'over',
     shots: (g) => [
       { file: 'phone-remote-over-4p', caption: 'No TV: the end, on your own view', client: 'phone', seat: g!.winner! },
-      { file: 'tv-remote-over-4p', caption: 'No TV: the final scores on the table view', client: 'tv', table: true, sizes: true },
+      { file: 'tv-remote-over-4p', caption: "No TV: the final scores on the table view, with a link to the game's recap", client: 'tv', table: true, sizes: true },
+      { file: 'tv-remote-recap-race-4p', caption: 'No TV, at the end: the points race on the table view, here round 12', client: 'tv', table: true, sizes: true, run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
+      { file: 'tv-remote-recap-points-4p', caption: "No TV, at the end: where everyone's points came from, on the table view", client: 'tv', table: true, run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
     ],
   },
 ];

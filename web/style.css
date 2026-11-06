@@ -54,7 +54,7 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 /* Paper: on any of these, words are ink, and colours that were picked for the
    night table are inked darker. */
 .pcard, .side .corner, .panel, .production, .result, .endbox, .summary, .recap-page .sheet, .target, .roost, .offer, .ptarget, .big-note, .mylog, .watchtv,
-.talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), input, select {
+.talkbar, .card, .mehead, .ally, .sent, .pover .standings, .pmap, .toast, .join-box, .seatcard, .seatlist li, button:not(.primary), a.button:not(.primary), input, select {
   --text: var(--ink); --muted: var(--ink-soft); --line: var(--paper-edge);
   --good: #1f8a47; --bad: #c0392b; --warn: #b35a00; --heal: #c0392b; --hit: #c0392b;
   color: var(--text);
@@ -66,17 +66,19 @@ body { background: var(--table); background-color: var(--bg); background-attachm
 
 /* Buttons: a tab of matte card standing up off the sheet, as thick as its
    hard edge below; pressed, it lies flat. Plain is cream card, primary blue,
-   ghost the table's own night card (a kraft tab on a sheet), chosen gold. */
-button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); border: 0; border-radius: 2px; padding: .5em .9em; cursor: pointer;
+   ghost the table's own night card (a kraft tab on a sheet), chosen gold.
+   A link that leaves the game (a.button) looks the same. */
+button, a.button { font: inherit; font-weight: 700; color: var(--text); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); border: 0; border-radius: 2px; padding: .5em .9em; cursor: pointer;
   --edge: var(--paper-edge); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a66; transition: transform .08s, box-shadow .08s; }
-button:active:not(:disabled) { transform: translateY(.14em); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .02em 0 var(--edge), 0 .06em .1em #0b081a66; }
+button:active:not(:disabled), a.button:active { transform: translateY(.14em); box-shadow: inset 0 1px 0 #fffbf0b3, 0 .02em 0 var(--edge), 0 .06em .1em #0b081a66; }
 button:disabled { opacity: .45; cursor: default; box-shadow: 0 .06em 0 var(--edge); }
-button.primary { --text: #fff; --muted: #e3e9ff; --edge: #213f8a; color: #fff; background: var(--grain), var(--mottle), linear-gradient(180deg, #4d7bdf, #3c68cb); box-shadow: inset 0 1px 0 #ffffff40, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; text-shadow: 0 1px 0 #0003; }
-button.primary:active:not(:disabled) { box-shadow: inset 0 1px 0 #ffffff40, 0 .02em 0 var(--edge); }
+button.primary, a.button.primary { --text: #fff; --muted: #e3e9ff; --edge: #213f8a; color: #fff; background: var(--grain), var(--mottle), linear-gradient(180deg, #4d7bdf, #3c68cb); box-shadow: inset 0 1px 0 #ffffff40, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; text-shadow: 0 1px 0 #0003; }
+button.primary:active:not(:disabled), a.button.primary:active { box-shadow: inset 0 1px 0 #ffffff40, 0 .02em 0 var(--edge); }
 button.ghost { --text: var(--paper); --edge: #15112a; color: var(--paper); background: var(--table-grain), var(--mottle), linear-gradient(180deg, #4b4279, #3d3567); box-shadow: inset 0 1px 0 #ffffff24, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a77; }
 :is(.talkbar, .panel, .pmap) button.ghost { --text: var(--ink); --edge: #a38a5c; color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #e6d7b6, #d8c59e); box-shadow: inset 0 1px 0 #fffbf080, 0 .16em 0 var(--edge), .05em .28em .12em #0b081a55; }
 button.small { padding: .2em .5em; font-size: .85em; }
-button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
+button.big, a.button.big { font-size: 1.15em; padding: .8em 1em; width: 100%; }
+a.button { display: inline-block; box-sizing: border-box; text-align: center; text-decoration: none; }
 input, select { font: inherit; background: var(--grain), #fffaf0; border: 1px solid var(--paper-edge); border-radius: 2px; padding: .5em; box-shadow: inset 0 .12em .2em #0002; }
 small { color: var(--muted); }
 /* Headings and banners in the cards' book face. */
@@ -337,7 +339,7 @@ q::after { content: close-quote; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }
 .endbox .tiebreak { margin: 0 0 .3em; color: var(--muted); font-size: 1.2em; }
 .endbox .standings { font-size: 1.5em; margin: .5em 2em; }
-.endbox button { font-size: 1.4em; margin-top: .6em; }
+.endbox :is(button, a.button) { font-size: 1.4em; margin-top: .6em; }
 .endbox .endactions { display: flex; gap: .8em; justify-content: center; }
 /* With the recap's QR code beside the standings, for anyone to scan on the way out. */
 .endbox .endbody { display: flex; align-items: center; justify-content: center; gap: 1.5em; margin: 0 2em; }
@@ -781,7 +783,8 @@ button.allpick, button.allpick.on { flex: none; white-space: nowrap; display: fl
 .pover h1 { margin: .5em 1rem 0; font-size: 2em; }
 .pover .tiebreak, .pover .mine { margin: .2em 1rem 0; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: .25em; }
 .pover .standings { font-size: 1.2em; margin: .8em 1rem; }
-.pover button { margin: 0 1rem; width: auto; }
+.pover :is(button, a.button) { margin: 0 1rem; width: auto; }
+.pover a.button + button { margin-top: .8em; }
 
 /* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
 body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100% tall, or the padding sits at the first screen's bottom, not after the page */
@@ -996,6 +999,17 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .production .pstage { font-size: 1.3em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
+.remote .endbox .endbody { margin: 0; }
+.remote .endbox :is(button, a.button) { font-size: 1.1em; }
+.remote .endbox .endactions { flex-wrap: wrap; padding: 0 .6em; }
+/* The summary on a phone: the race over what happened, one above the other. */
+.remote .summary { width: 100%; padding: .6em .8em 3.6em; }
+.remote .summary h1 { font-size: 1.6em; }
+.remote .summary .sumbody { grid-template-columns: minmax(0, 1fr); gap: .8em; min-height: 0; }
+.remote .summary .told { font-size: 1em; }
+.remote .summary > button { right: .8em; bottom: .8em; }
+.remote .summary.points-step { width: 100%; padding-bottom: 3.6em; }
+.remote .summary.points-step .breakdown { font-size: 1.05em; }
 .remote .raidbox { width: 100%; max-height: none; overflow: visible; }
 .remote .raidbox h1 { font-size: 1.7em; }
 .remote .target { min-width: 0; width: 100%; padding: .6em .8em; }

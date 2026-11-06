@@ -53,6 +53,8 @@ Each phone has a **You / Table** switch by the talk bar: Table shows what the TV
 
 The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, scenes cut to it only from then on, and You stays on.
 
+When the game ends, the table plays the same summary as the TV, as a scene the phone cuts to, and ends on the final scores with **Watch again** and **Open the recap** (the recap page) in place of the QR code. Every phone's own end screen has **Open the recap** too, with a TV or without.
+
 ## Playing from the command line
 
 ```
