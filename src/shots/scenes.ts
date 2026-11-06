@@ -706,6 +706,26 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-titan-fight-3p', caption: "TV: a fight on Titan's Throne mid-replay: the Titan looms over everything", client: 'tv', live: true, waitMs: 2900 }],
   },
   {
+    // The same fight with no TV, on a phone held upright: each side stands
+    // its figures one above another, and past four starts another column.
+    name: 'remote-titan-fight-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b] = turnOrder(g);
+      for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3, 3] : p === b ? [3, 3, 3, 3] : [0]);
+      toVote(g);
+      g.raid!.candidates[0] = 'titans_throne';
+      vote(g, 'titans_throne');
+      toBail(g, [a, b]);
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'phone-remote-titan-fight-3p', caption: "No TV: Titan's Throne on a phone: each side in columns of up to four", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2900 }],
+  },
+  {
     name: 'bail-3p',
     players: 3,
     seed: 1,

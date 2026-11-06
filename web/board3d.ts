@@ -34,6 +34,10 @@ const GROUND = TOP + PLATE_H; // where a building stands on its plate
 // from top-down. Lower shows more of the models' fronts and
 // sides; straight down would flatten them.
 const CAMERA_TILT = 1.13;
+// How far the stage's camera looks down (radians; about 36 degrees). The
+// map's is CAMERA_TILT; the stage keeps lower, so the places'
+// walls and the fighters' faces still show.
+const STAGE_TILT = 0.63;
 
 // Paper colours. Terrain is the phone map's colours, so the two maps match.
 const WALL = '#f1e8d4';
@@ -2720,37 +2724,145 @@ function portraitScene(p: Portrait): THREE.Scene {
 // once, with the board's paper and light, to an image the fight scene
 // (tv.ts) moves about; nothing here animates.
 
-// A defender standing on two legs, facing +x: legs, a tunic flared like a
-// paper skirt, a chest, two arms and a faceted head. `chunk` thickens it for
-// the giants.
+// ---------- folds ----------
+// The fight's own pieces are folded from sheets, as origami is: pleated
+// cones and tubes, kites bent along their middle, gable roofs, each a thin
+// sheet coloured on its face and white on its back, so where a fold turns
+// it over the white shows.
+
+const BACK = '#fbf6ea';
+const BACKS = new Map<string, THREE.MeshLambertMaterial>();
+function backPaper(color = BACK): THREE.MeshLambertMaterial {
+  let m = BACKS.get(color);
+  if (!m) {
+    GRAIN ??= paperTexture();
+    m = new THREE.MeshLambertMaterial({ color, map: GRAIN, flatShading: true, side: THREE.BackSide });
+    BACKS.set(color, m);
+  }
+  return m;
+}
+
+// A folded sheet: its face in `color`, its back white, its folds creased.
+function leaf(geo: THREE.BufferGeometry, color: string, o: PartOpts & { back?: string } = {}): THREE.Mesh {
+  const m = part(geo, color, { ...o, two: false });
+  const b = new THREE.Mesh(geo, backPaper(o.back));
+  b.castShadow = true;
+  b.receiveShadow = true;
+  m.add(b);
+  return m;
+}
+
+// A cone folded in pleats: its rim zigzags in and out (`depth` of the
+// radius) `n` times round, its point at the top, open underneath.
+function pleatCone(r: number, h: number, n: number, depth = 0.3): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [[0, h / 2, 0]];
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2, rr = i % 2 ? r * (1 - depth) : r;
+    pts.push([Math.cos(a) * rr, -h / 2, Math.sin(a) * rr]);
+  }
+  const tris: number[][] = [];
+  for (let i = 0; i < n * 2; i++) tris.push([0, 1 + ((i + 1) % (n * 2)), 1 + i]);
+  return sheet(pts, tris);
+}
+
+// A tube folded in pleats (a tower's wall, a quiver): open at both ends,
+// standing on y = 0, narrowing from `r` at the foot to `rt` at the top.
+function pleatTube(r: number, rt: number, h: number, n: number, depth = 0.2): THREE.BufferGeometry {
+  const ring = (y: number, R: number) => Array.from({ length: n * 2 }, (_, i) => {
+    const a = (i / (n * 2)) * Math.PI * 2, rr = i % 2 ? R * (1 - depth) : R;
+    return [Math.cos(a) * rr, y, Math.sin(a) * rr] as [number, number, number];
+  });
+  const pts = [...ring(0, r), ...ring(h, rt)], m = n * 2, tris: number[][] = [];
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    tris.push([i, m + i, j], [j, m + i, m + j]);
+  }
+  return sheet(pts, tris);
+}
+
+// A kite folded along its middle, from the origin up `len` to its point,
+// its two halves `w` wide bent back (to -x) by `bend`: a leg, an arm, a
+// blade, a flame, a feather.
+function kite(len: number, w: number, bend = w * 0.6, at = 0.3): THREE.BufferGeometry {
+  return sheet([[0, 0, 0], [0, len, 0], [-bend, len * at, w], [-bend, len * at, -w]], [[0, 1, 2], [0, 3, 1]]);
+}
+
+// A wall folded like a fan: an accordion of `n` pleats along x, `d` deep,
+// its top cut into battlements when `teeth`.
+function pleatWall(len: number, h: number, n: number, d: number, teeth = false): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [], tris: number[][] = [];
+  for (let i = 0; i <= n; i++) {
+    const x = -len / 2 + (i / n) * len, z = i % 2 ? -d : 0, top = teeth && i % 2 ? h * 0.86 : h;
+    pts.push([x, 0, z], [x, top, z]);
+    if (i) tris.push([(i - 1) * 2, i * 2, (i - 1) * 2 + 1], [i * 2, i * 2 + 1, (i - 1) * 2 + 1]);
+  }
+  return sheet(pts, tris);
+}
+
+// A paper house: a box of walls folded round, and a roof folded once along
+// its ridge, overhanging, its white underside under the eaves.
+function paperHouse(w: number, d: number, h: number, wall: string, roof: string): THREE.Group {
+  const g = group(leaf(pleatTube(Math.SQRT1_2, Math.SQRT1_2, h, 2, 0), wall, { rot: [0, Math.PI / 4, 0], scale: [w, 1, d] }));
+  const rw = w * 0.62, rh = h * 0.7, rd = d * 0.62;
+  g.add(leaf(sheet([[-rw, 0, -rd], [rw, 0, -rd], [rw, rh, 0], [-rw, rh, 0], [-rw, 0, rd], [rw, 0, rd]], [[0, 3, 1], [1, 3, 2], [3, 4, 5], [3, 5, 2]]), roof, { at: [0, h, 0] }));
+  // The gable ends: two triangles of wall.
+  for (const s of [-1, 1]) g.add(leaf(sheet([[s * w / 2, 0, -d / 2], [s * w / 2, 0, d / 2], [s * w / 2, rh * 0.95, 0]], s > 0 ? [[0, 2, 1]] : [[0, 1, 2]]), wall, { at: [0, h, 0] }));
+  g.add(part(box(w * 0.22, h * 0.6, 0.02), DARK, { at: [0, h * 0.3, d / 2 + 0.01], crease: false }));
+  return g;
+}
+
+// A pine folded from three pleated cones.
+function paperPine(s: number, color: string): THREE.Group {
+  return groupScaled(s, [
+    part(cyl(0.035, 0.045, 0.14, 4), WOOD_DARK, { at: [0, 0.07, 0], crease: false }),
+    leaf(pleatCone(0.22, 0.26, 5, 0.35), color, { at: [0, 0.24, 0] }),
+    leaf(pleatCone(0.17, 0.24, 5, 0.35), mix(color, '#9fc28a', 0.12), { at: [0, 0.38, 0], rot: [0, 0.3, 0] }),
+    leaf(pleatCone(0.11, 0.2, 4, 0.35), mix(color, '#9fc28a', 0.24), { at: [0, 0.52, 0] }),
+  ]);
+}
+
+// A mountain folded in pleats, its snow a smaller pleated cap.
+function paperPeak(r: number, h: number, color: string, spin: number, snow: boolean): THREE.Group {
+  const g = group(leaf(pleatCone(r, h, 5, 0.32), color, { at: [0, h / 2, 0], rot: [0, spin, 0] }));
+  if (snow) g.add(leaf(pleatCone(r * 0.38, h * 0.36, 5, 0.32), SNOW, { at: [0, h - h * 0.18 + 0.02, 0], rot: [0, spin, 0] }));
+  return g;
+}
+
+// A defender standing on two legs, facing +x, folded the way a paper
+// figure is: kite legs and arms, a skirt pleated round, a diamond chest
+// with a collar turned down to its white back, a diamond head. `chunk`
+// thickens it for the giants.
 interface Folk { coat: string; trim: string; skin: string; legs?: string; chunk?: number; eyes?: string }
 function folk(o: Folk): { g: THREE.Group; head: THREE.Group; hand: THREE.Group; off: THREE.Group } {
   const k = o.chunk ?? 1;
   const legs = o.legs ?? mix(o.coat, '#1d1712', 0.45);
   const g = new THREE.Group();
-  for (const z of [-0.075, 0.075]) g.add(part(box(0.08 * k, 0.3, 0.08 * k), legs, { at: [0, 0.15, z * k] }));
-  for (const z of [-0.075, 0.075]) g.add(part(box(0.13 * k, 0.05, 0.09 * k), mix(legs, '#1d1712', 0.3), { at: [0.03, 0.025, z * k], crease: false }));
-  g.add(part(cone(0.21 * k, 0.4, 4), o.coat, { at: [0, 0.42, 0], rot: [0, Math.PI / 4, 0] }));
-  g.add(part(box(0.17 * k, 0.24, 0.27 * k), o.coat, { at: [0, 0.62, 0] }));
-  g.add(part(box(0.05 * k, 0.05, 0.3 * k), o.trim, { at: [0, 0.5, 0], crease: false }));
+  for (const z of [-0.07, 0.07]) {
+    g.add(leaf(kite(0.34, 0.055 * k, 0.04 * k, 0.75), legs, { at: [0, 0.34, z * k], rot: [Math.PI, 0, 0] }));
+    g.add(part(kite(0.14 * k, 0.04 * k, 0.03, 0.4), mix(legs, '#1d1712', 0.3), { at: [-0.03, 0.01, z * k], rot: [0, 0, -Math.PI / 2], two: true }));
+  }
+  g.add(leaf(pleatCone(0.22 * k, 0.4, 5, 0.35), o.coat, { at: [0, 0.42, 0], rot: [0, Math.PI / 10, 0] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), o.coat, { at: [0, 0.64, 0], scale: [0.11 * k, 0.15, 0.17 * k] }));
+  // The collar: a flap folded down over the chest.
+  g.add(leaf(sheet([[0, 0, 0], [0.04 * k, -0.07, 0.08 * k], [0.07 * k, -0.11, 0], [0.04 * k, -0.07, -0.08 * k]], [[0, 1, 2], [0, 2, 3]]), o.trim, { at: [0.05 * k, 0.79, 0] }));
   const head = new THREE.Group();
-  head.position.set(0, 0.86, 0);
+  head.position.set(0, 0.88, 0);
   const hk = k > 1 ? k * 0.85 : 1;
   head.position.y += (hk - 1) * 0.1;
-  head.add(part(new THREE.OctahedronGeometry(0.1 * hk, 0), o.skin, { scale: [1, 1.2, 1], rot: [0, Math.PI / 4, 0] }));
+  head.add(part(new THREE.OctahedronGeometry(0.1 * hk, 0), o.skin, { scale: [1, 1.25, 1], rot: [0, Math.PI / 4, 0] }));
   for (const z of [-0.035, 0.035]) head.add(part(box(0.02 * hk, 0.025 * hk, 0.02 * hk), o.eyes ?? DARK, { at: [0.075 * hk, 0.02 * hk, z * hk], glow: o.eyes ? 0.9 : 0, crease: false }));
   g.add(head);
   // The weapon arm reaches forward, the other holds a shield or hangs.
-  const hand = new THREE.Group();
-  hand.position.set(0.02, 0.72, 0.17 * k);
+  const arm = () => group(
+    leaf(kite(0.32, 0.05 * k, 0.035 * k, 0.25), o.coat, { rot: [Math.PI, 0, 0] }),
+    part(new THREE.OctahedronGeometry(0.045 * k, 0), o.skin, { at: [0, -0.32, 0] }),
+  );
+  const hand = arm();
+  hand.position.set(0.02, 0.74, 0.17 * k);
   hand.rotation.z = -0.9;
-  hand.add(part(cone(0.05 * k, 0.32, 4), o.coat, { at: [0, -0.15, 0], rot: [Math.PI, 0, 0] }));
-  hand.add(part(new THREE.OctahedronGeometry(0.045 * k, 0), o.skin, { at: [0, -0.32, 0] }));
-  const off = new THREE.Group();
-  off.position.set(0, 0.72, -0.17 * k);
+  const off = arm();
+  off.position.set(0, 0.74, -0.17 * k);
   off.rotation.z = -0.35;
-  off.add(part(cone(0.05 * k, 0.32, 4), o.coat, { at: [0, -0.15, 0], rot: [Math.PI, 0, 0] }));
-  off.add(part(new THREE.OctahedronGeometry(0.045 * k, 0), o.skin, { at: [0, -0.32, 0] }));
   g.add(hand, off);
   return { g, head, hand, off };
 }
@@ -2765,23 +2877,26 @@ const held = (arm: THREE.Group, tip: number, ...kids: THREE.Object3D[]) => {
 };
 
 const SKIN = '#e8c39e', STEEL = '#c9ced6', STEEL_DARK = '#8e949e';
+// A blade folded from a long thin kite.
+const blade = (len: number, w: number, color: string, at = 0) => leaf(kite(len, w, w * 0.5, 0.15), color, { at: [0, at, 0] });
+
 function militia(): THREE.Group {
-  const f = folk({ coat: '#a0703c', trim: '#5e3e26', skin: SKIN });
-  // A straw hat, and a pitchfork.
-  f.head.add(part(cyl(0.16, 0.16, 0.02, 8), STRAW, { at: [0, 0.07, 0] }), part(cone(0.09, 0.12, 6), STRAW, { at: [0, 0.13, 0] }));
+  const f = folk({ coat: '#a0703c', trim: '#e9d9b0', skin: SKIN });
+  // A straw hat folded in pleats, and a pitchfork.
+  f.head.add(leaf(pleatCone(0.19, 0.14, 7, 0.18), STRAW, { at: [0, 0.12, 0] }));
   held(f.hand, 0.1,
     part(cyl(0.012, 0.012, 0.9, 4), WOOD, { at: [0, 0.1, 0], crease: false }),
     part(box(0.02, 0.02, 0.14), STEEL_DARK, { at: [0, 0.55, 0], crease: false }),
-    ...[-0.06, 0, 0.06].map((z) => part(cone(0.012, 0.14, 3), STEEL, { at: [0, 0.63, z], crease: false })));
+    ...[-0.06, 0, 0.06].map((z) => leaf(kite(0.15, 0.014, 0.01), STEEL, { at: [0, 0.56, z] })));
   return f.g;
 }
 
 function archers(): THREE.Group {
-  const f = folk({ coat: '#4c7f45', trim: '#7a5232', skin: SKIN, legs: '#5e3e26' });
-  // A pointed hood, a quiver of arrows on the back, a bow drawn forward.
-  f.head.add(part(cone(0.12, 0.24, 4), '#35603a', { at: [-0.02, 0.07, 0], rot: [0, Math.PI / 4, 0.2] }));
-  const quiver = part(cyl(0.05, 0.05, 0.3, 5), WOOD_DARK, { at: [-0.12, 0.7, -0.05], rot: [0.3, 0, 0.3] });
-  f.g.add(quiver, ...[0, 1, 2].map((i) => part(cone(0.02, 0.08, 3), '#fbf8f1', { at: [-0.17 + i * 0.015, 0.89, -0.1 + i * 0.04], crease: false })));
+  const f = folk({ coat: '#4c7f45', trim: '#d9c79a', skin: SKIN, legs: '#5e3e26' });
+  // A pointed hood folded over the head, a pleated quiver of arrows on the back, a bow drawn forward.
+  f.head.add(leaf(pleatCone(0.13, 0.26, 3, 0.3), '#35603a', { at: [-0.02, 0.07, 0], rot: [0, 0, 0.2] }));
+  f.g.add(leaf(pleatTube(0.05, 0.05, 0.3, 3, 0.25), WOOD_DARK, { at: [-0.18, 0.55, -0.1], rot: [0.3, 0, 0.3] }));
+  f.g.add(...[0, 1, 2].map((i) => leaf(kite(0.1, 0.025, 0.015), '#fbf8f1', { at: [-0.22 + i * 0.015, 0.84, -0.12 + i * 0.04], rot: [0.3, 0, 0.3] })));
   f.hand.rotation.z = -1.45;
   held(f.hand, 0,
     part(new THREE.TorusGeometry(0.3, 0.018, 3, 10, Math.PI * 0.75), WOOD, { rot: [Math.PI / 2, 0, -Math.PI * 0.375 + Math.PI / 2], at: [-0.17, 0, 0] }),
@@ -2791,22 +2906,23 @@ function archers(): THREE.Group {
 
 function knights(): THREE.Group {
   const f = folk({ coat: STEEL, trim: '#c8463d', skin: STEEL_DARK, legs: STEEL_DARK });
-  // A helm with a red plume, a sword up, a shield on the near arm.
-  f.head.add(part(cyl(0.085, 0.1, 0.2, 6), STEEL, { at: [0, 0.02, 0] }), part(box(0.02, 0.02, 0.12), DARK, { at: [0.095, 0.03, 0], crease: false }));
-  f.head.add(part(cone(0.04, 0.22, 3), '#c8463d', { at: [-0.05, 0.19, 0], rot: [0, 0, 0.9] }));
+  // A pleated helm with a folded red plume, a sword up, a kite shield on the near arm.
+  f.head.add(leaf(pleatTube(0.1, 0.085, 0.2, 4, 0.15), STEEL, { at: [0, -0.08, 0] }), leaf(pleatCone(0.085, 0.08, 4, 0.15), STEEL, { at: [0, 0.16, 0] }));
+  f.head.add(part(box(0.02, 0.02, 0.12), DARK, { at: [0.1, 0.03, 0], crease: false }));
+  f.head.add(leaf(kite(0.26, 0.05, 0.03), '#c8463d', { at: [0, 0.18, 0], rot: [0, 0, 0.9] }));
   f.hand.rotation.z = -1.1;
   held(f.hand, 0.5,
     part(box(0.03, 0.12, 0.04), WOOD_DARK, { at: [0, 0.02, 0], crease: false }),
     part(box(0.02, 0.03, 0.16), GOLD, { at: [0, 0.09, 0], crease: false }),
-    part(box(0.012, 0.55, 0.05), '#eef1f5', { at: [0, 0.38, 0] }));
-  // The shield on the other arm: the one nearer the room, since defenders face left.
+    blade(0.6, 0.035, '#eef1f5', 0.1));
+  // The shield on the other arm, the one nearer the room since defenders
+  // face left: a kite folded down its middle, a gold cross on it.
   const shield = group(
-    part(box(0.04, 0.34, 0.26), '#c8463d', {}),
-    part(box(0.05, 0.3, 0.05), GOLD, { crease: false }),
-    part(box(0.05, 0.05, 0.22), GOLD, { at: [0, 0.05, 0], crease: false }),
-    part(cone(0.13, 0.12, 4), '#c8463d', { at: [0, -0.22, 0], rot: [Math.PI, Math.PI / 4, 0], scale: [0.25, 1, 1.4] }),
+    leaf(sheet([[0.02, 0.2, 0], [0, 0.12, 0.15], [0, -0.32, 0], [0, 0.12, -0.15], [0.05, 0, 0]], [[0, 1, 4], [1, 2, 4], [0, 4, 3], [4, 2, 3]]), '#c8463d'),
+    part(box(0.02, 0.36, 0.035), GOLD, { at: [0.035, -0.04, 0], crease: false }),
+    part(box(0.02, 0.035, 0.22), GOLD, { at: [0.03, 0.06, 0], crease: false }),
   );
-  shield.position.set(0.17, 0.52, -0.2);
+  shield.position.set(0.17, 0.56, -0.2);
   shield.rotation.y = 0.8;
   f.g.add(shield);
   return f.g;
@@ -2815,12 +2931,14 @@ function knights(): THREE.Group {
 function frostGolem(): THREE.Group {
   const ice = '#9fd3ef', deep = '#5fa6cf';
   const g = new THREE.Group();
-  for (const z of [-0.13, 0.13]) g.add(part(new THREE.DodecahedronGeometry(0.13, 0), deep, { at: [0, 0.13, z], scale: [1, 1.3, 1] }));
-  g.add(part(new THREE.DodecahedronGeometry(0.3, 0), ice, { at: [0, 0.55, 0], scale: [0.9, 1, 1.1] }));
-  g.add(part(new THREE.DodecahedronGeometry(0.15, 0), ice, { at: [0.08, 0.95, 0] }));
-  for (const z of [-0.05, 0.05]) g.add(part(box(0.03, 0.03, 0.03), '#e8fbff', { at: [0.22, 0.98, z], glow: 0.9, crease: false }));
-  // Heavy arms of ice, and crystals grown out of its shoulders and back.
-  for (const z of [-0.34, 0.34]) g.add(part(new THREE.DodecahedronGeometry(0.12, 0), deep, { at: [0.12, 0.42, z], scale: [1, 1.8, 1] }));
+  // Pleated legs, a great folded diamond of a body, a smaller one for its head.
+  for (const z of [-0.13, 0.13]) g.add(leaf(pleatTube(0.13, 0.1, 0.3, 3, 0.3), deep, { at: [0, 0, z] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), ice, { at: [0, 0.58, 0], scale: [0.27, 0.36, 0.34] }));
+  g.add(part(new THREE.OctahedronGeometry(1, 0), mix(ice, '#fff', 0.35), { at: [0.06, 0.62, 0], scale: [0.22, 0.2, 0.3], rot: [0, 0, 0], crease: true }));
+  g.add(part(new THREE.OctahedronGeometry(0.15, 0), ice, { at: [0.08, 0.98, 0], scale: [1, 1.1, 1], rot: [0, Math.PI / 4, 0] }));
+  for (const z of [-0.05, 0.05]) g.add(part(box(0.03, 0.03, 0.03), '#e8fbff', { at: [0.2, 1.0, z], glow: 0.9, crease: false }));
+  // Heavy arms, folded kites, and crystals grown out of its shoulders and back.
+  for (const z of [-0.34, 0.34]) g.add(leaf(kite(0.48, 0.1, 0.08, 0.35), deep, { at: [0.1, 0.76, z], rot: [Math.PI + (z > 0 ? -0.15 : 0.15), 0, -0.25] }));
   for (const [x, y, z, h, rz] of [[-0.1, 0.9, 0.22, 0.28, 0.4], [-0.15, 0.85, -0.22, 0.24, 0.5], [-0.25, 0.7, 0, 0.3, 0.9], [0, 0.95, -0.12, 0.2, -0.2]]) {
     const c = crystal(h, '#d9f2ff');
     c.position.set(x, y, z);
@@ -2833,23 +2951,24 @@ function frostGolem(): THREE.Group {
 function stormGriffin(): THREE.Group {
   const hide = '#c9a25e', hide2 = '#9c7a3e', feather = '#fbf8f1', wing = mix(ELEMENT_COLORS.air, '#3d3f8f', 0.25);
   const g = new THREE.Group();
-  for (const [x, z] of [[0.2, 0.08], [0.2, -0.08], [-0.2, 0.08], [-0.2, -0.08]]) g.add(part(box(0.06, 0.28, 0.06), x > 0 ? GOLD : hide2, { at: [x, 0.14, z], crease: false }));
-  g.add(part(new THREE.DodecahedronGeometry(0.2, 0), hide, { at: [-0.04, 0.36, 0], scale: [1.6, 0.9, 0.9] }));
-  g.add(part(new THREE.DodecahedronGeometry(0.15, 0), feather, { at: [0.22, 0.45, 0], scale: [1, 1.2, 1] }));
+  for (const [x, z] of [[0.2, 0.08], [0.2, -0.08], [-0.2, 0.08], [-0.2, -0.08]]) g.add(leaf(kite(0.3, 0.035, 0.025, 0.7), x > 0 ? GOLD : hide2, { at: [x, 0.3, z], rot: [Math.PI, 0, 0] }));
+  // A diamond body, as the dragon's, and a ruff of feathers folded at its chest.
+  g.add(part(new THREE.OctahedronGeometry(1, 0), hide, { at: [-0.04, 0.38, 0], scale: [0.34, 0.17, 0.17] }));
+  g.add(leaf(pleatCone(0.16, 0.26, 5, 0.4), feather, { at: [0.2, 0.47, 0], rot: [0, 0, -1.2] }));
   const head = group(
-    part(new THREE.DodecahedronGeometry(0.11, 0), feather, {}),
-    part(cone(0.05, 0.16, 4), GOLD, { at: [0.13, -0.02, 0], rot: [Math.PI / 4, 0, -Math.PI / 2 - 0.3] }),
-    ...[-0.06, 0.06].map((z) => part(box(0.025, 0.025, 0.02), DARK, { at: [0.07, 0.03, z], crease: false })),
-    part(cone(0.03, 0.14, 3), wing, { at: [-0.08, 0.08, 0], rot: [0, 0, 1.1], crease: false }),
+    part(new THREE.OctahedronGeometry(1, 0), feather, { scale: [0.12, 0.1, 0.09] }),
+    leaf(kite(0.16, 0.04, 0.03), GOLD, { at: [0.08, -0.01, 0], rot: [0, 0, -Math.PI / 2 - 0.3] }),
+    ...[-0.05, 0.05].map((z) => part(box(0.025, 0.025, 0.02), DARK, { at: [0.06, 0.03, z], crease: false })),
+    leaf(kite(0.14, 0.03, 0.02), wing, { at: [-0.06, 0.05, 0], rot: [0, 0, 1.1] }),
   );
   head.position.set(0.34, 0.62, 0);
   g.add(head);
-  // A lion's tail with a tuft, and two wings raised to strike.
-  g.add(part(cone(0.025, 0.34, 3), hide2, { at: [-0.4, 0.42, 0], rot: [0, 0, 1.0], crease: false }), part(new THREE.OctahedronGeometry(0.05, 0), wing, { at: [-0.54, 0.52, 0] }));
+  // A lion's tail with a tuft, and two wings raised to strike, each folded once.
+  g.add(part(cone(0.025, 0.34, 3), hide2, { at: [-0.4, 0.42, 0], rot: [0, 0, 1.0], crease: false }), leaf(kite(0.12, 0.04, 0.03), wing, { at: [-0.52, 0.5, 0], rot: [0, 0, 0.9] }));
   for (const s of [1, -1]) {
     const w = group(
-      part(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.36, 0.5, 0], [-0.3, 0.06, 0]], [[0, 1, 2], [0, 2, 3]]), wing, { two: true }),
-      part(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.04, 0.4, 0]], [[0, 1, 2]]), mix(wing, '#fff8ea', 0.4), { two: true, crease: false }),
+      leaf(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.2, 0.3, s * 0.08], [-0.36, 0.5, 0], [-0.3, 0.06, 0]], s > 0 ? [[0, 1, 2], [0, 2, 4], [2, 3, 4]] : [[0, 2, 1], [0, 4, 2], [2, 4, 3]]), wing),
+      leaf(sheet([[0, 0, 0], [-0.1, 0.62, 0], [-0.04, 0.4, s * 0.03]], s > 0 ? [[0, 1, 2]] : [[0, 2, 1]]), mix(wing, '#fff8ea', 0.4)),
     );
     w.position.set(0.06, 0.46, s * 0.1);
     w.rotation.set(s * -0.5, 0, -0.15);
@@ -2866,29 +2985,39 @@ function giant(o: { coat: string; trim: string; skin: string; legs: string; eyes
 
 function fireGiant(): THREE.Group {
   return giant({ coat: '#5a2420', trim: '#ff9a3c', skin: '#b84a2e', legs: '#3a1a16', eyes: '#ffd23f' }, (f) => {
-    // Hair of flame, glowing eyes and a burning club.
-    for (const [x, z, h] of [[-0.06, 0, 0.34], [0, 0.1, 0.24], [0, -0.1, 0.26], [-0.12, 0.06, 0.22], [-0.12, -0.07, 0.24]]) f.head.add(part(cone(0.07, h, 4), h > 0.3 ? '#ffd23f' : '#ff7a2f', { at: [x, 0.12 + h / 2, z], glow: 0.7, crease: false }));
-    f.g.add(part(box(0.04, 0.14, 0.05), '#ffb02e', { at: [0.15, 0.66, -0.06], rot: [0, 0, 0.4], glow: 0.9, crease: false }));
+    // Hair of folded flames, glowing eyes and a burning club.
+    for (const [x, z, h, r] of [[-0.06, 0, 0.36, 0], [0, 0.1, 0.26, -0.4], [0, -0.1, 0.28, 0.4], [-0.12, 0.06, 0.24, -0.2], [-0.12, -0.07, 0.26, 0.2]]) f.head.add(part(kite(h, 0.06, 0.04), h > 0.3 ? '#ffd23f' : '#ff7a2f', { at: [x, 0.08, z], rot: [r, 0, 0.15], glow: 0.7, two: true }));
     f.hand.rotation.z = -1.25;
     held(f.hand, 0.8,
-      part(cyl(0.045, 0.025, 0.7, 5), WOOD_DARK, { at: [0, 0.3, 0] }),
-      part(new THREE.DodecahedronGeometry(0.11, 0), '#3a1a16', { at: [0, 0.65, 0] }),
-      part(cone(0.07, 0.18, 4), '#ff7a2f', { at: [0, 0.8, 0], glow: 0.8, crease: false }));
+      leaf(pleatTube(0.035, 0.07, 0.62, 3, 0.3), WOOD_DARK, { at: [0, -0.02, 0] }),
+      leaf(pleatCone(0.11, 0.16, 4, 0.3), '#3a1a16', { at: [0, 0.68, 0] }),
+      ...[-0.04, 0.04].map((z, i) => part(kite(0.2 - i * 0.04, 0.05, 0.03), i ? '#ffd23f' : '#ff7a2f', { at: [0, 0.72, z], glow: 0.8, two: true })));
   });
 }
 
 function titan(): THREE.Group {
   return giant({ coat: '#5d5a72', trim: GOLD, skin: '#9a97b8', legs: '#4c4962', eyes: '#fff4b8' }, (f) => {
-    // A crown of gold points, stone shoulder plates, a bolt of lightning held high.
-    f.head.add(part(cyl(0.12, 0.12, 0.05, 6), GOLD, { at: [0, 0.12, 0], glow: 0.2, crease: false }));
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      f.head.add(part(cone(0.03, 0.12, 3), GOLD, { at: [Math.cos(a) * 0.1, 0.2, Math.sin(a) * 0.1], glow: 0.2, crease: false }));
-    }
-    for (const z of [-0.26, 0.26]) f.g.add(part(new THREE.DodecahedronGeometry(0.11, 0), '#6e6b86', { at: [0, 0.76, z], scale: [1.2, 0.8, 1] }));
+    // A crown folded in gold points, pleated stone shoulder plates, a bolt of lightning held high.
+    f.head.add(leaf(pleatWallRing(0.12, 0.1, 6), GOLD, { at: [0, 0.1, 0], glow: 0.2 }));
+    for (const z of [-0.26, 0.26]) f.g.add(leaf(pleatCone(0.14, 0.1, 4, 0.3), '#6e6b86', { at: [0, 0.8, z] }));
     f.hand.rotation.z = -2.2;
-    held(f.hand, 0.3, part(sheet([[0, 0, 0], [0.12, 0.3, 0], [0.05, 0.3, 0], [0.16, 0.62, 0], [-0.02, 0.26, 0], [0.05, 0.26, 0]], [[0, 1, 5], [5, 1, 2], [2, 3, 4], [2, 4, 5]]), BOLT, { two: true, glow: 0.8, crease: false, rot: [0, 0, -0.3] }));
+    held(f.hand, 0.3, part(sheet([[0, 0, 0], [0.12, 0.3, 0], [0.05, 0.3, 0], [0.16, 0.62, 0], [-0.02, 0.26, 0], [0.05, 0.26, 0]], [[0, 1, 5], [5, 1, 2], [2, 3, 4], [2, 4, 5]]), BOLT, { glow: 0.8, rot: [0, 0, -0.3], two: true, crease: false }));
   });
+}
+
+// A crown: a band of paper folded into `n` points, round.
+function pleatWallRing(r: number, h: number, n: number): THREE.BufferGeometry {
+  const pts: [number, number, number][] = [], tris: number[][] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2;
+    pts.push([Math.cos(a) * r, 0, Math.sin(a) * r], [Math.cos(a) * r, i % 2 ? h * 0.45 : h, Math.sin(a) * r]);
+  }
+  const m = n * 2;
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    tris.push([i * 2, i * 2 + 1, j * 2], [j * 2, i * 2 + 1, j * 2 + 1]);
+  }
+  return sheet(pts, tris);
 }
 
 // The kingdoms' defenders, by UNITS key; anything else is a beast of the board.
@@ -2970,8 +3099,9 @@ export function fighterArt(f: Fighter, facing: 1 | -1, px = 420): { url: string;
   model.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
   const span = Math.max(size.x, size.y, size.z);
-  // A little from above, as you'd look at a paper figure on the table.
-  const tilt = 0.28;
+  // From above, as the stage is seen (stageArt's STAGE_TILT), so the
+  // figures stand on its ground rather than in front of it.
+  const tilt = STAGE_TILT;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, span * 20);
   camera.position.set(0, Math.sin(tilt) * span * 5, Math.cos(tilt) * span * 5);
   camera.lookAt(0, size.y / 2, 0);
@@ -3042,14 +3172,14 @@ function groundSheet(color: string, seed: string, back = -40): THREE.Mesh {
   return m;
 }
 
-// A low hill: a wide, flattened cone.
-const hill = (r: number, h: number, color: string, x: number, z: number, spin = 0) => part(cone(r, h, 7), color, { at: [x, h / 2 - 0.05, z], rot: [0, spin, 0] });
+// A low hill: a wide cone folded in shallow pleats.
+const hill = (r: number, h: number, color: string, x: number, z: number, spin = 0) => leaf(pleatCone(r, h, 6, 0.12), color, { at: [x, h / 2 - 0.05, z], rot: [0, spin, 0] });
 // A pine wood, seeded.
 function wood(seed: string, n: number, x0: number, x1: number, z0: number, z1: number, s: [number, number], color = PINE): THREE.Group {
   const r = rng(seed);
   const g = new THREE.Group();
   for (let i = 0; i < n; i++) {
-    const t = tree(s[0] + r() * (s[1] - s[0]), LEAF[i % 3] === LEAF[0] ? color : LEAF[i % 3]);
+    const t = paperPine(s[0] + r() * (s[1] - s[0]), LEAF[i % 3] === LEAF[0] ? color : LEAF[i % 3]);
     t.position.set(x0 + r() * (x1 - x0), 0, z0 + r() * (z1 - z0));
     t.rotation.y = r() * 3;
     g.add(t);
@@ -3063,26 +3193,41 @@ const placed = (o: THREE.Object3D, x: number, z: number, s = 1, spin = 0, y = 0)
   return o;
 };
 
-// A castle wall between towers, crenellated, along x at depth z.
+// A castle wall between towers along x at depth z: the wall folded like a
+// fan, its top cut into battlements; each tower a pleated tube, crowned
+// with a folded ring of battlements or a pleated roof.
 function curtainWall(x0: number, x1: number, z: number, h: number, wall: string, roof: string | null, banner?: string): THREE.Group {
   const g = new THREE.Group();
-  g.add(part(box(x1 - x0, h, 0.6), wall, { at: [(x0 + x1) / 2, h / 2, z] }));
-  for (let x = x0 + 0.25; x < x1; x += 0.7) g.add(part(box(0.35, 0.3, 0.62), wall, { at: [x, h + 0.15, z] }));
+  const n = Math.round((x1 - x0) / 0.35);
+  g.add(leaf(pleatWall(x1 - x0, h, n - (n % 2), 0.3, true), wall, { at: [(x0 + x1) / 2, 0, z + 0.15] }));
   for (const tx of [x0, (x0 + x1) / 2, x1]) {
     const th = h * 1.6;
-    g.add(part(cyl(0.75, 0.85, th, 8), mix(wall, '#fff8ea', 0.08), { at: [tx, th / 2, z] }));
-    if (roof) g.add(part(cone(0.95, 1.3, 8), roof, { at: [tx, th + 0.65, z] }));
-    else for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      g.add(part(box(0.3, 0.3, 0.3), wall, { at: [tx + Math.cos(a) * 0.7, th + 0.15, z + Math.sin(a) * 0.7], rot: [0, -a, 0] }));
-    }
-    if (banner) g.add(placed(flag(banner, 1.4), tx, z, 2.2, 0, th + (roof ? 1.2 : 0.2)));
-    g.add(part(box(0.25, 0.45, 0.02), DARK, { at: [tx, th * 0.65, z + 0.82], crease: false }));
+    const tc = mix(wall, '#fff8ea', 0.08);
+    g.add(leaf(pleatTube(0.85, 0.75, th, 6, 0.14), tc, { at: [tx, 0, z] }));
+    if (roof) g.add(leaf(pleatCone(1.0, 1.4, 6, 0.3), roof, { at: [tx, th + 0.68, z] }));
+    else g.add(leaf(pleatWallRing(0.78, 0.4, 8), tc, { at: [tx, th - 0.02, z] }));
+    if (banner) g.add(placed(flag(banner, 1.4), tx, z, 2.2, 0, th + (roof ? 1.25 : 0.25)));
+    g.add(leaf(kite(0.45, 0.13, 0.02, 0.5), DARK, { at: [tx, th * 0.55, z + 0.84], rot: [0, -Math.PI / 2, 0] }));
   }
   // The gate.
-  g.add(part(box(1.1, 1.5, 0.04), DARK, { at: [(x0 + x1) / 2 + ((x1 - x0) / 4), 0.75, z + 0.31], crease: false }));
+  g.add(part(box(1.1, 1.5, 0.04), DARK, { at: [(x0 + x1) / 2 + ((x1 - x0) / 4), 0.75, z + 0.33], crease: false }));
   return g;
 }
+
+// A lighthouse folded from paper: a tapering pleated tower, bands round it,
+// a glowing lamp under a pleated cap.
+function paperLighthouse(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(leaf(pleatTube(0.24, 0.15, 1.0, 6, 0.12), MONUMENT_STONE, { at: [0, 0.1, 0] }));
+  for (const y of [0.45, 0.8]) g.add(leaf(pleatTube(0.215 - (y - 0.45) * 0.2, 0.2 - (y - 0.45) * 0.2, 0.08, 6, 0.12), MONUMENT_DARK, { at: [0, y, 0] }));
+  g.add(part(cyl(0.12, 0.12, 0.18, 6), '#ffd23f', { at: [0, 1.19, 0], glow: 0.8 }));
+  g.add(leaf(pleatCone(0.2, 0.2, 6, 0.25), MONUMENT_DARK, { at: [0, 1.38, 0] }));
+  g.add(part(box(0.1, 0.16, 0.02), DARK, { at: [0, 0.3, -0.21], crease: false }));
+  return g;
+}
+
+// A rock: a low cone folded in a few pleats.
+const rock = (r: number, h: number, color: string, at: [number, number, number], spin = 0) => leaf(pleatCone(r, h, 4, 0.3), color, { at: [at[0], at[1] + h / 2, at[2]], rot: [0, spin, 0] });
 
 // A zigzag of lightning across the sky.
 function skyBolt(x: number, y: number, z: number, s: number): THREE.Mesh {
@@ -3104,8 +3249,8 @@ const PLACES: Record<string, Place> = {
     sky: ['#f6b26b', '#fbe3a1'], sun: [5, 6, '#fff2c0'], ground: '#9cb85a',
     build: (g) => {
       g.add(hill(9, 2.2, '#8ea35a', -6, -16), hill(11, 2.8, '#a8bd6e', 7, -18, 1), hill(7, 1.6, '#7a9844', 0, -13, 2));
-      g.add(placed(cottage(0.5, 0.4, 0.32, WALL, '#9a5a32'), -5.2, -5, 3, 0.3), placed(cottage(0.45, 0.4, 0.3, '#e8d6b0', '#b5653a'), -2.6, -7.5, 3, -0.2));
-      g.add(placed(cottage(0.5, 0.42, 0.32, WALL, '#b5653a'), 3.6, -6.5, 3, -0.4), placed(cottage(0.42, 0.38, 0.28, '#e8d6b0', '#9a5a32'), 6.4, -4.8, 3, 0.5));
+      g.add(placed(paperHouse(0.5, 0.4, 0.32, WALL, '#9a5a32'), -5.2, -5, 3, 0.3), placed(paperHouse(0.45, 0.4, 0.3, '#e8d6b0', '#b5653a'), -2.6, -7.5, 3, -0.2));
+      g.add(placed(paperHouse(0.5, 0.42, 0.32, WALL, '#b5653a'), 3.6, -6.5, 3, -0.4), placed(paperHouse(0.42, 0.38, 0.28, '#e8d6b0', '#9a5a32'), 6.4, -4.8, 3, 0.5));
       g.add(wood('brindle', 10, -10, 10, -12, -8, [1.6, 2.4]));
       g.add(placed(sheep(), -0.8, -4.5, 2.2, 0.8), placed(sheep(), 0.6, -5.2, 2.2, 2));
     },
@@ -3114,16 +3259,12 @@ const PLACES: Record<string, Place> = {
     sky: ['#8fc0e6', '#eadbb4'], ground: '#b39a62',
     build: (g) => {
       g.add(wood('hold', 26, -14, 14, -16, -9, [2.2, 3.4]));
-      // The stockade: a row of sharpened logs, a gap for the gate.
-      for (let x = -12; x <= 12; x += 0.42) {
-        if (Math.abs(x - 1) < 0.9) continue;
-        const h = 2.1 + (Math.abs(Math.sin(x * 7)) * 0.25);
-        g.add(part(cyl(0.2, 0.2, h, 5), x % 0.84 < 0.42 ? WOOD : WOOD_DARK, { at: [x, h / 2, -6], crease: false }), part(cone(0.2, 0.4, 5), WOOD, { at: [x, h + 0.2, -6], crease: false }));
-      }
+      // The stockade: a fence folded like a fan, its top cut to points, a gap for the gate.
+      g.add(leaf(pleatWall(12.1, 2.3, 30, 0.3, true), WOOD, { at: [-5.95, 0, -6] }), leaf(pleatWall(10.1, 2.3, 26, 0.3, true), WOOD, { at: [7.05, 0, -6] }));
       for (const x of [-5, 6]) {
         for (const [dx, dz] of [[-0.6, -0.5], [0.6, -0.5], [-0.6, 0.5], [0.6, 0.5]]) g.add(part(cyl(0.09, 0.09, 3.6, 4), WOOD_DARK, { at: [x + dx, 1.8, -6.8 + dz], crease: false }));
         g.add(part(box(1.7, 0.18, 1.5), WOOD, { at: [x, 3.6, -6.8] }), part(box(1.7, 0.6, 0.1), WOOD, { at: [x, 3.95, -6.1] }));
-        g.add(part(cone(1.35, 1.1, 4), '#8a3a2a', { at: [x, 4.8, -6.8], rot: [0, Math.PI / 4, 0] }));
+        g.add(leaf(pleatCone(1.35, 1.1, 4, 0.2), '#8a3a2a', { at: [x, 4.8, -6.8], rot: [0, Math.PI / 4, 0] }));
         g.add(placed(flag('#e5484d', 1), x, -6.8, 1.6, 0, 5.3));
       }
     },
@@ -3131,7 +3272,7 @@ const PLACES: Record<string, Place> = {
   frostpeak: {
     sky: ['#9fd0ee', '#eef8ff'], ground: '#e8f4fb',
     build: (g) => {
-      for (const [x, z, r, h, s] of [[-9, -16, 4, 8, 0.3], [-3, -19, 5, 10.5, 1], [4, -17, 4.2, 8.5, 2], [10, -20, 5, 11, 0.6], [0, -13, 3, 5.5, 1.5]]) g.add(placed(peak(r, h, 5, s, true), x, z));
+      for (const [x, z, r, h, s] of [[-9, -16, 4, 8, 0.3], [-3, -19, 5, 10.5, 1], [4, -17, 4.2, 8.5, 2], [10, -20, 5, 11, 0.6], [0, -13, 3, 5.5, 1.5]]) g.add(placed(paperPeak(r, h, mix(STONE, '#8d8f96', 0.4), s, true), x, z));
       g.add(hill(6, 1.2, '#cfe7f5', -6, -8), hill(7, 1.4, '#d9eef8', 6, -9, 1));
       for (const [x, z, h, rz] of [[-7, -5, 1.6, 0.2], [-6.2, -5.6, 1, -0.3], [7, -4.5, 1.8, -0.2], [7.8, -5.3, 1.1, 0.4], [-2, -8, 0.9, 0.1]]) {
         const c = crystal(h, '#bfe3f5');
@@ -3146,15 +3287,15 @@ const PLACES: Record<string, Place> = {
     build: (g) => {
       g.add(hill(10, 2.2, '#61789a', -8, -22), hill(12, 2.8, '#6c82a2', 9, -24, 1));
       g.add(curtainWall(-8, 8, -9, 2.6, '#a5a8b3', '#5a6a9a', '#e5484d'));
-      g.add(placed(tower('#5a6a9a', 2), 0, -12, 2.6));
+      g.add(leaf(pleatTube(1.0, 0.9, 5.2, 6, 0.14), '#b4b7c2', { at: [0, 0, -12] }), leaf(pleatCone(1.2, 2.2, 6, 0.3), '#5a6a9a', { at: [0, 6.3, -12] }), placed(flag('#e5484d', 1.4), 0, -12, 2.2, 0, 7.4));
     },
   },
   stormspire: {
     sky: ['#221d3c', '#5d518d'], ground: '#4c4670',
     build: (g) => {
-      const rock = '#3a3360';
-      for (const [x, z, r, h] of [[-9, -16, 4, 6], [-4, -18, 3.5, 5], [5, -17, 4, 6.5], [10, -19, 3.8, 5]]) g.add(part(cone(r, h, 5), rock, { at: [x, h / 2, z], rot: [0, x, 0] }));
-      g.add(part(cone(1.1, 11, 5), '#2a2445', { at: [0.5, 5.5, -13] }), placed(crystal(0.9, BOLT), 0.5, -13, 1, 0, 11.3));
+      const stone = '#3a3360';
+      for (const [x, z, r, h] of [[-9, -16, 4, 6], [-4, -18, 3.5, 5], [5, -17, 4, 6.5], [10, -19, 3.8, 5]]) g.add(leaf(pleatCone(r, h, 5, 0.3), stone, { at: [x, h / 2, z], rot: [0, x, 0] }));
+      g.add(leaf(pleatCone(1.1, 11, 5, 0.3), '#2a2445', { at: [0.5, 5.5, -13] }), placed(crystal(0.9, BOLT), 0.5, -13, 1, 0, 11.3));
       g.add(skyBolt(-5, 10, -15, 1.6), skyBolt(6.5, 11, -16, 1.9));
       for (const [x, z, h] of [[-6, -6, 1.2], [6.5, -5, 1.4], [-3, -9, 0.8]]) {
         const c = crystal(h, '#8a91e0');
@@ -3167,7 +3308,7 @@ const PLACES: Record<string, Place> = {
     sky: ['#78bfd6', '#dff1ec'], ground: '#ddc98f', shore: -6,
     build: (g) => {
       seaBand(g, -6);
-      g.add(placed(lighthouse(), 5, -10, 4.2), part(new THREE.DodecahedronGeometry(1.8, 0), STONE, { at: [5, 0.2, -10], scale: [1.6, 0.5, 1.3] }));
+      g.add(placed(paperLighthouse(), 5, -10, 4.2), rock(2.8, 1.0, STONE, [5, 0, -10]));
       g.add(curtainWall(-10, -3.5, -4.6, 1.5, '#c9c3b5', '#c8463d', '#2f8fff'));
     },
   },
@@ -3175,25 +3316,25 @@ const PLACES: Record<string, Place> = {
     sky: ['#1e0a0e', '#7a2416'], ground: '#3b2018',
     build: (g) => {
       // The volcano: a cut-off cone, its crater glowing and fire out of the top.
-      g.add(part(cyl(1.8, 7, 7.5, 7), '#3a1712', { at: [5, 3.75, -18] }), part(cyl(1.75, 1.75, 0.1, 7), '#ff6a2a', { at: [5, 7.52, -18], glow: 1, crease: false }));
-      for (const [dx, h, c] of [[0, 2.4, '#ffb02e'], [-0.7, 1.5, '#ff7a2f'], [0.7, 1.7, '#ff7a2f']] as const) g.add(part(cone(0.7, h, 5), c, { at: [5 + dx, 7.5 + h / 2, -18], glow: 1, crease: false }));
+      g.add(leaf(pleatTube(7, 1.8, 5.6, 7, 0.16), '#4a1e16', { at: [5, 0, -19] }), part(cyl(1.6, 1.6, 0.1, 14), '#ff6a2a', { at: [5, 5.45, -19], glow: 1, crease: false }));
+      for (const [dx, h, c] of [[0, 2.6, '#ffb02e'], [-0.7, 1.7, '#ff7a2f'], [0.7, 1.9, '#ff7a2f']] as const) g.add(part(kite(h, 0.6, 0.4), c, { at: [5 + dx, 5.4, -19], rot: [0, -Math.PI / 2, dx * -0.4], glow: 1, two: true }));
       g.add(hill(6, 1.3, '#2c120e', -7, -12), hill(5, 1.1, '#2c120e', 9, -10, 1));
       g.add(curtainWall(-10, -1, -9, 2.4, '#3a2420', null));
       for (const x of [-8, -5.5, -3]) g.add(part(box(0.3, 0.45, 0.02), '#ff9a3a', { at: [x, 1.4, -8.69], glow: 1, crease: false }));
-      for (const [x, z] of [[-1, -4], [3, -6], [7.5, -4.5]]) g.add(part(new THREE.DodecahedronGeometry(0.4, 0), '#ff7a2f', { at: [x, 0.05, z], scale: [1.4, 0.25, 1], glow: 0.9, crease: false }));
+      for (const [x, z] of [[-1, -4], [3, -6], [7.5, -4.5]]) g.add(part(pleatCone(0.55, 0.08, 4, 0.35), '#ff7a2f', { at: [x, 0.05, z], glow: 0.9, two: true, crease: false }));
     },
   },
   titans_throne: {
     sky: ['#15122e', '#4a3f7a'], ground: '#3c3a52',
     build: (g) => {
-      for (const [x, z, r, h] of [[-10, -18, 4.5, 7], [-5, -21, 4, 6], [6, -20, 4.2, 6.5], [11, -18, 4.6, 7.5]]) g.add(part(cone(r, h, 5), '#2b2650', { at: [x, h / 2, z], rot: [0, x, 0] }));
+      for (const [x, z, r, h] of [[-10, -18, 4.5, 7], [-5, -21, 4, 6], [6, -20, 4.2, 6.5], [11, -18, 4.6, 7.5]]) g.add(leaf(pleatCone(r, h, 5, 0.3), '#2b2650', { at: [x, h / 2, z], rot: [0, x, 0] }));
       // The throne: a stepped dais, a seat and a high back, arms of stone.
       const st = '#5d5a72', st2 = '#6e6b86';
       g.add(part(box(9, 0.8, 4), '#4c4962', { at: [0, 0.4, -12] }), part(box(7, 0.8, 3), st, { at: [0, 1.2, -12.3] }));
-      g.add(part(box(4, 1.6, 2.4), st2, { at: [0, 2.4, -12.4] }), part(box(4.4, 7, 0.9), st, { at: [0, 4.6, -13.6] }));
-      g.add(part(cone(2.4, 1.4, 4), st, { at: [0, 8.8, -13.6], rot: [0, Math.PI / 4, 0], scale: [1, 1, 0.3] }));
+      g.add(part(box(4, 1.6, 2.4), st2, { at: [0, 2.4, -12.4] }), leaf(pleatWall(4.4, 7, 8, 0.45), st, { at: [0, 1.1, -13.3] }));
+      g.add(leaf(pleatWallRing(1.6, 1.4, 5), st, { at: [0, 8.05, -13.5], scale: [1.4, 1, 0.3] }));
       for (const x of [-2.4, 2.4]) g.add(part(box(0.8, 2.6, 2.6), st2, { at: [x, 2.9, -12.4] }));
-      g.add(part(cone(0.5, 0.8, 6), GOLD, { at: [0, 9.8, -13.6], glow: 0.3 }));
+      g.add(leaf(pleatCone(0.5, 0.8, 5, 0.35), GOLD, { at: [0, 9.85, -13.5], glow: 0.3 }));
       g.add(skyBolt(-6, 11, -16, 1.8), skyBolt(7, 10.5, -16, 1.5));
     },
   },
@@ -3201,7 +3342,7 @@ const PLACES: Record<string, Place> = {
   forest: { sky: ['#20304a', '#5f7a86'], ground: '#2f5a36', build: (g) => { g.add(wood('forest-far', 70, -18, 18, -20, -9, [4, 6.5])); g.add(wood('forest-near', 10, -12, 12, -7, -4.5, [3, 4.2])); } },
   mountain: {
     sky: ['#8aa0b8', '#d8dee6'], ground: '#9a9ca3',
-    build: (g) => { for (const [x, z, r, h, s] of [[-9, -15, 4, 7, 0.3], [-2, -19, 5, 10, 1], [5, -16, 4.4, 8, 2], [11, -19, 4.6, 9, 0.6], [-5, -10, 2.4, 3.4, 1.2], [7, -9, 2, 3, 0.4]]) g.add(placed(peak(r, h, 5, s, h > 5), x, z)); },
+    build: (g) => { for (const [x, z, r, h, s] of [[-9, -15, 4, 7, 0.3], [-2, -19, 5, 10, 1], [5, -16, 4.4, 8, 2], [11, -19, 4.6, 9, 0.6], [-5, -10, 2.4, 3.4, 1.2], [7, -9, 2, 3, 0.4]]) g.add(placed(paperPeak(r, h, mix(STONE, '#8d8f96', 0.4), s, h > 5), x, z)); },
   },
   ley: {
     sky: ['#2e2456', '#7d68c0'], ground: '#5d4a9c',
@@ -3223,10 +3364,10 @@ const PLACES: Record<string, Place> = {
     sky: ['#9cc7e8', '#f2e6c0'], ground: '#d9c68e',
     build: (g) => {
       g.add(hill(12, 1.6, '#c8b77c', -6, -20), hill(12, 1.8, '#d0be84', 8, -22, 1));
-      for (const [x, z] of [[-6, -8], [-4.6, -9], [5, -7.5], [7, -9.5]]) g.add(part(cyl(0.6, 0.75, 0.9, 7), STRAW, { at: [x, 0.45, z] }), part(cone(0.65, 0.5, 7), mix(STRAW, '#fff8ea', 0.2), { at: [x, 1.15, z] }));
+      for (const [x, z] of [[-6, -8], [-4.6, -9], [5, -7.5], [7, -9.5]]) g.add(leaf(pleatTube(0.75, 0.6, 0.9, 6, 0.15), STRAW, { at: [x, 0, z] }), leaf(pleatCone(0.7, 0.55, 6, 0.25), mix(STRAW, '#fff8ea', 0.2), { at: [x, 1.17, z] }));
     },
   },
-  harbor: { sky: ['#7fc4d6', '#e3f2ec'], ground: '#d9c68e', shore: -6, build: (g) => { seaBand(g, -6, mix(TERRAIN_COLORS.harbor, '#e6eef2', 0.2)); g.add(placed(lighthouse(), -6, -9, 3), part(new THREE.DodecahedronGeometry(1.3, 0), STONE, { at: [-6, 0.15, -9], scale: [1.6, 0.5, 1.3] })); } },
+  harbor: { sky: ['#7fc4d6', '#e3f2ec'], ground: '#d9c68e', shore: -6, build: (g) => { seaBand(g, -6, mix(TERRAIN_COLORS.harbor, '#e6eef2', 0.2)); g.add(placed(paperLighthouse(), -6, -9, 3), rock(2, 0.8, STONE, [-6, 0, -9])); } },
   ocean: { sky: ['#3f6f96', '#a6cbe0'], ground: SEA_PAPER, shore: 2, build: (g) => seaBand(g, 2) },
 };
 
@@ -3251,13 +3392,15 @@ export function stageArt(key: string, w = 1600, h = 900): string {
     const [x, y, c] = p.sun;
     scene.add(part(cyl(1.6, 1.6, 0.05, 8), c, { at: [x, y, -30], rot: [Math.PI / 2, 0, 0], glow: 1, crease: false }));
   }
-  scene.fog = new THREE.Fog(p.sky[1], 22, 60);
+  scene.fog = new THREE.Fog(p.sky[1], 34, 75);
   // On a screen narrower than the TV's, the view widens (most of the way)
   // rather than cropping in, so a phone held upright still sees the place.
   const vfov = w / h >= 1.6 ? 34 : (2 * Math.atan((Math.tan((17 * Math.PI) / 180) * 1.6 * 0.8) / (w / h)) * 180) / Math.PI;
   const camera = new THREE.PerspectiveCamera(Math.max(34, vfov), w / h, 0.1, 200);
-  camera.position.set(0, 3.4, 12);
-  camera.lookAt(0, 2.4, -6);
+  // Looking down on the place, as the map is looked down on (a little less
+  // steeply, so the places' fronts and a hint of sky still show).
+  camera.position.set(0, 1 + Math.sin(STAGE_TILT) * 28, -11 + Math.cos(STAGE_TILT) * 28);
+  camera.lookAt(0, 1, -11);
   lights(scene, 8, new THREE.Vector3(0, 0, -8));
   const gl = fightGl();
   gl.setSize(w, h, false);
