@@ -4,19 +4,21 @@ Every word a player reads (the TV, the phone, the cards, `docs/rules.md`, the CL
 
 The game should read like a well-edited board game: the box's rulebook, the cards in your hand and the reference card by your seat all use the same few words, the same way, in the same voice.
 
-## The five rules
+## The six rules
 
 1. **Talk to the player as "you", in the present tense, in the active voice.** "You draw 1 action card." "Ada builds a Quarry." Not "A card is drawn", not "Ada built a Quarry". Other players are named, or "each other player" or "everyone". A player whose pronoun is needed is "they".
 2. **Tell people what to do with imperatives.** Card text and buttons are commands: "Gain 2 gold.", "Place a Wolf Pack on…", "Build", "Choose a hex for the Quarry." Don't ask the player a question to tell them what to do ("Send the Cave Bear where?", "Who's going?"), and don't say "you should" or "you can now".
 3. **Same thing, same words.** One name for each thing, used everywhere: a card's verb is its button's verb and its log line's verb; a rules step's name is its heading on the TV and the phone. A different word means a different thing.
 4. **Numbers as numerals.** "Gain 2 gold", "1 extra step", "First to 20 points wins". Not "two gold", not "one more raid". (A sentence doesn't start with a numeral, and "one of your dragons" is a pronoun, not a count.)
 5. **Plain and short.** Cut words until the meaning would change. No "it" or "they" whose thing isn't on the same line. An exclamation mark only for the game's end ("Ada wins!").
+6. **Every word costs the player attention, and a screen has a fixed budget.** A player glances at a screen for a couple of seconds and reads the first few words of each block. Adding text doesn't give them more information: it takes attention from everything else on the screen, so they read less of it. Before adding words, ask what the player will stop reading because of them. Cut whatever the screen already shows (the heading, the button, the picture, a number beside an icon), and when in doubt show the number, not the sentence. Text you'd skip yourself is slop.
 
 ## Kinds of text
 
 | Kind | Form | Examples |
 |---|---|---|
-| **Card text** | One or two sentences, capitalized and full-stopped. An effect you carry out is an imperative ("Gain 3 of one resource other than gold."); a lasting effect is a present-tense statement ("Makes 1 timber each round for each adjacent forest hex.", "Worth 1 point while in your hand."). | Windfall, Lumber Camp, Secret Hoard |
+| **Card text** (the card itself, in your hand or zoomed in) | One or two sentences, capitalized and full-stopped. An effect you carry out is an imperative ("Gain 3 of one resource other than gold."); a lasting effect is a present-tense statement ("Makes 1 timber each round for each adjacent forest hex.", "Worth 1 point while in your hand."). | Windfall, Lumber Camp, Secret Hoard |
+| **At a glance** (a preview, a comparison, a stat line, what a hex or building does on the board) | Numbers and icons, not sentences. A change is before → after. Leave out what the heading, button or picture already says, and what doesn't change. | "5 → 7 [stone] · 1 → 2 [point]", "+2 [stone]", "1d4 → 2 + 1d4 [livestock]" |
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. Every choice among several options has one, and each option's button still carries the verb ("Gain", not a bare icon). | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear", "Choose a resource to gain" |
 | **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or bail", "End of round" |
@@ -64,10 +66,12 @@ Spelling is American ("harbor", "color"), to match the terrain and code names th
 
 ## Icons
 
-Few icons, for the things the game names over and over: the five resources, points, and a dragon for what your dragons eat beside the livestock they eat it from ("1 − 1🐉") (the owner, 2026-11-03: "use icons for core resources, there should not be that many icons"; 2026-11-05, on the dragons' livestock: "it should be on same row with a dragon icon"). Everything else is words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
+Few kinds of icon, used freely. The set stays small: the five resources, points, and a dragon for what your dragons eat beside the livestock they eat it from ("1 − 1🐉"). A player learns those once and then reads them anywhere at a glance, so use them wherever a number counts one of them, instead of a word or a sentence: "5 → 7 [stone]", not "Makes 7 stone each round." (The owner, 2026-11-03: "use icons for core resources, there should not be that many icons"; 2026-11-05, on the dragons' livestock: "it should be on same row with a dragon icon"; 2026-11-06: "the cardinality of icons should not be that high, the number should be.") Don't add a new kind of icon; for anything outside the set, use words: dice are "1d6", as the rules write them; a stat is its name and number; a raid step is its name; an element in a stat line is its name. A picture of a thing (a building, a beast, a dragon, a die rolling) is art, not an icon standing for a word, and stays. What a player types is shown as typed: no icons in table talk.
 
 ## Checks before you add text
 
+- What will the player stop reading because of it? Does the screen already say it?
+- On an at-a-glance surface, is there a sentence where a number and an icon would do?
 - Does the button use the same verb as the card or the rule it carries out?
 - Is a "?" telling the player what to do? Make it an imperative.
 - Is there an "it" or "they" whose thing isn't named nearby?
@@ -76,6 +80,8 @@ Few icons, for the things the game names over and over: the five resources, poin
 - Is an icon standing for a word that isn't a resource, points or the dragons eating? Write the word.
 
 ## Sources
+
+The research below is about writing rulebooks and card text, so it backs rules 1–5 and the card-text and rules rows above. Rule 6, the at-a-glance row and "used freely" for icons come from the owner (2026-11-06), after previews written as card-text sentences proved too long to read: "really what happens is the user than misses half of what is on the screen, so they see less information." Published games are this terse where it counts: Dominion's Village reads "+1 Card +2 Actions", a fragment, not a sentence.
 
 What published games do, which these rules follow:
 
