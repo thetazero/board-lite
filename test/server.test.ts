@@ -612,6 +612,11 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     }
     assert.deepEqual((await reply(2)).result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
     assert.match((await reply(3)).result.content[0].text, /^Table: P1 Ada, P2 Opus \(you\)\.\nYou are P2\./);
+    // The view carries a picture of the board beside the text map (#384).
+    const picture = (await reply(3)).result.content[1];
+    assert.equal(picture.type, 'image');
+    assert.equal(picture.mimeType, 'image/png');
+    assert.equal(Buffer.from(picture.data, 'base64').subarray(1, 4).toString(), 'PNG');
     assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
     assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
     // The moves file pairs each move's private reason with what really happened.
