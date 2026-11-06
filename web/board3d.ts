@@ -1762,12 +1762,19 @@ const canFly = (d: DragonView) => d.status === 'ready';
 
 // walk: a beast that wandered here from the next hex, walking in from `from`
 // (where it stood, from where it stands now) since `at` on the board's clock.
-interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number } }
+// surface: the Leviathan, come up here after diving elsewhere, rising from
+// under the sea at `at`.
+interface Built { sig: string; obj: THREE.Group; born: number; walk?: { from: THREE.Vector3; at: number }; surface?: number }
 
 // A wandering beast turns to face the next hex, walks there, and turns back
 // to face the room (seconds): an unhurried walk, so it's still going when
 // someone looks up from their phone.
 const WALK_TURN = 0.7, WALK_GO = 3.4;
+
+// The Leviathan moving: it sinks under the sea where it was (DIVE_S seconds),
+// stays under, and comes back up at its new hex SURFACE_AT seconds after it
+// began to dive, rising for RISE_S. DEPTH is far enough down to be hidden.
+const DIVE_S = 1.6, SURFACE_AT = 4, RISE_S = 1.3, DEPTH = 1.8;
 
 // What just changed on the board stays marked for a while: a glowing gold
 // outline round its hex (round the building's border, which is in its owner's
@@ -1856,7 +1863,8 @@ export class Board3D {
   private marks = new Map<string, { mesh: THREE.Mesh; born: number }>(); // by hex
   // What's leaving the board, folding flat (a building or beast) or shrinking
   // away (a dragon or an egg) before it's gone.
-  private leaving: { obj: THREE.Object3D; at: number; how: 'fold' | 'shrink'; size: number; beast?: Built }[] = [];
+  // The Leviathan dives instead, sinking under the sea.
+  private leaving: { obj: THREE.Object3D; at: number; how: 'fold' | 'shrink' | 'dive'; size: number; beast?: Built }[] = [];
   // Hexes whose scenery is changing: the old folds flat while the new folds up.
   // They're left out of the merged scenery until they're done.
   private decorMoves = new Map<string, { old: THREE.Group; now: THREE.Group; at: number }>();
@@ -1985,7 +1993,20 @@ export class Board3D {
       const obj = this.placed(this.beastGroup(f.key, !!h.building, h.k), h);
       const at = animate ? next(h.k) : -1e9;
       const entry: Built = { sig: `${f.key}|${h.building ? 1 : 0}`, obj, born: at };
-      const from = animate ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
+      const dove = animate && f.key === 'leviathan' ? gone.findIndex((o) => o.key === f.key) : -1;
+      const from = animate && dove < 0 ? gone.findIndex((o) => o.key === f.key && o.k !== h.k && hexDist(this.tiles.get(o.k)!.hex, h) === 1) : -1;
+      if (dove >= 0) {
+        // The Leviathan swam here: it dives where it was, and comes up here
+        // a few seconds later. The gold mark waits for it.
+        entry.born = -1e9;
+        entry.surface = at + SURFACE_AT;
+        this.leave(gone[dove].b.obj, at, 'dive', gone[dove].b);
+        gone.splice(dove, 1);
+        this.beasts.set(h.k, entry);
+        this.animateBeast(entry, clock());
+        this.mark(h, entry.surface);
+        continue;
+      }
       if (from >= 0) {
         entry.born = -1e9;
         entry.walk = { from: gone[from].at.sub(this.figureAt(entry)), at };
@@ -2079,7 +2100,7 @@ export class Board3D {
   }
 
   // Takes something off the board slowly: see `leaving`.
-  private leave(obj: THREE.Object3D, now: number, how: 'fold' | 'shrink', beast?: Built) {
+  private leave(obj: THREE.Object3D, now: number, how: 'fold' | 'shrink' | 'dive', beast?: Built) {
     this.leaving.push({ obj, at: now, how, size: obj.scale.x, beast });
   }
 
@@ -2137,6 +2158,14 @@ export class Board3D {
       gait = smooth(0, WALK_TURN * 0.6, since) * (1 - back);
       stride = since;
     } else delete b.walk;
+    if (b.surface !== undefined) {
+      // Under the sea until it's time, then it rises, breaking the surface
+      // with a little overshoot, and settles.
+      const up = Math.max(0, Math.min(1, (t - b.surface) / RISE_S));
+      m.position.y = -DEPTH * (1 - popUp(up));
+      m.visible = t >= b.surface;
+      if (up >= 1) delete b.surface;
+    }
     for (const r of m.userData.rigs as BeastRig[]) animateBeast(r, t, gait, stride);
   }
 
@@ -2390,13 +2419,21 @@ export class Board3D {
       }
     }
     // Leaving: a building or beast folds back down flat, the way it came; a
-    // dragon or an egg shrinks away.
+    // dragon or an egg shrinks away; the Leviathan dives.
     this.leaving = this.leaving.filter((l) => {
-      const k = smooth(0, LEAVE_S, t - l.at);
+      const k = smooth(0, l.how === 'dive' ? DIVE_S : LEAVE_S, t - l.at);
       if (k >= 1) {
         this.world.remove(l.obj);
         dispose(l.obj);
         return false;
+      }
+      if (l.how === 'dive') {
+        // Head first, down under the sea, then gone.
+        if (l.beast) this.animateBeast(l.beast, t);
+        const m = l.obj.userData.figure as THREE.Group;
+        m.position.y = -DEPTH * k * k;
+        m.rotation.z = -0.5 * smooth(0, DIVE_S * 0.6, t - l.at);
+        return true;
       }
       if (l.how === 'fold') {
         const pop = l.obj.userData.pop as THREE.Group;

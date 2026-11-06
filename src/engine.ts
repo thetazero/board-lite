@@ -5,7 +5,7 @@ import {
   ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
   type Attack, type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
-import { PEAK, generateMap, key, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
+import { PEAK, distance, generateMap, key, leviathanWaters, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
 
 export interface Card {
@@ -108,7 +108,7 @@ export type GameEvent =
   | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
   | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
   | { k: 'recall'; p: number; ds: string[] }
-  | { k: 'wander'; from: string; to: string; fauna: string; name: string } // a beast of the fauna moves 1 hex, in production
+  | { k: 'wander'; from: string; to: string; fauna: string; name: string } // in production, a beast of the fauna moves 1 hex, or the Leviathan swims anywhere in its waters
   | { k: 'bank'; p: number; give: Bundle; get: Bundle }
   | { k: 'offer'; p: number; to: number | null }
   | { k: 'trade'; from: number; to: number; give: string; get: string }
@@ -583,6 +583,7 @@ function startRound(g: Game) {
     log(g, `${pname(p)} produces ${bundleText(got)}.${eat ? ` ${pname(p)}'s dragons eat ${eat} livestock.` : ''}`, { k: 'produce', p, got, eat }, { dice });
   }
   wander(g);
+  roam(g);
   // A fed dragon heals some if it's hurt, and grows if it isn't; a hungry one
   // does neither.
   for (const d of g.dragons) {
@@ -1060,6 +1061,25 @@ function wander(g: Game) {
     const b = g.buildings[n];
     log(g, `The ${FAUNA[f].name} at ${k} moves to ${n}${b ? `, onto ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}.`, { k: 'wander', from: k, to: n, fauna: f, name: FAUNA[f].name });
   }
+}
+
+// In production the Leviathan, while it lives, dives and comes up at another
+// hex of its waters, at random: a hex is as likely as it is far, so it
+// usually swims well away, but not always.
+function roam(g: Game) {
+  const k = faunaOnMap(g).find((x) => g.map[x].fauna === 'leviathan');
+  if (!k) return;
+  const [q, r] = parseKey(k)!;
+  const far = (n: string) => {
+    const [nq, nr] = parseKey(n)!;
+    return distance(nq - q, nr - r);
+  };
+  const to = leviathanWaters(g.map, g.players.length).filter((n) => n !== k);
+  if (!to.length) return;
+  const n = pick(g.rng, to.flatMap((m) => Array(far(m)).fill(m)));
+  g.map[n].fauna = 'leviathan';
+  delete g.map[k].fauna;
+  log(g, `The Leviathan dives at ${k} and surfaces at ${n}.`, { k: 'wander', from: k, to: n, fauna: 'leviathan', name: BEASTS.leviathan.name });
 }
 
 // Where a fauna card can put its beast: any land hex without fauna or a tower.
