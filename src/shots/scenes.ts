@@ -1505,7 +1505,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => perchers(g),
     shots: (g) => [
-      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, suppressed and grey", client: 'tv', waitMs: 4800 },
+      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, suppressed: their hexes go dark grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-perch-turn-3p', caption: 'Phone: your turn, with perched dragons to clear, a building to perch on and a dragon to recall', client: 'phone', seat: g!.turn },
       { file: 'phone-perch-pick-3p', caption: "Phone: choosing a rival's building to perch on", client: 'phone', seat: g!.turn, clicks: ['#perch'] },
       { file: 'phone-perch-send-3p', caption: 'Phone: choosing dragons to perch there', client: 'phone', seat: g!.turn, clicks: ['#perch', '[data-hex]', '[data-hunter]'] },
@@ -1524,7 +1524,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => roostPerched(g),
     shots: (g) => [
-      { file: 'tv-perch-roost-3p', caption: "TV: a dragon perched on a rival's roost, which goes grey", client: 'tv', waitMs: 4800 },
+      { file: 'tv-perch-roost-3p', caption: "TV: a dragon perched on a rival's roost, whose hex goes dark grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-perch-roost-3p', caption: 'Phone: your roost suppressed, so you have 1 dragon more than room', client: 'phone', seat: g!.turn },
     ],
   },
