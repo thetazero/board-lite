@@ -38,7 +38,7 @@ export interface GameStats {
   played: Count; // action cards
   hatched: Count; // dragon keys hatched (cards and projects); starting dragons not counted
   elements: Count; // every dragon a seat ended with, by element, starting ones included
-  projects: Count; // special projects: building type, 'tower_floor' or 'egg'
+  projects: Count; // special projects: building type, 'tower_floor', upgrade key or 'egg'
   hoards: number[]; // Secret Hoards in hand at the end
   raids: { targets: Record<string, { chosen: number; fell: number }>; joined: number[]; fell: number[]; loot: number[]; bailed: number[]; gold: number[] };
   fauna: Record<string, { tried: number[]; cleared: number[] }>;
@@ -125,6 +125,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'upgrade':
         r.buildings[ev.hex].upgrade = ev.u;
         bump(s.upgraded, ev.u, ev.p, n);
+        if (ev.project) bump(s.projects, ev.u, ev.p, n);
         break;
       case 'hatch':
         r.dragons.push({ id: ev.d, owner: ev.p, key: keyOf[ev.d], stage: 0, growth: 0, damage: 0 });
@@ -273,7 +274,7 @@ const CATALOG: { what: string; keys: string[]; uses: (s: GameStats) => Count; se
   { what: 'Action cards played', keys: Object.keys(ACTIONS).filter((k) => ACTIONS[k].effect !== 'hidden_point'), uses: (s) => s.played, seen: true },
   { what: 'Dragons hatched', keys: Object.keys(DRAGONS), uses: (s) => s.hatched, seen: true },
   { what: 'Dragon elements held at the end', keys: [...ELEMENTS], uses: (s) => s.elements, noFlags: true },
-  { what: 'Special projects', keys: [...BUILD_KEYS.filter((k) => BUILDINGS[k].basic), 'egg'], uses: (s) => s.projects },
+  { what: 'Special projects', keys: [...BUILD_KEYS.filter((k) => BUILDINGS[k].basic), ...Object.keys(UPGRADES).filter((k) => UPGRADES[k].base), 'egg'], uses: (s) => s.projects },
   { what: 'Fauna and great beasts cleared', keys: [...Object.keys(FAUNA), ...Object.keys(BEASTS)], uses: (s) => Object.fromEntries(Object.entries(s.fauna).map(([k, v]) => [k, v.cleared])) },
 ];
 

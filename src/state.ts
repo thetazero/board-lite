@@ -2,10 +2,10 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
 import {
   type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
-  onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
@@ -182,6 +182,9 @@ export interface SeatState {
   deciding: boolean;
   basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean; why: string | null }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean; why: string | null };
+  // Upgrades added without the card, as a special project (the Workshop): on
+  // which of your buildings, and what each would do with it.
+  upgradeProjects: { key: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes>; why: string | null }[];
   raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
   huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
@@ -352,7 +355,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const u = UPGRADES[c.key];
     const hexes = upgradeTargets(g, p, c.key);
     const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, c.key)]));
-    return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.` };
+    return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : noUpgradeHex(u) };
   }
   if (kind === 'dragon') {
     const d = DRAGONS[c.key];
@@ -378,6 +381,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
 }
 
 const NO_ROOM = 'No room for another dragon: build a roost first.';
+const noUpgradeHex = (u: UpgradeDef) => `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.`;
 const noHex = (b: BuildingDef) => `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings${b.beside ? ` and to ${besideText(b.beside)}` : ''}.`;
 // A building's card text, plus where it must go.
 const placeText = (b: BuildingDef) => `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}${b.beside ? ` Build adjacent to ${besideText(b.beside)}.` : ''}`;
@@ -412,6 +416,13 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
       return { key: k, cls: b.class, name: b.name, text: placeText(b), cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, onTower: !!b.onTower, why };
     }),
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
+    upgradeProjects: PROJECT_UPGRADES.map((key) => {
+      const u = UPGRADES[key];
+      const cost = specialProjectCost(u.cost);
+      const hexes = upgradeTargets(g, p, key);
+      const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, key)]));
+      return { key, name: u.name, text: u.text, cost: res(cost), affordable: canAfford(pl, cost), hexes, after, why: (hexes.length ? null : noUpgradeHex(u)) ?? afford(pl, cost) };
+    }),
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
     perchable: perchHexes(g, p),
@@ -493,7 +504,7 @@ export interface Recap {
 export interface BookBuilding { key: string; name: string; cls: string; text: string; cost: Res; terrain?: string; basic: boolean }
 export interface Rulebook {
   buildings: BookBuilding[]; // the basic buildings, then the building cards
-  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */ }[];
+  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */; base: boolean /* also a special project */ }[];
   actions: { key: string; name: string; text: string; cost: Res; fauna?: FaunaView }[];
   dragons: { key: string; name: string; element: string; cost: Res; base: boolean; growth: number; targeting: string; stages: DragonStageView[] }[];
   fauna: FaunaView[];
@@ -513,7 +524,7 @@ export function rulebook(): Rulebook {
   };
   return {
     buildings: [...BASIC_BUILDINGS, ...Object.keys(BUILDINGS).filter((k) => !BUILDINGS[k].basic)].map(building),
-    upgrades: Object.entries(UPGRADES).map(([key, u]) => ({ key, name: u.name, text: u.text, cost: res(u.cost), on: u.appliesTo })),
+    upgrades: Object.entries(UPGRADES).map(([key, u]) => ({ key, name: u.name, text: u.text, cost: res(u.cost), on: u.appliesTo, base: !!u.base })),
     actions: Object.entries(ACTIONS).map(([key, a]) => ({ key, name: a.name, text: a.text, cost: res(a.cost), ...(a.fauna ? { fauna: faunaView(a.fauna, {}) } : {}) })),
     dragons: Object.entries(DRAGONS).map(([key, d]) => ({ key, name: d.name, element: d.element, cost: res(d.cost), base: !!d.base, growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) })),
     fauna: Object.keys(FAUNA).map((k) => faunaView(k)),

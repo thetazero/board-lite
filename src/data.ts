@@ -66,7 +66,7 @@ export const TUNING = {
   towerDragonCapacity: 1,
   // Each player's starting base dragon begins at this life stage (0 egg).
   startingDragonStage: 0,
-  // The base-egg special project costs this many times the base dragon card.
+  // A special project (a base egg, or a Workshop) costs this many times its card.
   specialProjectMultiplier: 2,
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
@@ -186,10 +186,11 @@ export interface UpgradeDef {
   dragonCapacity?: number;
   points?: number; // added to the building's
   copies: number;
+  base?: boolean; // also added without the card, as a special project
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, points: 1, text: 'This stone, timber, crystal or livestock building makes 2 more; worth 1 point.', copies: 4 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, points: 1, text: 'This stone, timber, crystal or livestock building makes 2 more; worth 1 point.', copies: 4, base: true },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
 };
 

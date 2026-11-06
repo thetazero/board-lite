@@ -1,9 +1,9 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
-import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING, UPGRADES } from './data.ts';
 import {
-  acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
+  acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost, PROJECT_UPGRADES,
   score, upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -58,6 +58,10 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
     if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
+    for (const u of PROJECT_UPGRADES) {
+      const t = upgradeTargets(g, p, u);
+      if (t.length && canAfford(pl, specialProjectCost(UPGRADES[u].cost))) out.push(`project ${u} ${pick(rng, t)}`);
+    }
     for (const b of shuffle(rng, BASIC_BUILDINGS.slice())) {
       if (b === 'roost' && roomForDragon) continue;
       const hexes = buildableHexes(g, p, b);

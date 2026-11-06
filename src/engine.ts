@@ -2,7 +2,7 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef,
+  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef, orList,
   type Attack, type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
 import { PEAK, distance, generateMap, key, leviathanWaters, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
@@ -96,7 +96,7 @@ export type GameEvent =
   | { k: 'turn'; p: number }
   | { k: 'build'; p: number; b: string; name: string; hex: string; project?: boolean }
   | { k: 'floor'; p: number; floors: number; project?: boolean }
-  | { k: 'upgrade'; p: number; u: string; name: string; on: string; hex: string }
+  | { k: 'upgrade'; p: number; u: string; name: string; on: string; hex: string; project?: boolean }
   | { k: 'hatch'; p: number; d: string; project?: boolean }
   | { k: 'play'; p: number; card: string; name: string; gain?: Bundle; d?: string; raids?: number; hex?: string; fauna?: string }
   // A player's dragons attack what holds a hex: its beast (at full health)
@@ -1206,6 +1206,25 @@ export function upgradeTargets(g: Game, p: number, up: string): string[] {
     .sort();
 }
 
+// The hex an upgrade goes on, from what the player typed, or why it can't.
+function upgradeCheck(g: Game, p: number, up: string, typed: string | undefined): string {
+  const coords = parseKey(typed ?? '');
+  const k = coords ? key(...coords) : '';
+  const ok = upgradeTargets(g, p, up);
+  if (!ok.includes(k)) fail(`${UPGRADES[up].name} can go on: ${ok.join(' ') || 'none of your buildings'}.`);
+  return k;
+}
+
+function placeUpgrade(g: Game, p: number, up: string, k: string, project = false) {
+  g.buildings[k].upgrade = up;
+  const b = g.buildings[k];
+  const name = UPGRADES[up].name;
+  log(g, `${pname(p)} adds ${name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}${project ? ' as a special project' : ''}.`, { k: 'upgrade', p, u: up, name, on: b.type, hex: k, ...(project ? { project } : {}) });
+}
+
+// The upgrades a player may add without the card, as a special project.
+export const PROJECT_UPGRADES = Object.keys(UPGRADES).filter((k) => UPGRADES[k].base);
+
 export function specialProjectCost(cost: Bundle): Bundle {
   return scale(cost, TUNING.specialProjectMultiplier);
 }
@@ -1310,14 +1329,10 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
     case 'upgrade': {
       const c = handCard(g, p, args[0]);
       if (cardKind(c) !== 'upgrade') fail(`${cardName(c)} is not an upgrade card.`);
-      const coords = parseKey(args[1] ?? '');
-      const k = coords ? key(...coords) : '';
-      if (!upgradeTargets(g, p, c.key).includes(k)) fail(`${cardName(c)} can go on: ${upgradeTargets(g, p, c.key).join(' ') || 'none of your buildings'}.`);
+      const k = upgradeCheck(g, p, c.key, args[1]);
       pay(pl, UPGRADES[c.key].cost);
       pl.hand.splice(pl.hand.indexOf(c), 1);
-      g.buildings[k].upgrade = c.key;
-      const b = g.buildings[k];
-      return log(g, `${pname(p)} adds ${UPGRADES[c.key].name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}.`, { k: 'upgrade', p, u: c.key, name: UPGRADES[c.key].name, on: b.type, hex: k });
+      return placeUpgrade(g, p, c.key, k);
     }
     case 'clear': {
       const coords = parseKey(args[0] ?? '');
@@ -1358,7 +1373,12 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
         pay(pl, specialProjectCost(DRAGONS[dk].cost));
         return hatch(g, p, dk, true);
       }
-      return fail(`The special project is a base dragon egg of an element: ${ELEMENTS.join(', ')}.`);
+      if (UPGRADES[what]?.base) {
+        const k = upgradeCheck(g, p, what, args[1]);
+        pay(pl, specialProjectCost(UPGRADES[what].cost));
+        return placeUpgrade(g, p, what, k, true);
+      }
+      return fail(`A special project is a base dragon egg of an element (${ELEMENTS.join(', ')}) or ${orList(PROJECT_UPGRADES.map((u) => `a ${UPGRADES[u].name}`))} on one of your buildings, like "project ${PROJECT_UPGRADES[0]} 2,-1".`);
     }
     case 'play': {
       const c = handCard(g, p, args[0]);

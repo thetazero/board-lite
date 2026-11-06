@@ -137,7 +137,7 @@ The owner (2026-11-03): "great beasts that are hard to kill and give 1 VP for ki
 
 ### Special projects
 
-- Always-available "special projects" let a player get unstuck on all the basic things without a card, such as building the basic buildings or getting a base dragon of each element. (With the basic buildings no longer cards, only the base egg is left as a special project.)
+- Always-available "special projects" let a player get unstuck on all the basic things without a card, such as building the basic buildings or getting a base dragon of each element. (With the basic buildings no longer cards, only the base egg was left as a special project.) Since #350 a Workshop is one too, so the 4 Workshop cards can't all sit with one player: in a 25-round playtest one player held all 4 by round 6 and production flattened for everyone. The owner: "I want a workshop basic project, which is 2x as expensive as the card".
 - They are expensive: always worse than the equivalent card.
 
 ## Map
@@ -253,7 +253,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - The tower produces 1 of each non-gold resource and houses 1 dragon, plus 1 per floor (#323).
 - Only production buildings are tied to terrain; other buildings go on any free hex.
 - One upgrade per building; the tower counts as a monument and a dragon building.
-- The special project is a base egg of any element, at double the base dragon card.
+- The special projects are a base egg of any element and a Workshop, each at double its card.
 - Dragon cards hatch as eggs. Every dragon, eggs included, eats 1 livestock per round, in order of hatching.
 - Healing: every fed dragon that is hurt heals a fixed amount at production (7 health, in `src/data.ts`). The owner (#262): "dragons can fight whenever they have positive health. knocked out drags should be greyed out and clearly indicated": a hurt dragon fights with the health it has left, so the hits it takes are a cost it carries into its next fights; only a knocked-out one (0 health) can't fight, until a fed production heals it. Nothing sits out any more: not a hurt dragon, not a hungry one, not one that cleared a hex. Combat power stays as printed; the health bar shows the damage (the owner: "feature not bug"). (Changed in #262 from sitting out a raid round per 7 damage.) The owner (#234): "dragons should not grow while they are healing up... and should not heal while out of food": a hurt dragon heals instead of growing, and a hungry one does neither. Dragons never die: at 0 health they are knocked out and heal at home. (Changed in #65 from healing fully each round.)
 - Combat: dragons strike first, then each defender hits random dragons, until one side has fallen. No fleeing mid-fight; bailing before it is the only way out.

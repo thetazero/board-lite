@@ -915,10 +915,12 @@ function moreView(me: Me): string {
   // The egg's button opens the choice of its element, as a basic building's opens the choice of its hex.
   const egg = me.eggProject;
   const eggs = eggOpen && !egg.why ? choose('Choose an element for the egg', egg.elements.map((e) => `<button class="elembtn" style="--ec:${ELEMENT_COLORS[e]}" data-egg="${e}">${elemIcon(e, 1.5)} ${e[0].toUpperCase()}${e.slice(1)}</button>`)) : '';
+  // An upgrade's button opens the choice of its building, as its card's does.
+  const ups = me.upgradeProjects.map((u) => row('', u.name, u.cost, btn('Upgrade', `data-upproject="${u.key}"`, u.why, ''), u.why)).join('');
   return `
     <section class="panel"><h3>Basic buildings</h3>${basics}</section>
     <section class="panel"><h3>Special projects</h3>
-      ${row('', 'Base dragon egg', egg.cost, btn('Hatch', 'id="egg"', egg.why, eggOpen && !egg.why ? 'on' : ''), egg.why)}${eggs}</section>`;
+      ${row('', 'Base dragon egg', egg.cost, btn('Hatch', 'id="egg"', egg.why, eggOpen && !egg.why ? 'on' : ''), egg.why)}${eggs}${ups}</section>`;
 }
 
 function stepper(side: 'give' | 'get', r: string, n: number, max: number): string {
@@ -1508,6 +1510,16 @@ function wire(g: PublicState, me: Me) {
     if (b.onTower) return send(`build ${b.key}`);
     const about = pickAbout(cardArt('building', b.key, undefined, b.cls), b.name, b.text, frameColor('building'));
     picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}`, about };
+    render();
+  });
+  bind('[data-upproject]', (el) => {
+    const u = me.upgradeProjects.find((x) => x.key === el.dataset.upproject)!;
+    const about = pickAbout(cardArt('upgrade', u.key), u.name, u.text, frameColor('upgrade'));
+    // As placing the card: what the building does with it shows before it's final (#246).
+    const now = () => ({ g: snap!.game!, me: snap!.you! });
+    const after = (k: string) => (now().me.upgradeProjects.find((x) => x.key === u.key) ?? u).after[k];
+    const confirm = { verb: 'Upgrade', detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: u.name, after: after(k)! }) };
+    picking = { title: `Choose a building for the ${u.name}`, hexes: u.hexes, command: (h) => `project ${u.key} ${h}`, about, confirm };
     render();
   });
   bind('[data-keep]', (el) => send(`keep ${el.dataset.keep}`));

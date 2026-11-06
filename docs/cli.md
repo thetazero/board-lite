@@ -53,6 +53,7 @@ Action phase, on your turn:
 | `perch 2,-1 d3` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it makes nothing while d3 stays, and d3 doesn't raid |
 | `recall d3` | bring your perched dragon d3 home |
 | `project fire` | special project: a base dragon egg of that element, no card, double cost |
+| `project workshop 2,-1` | special project: a Workshop on that building of yours, no card, double cost |
 | `merchants stone timber 2` | pay 2× your merchants' rate in stone for 2 timber (the merchants don't trade gold) |
 | `offer P2 give 2 stone c12 get 1 gold` | propose a trade; items are `<n> <resource>` and card ids |
 | `offer anyone give 2 stone get 1 timber` | propose a trade to every other player at once; the first to accept trades |
