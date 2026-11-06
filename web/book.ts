@@ -72,7 +72,7 @@ function portraitList(b: Rulebook, seat: number): { id: string; p: Portrait }[] 
   add('perched', { terrain: 'meadow', building: 'pasture', dragon: { element: 'ice', stage: 3 } });
   add('held thunderbird', { terrain: 'meadow', held: 'thunderbird' });
   add('held leviathan', { terrain: 'harbor', held: 'leviathan' });
-  add('peak zone', { terrain: 'meadow', peakZone: true });
+  add('peak zone', { terrain: 'meadow', peakZone: b.peakBonus });
   add('tower', { terrain: 'plains', building: 'tower' });
   for (const x of b.buildings) add(`building ${x.key}`, x.key === 'tower_floor' ? { terrain: 'plains', building: 'tower', floors: 3 } : { terrain: x.terrain ?? 'plains', building: x.key });
   for (const u of b.upgrades) add(`upgrade ${u.key}`, { ...UPGRADE_ON[u.key], upgrade: u.key });
@@ -150,7 +150,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
       ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('A beast holds it: it makes nothing until someone clears the beast.'), 'shut')}
       ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building makes nothing until its owner recalls it or it’s knocked out.'), 'perched')}
       ${b.greatBeasts.map((f) => entry(pic(`held ${f.key}`, `Held by the ${f.name}`), `A border in the ${f.name}’s color`, text(`The ${f.name} holds this hex: nothing is built here while the ${f.name} lives.`), `held ${f.key}`)).join('')}
-      ${entry(pic('peak zone', 'A gold border'), 'A gold border', text(`On or adjacent to the Thunderbird’s peak, once the Thunderbird is slain: a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
+      ${entry(pic('peak zone', `A gold border and a +${b.peakBonus}`), `A gold border and a +${b.peakBonus}`, text(`On or adjacent to the Thunderbird’s peak, once the Thunderbird is slain: a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
   },
   buildings(b) {
     const one = (x: BookBuilding) => entry(pic(`building ${x.key}`, x.name), x.name, `${text(x.text)}${cost(x.cost)}`, `building ${x.key}`);

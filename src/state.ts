@@ -22,7 +22,7 @@ export interface HexView {
   perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
   held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
   peak?: 'held' | 'free'; // the Thunderbird's peak
-  peakZone?: boolean; // on or next to the freed peak: a production building here makes more
+  peakZone?: number; // on or next to the freed peak: a production building here makes this many more each round
 }
 
 // What a building does each round on its hex (engine's buildingYield), with,
@@ -291,7 +291,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       return {
         ...(!h.fauna && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
-        ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
+        ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
         building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,

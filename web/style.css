@@ -572,6 +572,11 @@ body.recap-page { font-size: 16px; }
 .outcome h1 { margin: .3em 0 .2em; font-family: var(--serif); font-size: 2.3em; }
 .spoils { display: flex; gap: 2em; justify-content: center; font-size: 1.6em; }
 .spoils > span { display: inline-flex; align-items: center; gap: .3em; }
+/* The freed peak's rule, popping up on its gold token after the points. */
+.outcome .boon { display: flex; align-items: center; justify-content: center; gap: .6em; max-width: 30em; margin: .55em auto 0; padding-top: .5em; border-top: 1px solid var(--paper-edge); font-size: 1.35em; text-align: left; }
+.outcome.show .boon { animation: boon .5s .9s cubic-bezier(.3, 1.6, .5, 1) both; }
+.ptoken { flex: none; display: inline-grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 50%; background: #e7b43f; color: #3a2710; font-family: var(--serif); font-weight: 700; font-size: 1.15em; box-shadow: 0 2px 0 #b88a2a, var(--lift); }
+@keyframes boon { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
 /* The scoring beat: the crown comes down on the most power standing, on
    their dragons and their name, then the points. */
 .outcome .score { display: flex; align-items: center; justify-content: center; gap: .5em; margin-top: .5em; padding-top: .45em; border-top: 1px solid var(--paper-edge); font-size: 1.6em; opacity: 0; transition: opacity .4s; }
@@ -1124,6 +1129,7 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .fig .dmg { font-size: .7em; }
 .remote .fightscene .outcome { top: 13vh; min-width: 0; width: 94vw; padding: .2em .6em .6em; font-size: .85em; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
+.remote .outcome .boon { font-size: 1em; }
 .remote .outcome .score { font-size: 1.1em; flex-wrap: wrap; }
 .remote .fled { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
 /* A dragon in the roost is a button: tap it for its card. */
