@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { botStep, playOut } from '../src/bot.ts';
+import { botStep, playToEnd } from '../src/bot.ts';
 import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
@@ -30,8 +30,10 @@ const hatchAll = (g: Game) => g.dragons.forEach((d) => (d.stage = Math.max(d.sta
 const rich = (g: Game, p: number) => (g.players[p].resources = { stone: 50, timber: 50, crystal: 50, livestock: 50, gold: 50 });
 
 // The bot games every test below reads: two seeds per player count, played
-// once. waitingOn is checked at every step on the way.
-let played: { players: number; seed: number; g: Game }[] | undefined;
+// once. waitingOn is checked at every step on the way. Bot games can stall
+// short of the points to win, so playToEnd lowers the target late in the game
+// (target: the one it ended on); that keeps these tests apart from tuning.
+let played: { players: number; seed: number; g: Game; target: number }[] | undefined;
 function botGames() {
   if (played) return played;
   played = [];
@@ -39,22 +41,22 @@ function botGames() {
     for (const seed of [1, 2]) {
       const g = newGame(players, seed);
       const rng = { state: seed * 31 + players };
-      for (let steps = 0; g.phase !== 'over' && steps < 20000; steps++) {
+      const target = playToEnd(g, () => {
         assert.ok(waitingOn(g).length > 0, `${players}p seed ${seed}: no one to wait on`);
         botStep(g, rng);
-      }
-      played.push({ players, seed, g });
+      });
+      played.push({ players, seed, g, target });
     }
   }
   return played;
 }
 
 test('bot games reach a winner for every player count, naming someone to wait on until then', () => {
-  for (const { players, seed, g } of botGames()) {
+  for (const { players, seed, g, target } of botGames()) {
     assert.equal(g.phase, 'over', `${players}p seed ${seed} did not finish`);
     assert.ok(g.winner !== null);
     assert.deepEqual(waitingOn(g), []);
-    assert.ok(score(g, g.winner!).total >= TUNING.pointsToWin);
+    assert.ok(score(g, g.winner!).total >= target);
     // The game survives a save/load round trip at the end.
     assert.deepEqual(JSON.parse(JSON.stringify(g)), g);
   }
@@ -114,7 +116,8 @@ test('the log reads as English: no "1 cards", "card(s)" or one winner who "each 
 test('the same seed gives the same game', () => {
   const [{ players, seed, g }] = botGames();
   const again = newGame(players, seed);
-  playOut(again, { state: seed * 31 + players });
+  const rng = { state: seed * 31 + players };
+  playToEnd(again, () => botStep(again, rng));
   assert.deepEqual(again, g);
 });
 
