@@ -308,3 +308,32 @@ test('the chart works both ways when dragons fight dragons: water doubles on fir
   const fire = fightHits('ice_whelp', 1).filter((h) => h.by === 'unit');
   assert.ok(fire.length && fire.every((h) => h.dmg % 2 === 0), `fire on ice: ${fire.map((h) => h.dmg)}`);
 });
+
+test('a coin flip, once a fight, decides which side strikes first each combat round (#380)', () => {
+  const seen = new Set<string>();
+  for (let seed = 1; seen.size < 2 && seed < 40; seed++) {
+    const { g, pasture } = perchGame();
+    const [a, b] = [addDragon(g, 1, 3), addDragon(g, 1, 3)];
+    apply(g, 0, 'end');
+    apply(g, 1, `perch ${pasture} ${a.id} ${b.id}`);
+    apply(g, 1, 'end');
+    toTurnOf(g, 0);
+    g.rng.state = seed;
+    const ds = [addDragon(g, 0, 3), addDragon(g, 0, 3)];
+    apply(g, 0, `clear ${pasture} ${ds.map((d) => d.id).join(' ')}`);
+    const at = g.log.findLastIndex((e) => e.ev?.k === 'hunt');
+    const hunt = g.log[at].ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
+    assert.ok(hunt.first === 'dragons' || hunt.first === 'defenders');
+    assert.match(g.log[at].text, hunt.first === 'dragons' ? /Coin flip: the dragons strike first\./ : /Coin flip: the defenders strike first\./);
+    seen.add(hunt.first!);
+    // Every round, the winner's hits all come before the other side's.
+    const rounds = g.log.slice(at).flatMap((e) => (e.ev?.k === 'combat' ? [e.ev] : []));
+    assert.ok(rounds.length > 0);
+    for (const r of rounds) {
+      const sides = r.hits.map((h) => (h.by === 'dragon' ? 'dragons' : 'defenders'));
+      const firstOther = sides.findIndex((s) => s !== hunt.first);
+      if (firstOther >= 0) assert.ok(sides.slice(firstOther).every((s) => s !== hunt.first), `round ${r.round}: ${sides.join(' ')}`);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['defenders', 'dragons']);
+});

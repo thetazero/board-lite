@@ -576,7 +576,8 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
-  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), fled, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms);
+  const first = ev.first === 'defenders' ? 'Defenders' : 'Dragons';
+  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), fled, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms, first);
 }
 
 // A fight for a hex: one player's dragons against what holds it (a beast,
@@ -603,7 +604,8 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
-  return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms);
+  const first = ev.first !== 'defenders' ? 'Dragons' : units.length > 1 ? 'Defenders' : units[0].name;
+  return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);
 }
 
 // The Thunderbird's fall frees its peak: the rule pops up under the points,
@@ -627,7 +629,8 @@ const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
 const STEEL = '#c9ced6';
 
 type Foe = { name: string; hp: number; max: number; d?: DragonView; el?: string };
-function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number): Banner {
+// `first`: who won the fight's coin flip and strikes first each round (#380).
+function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number, first: string): Banner {
   const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
   // A figure: its health over its head, the figure standing on its shadow
   // (in its owner's colour, for a dragon), and its name at its feet.
@@ -690,7 +693,7 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
-      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first)}</b></div></header>
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
       ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;

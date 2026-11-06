@@ -550,6 +550,7 @@ body.recap-page { font-size: 16px; }
 .bvs { display: flex; flex-direction: column; align-items: center; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
 .bvs b { font-size: 2.2em; line-height: 1; color: var(--ink); min-height: 1em; }
+.bvs.bfirst b { font-size: 1.3em; line-height: 1.4; font-family: var(--serif); white-space: nowrap; } /* who won the coin flip, a word not a number */
 .battle { position: absolute; left: 3vw; right: 3vw; bottom: 9vh; top: 30vh; display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; align-items: end;
   --k: clamp(.45em, min(calc(34vw / var(--sl)), calc(34vw / var(--sr)), calc(46vh / var(--mx))), 3em); }
 /* wrap-reverse: a second row stands behind the first, and flex-start is the ground. */
