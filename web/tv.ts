@@ -58,7 +58,8 @@ async function boot() {
     // It shows the TV's fights, so it folds their figures too: three.js
     // loads behind the table, never holding it up (a fight before it's in is
     // drawn flat).
-    void load3d().then((m) => (fight3d = m));
+    // (`folded` on the body says it has settled, either way.)
+    void load3d().then((m) => { fight3d = m; document.body.classList.add('folded'); });
     return watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok));
   }
   // If three.js can't load, the TV still runs, on the flat map.
@@ -609,12 +610,14 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const right = units.map((u) => ({ u, ...art(u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, -1, () => (u.d ? dragonFigure(u.d.element) : unitFigure(unitKey(u.name)))) }));
   // A figure's width: its area goes with its full health, whatever its shape.
   const width = (max: number, aspect: number) => figSize(max) * Math.sqrt(aspect / 1.25);
-  const side = left.map(({ d, html: a, aspect }) => fig(`data-d="${d.id}" data-p="${d.owner}"`, width(d.maxHp, aspect), a, dragonLabel(d, g.dragons), hp0(d), d.maxHp, 'fig-d', PLAYER_COLORS[d.owner])).join('');
+  const leftFigs = left.map(({ d, html: a, aspect }) => fig(`data-d="${d.id}" data-p="${d.owner}"`, width(d.maxHp, aspect), a, dragonLabel(d, g.dragons), hp0(d), d.maxHp, 'fig-d', PLAYER_COLORS[d.owner]));
+  const side = leftFigs.join('');
   // The biggest defenders stand at the back, the smallest nearest the dragons.
   const rank = units.map((u, i) => i).sort((a, b) => units[a].max - units[b].max || a - b);
-  const foes = right.map(({ u, html: a, aspect }, i) => u.d
+  const foeFigs = right.map(({ u, html: a, aspect }, i) => u.d
     ? fig(`data-u="${i}"`, width(u.max, aspect), a, u.name, u.hp, u.max, 'fig-u fig-d', PLAYER_COLORS[u.d.owner], rank.indexOf(i))
-    : fig(`data-u="${i}"`, width(u.max, aspect), a, u.name, u.hp, u.max, 'fig-u', undefined, rank.indexOf(i))).join('');
+    : fig(`data-u="${i}"`, width(u.max, aspect), a, u.name, u.hp, u.max, 'fig-u', undefined, rank.indexOf(i)));
+  const foes = foeFigs.join('');
   // How big a figure is drawn: as big as fits the more crowded side across,
   // and the tallest figure up; a very crowded side takes two rows.
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -626,26 +629,35 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const shape = Math.min(2.4, Math.max(0.4, innerWidth / Math.max(1, innerHeight)));
   // A screen held upright has no room across for a row of figures: each side
   // stands its figures one above another, as the raid's list does, and past
-  // STACK of them adds a column (the first nearest the other side).
+  // STACK of them adds a column (the first nearest the other side). Every
+  // column has the same rows, so a row lines up across the screen. A boss (a
+  // defender with four times the health of any other) has no room beside
+  // its columns on a phone: it stands over them, at the back, as wide as its
+  // side, so it looms.
   const stack = shape < 1;
   const STACK = 4;
-  const cols = (heights: number[], widths: number[]) => {
-    const n = Math.max(1, Math.ceil(heights.length / STACK)), per = Math.ceil(heights.length / n);
-    const cs = Array.from({ length: n }, (_, c) => ({ w: Math.max(0, ...widths.slice(c * per, (c + 1) * per)), h: sum(heights.slice(c * per, (c + 1) * per)) }));
-    return { rows: per, w: sum(cs.map((c) => c.w)), h: Math.max(...cs.map((c) => c.h)) };
-  };
   const tall = (max: number, aspect: number) => width(max, aspect) / aspect * 1.25;
-  const lrank = [...right].sort((a, b) => a.u.max - b.u.max);
-  const cl = cols(left.map((x) => tall(x.max, x.aspect)), left.map((x) => width(x.max, x.aspect)));
-  const cr = cols(lrank.map((x) => tall(x.u.max, x.aspect)), lrank.map((x) => width(x.u.max, x.aspect)));
+  const sorted = rank.map((i) => ({ i, max: units[i].max, w: width(units[i].max, right[i].aspect), h: tall(units[i].max, right[i].aspect) }));
+  const boss = sorted.length > 1 && sorted[sorted.length - 1].max >= 4 * sorted[sorted.length - 2].max ? sorted.pop()! : null;
+  const split = <T,>(xs: T[]) => { const n = Math.max(1, Math.ceil(xs.length / STACK)), per = Math.ceil(xs.length / n); return Array.from({ length: n }, (_, c) => xs.slice(c * per, (c + 1) * per)); };
+  const lcols = split(left.map((x, i) => ({ i, w: width(x.max, x.aspect), h: tall(x.max, x.aspect) })));
+  const rcols = split(sorted);
+  const colW = (cs: { w: number }[][]) => sum(cs.map((c) => Math.max(0, ...c.map((x) => x.w))));
+  // Each side sized on its own: as many rows as its first column, each as tall as its tallest figure.
+  const rowsOf = (cs: { h: number }[][]) => Math.max(1, cs[0].length);
+  const highOf = (cs: { h: number }[][]) => rowsOf(cs) * Math.max(1, ...cs.flat().map((x) => x.h));
+  const col = (figs: string[], c: { i: number }[]) => `<div class="bcol">${c.map((x) => figs[x.i]).join('')}</div>`;
   const fit = stack
-    ? `stack" style="--sl:${cl.w.toFixed(1)};--sr:${cr.w.toFixed(1)};--mx:${Math.max(cl.h, cr.h).toFixed(1)};--rows:${Math.max(cl.rows, cr.rows)};--rl:${cl.rows};--rr:${cr.rows}"`
+    ? `stack" style="--sl:${colW(lcols).toFixed(1)};--sr:${colW(rcols).toFixed(1)};--hl:${highOf(lcols).toFixed(1)};--hr:${highOf(rcols).toFixed(1)};--rl:${rowsOf(lcols)};--rr:${rowsOf(rcols)}"`
     : `" style="--sl:${sl.toFixed(1)};--sr:${sr.toFixed(1)};--mx:${mx.toFixed(1)}"`;
+  const sides = stack
+    ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
+    : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const stage = fight3d ? fight3d.stageArt(place, Math.round(shape >= 1.78 ? 1600 : 900 * shape), Math.round(shape >= 1.78 ? 1600 / shape : 900)) : null;
   const html = `<div class="fightscene">${stage ? `<img class="backdrop" src="${stage}" alt="">` : backdrop(place)}
       <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
       <div class="outcome">${outcome}</div>
-      <div class="battle ${fit}><div class="bside bl">${side}</div><div class="bside br">${foes}</div></div>
+      <div class="battle ${fit}>${sides}</div>
       ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
