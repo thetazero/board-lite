@@ -481,6 +481,8 @@ export interface Recap {
   pointsToWin: number;
   names: string[]; // by seat; the colours are the seats'
   race: number[][]; // everyone's points at the start (0) and after each round; the last row has cards in hand too
+  power?: number[][]; // everyone's dragon power at the start (0) and after each round (absent in recaps from before it)
+  made?: number[][]; // [round-1]: the resources everyone's production made at the start of each round (absent in recaps from before it)
   standings: RecapStanding[];
   moments: Moment[];
 }
