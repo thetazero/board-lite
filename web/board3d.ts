@@ -3342,6 +3342,8 @@ type Standing = {
 // 3, the Fire Giant 5.4 and the Titan 7: the bosses loom.
 const FIG_K = 1;
 const BOSS_LOOM = 1.35;
+// How many fighters a column holds before its side starts another.
+const PER_COLUMN = { upright: 5, wide: 3 };
 const CROWN_PX = 44; // the crown over a head, at the scoring (style.css .fig-crown)
 const LUNGE_S = 0.3, FLINCH_S = 0.25, FALL_S = 0.5;
 const GREY = new THREE.Color('#8a8790');
@@ -3349,14 +3351,13 @@ const GREY = new THREE.Color('#8a8790');
 // A fight, played on the place it's fought over: the place's diorama and
 // the fighters as one scene, every fighter standing on its ground, under
 // one sun, as the board is. The raiders stand on the left facing right,
-// the defenders on the right facing left. On a wide screen each side
-// stands in lines of up to six across, one behind another, and a boss (four
-// times any other defender's health) at the far end of its front line; on
-// one held upright, in files of up to four going back, side by side, and a
-// boss behind them. It's seen through the map's camera (its field of view,
-// looking down at CAMERA_TILT), so it reads as the board does: nothing
-// stands in front of anything. The camera is as far back as lets every fighter, with room
-// for its plate, fit between `safe.top` and `safe.bottom` (fractions of the
+// the defenders on the right facing left, each side in columns going back
+// (layout). A boss (four times any other defender's health) stands as a
+// column of its own beyond its side's on a wide screen; on one held
+// upright, with no room across, it stands behind them. It's seen through
+// the map's camera (its field of view, looking down at CAMERA_TILT), so it
+// reads as the board does: nothing stands in front of anything. The camera
+// is as far back as lets every fighter, with room for its plate, fit between `safe.top` and `safe.bottom` (fractions of the
 // height kept clear for the page's header and footer). Labels are the
 // page's (tv.ts), pinned over each model by anchor().
 export class FightStage {
@@ -3501,10 +3502,10 @@ export class FightStage {
     this.layout(this.foes, -1);
     const boss = this.boss;
     if (boss && !this.upright) {
-      // At the far end of its side's front line, where there's room.
-      const front = this.foes.filter((f) => f.z === 0);
-      boss.x = Math.max(1.2, ...front.map((f) => f.x + Math.max(2 * f.rx, f.label.w * f.u) / 2)) + 0.4 + Math.max(2 * boss.rx, boss.label.w * boss.u) / 2;
-      boss.z = 0;
+      // A column of its own beyond its side's, where there's room, level with their middle.
+      boss.x = Math.max(1.2, ...this.foes.map((f) => f.x + Math.max(2 * f.rx, f.label.w * f.u) / 2)) + 0.4 + Math.max(2 * boss.rx, boss.label.w * boss.u) / 2;
+      const zs = this.foes.map((f) => f.z);
+      boss.z = zs.length ? (Math.min(...zs) + Math.max(...zs)) / 2 : 0;
     } else if (boss) {
       // Behind its files, across the middle of its side.
       const xs = this.foes.map((f) => f.x);
@@ -3519,52 +3520,41 @@ export class FightStage {
     }
   }
 
-  // A side's places, the first nearest the other side. Across: lines of up
-  // to six, each behind the last. Upright: files of up to four going
-  // back, each the next out from the middle; within a file each figure
-  // stands far enough in front of the one behind for that one's head, bar
-  // and name to show over it.
+  // A side's places: columns going back, the first nearest the other side
+  // and each next one further out, so every bolt crosses the screen from
+  // one side to the other. A column holds PER_COLUMN fighters (more on a
+  // phone held upright, which has height to spare and no width), and a
+  // side takes another column only when it needs one. The ranks line up
+  // across the columns, each as far in front of the one behind as its
+  // tallest figure needs to leave that one, its plate and crown showing.
   private layout(fs: Standing[], side: 1 | -1) {
-    const per = this.upright ? 4 : 6;
-    const lines: Standing[][] = [];
-    for (let i = 0; i < fs.length; i += per) lines.push(fs.slice(i, i + per));
+    const per = this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
+    const cols: Standing[][] = [];
+    for (let i = 0; i < fs.length; i += per) cols.push(fs.slice(i, i + per));
+    if (!cols.length) return;
     const back = 1 / Math.tan(CAMERA_TILT); // how far back a height reaches, looking down
     const GAP = 0.4, MID = 1.2;
-    const wide = (f: Standing) => Math.max(2 * f.rx, f.label.w * f.u);
+    // (Labels a little wider than measured: the camera settles a little further back than it was when they were.)
+    const wide = (f: Standing) => Math.max(2 * f.rx, f.label.w * f.u * 1.15);
     // Depth on the ground shows on the screen foreshortened, by the tilt's sine.
-    // (A line's plates, and the crowns over the heads in front of them at the scoring.)
-    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => (f.label.h + CROWN_PX) * f.u)) * 1.1) / Math.sin(CAMERA_TILT) + 0.3;
-    if (this.upright) {
-      // Ranks line up across the files: each rank as far in front of the
-      // one behind as its tallest figure needs to leave that one showing.
-      const ranks = Math.max(...lines.map((l) => l.length));
-      const zs = [0];
-      for (let k = 1; k < ranks; k++) {
-        const prev = lines.map((l) => l[k - 1]).filter(Boolean), cur = lines.map((l) => l[k]).filter(Boolean);
-        const pr = Math.max(...prev.map((f) => f.rz)), cr = Math.max(...cur.map((f) => f.rz)), ch = Math.max(...cur.map((f) => f.h));
-        zs.push(zs[k - 1] + Math.max(pr + cr, ch * back) + clear([...prev, ...cur]));
-      }
-      const front = zs[ranks - 1];
-      let x = MID;
-      for (const file of lines) {
-        const w = Math.max(...file.map(wide)) / 2;
-        file.forEach((f, k) => {
-          f.x = -side * (x + w);
-          f.z = zs[k] - front;
-        });
-        x += 2 * w + Math.max(GAP, 12 * Math.max(...file.map((f) => f.u)));
-      }
-    } else {
-      let z = 0;
-      for (const line of lines) {
-        let x = MID;
-        for (const f of line) {
-          f.x = -side * (x + wide(f) / 2);
-          f.z = z;
-          x += wide(f) + Math.max(GAP, 12 * f.u);
-        }
-        z -= Math.max(...line.map((f) => f.rz * 2 + f.h * back * 0.7)) + clear(line);
-      }
+    // (A rank's plates, and the crowns over the heads in front of them at the scoring.)
+    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => (f.label.h + CROWN_PX) * f.u)) * 1.15) / Math.sin(CAMERA_TILT) + 0.3;
+    const ranks = Math.max(...cols.map((c) => c.length));
+    const zs = [0];
+    for (let k = 1; k < ranks; k++) {
+      const prev = cols.map((c) => c[k - 1]).filter(Boolean), cur = cols.map((c) => c[k]).filter(Boolean);
+      const pr = Math.max(...prev.map((f) => f.rz)), cr = Math.max(...cur.map((f) => f.rz)), ch = Math.max(...cur.map((f) => f.h));
+      zs.push(zs[k - 1] + Math.max(pr + cr, ch * back) + clear([...prev, ...cur]));
+    }
+    const front = zs[ranks - 1];
+    let x = MID;
+    for (const col of cols) {
+      const w = Math.max(...col.map(wide)) / 2;
+      col.forEach((f, k) => {
+        f.x = -side * (x + w);
+        f.z = zs[k] - front;
+      });
+      x += 2 * w + Math.max(GAP, 24 * Math.max(...col.map((f) => f.u)));
     }
   }
 
