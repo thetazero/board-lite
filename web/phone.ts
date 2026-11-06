@@ -1108,6 +1108,15 @@ function hexDetail(g: PublicState, me: SeatState, k: string, upgrade?: { name: s
   return `${head}<p>${said(now)}</p>${after}${stopped}`;
 }
 
+// The hex picked for a building before it's built: what it would do there,
+// and, on or next to the freed peak, whether it makes the peak's bonus (#366).
+function placeDetail(g: PublicState, name: string, d: Does | undefined): string {
+  if (!d) return '';
+  const peak = d.peak === 'more' ? `<p class="hint">Includes ${g.peakBonus} more each round, by the Thunderbird’s peak.</p>`
+    : d.peak === 'none' ? `<p class="hint">Production buildings here make ${g.peakBonus} more each round, by the Thunderbird’s peak. The ${esc(name)} isn’t one: it makes no resource.</p>` : '';
+  return `<p class="pchead">The <b>${esc(name)}</b> here</p><p>${said(doesLines(d))}</p>${peak}`;
+}
+
 // What a pick is for, under the map: the card (or basic building) being placed,
 // small, with its rule text, so the numbers on the hexes have their reason in view.
 function pickAbout(art: string, name: string, text: string, color: string): string {
@@ -1312,10 +1321,11 @@ function pickHexFor(c: CardView) {
   const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
   const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
   const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
-  // Placing a beast or an upgrade shows what the hex does before it's final (#246).
+  // Placing a building, a beast or an upgrade shows what the hex does before it's final (#246, #366).
   const now = () => ({ g: snap!.game!, me: snap!.you! });
   const after = (k: string) => (now().me.hand.find((x) => x.id === c.id) ?? c).after?.[k];
   const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k) && { name: c.name, after: after(k)! }) }
+    : c.kind === 'building' ? { verb: c.verb, detail: (k: string) => placeDetail(now().g, c.name, after(k)) }
     : c.fauna ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k) } : undefined;
   picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about, confirm };
   openCard = null;
@@ -1538,7 +1548,9 @@ function wire(g: PublicState, me: Me) {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
     if (b.onTower) return send(`build ${b.key}`);
     const about = pickAbout(cardArt('building', b.key, undefined, b.cls), b.name, b.text, frameColor('building'));
-    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}`, about };
+    const after = (k: string) => (snap!.you!.basics.find((x) => x.key === b.key) ?? b).after[k];
+    const confirm = { verb: 'Build', detail: (k: string) => placeDetail(snap!.game!, b.name, after(k)) };
+    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}`, about, confirm };
     render();
   });
   bind('[data-upproject]', (el) => {
