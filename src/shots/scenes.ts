@@ -326,7 +326,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-join-bad-code', caption: 'Phone: joining with a code no room has', client: 'phone', path: '/', fill: { code: 'QQQQ', name: 'Dax' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
       { file: 'phone-join-name-taken', caption: 'Phone: joining with a name already taken', client: 'phone', fill: { name: 'ada' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
       { file: 'phone-join-blank-name', caption: 'Phone: joining with only spaces for a name (empty is stopped by the browser first)', client: 'phone', fill: { name: '   ' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
-      { file: 'tv-guest-lobby', caption: "TV: a second screen on the room's address (no host token): no buttons, it says who starts", client: 'tv', guest: true },
+      { file: 'tv-guest-lobby', caption: "TV: a second screen on the room's address (no host token): no buttons for the room, it says who starts", client: 'tv', guest: true },
     ],
   },
   {
@@ -349,6 +349,7 @@ export const SCENES: Scene[] = [
     setup: canBuild,
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
+      { file: 'tv-pointing-3p', caption: 'TV, in a game: the mouse moves, and Full screen shows in the corner', client: 'tv', run: "dispatchEvent(new PointerEvent('pointermove'))", waitFor: 'body.pointing #fullscreen', hold: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },

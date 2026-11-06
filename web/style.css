@@ -169,6 +169,11 @@ body.tv { font-size: clamp(14px, 1.05vw, 26px); overflow: hidden; }
 svg.token { flex: none; }
 .lobby-actions { display: flex; gap: 1em; font-size: 1.3em; }
 .hint { color: var(--muted); }
+/* Full screen (tv.ts): top right, over the lobby's sky or the board's goal;
+   in a game only while the mouse moves. */
+#fullscreen { display: none; position: fixed; top: .8em; right: 1em; z-index: 50; font-size: 1.2em; }
+body.tv:has(#app > .lobby) #fullscreen, body.tv.pointing #fullscreen { display: block; }
+body.tv.fullscreen #fullscreen { display: none; }
 
 /* The board is read from a couch about 3 m away: nothing on it is smaller
    than 1.1em of the TV's base size (about 22px at 1080p). */

@@ -1019,4 +1019,28 @@ function toast(e: unknown) {
   setTimeout(() => fadeAway(t), 3500);
 }
 
+// Full screen, for setting the TV up: a button in the top corner while the
+// page isn't full screen. It's always there in the lobby; in a game it shows
+// only while the mouse moves, so it never sits over the board for long.
+// Not in a phone's table view, nor in a browser that can't go full screen.
+function fullscreenButton() {
+  if (remote || !document.fullscreenEnabled) return;
+  const b = document.createElement('button');
+  b.id = 'fullscreen';
+  b.className = 'ghost';
+  b.textContent = 'Full screen';
+  b.onclick = () => void document.documentElement.requestFullscreen().catch(toast);
+  document.body.append(b);
+  // (F11 fills the screen without the page knowing: the button stays, and
+  // pressing it changes nothing a player sees.)
+  document.addEventListener('fullscreenchange', () => document.body.classList.toggle('fullscreen', !!document.fullscreenElement));
+  let still = 0;
+  addEventListener('pointermove', () => {
+    document.body.classList.add('pointing');
+    clearTimeout(still);
+    still = setTimeout(() => document.body.classList.remove('pointing'), 3000);
+  });
+}
+
+fullscreenButton();
 boot().catch(toast);
