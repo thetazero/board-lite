@@ -690,6 +690,27 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-points-result-3p', caption: 'TV: Cinderkeep falls, and the crown comes down on the most power standing, then its point', client: 'tv', live: true, waitFor: '#overlay .scored', waitMs: 600 }],
   },
   {
+    // Cinderkeep falls to all six, long names and all: the loot row wraps
+    // inside its sheet, which stands clear of the fighters, and one crown
+    // comes down (#364).
+    name: 'points-result-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [3, 3]);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      const all = [...g.players.keys()];
+      toBail(g, all);
+      for (const p of all.slice(1)) apply(g, p, 'fight');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-points-result-6p', caption: 'TV: Cinderkeep falls to six players with long names: the loot wraps inside its sheet, clear of the fighters, and one crown comes down', client: 'tv', live: true, waitFor: '#overlay .scored', waitMs: 600 }],
+  },
+  {
     // The same fight on Cinderkeep, mid-replay: its Fire Giant looms over the Knights (#326).
     name: 'points-fight-3p',
     players: 3,

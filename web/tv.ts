@@ -572,7 +572,7 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   }).join('');
   const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
@@ -709,10 +709,20 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       if (f && n) f.style.setProperty('--plate', `${n.offsetHeight}px`); // its bar sits in the plate's foot
       return { w: (n?.offsetWidth ?? 80) + 6, h: (n?.offsetHeight ?? 20) + 8 };
     };
+    // The outcome's sheet stands under the heading, however many lines that
+    // takes, and the fighters stand under the sheet, however many lines the
+    // loot takes: it's laid out (unseen) from the start, so the fight is
+    // framed for it and nothing moves when it shows.
+    const fhead = el.querySelector<HTMLElement>('.fhead')!, sheet = el.querySelector<HTMLElement>('.outcome')!;
+    const gap = innerHeight * 0.01;
+    sheet.style.top = `${Math.max(sheet.offsetTop, fhead.getBoundingClientRect().bottom + gap)}px`;
+    const below = (sheet.getBoundingClientRect().bottom + gap) / innerHeight;
+    const safe = remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 };
+    safe.top = Math.max(safe.top, Math.min(below, 0.6));
     const stage = live ? new live.FightStage(place,
       dragons.map((d) => ({ key: `d${d.id}`, fighter: { dragon: { element: d.element, stage: d.stage } }, maxHp: d.maxHp, label: label(`d${d.id}`) })),
       units.map((u, i) => ({ key: `u${i}`, fighter: u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, maxHp: u.max, label: label(`u${i}`) })),
-      shape < 1, remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 }) : null;
+      shape < 1, safe) : null;
     if (stage) {
       stage.onLayout = () => {
         for (const key of hp.keys()) {
@@ -777,11 +787,13 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       el.querySelector('.outcome')!.classList.add('show');
     }, shown);
     if (scorer === null) return;
-    // The scoring beat: the crown comes down on the scorer's dragons still
-    // standing, and on their name; then their points.
+    // The scoring beat: one crown comes down, on the scorer's biggest dragon
+    // still standing, and on their name; then their points.
     setTimeout(() => {
       el.classList.add('crowned');
-      el.querySelectorAll<HTMLElement>(`.fig[data-p="${scorer}"]:not(.down)`).forEach((f) => f.classList.add('king'));
+      const max = (f: HTMLElement) => dragons.find((d) => d.id === f.dataset.d)?.maxHp ?? 0;
+      const standing = [...el.querySelectorAll<HTMLElement>(`.fig-d[data-p="${scorer}"]:not(.down)`)];
+      standing.reduce<HTMLElement | null>((best, f) => (!best || max(f) > max(best) ? f : best), null)?.classList.add('king');
     }, shown + CROWN_AT_MS);
     setTimeout(() => el.classList.add('scored'), shown + CROWN_AT_MS + POINTS_AT_MS);
   };
