@@ -1304,7 +1304,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       if (cardKind(c) !== 'building') fail(`${cardName(c)} is not a building card.`);
       const k = placeCheck(g, p, c.key, args[1]);
       pay(pl, BUILDINGS[c.key].cost);
-      pl.hand.splice(pl.hand.indexOf(c), 1);
+      discardCard(g, p, c);
       return placeBuilding(g, p, c.key, k);
     }
     case 'upgrade': {
@@ -1314,7 +1314,7 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       const k = coords ? key(...coords) : '';
       if (!upgradeTargets(g, p, c.key).includes(k)) fail(`${cardName(c)} can go on: ${upgradeTargets(g, p, c.key).join(' ') || 'none of your buildings'}.`);
       pay(pl, UPGRADES[c.key].cost);
-      pl.hand.splice(pl.hand.indexOf(c), 1);
+      discardCard(g, p, c);
       g.buildings[k].upgrade = c.key;
       const b = g.buildings[k];
       return log(g, `${pname(p)} adds ${UPGRADES[c.key].name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}.`, { k: 'upgrade', p, u: c.key, name: UPGRADES[c.key].name, on: b.type, hex: k });
