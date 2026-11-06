@@ -598,13 +598,13 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const fig = (key: string, size: number, art: string, name: string, hp: number, max: number, cls: string, pc?: string, order?: number) =>
     `<div class="fig ${cls}" ${key} style="--s:${size.toFixed(2)}${pc ? `;--pc:${pc}` : ''}${order !== undefined ? `;order:${order}` : ''}">
       <span class="fig-crown">${crown()}</span>${hpBar(hp, max)}<span class="fig-body">${art}</span><b class="fig-name">${esc(name)}</b></div>`;
-  // Each figure's picture: the board's origami model of it (board3d.ts),
-  // or, without WebGL, a flat paper cut-out (arena.ts). `aspect` is its
+  // Without WebGL, each figure is a flat paper cut-out (arena.ts), laid out
+  // here; with it, the figures are the board's own origami models standing
+  // in the place, in one live scene (board3d.ts, FightStage), and this page
+  // draws only their bars, names and hits over them. `aspect` is a cut-out's
   // width over its height.
-  const art = (f: Fighter, facing: 1 | -1, flat: () => string): { html: string; aspect: number } => {
-    const a = fight3d ? fight3d.fighterArt(f, facing) : null;
-    return a ? { html: `<img class="fig-art fig-3d" src="${a.url}" alt="">`, aspect: a.aspect } : { html: flat(), aspect: 1.25 };
-  };
+  const live = fight3d;
+  const art = (_f: Fighter, _facing: 1 | -1, flat: () => string): { html: string; aspect: number } => ({ html: live ? '' : flat(), aspect: 1.25 });
   const unitKey = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, '_');
   const left = dragons.map((d) => ({ d, max: d.maxHp, ...art({ dragon: { element: d.element, stage: d.stage } }, 1, () => dragonFigure(d.element)) }));
   const right = units.map((u) => ({ u, ...art(u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, -1, () => (u.d ? dragonFigure(u.d.element) : unitFigure(unitKey(u.name)))) }));
@@ -653,11 +653,10 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
   const sides = stack
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
-  const stage = fight3d ? fight3d.stageArt(place, Math.round(shape >= 1.78 ? 1600 : 900 * shape), Math.round(shape >= 1.78 ? 1600 / shape : 900)) : null;
-  const html = `<div class="fightscene">${stage ? `<img class="backdrop" src="${stage}" alt="">` : backdrop(place)}
+  const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
       <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
       <div class="outcome">${outcome}</div>
-      <div class="battle ${fit}>${sides}</div>
+      ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
       ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
@@ -666,6 +665,28 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     dragons.forEach((d) => hp.set(`d${d.id}`, [hp0(d), d.maxHp]));
     units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max]));
     const box = (key: string) => el.querySelector<HTMLElement>(key[0] === 'u' ? `[data-u="${key.slice(1)}"]` : `[data-d="${key.slice(1)}"]`);
+    // The live scene: the fighters on the place's ground, and each one's
+    // bar, name and hits pinned over it.
+    // Each figure's plate (its name and bar) as the page draws it, so the scene spaces them to fit.
+    const label = (key: string) => {
+      const f = box(key), n = f?.querySelector<HTMLElement>('.fig-name');
+      if (f && n) f.style.setProperty('--plate', `${n.offsetHeight}px`); // its bar sits in the plate's foot
+      return { w: (n?.offsetWidth ?? 80) + 6, h: (n?.offsetHeight ?? 20) + 8 };
+    };
+    const stage = live ? new live.FightStage(place,
+      dragons.map((d) => ({ key: `d${d.id}`, fighter: { dragon: { element: d.element, stage: d.stage } }, maxHp: d.maxHp, label: label(`d${d.id}`) })),
+      units.map((u, i) => ({ key: `u${i}`, fighter: u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, maxHp: u.max, label: label(`u${i}`) })),
+      shape < 1, remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 }) : null;
+    if (stage) {
+      stage.onLayout = () => {
+        for (const key of hp.keys()) {
+          const a = stage.anchor(key), f = box(key);
+          if (!a || !f) continue;
+          f.style.cssText += `;left:${a.x0}px;top:${a.y0}px;width:${a.x1 - a.x0}px;height:${a.y1 - a.y0}px;--foot:${a.foot - a.y0}px`;
+        }
+      };
+      stage.mount(el.querySelector<HTMLElement>('.stagebox')!);
+    }
     const battle = el.querySelector<HTMLElement>('.battle')!;
     hits.forEach((h, n) => setTimeout(() => {
       el.querySelector('.cround')!.textContent = String(h.round);
@@ -678,6 +699,9 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       const c = h.by === 'dragon' ? ELEMENT_COLORS[dragons.find((d) => d.id === h.d)?.element ?? ''] ?? '#fff' : ELEMENT_COLORS[units[h.u]?.el ?? ''] ?? STEEL;
       // The attacker lunges at what it hits.
       a?.classList.remove('strike'); void a?.offsetWidth; a?.classList.add('strike');
+      stage?.strike(from);
+      stage?.hit(to);
+      if (now <= 0) stage?.fall(to);
       if (a && t) {
         // The bolt: from the attacker to the target, in the attacker's
         // colour. The last one fades out under the new one, never just blinks off.

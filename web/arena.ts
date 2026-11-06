@@ -1,10 +1,10 @@
 // The fight's own scene (#326): when a raid or a hunt is fought, the TV cuts
 // from the map to a full-screen stage, a backdrop of the place being fought
 // over, with the two sides drawn as paper figures facing each other at their
-// size. tv.ts plays the fight on it. Its stage and figures are folded from
-// the board's own origami models (board3d.ts: stageArt, fighterArt); this
-// file is the flat cut-paper art drawn instead where there's no WebGL, and
-// the crown and burst laid over either.
+// size. tv.ts plays the fight on it. With WebGL it's a live scene of the
+// board's own origami models standing in the place (board3d.ts,
+// FightStage); this file is the flat cut-paper art drawn instead where
+// there's no WebGL, and the crown and burst laid over either.
 
 import { ELEMENT_COLORS } from './common.ts';
 import { iconShapes } from './icons.ts';

@@ -34,9 +34,11 @@ const GROUND = TOP + PLATE_H; // where a building stands on its plate
 // from top-down. Lower shows more of the models' fronts and
 // sides; straight down would flatten them.
 const CAMERA_TILT = 1.13;
-// How far the stage's camera looks down (radians; about 36 degrees). The
-// map's is CAMERA_TILT; the stage keeps lower, so the places'
-// walls and the fighters' faces still show.
+// How far the fight's camera looks down on a wide screen (radians; about
+// 36 degrees). The map's is CAMERA_TILT; the fight keeps lower, so the
+// places' walls and the fighters' faces still show. On a screen held
+// upright it looks down at CAMERA_TILT, as the map does, so the files going
+// back aren't squashed together.
 const STAGE_TILT = 0.63;
 
 // Paper colours. Terrain is the phone map's colours, so the two maps match.
@@ -3039,100 +3041,6 @@ function fightingDragon(element: string): THREE.Group {
   return r.root;
 }
 
-let FIGHT_GL: THREE.WebGLRenderer | null = null;
-const fightGl = () => {
-  if (!FIGHT_GL) {
-    FIGHT_GL = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    FIGHT_GL.setPixelRatio(1);
-    FIGHT_GL.shadowMap.enabled = true;
-    FIGHT_GL.shadowMap.type = THREE.PCFShadowMap;
-  }
-  return FIGHT_GL;
-};
-
-function lights(scene: THREE.Scene, span: number, at = new THREE.Vector3()) {
-  scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 0.95));
-  const sun = new THREE.DirectionalLight('#fff1dc', 3.4);
-  // From the room's left, as on the board.
-  sun.position.copy(at).add(new THREE.Vector3(-1.4, 3.3, 1.7).multiplyScalar(span));
-  sun.target.position.copy(at);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.02;
-  Object.assign(sun.shadow.camera, { left: -span * 1.6, right: span * 1.6, top: span * 1.6, bottom: -span * 1.6, near: 0.1, far: span * 12 });
-  scene.add(sun, sun.target);
-}
-
-function freeScene(scene: THREE.Scene) {
-  scene.traverse((o) => {
-    if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
-  });
-}
-
-const ART = new Map<string, { url: string; aspect: number }>();
-
-// One fighter, drawn standing three-quarters to the room and facing right
-// (`facing` 1, the raiders' side) or left (-1), cut tight round it on a
-// clear ground. `aspect` is the picture's width over its height.
-export function fighterArt(f: Fighter, facing: 1 | -1, px = 420): { url: string; aspect: number } {
-  const key = `${JSON.stringify(f)}|${facing}|${px}`;
-  const done = ART.get(key);
-  if (done) return done;
-  const scene = new THREE.Scene();
-  let model: THREE.Group;
-  // Dragons are built head to +z, everything else head to +x.
-  let face: number;
-  const turn = 0.5; // how far it turns to the room
-  if ('dragon' in f) {
-    model = fightingDragon(f.dragon.element);
-    model.scale.setScalar(STAGE_SCALE[f.dragon.stage] ?? 1);
-    face = facing * (Math.PI / 2 - turn);
-  } else {
-    const make = DEFENDERS[f.foe];
-    model = make ? make() : BEASTS.has(f.foe) ? beastModel(f.foe) : militia();
-    if (!make && BEASTS.has(f.foe)) for (const r of model.userData.rigs as BeastRig[]) animateBeast(r, 0, 0, 0);
-    face = facing === 1 ? -turn : Math.PI + turn;
-  }
-  model.rotation.y = face;
-  scene.add(model);
-  model.updateMatrixWorld(true);
-  const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
-  const span = Math.max(size.x, size.y, size.z);
-  // From above, as the stage is seen (stageArt's STAGE_TILT), so the
-  // figures stand on its ground rather than in front of it.
-  const tilt = STAGE_TILT;
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, span * 20);
-  camera.position.set(0, Math.sin(tilt) * span * 5, Math.cos(tilt) * span * 5);
-  camera.lookAt(0, size.y / 2, 0);
-  camera.updateMatrixWorld(true);
-  // Cut tight: every corner of every piece, as the camera sees it.
-  const v = new THREE.Vector3();
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  model.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
-    const p = o.geometry.getAttribute('position');
-    for (let i = 0; i < p.count; i++) {
-      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
-      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
-    }
-  });
-  const pad = (x1 - x0 + y1 - y0) * 0.02;
-  Object.assign(camera, { left: x0 - pad, right: x1 + pad, bottom: y0 - pad, top: y1 + pad });
-  camera.updateProjectionMatrix();
-  const aspect = (x1 - x0) / (y1 - y0);
-  const w = Math.round(aspect >= 1 ? px : px * aspect), h = Math.round(aspect >= 1 ? px / aspect : px);
-  lights(scene, span, new THREE.Vector3(0, size.y / 2, 0));
-  const gl = fightGl();
-  gl.setSize(w, h, false);
-  gl.setClearColor(0x000000, 0);
-  gl.render(scene, camera);
-  const out = { url: gl.domElement.toDataURL('image/png'), aspect };
-  freeScene(scene);
-  ART.set(key, out);
-  return out;
-}
-
 // ---------- the places ----------
 
 // A sky of paper: its colours top to bottom, laid behind everything.
@@ -3155,7 +3063,7 @@ function skyTexture(top: string, bottom: string): THREE.Texture {
 // front of the camera back to `back` (where a sea begins), rising a little
 // into the distance.
 function groundSheet(color: string, seed: string, back = -40): THREE.Mesh {
-  const w = 60, front = 14, d = front - back;
+  const w = 400, front = 160, d = front - back;
   const geo = new THREE.PlaneGeometry(w, d, 18, 12);
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, 0, front - d / 2);
@@ -3371,43 +3279,417 @@ const PLACES: Record<string, Place> = {
   ocean: { sky: ['#3f6f96', '#a6cbe0'], ground: SEA_PAPER, shore: 2, build: (g) => seaBand(g, 2) },
 };
 
-const STAGES = new Map<string, string>();
 
-// The place a fight is fought over, a kingdom (a TARGETS key) or a hex's
-// terrain, as a picture `w` by `h`: the diorama, low and wide, its ground
-// running down to the bottom edge where the fighters stand.
-export function stageArt(key: string, w = 1600, h = 900): string {
-  const k = `${PLACES[key] ? key : 'plains'}|${w}x${h}`;
-  const done = STAGES.get(k);
-  if (done) return done;
-  const p = PLACES[key] ?? PLACES.plains;
-  const scene = new THREE.Scene();
-  scene.background = skyTexture(p.sky[0], p.sky[1]);
-  const world = new THREE.Group();
-  world.add(groundSheet(p.ground, key, p.shore));
-  p.build(world);
-  scene.add(world);
-  if (p.sun) {
-    // The sun, moon or glow: a cut-paper disc on the sky.
-    const [x, y, c] = p.sun;
-    scene.add(part(cyl(1.6, 1.6, 0.05, 8), c, { at: [x, y, -30], rot: [Math.PI / 2, 0, 0], glow: 1, crease: false }));
+// ---------- the fight, live ----------
+
+// One fighter on the stage: `key` names it to the page (its bar and name are
+// drawn over it there), `maxHp` sizes it.
+// `label` is the size in CSS pixels of what the page draws with it (its
+// name across, its bar and name together up), so they're spaced to fit.
+export type FightFigure = { key: string; fighter: Fighter; maxHp: number; label: { w: number; h: number } };
+// Where a figure is on the canvas, in CSS pixels: its box, and where its
+// plate (its name and bar) goes, under the lowest of it.
+export type FigureAnchor = { x0: number; y0: number; x1: number; y1: number; foot: number };
+
+type Standing = {
+  side: 1 | -1; // which way it faces: 1 the raiders, toward +x
+  obj: THREE.Group; // stands at (x, 0, z), turned to face; lunges and falls
+  x: number; z: number; h: number;
+  r: number; rx: number; rz: number; // its footprint: half its longest side; half across; half deep
+  label: { w: number; h: number };
+  u: number; // world units to a CSS pixel where it stood when last looked at (0 before)
+  pts: THREE.Vector3[]; // points on its model, from where it stands: what the camera must see of it
+  rigs: BeastRig[];
+  mats: { m: THREE.MeshLambertMaterial; c: THREE.Color }[];
+  strikeAt: number; hitAt: number; downAt: number;
+};
+
+// A figure's size from its full health: its area goes with its health, as
+// on the cards, so a Knight (12) is about 1.9 across, an adult dragon 2.5 to
+// 3, the Fire Giant 5.4 and the Titan 7: the bosses loom.
+const FIG_K = 1;
+const BOSS_LOOM = 1.35;
+const LUNGE_S = 0.3, FLINCH_S = 0.25, FALL_S = 0.5;
+const GREY = new THREE.Color('#8a8790');
+
+// A fight, played on the place it's fought over: the place's diorama and
+// the fighters as one scene, every fighter standing on its ground, under
+// one sun, as the board is. The raiders stand on the left facing right,
+// the defenders on the right facing left. On a wide screen each side
+// stands in lines of up to six across, one behind another, and a boss (four
+// times any other defender's health) at the far end of its front line; on
+// one held upright, in files of up to four going back, side by side, and a
+// boss behind them. The camera looks down at it (STAGE_TILT, or
+// CAMERA_TILT upright) from as far back as lets every fighter, with room
+// for its plate, fit between `safe.top` and `safe.bottom` (fractions of the
+// height kept clear for the page's header and footer). Labels are the
+// page's (tv.ts), pinned over each model by anchor().
+export class FightStage {
+  readonly el: HTMLCanvasElement;
+  private renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.1, 300);
+  private figs = new Map<string, Standing>();
+  private clock = new THREE.Clock();
+  private sun = new THREE.DirectionalLight('#fff1dc', 3.4);
+  private size = { w: 0, h: 0 };
+  private dead = false;
+  private mounted = false;
+  /** Called whenever the figures' places on the canvas change (a resize). */
+  onLayout: (() => void) | null = null;
+
+  private upright: boolean;
+  private safe: { top: number; bottom: number };
+  private left: Standing[] = [];
+  private foes: Standing[] = [];
+  private boss: Standing | null = null;
+  // How far it looks down: on a screen held upright, as steeply as the map
+  // (the files go back, and a shallower look would squash them together).
+  private tilt: number;
+
+  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }) {
+    this.upright = upright;
+    this.safe = safe;
+    this.tilt = upright ? CAMERA_TILT : STAGE_TILT;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.el = this.renderer.domElement;
+    this.el.className = 'stage3d';
+    GRAIN ??= paperTexture();
+
+    const p = PLACES[place] ?? PLACES.plains;
+    this.scene.background = skyTexture(p.sky[0], p.sky[1]);
+    const world = new THREE.Group();
+    world.add(groundSheet(p.ground, place, p.shore));
+    p.build(world);
+    this.scene.add(world);
+    if (p.sun) {
+      const [x, y, c] = p.sun;
+      this.scene.add(part(cyl(1.6, 1.6, 0.05, 8), c, { at: [x, y, -30], rot: [Math.PI / 2, 0, 0], glow: 1, crease: false }));
+    }
+    this.scene.fog = new THREE.Fog(p.sky[1], 34, 75);
+
+    this.left = left.map((f) => this.stand(f, 1));
+    const r = right.map((f) => this.stand(f, -1));
+    // The biggest defender stands farthest from the dragons, the smallest nearest.
+    const order = r.map((_, i) => i).sort((a, b) => right[a].maxHp - right[b].maxHp || a - b);
+    this.foes = order.map((i) => r[i]);
+    if (order.length > 1 && right[order.at(-1)!].maxHp >= 4 * right[order.at(-2)!].maxHp) {
+      this.boss = this.foes.at(-1)!;
+      this.foes = this.foes.slice(0, -1);
+      // A little bigger than its health alone makes it, so it looms (and,
+      // standing at the back on a phone, isn't shrunk by the distance).
+      const b = this.boss;
+      b.obj.scale.setScalar(BOSS_LOOM);
+      b.h *= BOSS_LOOM; b.r *= BOSS_LOOM; b.rx *= BOSS_LOOM; b.rz *= BOSS_LOOM;
+      for (const p of b.pts) p.multiplyScalar(BOSS_LOOM);
+    }
+    this.scene.add(new THREE.HemisphereLight('#fff6e6', '#5a4a3c', 0.95));
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.bias = -0.0005;
+    this.sun.shadow.normalBias = 0.02;
+    this.scene.add(this.sun, this.sun.target);
   }
-  scene.fog = new THREE.Fog(p.sky[1], 34, 75);
-  // On a screen narrower than the TV's, the view widens (most of the way)
-  // rather than cropping in, so a phone held upright still sees the place.
-  const vfov = w / h >= 1.6 ? 34 : (2 * Math.atan((Math.tan((17 * Math.PI) / 180) * 1.6 * 0.8) / (w / h)) * 180) / Math.PI;
-  const camera = new THREE.PerspectiveCamera(Math.max(34, vfov), w / h, 0.1, 200);
-  // Looking down on the place, as the map is looked down on (a little less
-  // steeply, so the places' fronts and a hint of sky still show).
-  camera.position.set(0, 1 + Math.sin(STAGE_TILT) * 28, -11 + Math.cos(STAGE_TILT) * 28);
-  camera.lookAt(0, 1, -11);
-  lights(scene, 8, new THREE.Vector3(0, 0, -8));
-  const gl = fightGl();
-  gl.setSize(w, h, false);
-  gl.render(scene, camera);
-  const url = gl.domElement.toDataURL('image/jpeg', 0.88);
-  freeScene(scene);
-  (scene.background as THREE.Texture).dispose();
-  STAGES.set(k, url);
-  return url;
+
+  // The sun, from the room's left as on the board, over the fighters where
+  // they stand, its shadows reaching across all of them and the place behind.
+  private aimSun() {
+    const all = [...this.figs.values()];
+    const cx = (Math.min(...all.map((f) => f.x - f.rx)) + Math.max(...all.map((f) => f.x + f.rx))) / 2;
+    const cz = (Math.min(...all.map((f) => f.z - f.rz)) + Math.max(...all.map((f) => f.z + f.rz))) / 2;
+    const span = Math.max(12, ...all.map((f) => Math.max(Math.abs(f.x - cx), Math.abs(f.z - cz)) + f.r + 2));
+    const at = new THREE.Vector3(cx, 0, Math.min(cz, -4));
+    this.sun.position.copy(at).add(new THREE.Vector3(-1.4, 3.3, 1.7).multiplyScalar(span));
+    this.sun.target.position.copy(at);
+    Object.assign(this.sun.shadow.camera, { left: -span * 1.6, right: span * 1.6, top: span * 1.6, bottom: -span * 1.6, near: 0.1, far: span * 12 });
+    this.sun.shadow.camera.updateProjectionMatrix();
+  }
+
+  // A fighter's model, sized by its health and turned to face the other side,
+  // three-quarters to the room.
+  private stand(f: FightFigure, side: 1 | -1): Standing {
+    let model: THREE.Group;
+    let face: number;
+    const turn = 0.5;
+    let rigs: BeastRig[] = [];
+    if ('dragon' in f.fighter) {
+      model = fightingDragon(f.fighter.dragon.element);
+      face = side * (Math.PI / 2 - turn); // dragons are built head to +z
+    } else {
+      const make = DEFENDERS[f.fighter.foe];
+      model = make ? make() : BEASTS.has(f.fighter.foe) ? beastModel(f.fighter.foe) : militia();
+      if (!make && BEASTS.has(f.fighter.foe)) rigs = model.userData.rigs as BeastRig[];
+      face = side === 1 ? -turn : Math.PI + turn; // everything else head to +x
+    }
+    for (const r of rigs) animateBeast(r, 0, 0, 0);
+    model.rotation.y = face;
+    model.updateMatrixWorld(true);
+    let b = new THREE.Box3().setFromObject(model);
+    let s = b.getSize(new THREE.Vector3());
+    const k = (FIG_K * Math.sqrt(Math.max(1, f.maxHp))) / Math.sqrt(Math.max(1e-3, s.y * Math.max(s.x, s.z)));
+    model.scale.setScalar(k);
+    model.updateMatrixWorld(true);
+    b = new THREE.Box3().setFromObject(model);
+    s = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    // Its feet on the ground, its footprint centred on where it stands.
+    model.position.set(-c.x, -b.min.y, -c.z);
+    const obj = new THREE.Group();
+    obj.add(model);
+    this.scene.add(obj);
+    // Some of its corners, from where it stands, for the camera to fit to
+    // (its box's corners would ask room for the air round a sprawling model).
+    obj.updateMatrixWorld(true);
+    const pts: THREE.Vector3[] = [];
+    obj.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const p = o.geometry.getAttribute('position');
+      const step = Math.max(1, Math.floor(p.count / 40));
+      for (let i = 0; i < p.count; i += step) pts.push(new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld));
+    });
+    // Its own paper, so it can grey when it falls without greying its kind.
+    const mats: Standing['mats'] = [];
+    obj.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshLambertMaterial)) return;
+      o.material = o.material.clone();
+      mats.push({ m: o.material, c: o.material.color.clone() });
+    });
+    const st: Standing = { side, obj, x: 0, z: 0, h: s.y, r: Math.max(s.x, s.z) / 2, rx: s.x / 2, rz: s.z / 2, label: f.label, u: 0, pts, rigs, mats, strikeAt: -1, hitAt: -1, downAt: -1 };
+    this.figs.set(f.key, st);
+    return st;
+  }
+
+  // Every fighter's place, with `u` world units to a CSS pixel (so labels
+  // can be given room); then all of them moved up in front of the place's
+  // scenery, which starts a few steps behind the middle.
+  private place() {
+    this.layout(this.left, 1);
+    this.layout(this.foes, -1);
+    const boss = this.boss;
+    if (boss && !this.upright) {
+      // At the far end of its side's front line, where there's room.
+      const front = this.foes.filter((f) => f.z === 0);
+      boss.x = Math.max(1.2, ...front.map((f) => f.x + Math.max(2 * f.rx, f.label.w * f.u) / 2)) + 0.4 + Math.max(2 * boss.rx, boss.label.w * boss.u) / 2;
+      boss.z = 0;
+    } else if (boss) {
+      // Behind its files, across the middle of its side.
+      const xs = this.foes.map((f) => f.x);
+      boss.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 1.2 + boss.rx;
+      boss.z = Math.min(0, ...this.foes.map((f) => f.z - f.rz - f.h / Math.tan(this.tilt) * 0.3)) - boss.rz - boss.label.h * boss.u;
+    }
+    const all = [...this.figs.values()];
+    const shift = -3 - Math.min(...all.map((f) => f.z - f.rz));
+    for (const f of all) {
+      f.z += shift;
+      f.obj.position.set(f.x, 0, f.z);
+    }
+  }
+
+  // A side's places, the first nearest the other side. Across: lines of up
+  // to six, each behind the last. Upright: files of up to four going
+  // back, each the next out from the middle; within a file each figure
+  // stands far enough in front of the one behind for that one's head, bar
+  // and name to show over it.
+  private layout(fs: Standing[], side: 1 | -1) {
+    const per = this.upright ? 4 : 6;
+    const lines: Standing[][] = [];
+    for (let i = 0; i < fs.length; i += per) lines.push(fs.slice(i, i + per));
+    const back = 1 / Math.tan(this.tilt); // how far back a height reaches, looking down
+    const GAP = 0.4, MID = 1.2;
+    const wide = (f: Standing) => Math.max(2 * f.rx, f.label.w * f.u);
+    // Depth on the ground shows on the screen foreshortened, by the tilt's sine.
+    const clear = (fs: Standing[]) => (Math.max(...fs.map((f) => f.label.h * f.u)) * 1.1) / Math.sin(this.tilt) + 0.3;
+    if (this.upright) {
+      // Ranks line up across the files: each rank as far in front of the
+      // one behind as its tallest figure needs to leave that one showing.
+      const ranks = Math.max(...lines.map((l) => l.length));
+      const zs = [0];
+      for (let k = 1; k < ranks; k++) {
+        const prev = lines.map((l) => l[k - 1]).filter(Boolean), cur = lines.map((l) => l[k]).filter(Boolean);
+        const pr = Math.max(...prev.map((f) => f.rz)), cr = Math.max(...cur.map((f) => f.rz)), ch = Math.max(...cur.map((f) => f.h));
+        zs.push(zs[k - 1] + Math.max(pr + cr, ch * back) + clear([...prev, ...cur]));
+      }
+      const front = zs[ranks - 1];
+      let x = MID;
+      for (const file of lines) {
+        const w = Math.max(...file.map(wide)) / 2;
+        file.forEach((f, k) => {
+          f.x = -side * (x + w);
+          f.z = zs[k] - front;
+        });
+        x += 2 * w + GAP;
+      }
+    } else {
+      let z = 0;
+      for (const line of lines) {
+        let x = MID;
+        for (const f of line) {
+          f.x = -side * (x + wide(f) / 2);
+          f.z = z;
+          x += wide(f) + GAP;
+        }
+        z -= Math.max(...line.map((f) => f.rz * 2 + f.h * back * 0.7)) + clear(line);
+      }
+    }
+  }
+
+  /** Puts it in `box` (which it fills) and starts playing; it stops itself once taken off the page. */
+  mount(box: HTMLElement) {
+    box.append(this.el);
+    this.mounted = true;
+    const fit = () => {
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h || (w === this.size.w && h === this.size.h)) return;
+      this.size = { w, h };
+      this.renderer.setSize(w, h, false);
+      this.el.style.width = `${w}px`;
+      this.el.style.height = `${h}px`;
+      // Labels are sized in pixels, the scene in world units: place, look,
+      // see how big a world unit came out, and place again.
+      for (let i = 0; i < 3; i++) {
+        this.place();
+        this.fit();
+        this.measure();
+      }
+      this.aimSun();
+      this.onLayout?.();
+    };
+    new ResizeObserver(fit).observe(box);
+    fit();
+    const loop = () => {
+      if (this.dead) return;
+      if (this.mounted && !this.el.isConnected) return this.dispose();
+      requestAnimationFrame(loop);
+      this.frame();
+    };
+    loop();
+  }
+
+  // The camera: looking down at the fighters' middle, as far back as fits
+  // them all, plates and all (and no nearer than the place needs to show),
+  // then moved up or down so they sit in the middle of the clear band.
+  private fit() {
+    const { w, h } = this.size;
+    const aspect = w / h;
+    // On a screen narrower than the TV's, the view widens (most of the way)
+    // rather than cropping in, so a phone held upright still sees the place.
+    const vfov = aspect >= 1.6 ? 34 : (2 * Math.atan((Math.tan((17 * Math.PI) / 180) * 1.6 * 0.8) / aspect) * 180) / Math.PI;
+    this.camera.fov = Math.max(34, vfov);
+    this.camera.aspect = aspect;
+    const top = 1 - 2 * this.safe.top, bottom = -1 + 2 * this.safe.bottom;
+    this.camera.clearViewOffset();
+    const all = [...this.figs.values()];
+    const at = new THREE.Vector3(
+      all.length ? (Math.min(...all.map((f) => f.x - f.rx)) + Math.max(...all.map((f) => f.x + f.rx))) / 2 : 0, 0,
+      all.length ? (Math.min(...all.map((f) => f.z - f.rz)) + Math.max(...all.map((f) => f.z + f.rz))) / 2 : 0);
+    const dir = new THREE.Vector3(0, Math.sin(this.tilt), Math.cos(this.tilt));
+    // Room over each head for the crown, under its feet for its plate.
+    const over = (2 * 28) / h;
+    const v = new THREE.Vector3();
+    // How much of the screen the fighters take, up and across, from `d` away.
+    const extent = (d: number) => {
+      this.camera.position.copy(at).addScaledVector(dir, d);
+      this.camera.lookAt(at);
+      this.camera.updateMatrixWorld();
+      this.camera.updateProjectionMatrix();
+      let lo = Infinity, hi = -Infinity, wide = 0;
+      for (const f of all) {
+        let low = Infinity;
+        for (const p of f.pts) {
+          v.set(f.x + p.x, p.y, f.z + p.z).project(this.camera);
+          hi = Math.max(hi, v.y + over);
+          low = Math.min(low, v.y);
+          wide = Math.max(wide, Math.abs(v.x));
+        }
+        // Its plate hangs under the lowest of it.
+        lo = Math.min(lo, low - (2 * (f.label.h + 4)) / h);
+        v.set(f.x, 0, f.z).project(this.camera);
+        wide = Math.max(wide, Math.abs(v.x) + f.label.w / w);
+      }
+      return { lo, hi, wide };
+    };
+    const fits = (d: number) => {
+      const e = extent(d);
+      return e.hi - e.lo <= top - bottom && e.wide <= 0.95;
+    };
+    let lo = 4, hi = 400;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    const d = Math.max(hi, 16);
+    // Then moved up or down the screen so what's drawn sits in the middle of the clear band.
+    const e = extent(d);
+    this.camera.setViewOffset(w, h, 0, (((top + bottom) - (e.hi + e.lo)) / 2) * (h / 2), w, h);
+    this.camera.updateProjectionMatrix();
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = d + 10;
+    fog.far = d + 60;
+  }
+
+  // Each figure's world units to a CSS pixel, where it stands: nearer the
+  // camera, a pixel is less of the world.
+  private measure() {
+    for (const f of this.figs.values()) {
+      const a = new THREE.Vector3(f.x - 1, 0, f.z).project(this.camera), b = new THREE.Vector3(f.x + 1, 0, f.z).project(this.camera);
+      const px = (Math.abs(b.x - a.x) / 2) * (this.size.w / 2);
+      f.u = px > 0 ? 1 / px : 0;
+    }
+  }
+
+  /** Where a figure stands on the canvas, as it stood before the fight. */
+  anchor(key: string): FigureAnchor | null {
+    const f = this.figs.get(key);
+    if (!f || !this.size.w) return null;
+    const v = new THREE.Vector3();
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of f.pts) {
+      v.set(f.x + p.x, p.y, f.z + p.z).project(this.camera);
+      const px = ((v.x + 1) / 2) * this.size.w, py = ((1 - v.y) / 2) * this.size.h;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    return { x0, y0, x1, y1, foot: y1 };
+  }
+
+  /** It lunges at the other side. */
+  strike(key: string) { const f = this.figs.get(key); if (f) f.strikeAt = this.clock.getElapsedTime(); }
+  /** It flinches from a hit. */
+  hit(key: string) { const f = this.figs.get(key); if (f) f.hitAt = this.clock.getElapsedTime(); }
+  /** It falls over onto its back, and greys. */
+  fall(key: string) { const f = this.figs.get(key); if (f && f.downAt < 0) f.downAt = this.clock.getElapsedTime(); }
+
+  private frame() {
+    const t = this.clock.getElapsedTime();
+    for (const f of this.figs.values()) {
+      for (const r of f.rigs) animateBeast(r, t, 0, 0);
+      const ls = f.strikeAt < 0 ? 1 : (t - f.strikeAt) / LUNGE_S;
+      const lunge = ls < 1 ? Math.sin(ls * Math.PI) * Math.max(0.4, f.r * 0.5) : 0;
+      const fl = f.hitAt < 0 ? 1 : (t - f.hitAt) / FLINCH_S;
+      const flinch = fl < 1 ? Math.sin(fl * Math.PI) : 0;
+      const dn = f.downAt < 0 ? 0 : Math.min(1, (t - f.downAt) / FALL_S);
+      const fall = dn * dn * (3 - 2 * dn);
+      f.obj.position.set(f.x + f.side * (lunge - flinch * 0.15 * f.r), 0, f.z);
+      // Tipped back from the other side by a flinch; laid on its back by a
+      // fall, away from the room, so it falls on no one.
+      f.obj.rotation.z = f.side * flinch * 0.12;
+      f.obj.rotation.x = -fall * 1.45;
+      if (f.downAt >= 0 && dn <= 1) for (const { m, c } of f.mats) m.color.copy(c).lerp(GREY, fall * 0.7);
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    if (this.dead) return;
+    this.dead = true;
+    this.scene.traverse((o) => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
+    });
+    (this.scene.background as THREE.Texture | null)?.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+  }
 }

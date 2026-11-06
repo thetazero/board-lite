@@ -1165,3 +1165,19 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .pchosen .pcafter b { color: var(--accent); }
 /* a name on the last-round banner, darkened to read on its yellow */
 :is(.topbar .goal.last, .lastround) .ptag { color: color-mix(in oklab, var(--pc) 50%, #1a1218); }
+
+/* The live fight (board3d.ts, FightStage): the scene fills the screen, its
+   fighters standing on the place's ground, and each one's name and bar
+   pinned over its model (tv.ts sets each .fig's box to the model's, and
+   --foot to the lowest of it): a plate at its feet, as on a miniature's
+   base, its name over its health. */
+.fightscene .stagebox { position: absolute; inset: 0; }
+.fightscene .stage3d { display: block; }
+.fightscene .battle.live { inset: 0; display: block; pointer-events: none; }
+.fightscene .battle.live .fig { position: absolute; display: block; min-width: 0; }
+.fightscene .battle.live .fig-body { position: absolute; inset: 0; transform: none; animation: none; }
+.fightscene .battle.live .fig-body::after { display: none; }
+.fightscene .battle.live .fig-name { position: absolute; left: 50%; top: var(--foot); translate: -50% .2em; margin: 0; width: max-content; max-width: 6.5em; text-align: center; font-size: .85em; padding-bottom: .75em; }
+.fightscene .battle.live .fig .hpbar { position: absolute; z-index: 1; left: 50%; top: var(--foot); translate: -50% calc(var(--plate, 1.5em) - .3em); width: clamp(3em, 60%, 5em); height: .45em; margin: 0; box-shadow: none; }
+.fightscene .battle.live .fig-crown { top: 0; }
+.remote .fightscene .battle.live .fig-name { font-size: .7em; max-width: 6em; }
