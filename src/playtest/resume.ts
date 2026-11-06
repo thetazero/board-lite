@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-export interface SavedSeat { p: number; model: string; token: string; session: string; starts: number; cost: number }
+export interface SavedSeat { p: number; model: string; token: string; session: string; starts: number; cost: number; tokens?: number }
 
 export interface RunnerState {
   pid?: number; // the runner running this directory, while it runs
@@ -42,7 +42,7 @@ function fromLeftovers(out: string): RunnerState {
     if (!existsSync(mcp)) continue;
     const [, url, token] = JSON.parse(readFileSync(mcp, 'utf8')).mcpServers.game.args as string[];
     room ||= url;
-    const session = /"session_id":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1];
+    const session = /"(?:session_id|thread_id)":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1]; // Claude's session, or Codex's thread
     const fromResults = (results.seats as { seat: string; model: string; costUsd?: number; starts?: number }[] | undefined)?.find((s) => s.seat === `P${n}`);
     const model = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
     if (!model) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
