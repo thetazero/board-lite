@@ -299,7 +299,7 @@ function renderGame(g: PublicState) {
       <div class="pcard${turn ? ' turn' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
           <span class="pname">${esc(names[i])}${seatTag(seat)}</span>
-          ${titles}
+          ${titles ? `<span class="badges">${titles}</span>` : ''}
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
           <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
