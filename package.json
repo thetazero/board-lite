@@ -14,7 +14,9 @@
     "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts test/design/*.test.ts",
     "ci": "npm run typecheck && npm test",
-    "shots": "node src/shots/shots.ts"
+    "shots": "node src/shots/shots.ts",
+    "eval": "node src/playtest/eval.ts",
+    "leaderboard": "node src/playtest/leaderboard.ts"
   },
   "engines": {
     "node": ">=22.18"

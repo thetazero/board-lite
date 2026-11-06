@@ -1,0 +1,89 @@
+# Model eval and leaderboard
+
+How well does each AI model play board-lite? The eval plays games among a roster of Claude and Codex models, and the leaderboard gives every model a rating from the games it finished. The leaderboard also rates you, and anyone else, from games played on `npm run serve` against bots or AI players.
+
+Nothing here runs by itself: the eval costs real money and hours, so you start it.
+
+## Run the eval
+
+First check what it would play (this plays nothing):
+
+```
+node src/playtest/eval.ts --models opus,sonnet,haiku,codex:gpt-5.6-sol --dry-run
+```
+
+Then run it, in the background:
+
+```
+npm run eval -- --models opus,sonnet,haiku,codex:gpt-5.6-sol
+```
+
+- `--models` is the roster: Claude models (`opus`, `sonnet`, `haiku`, or a full name like `claude-haiku-5-5`), Codex models as `codex:<model>`, and `bot` (the random bot). List a model twice to give it two entries.
+- Each game has `--seats` players (default 3). The eval plays every lineup of 3 from the roster, and each lineup in every seat order (seat order matters: see [`playtest.md`](playtest.md#depth-batches)). That's one **round**: with 4 models, 4 lineups × 3 seat orders = 12 games, each model in 9. `--games N` plays N games instead: every lineup comes up once before any comes up twice, so a short eval is still fair.
+- Games go in `~/.cache/board-lite/playtests/<time>-eval-<models>/g<i>`, each one a normal playtest directory ([`playtest.md`](playtest.md#results)). At the end it writes `leaderboard.md` there, for those games alone.
+- **Stopped, or want more?** Run the same command with `--out <that directory>` and a bigger `--games`. Finished games are kept; unfinished ones are played again; new ones are added. Two rounds of 4 models is `--games 24`.
+- Other options: `--parallel N` (games at once, default 1), `--budget-usd N` (cap per Claude seat a game, default 25), `--seed N`, `--effort`, `--max-minutes`, `--stall-minutes`. `node src/playtest/eval.ts --help` lists them.
+
+### Cost and time
+
+From the playtest at c4162c8 (19 rounds, about 75 minutes): $11.55 for the Opus seat, $4.56 for Sonnet, $2.40 for Haiku (API-equivalent). So one round of `opus,sonnet,haiku` plus one Codex model is about 12 game-lengths (15 hours) and $170 of Claude, plus the Codex seat's usage of your ChatGPT plan. Codex reports tokens, not dollars; the leaderboard shows its tokens a game.
+
+The default budget of $25 a seat is there because Opus spends over $10 a game: at the playtest default of $5, Opus seats would stop partway and the games wouldn't count.
+
+One game at a time by default: three Claude seats starting at once, with other work on the machine, has set off the memory reaper, which killed the game server and the runner. The seat pool and memory checks ([`playtest.md`](playtest.md#how-many-games-run-at-once)) still apply on top of `--parallel`. A game killed for low memory isn't lost: rerun the same command.
+
+## The leaderboard
+
+```
+npm run leaderboard
+```
+
+It reads every finished game it can find and plays none:
+
+- every playtest, batch and eval under `~/.cache/board-lite/playtests` (or the directories you name: `npm run leaderboard -- <dir> ...`);
+- every game played on `npm run serve` (`~/.cache/board-lite/rooms`), so your games against bots count. Claude or Codex players seated in your room with `run.ts --room` are named by their model, from that runner's `results.json`.
+
+```
+| # | Player | Rating | 95% range | Games | Wins | Average place | Cost a game |
+|---|---|---|---|---|---|---|---|
+| 1 | claude-opus-5-5 | 1676 | 1615 to 1738 | 88 | 68 | 1.30 | $2.26 |
+| 2 | haiku | 1400 | 1364 to 1437 | 88 | 20 | 2.26 | $0.21 |
+| 3 | Lesha (person) | 1378 | 784 to 1971 | 1 | 0 | 2.00 | |
+```
+
+How to read it:
+
+- **Rating:** on the Elo scale. 400 points above another player means finishing ahead of it 10 times in 11; 200 points, 3 times in 4; 100 points, 2 times in 3. The average seat is 1500, so ratings say how players compare with each other, not against a fixed bar: adding a strong player moves the others down a little. The random bot, if it played, is the floor to read the rest against.
+- **95% range:** where the rating really is, from these games. Two players whose ranges overlap a lot aren't told apart yet; play more games. One game gives a range about 1000 points wide; a model's range narrows as it plays more.
+- **Games, Wins, Average place:** the raw record (1.00 = won every game).
+- **Cost a game:** what a Claude seat spent, or a Codex seat's tokens.
+
+Options: `--since 2026-11-01` counts only games that ended on or after a date. Use it after a rules change, since a rating mixes every game it reads. `--no-rooms` leaves out games on `npm run serve`, and `--out FILE` also writes the table to a file.
+
+### Who's who
+
+- A **model** is the model a Claude seat reported running (`claude-opus-5-5`), or the name it was given (`opus`) for games from before that was recorded; Codex seats are `codex:<model>`. An `--effort` other than the model's own is part of the name (`claude-opus-5-5 @high`): a model at another effort is another player.
+- A **person** is the name they joined with, whatever the case. Join with the same name every time to keep one rating. A player who quit partway (a bot finished for them) isn't rated for that game.
+- `bot` is the random bot (`src/bot.ts`), the same in playtests and on `npm run serve`.
+
+### What counts
+
+Only games that ended (`over`). Left out, and counted at the bottom of the table: unfinished games, games played with `--advice` (an experiment on how players play), and games with fewer than two different players (all the same model, or bots only).
+
+### How the rating works
+
+`src/playtest/rating.ts`. Each finished game is split into its pairs of players: the winner finished ahead of everyone, 2nd place ahead of 3rd and so on; players level on points tie. Each pair counts 1/(players − 1), so a 6-player game weighs the same as a 2-player game for each player in it. The same model in two seats gives no result between them. The ratings are the Bradley–Terry fit of all those results at once (the model behind Elo), with a weak prior that keeps a player with one or two games from flying off to infinity. Being fitted all at once, the ratings don't depend on the order games were played in, unlike game-by-game Elo updates.
+
+Places come from the final scores the engine logged: the winner first, even when they won a tie on gold or turn order.
+
+## Codex seats
+
+A Codex seat is `codex exec` (Codex CLI 0.154), sandboxed as tightly as a Claude seat ([`playtest.md`](playtest.md#how-the-sandbox-works)): its only tools are the game's five, through the same seat server.
+
+- `--ignore-user-config --ignore-rules`: none of your Codex settings, rules or project docs (auth still comes from `~/.codex`).
+- `--disable` for the shell, web, browser, computer use, images, plugins, apps, hooks and sub-agents, plus `agents.max_depth=0` (`--disable multi_agent` alone leaves sub-agents on), `web_search="disabled"` and `sandbox_mode="read-only"`.
+- Two things Codex 0.154 keeps on regardless. One is `apply_patch`, which the read-only sandbox rejects. The other is "code mode", a JavaScript runner it calls tools through, which has no `require`, `fetch` or files.
+
+This was checked by hand on 0.154 (no game): asked to list its tools, run `ls /`, read `~/.bashrc`, write a file, fetch a page and start a sub-agent, it could do none of them, and it reached the game tools. Recheck after upgrading Codex.
+
+Codex picks its own session id; the runner saves it in `runner.json`, so `--resume` works for Codex seats too. Its transcript (`codex exec --json` events) is in `seat-N.jsonl`. A ChatGPT login only serves some models (`gpt-5.5` was refused); `~/.codex/models_cache.json` lists what it offers.
