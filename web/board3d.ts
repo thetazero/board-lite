@@ -1795,8 +1795,15 @@ const CASCADE_S = 0.3, CASCADE_MAX = 8;
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 // A building on its plate, as it stands on a hex (shut: a beast or a perched dragon holds it).
+// A shut-down building's whole hex: dark ash, so it reads at a glance from
+// across the room, darker than any terrain (mountains are a light grey).
+const SHUT_GROUND = '#4a474d';
+let shutTop: THREE.BufferGeometry | null = null;
 function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-  const g = plate(b.upgrade, tileColor(terrain));
+  const g = plate(b.upgrade, shut ? SHUT_GROUND : tileColor(terrain));
+  // Shut down: the tile goes dark too, a cap of ash paper over its folded top
+  // (just above the tile's own small lift), under its owner's border.
+  if (shut) g.add(part((shutTop ??= tileGeometry().top), SHUT_GROUND, { at: [0, 0.012, 0], crease: false }));
   const { model: parts, offset } = buildingModel(b);
   const model = bake(parts);
   // Shut down by a beast or a perched dragon: the building goes to dull grey
