@@ -1231,7 +1231,7 @@ function raidView(g: PublicState, me: Me): string {
     const chose = me.myChoice;
     // Alone, the loot is all yours if you fight, so Fight shows it; shared, how much is yours depends on who's knocked out.
     const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
-    const split = others ? '<p class="hint">Every dragon not knocked out splits the loot by power, fought or held back.</p>' : '';
+    const split = others ? '<p class="hint">Fought or held back, every dragon not knocked out splits the loot by power.</p>' : '';
     return `${targetPanel(raid.target!, lead)}${sentHead}
       <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
       ${others ? `<div class="allies">${others}</div>` : ''}${split}
