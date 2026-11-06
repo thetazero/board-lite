@@ -148,10 +148,10 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
+      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and every rival dragon perched there together, to the end; a coin flip, once for the fight, decides which side strikes first each round. The hits your dragons take stay on them, but clearing doesn't use them up: those not knocked out can clear hex after hex this turn, and still raid. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
     }
     if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (clear your own buildings one at a time, weakest first, each time sending all your raid-ready dragons; it stops when nothing is left or a fight is lost. Holding your buildings: ${you.autoClear.join(' ')})`);
-    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
+    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Dragons perched on one building fight together when someone clears it; one perched alone fights alone. Rivals' buildings: ${you.perchable.join(' ')})`);
     if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
     out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
     for (const u of you.upgradeProjects) {
