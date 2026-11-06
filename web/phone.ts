@@ -1190,7 +1190,7 @@ function raidView(g: PublicState, me: Me): string {
   if (raid.step === 'vote') {
     const voted = me.myVote !== null || !!me.whyNoVote;
     // What each vote is worth, cast or not: the kingdom with the most power voted for it is raided.
-    const worth = `<h3 class="ask">Each vote counts its power</h3><div class="vote-power">${names.flatMap((_, p) => (raid.voters[p] ? [voterTag(p, raid.votePower[p], names)] : [])).join('')}</div>`;
+    const worth = `<div class="vote-power">${names.flatMap((_, p) => (raid.voters[p] ? [voterTag(p, raid.votePower[p], names)] : [])).join('')}</div>`;
     return worth + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names,
       { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
