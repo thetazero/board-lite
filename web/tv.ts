@@ -401,6 +401,22 @@ function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
   return `<span class="rd${sent ? ' sent' : ''}" title="${name}">${dragonBadge(d, 60)}${sent ? `${hpBar(d.hp, d.maxHp)}<small>${name}</small>` : ''}</span>`;
 }
 
+// Whether a raider has chosen to fight or bail, never which: a card laid face
+// down once they have, an empty place for it while they're choosing.
+function choiceMark(done: boolean): string {
+  return done ? '<span class="choice done"><i></i>Chosen</span>' : '<span class="choice"><i></i>Choosing</span>';
+}
+
+// The raiders' power, each player's share in their colour, pushing against the
+// kingdom's from the other end; past the middle, the raiders usually win
+// (rules.md, combat power). It counts everyone in, as no one has bailed yet
+// that the table knows of.
+function balance(sides: { p: number; power: number }[], foe: number): string {
+  const ours = sides.reduce((s, x) => s + x.power, 0);
+  const segs = sides.map((x) => `<i style="--pc:${PLAYER_COLORS[x.p]};flex:${x.power}"></i>`).join('');
+  return `<div class="balance${ours > foe ? ' ahead' : ''}"><div class="bside">${powerTag(ours, 'big')}<small>If everyone fights</small></div><div class="bbar">${segs}<i class="foe" style="flex:${foe}"></i><b class="mid"></b></div><div class="bside foe">${powerTag(foe, 'big')}</div></div>`;
+}
+
 const HOME = buildingIcon('roost', 40, '#9aa1ad'); // staying home: the roost
 
 function renderRaid(g: PublicState) {
@@ -408,7 +424,7 @@ function renderRaid(g: PublicState) {
   if (!raid) return;
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragonById(id).power, 0);
-  const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!, pointsLeader(g, raid.commits))}</div>`;
+  const arena = (rows: string, cls = '') => `<div class="arena ${cls}"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!, pointsLeader(g, raid.commits))}</div>`;
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
@@ -426,11 +442,12 @@ function renderRaid(g: PublicState) {
     };
     body = `<h1>${icon('raid', 1.1)} Commit ${OPEN}${raidPips(g)}</h1>${arena(names.map((_, p) => row(p)).join(''))}`;
   } else if (raid.step === 'bail') {
-    // Who's in, with what; a tick once they've chosen (not what they chose).
-    const rows = names.flatMap((_, p) => (raid.commits[p].length
-      ? [`<li class="raider" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${check(raid.decided[p])}</li>`]
-      : [])).join('');
-    body = `<h1>${icon('raid', 1.1)} Fight or bail ${SECRET}${raidPips(g)}</h1>${arena(rows)}`;
+    // Who's in, with what, and whether they've chosen (never what they chose):
+    // a face-down card once they have, an empty place while they're choosing.
+    // Above them, the power they'd bring together against the kingdom's.
+    const ins = names.flatMap((_, p) => (raid.commits[p].length ? [p] : []));
+    const rows = ins.map((p) => `<li class="raider${raid.decided[p] ? ' chosen' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${choiceMark(raid.decided[p])}</li>`).join('');
+    body = `<h1>${icon('raid', 1.1)} Fight or bail ${SECRET}${raidPips(g)}</h1>${balance(ins.map((p) => ({ p, power: sum(raid.commits[p]) })), raid.target!.power)}${arena(rows, 'bail')}`;
   }
   // A new step (or the next raid) rises in; ticks within a step update in place.
   showOverlay('raid', `raid ${g.round} ${g.raidsLeft} ${raid.step}`, `<div class="raidbox">${body}</div>`);
@@ -576,7 +593,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   const flown = home ? `<div class="spoils"><span>${home}<span class="arrow">➜</span>${HOME}</span></div>` : '';
   const The = ev.fauna ? `The ${esc(ev.name)}` : 'The perched dragons';
   const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
-    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
+    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>${ev.fauna === 'thunderbird' ? peakBoon(g.peakBonus) : ''}`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
     : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? esc(ev.name) : 'Perched dragons'}`;
@@ -587,6 +604,12 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms);
+}
+
+// The Thunderbird's fall frees its peak: the rule pops up under the points,
+// on the gold token the board then shows on each of the peak's hexes (#354).
+function peakBoon(n: number): string {
+  return `<div class="boon"><span class="ptoken">+${n}</span><span>Production buildings on and adjacent to its peak make ${n} more each round.</span></div>`;
 }
 
 // Each fighting dragon's health as its fight started, by id: drawn after the
