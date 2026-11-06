@@ -72,3 +72,10 @@ Dragons are worth no points; they count toward Strongest Dragon Army.
 ## Cards
 
 Basic buildings (no card): quarry, lumber camp, crystal mine, pasture, roost, tower floor. Building cards and upgrades are listed with their text and cost in a player's view, in `src/data.ts`, and with what they're worth in `docs/datasheet.md`: 21 buildings across the 7 classes, most of which count what's adjacent, and 2 upgrades (Workshop, Nesting Grounds). Action cards: Windfall, Buried Treasure, Growth Elixir, Healing Potion, War Horn, Secret Hoard, Rouse the Bear, Wake the Basilisk, and 15 dragons (a base dragon named for its element, like the Fire Dragon, and 2 special dragons per element).
+
+## Tips
+
+Mistakes players often make, and how to avoid them.
+
+- Empty hexes run out by the end of the game. Build out early, so your rivals don't box you in.
+- A lone dragon perched on a rival's building is easy prey: its owner can clear it with all their dragons at once.

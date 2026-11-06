@@ -15,6 +15,7 @@ import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D, Fighter } from './board3d.ts';
 import { qrSvg } from './qr.ts';
+import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
@@ -154,6 +155,16 @@ function tailscaleUrl(): string | null {
   return t && lan.lan.length ? joinUrl(t) : null;
 }
 
+// The lobby's tip (tips.ts): a random one, changed every TIP_MS. Only the
+// tip's text changes, so the rest of the lobby stays still under it.
+let tip = Math.floor(Math.random() * TIPS.length);
+setInterval(() => {
+  const el = document.getElementById('tip');
+  if (!el) return;
+  tip = nextTip(tip);
+  el.textContent = TIPS[tip];
+}, TIP_MS);
+
 // The lobby: who's at the table, and how to join. A saved game hosted again
 // comes back here until every seat is taken: its seats are the game's, the
 // open ones waiting in their player's colour.
@@ -201,6 +212,7 @@ function renderLobby() {
           ${hint ? `<p class="hint">${hint}</p>` : ''}
         </div>
       </div>
+      <p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>
     </div>`;
   if (!isHost) return;
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
