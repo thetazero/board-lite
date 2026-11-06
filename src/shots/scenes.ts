@@ -7,7 +7,7 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, stageStats, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
 import { PEAK, distance, leviathanWaters, nearBeast, neighbors, parseKey } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -974,6 +974,26 @@ export const SCENES: Scene[] = [
         { file: 'phone-late-6p', caption: 'Phone, late game: the leader', client: 'phone', seat: leader, sizes: true },
       ];
     },
+  },
+  {
+    // Late in a big game: 12 or 13 dragons each, of every stage, long names;
+    // some hurt, a few knocked out (#406).
+    name: 'late-many-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    until: late(6, 1),
+    setup: (g) => {
+      const stages = [3, 3, 2, 3, 1, 3, 2, 0, 3, 3, 2, 1, 3];
+      // More than their roosts hold: the TV draws them all the same.
+      const keys = Object.keys(DRAGONS);
+      g.dragons = [];
+      for (const p of g.players.keys()) stages.slice(0, 12 + (p % 2)).forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0 }));
+      const adults = g.dragons.filter((d) => d.stage === 3);
+      adults.forEach((d, i) => { if (i % 5 === 1) d.damage = 6; if (i % 11 === 4) d.damage = 99; });
+      for (const d of g.dragons) d.damage = Math.min(d.damage, stageStats(d)?.hp ?? 0);
+    },
+    shots: () => [{ file: 'tv-late-many-6p', caption: 'TV, late game (6 players): 12 or 13 dragons each', client: 'tv', sizes: true }],
   },
   {
     name: 'late-2p',
