@@ -881,7 +881,8 @@ export const SCENES: Scene[] = [
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // Three raiders: the first holds back, the second fights, the third decides live.
+    // Three raiders: the first holds back, the second fights with one dragon
+    // and holds back the other, the third decides live.
     setup: (g) => {
       const [a, b, c] = turnOrder(g);
       for (const p of g.players.keys()) arm(g, p, [a, b, c].includes(p) ? [3, 3] : [0]);
@@ -889,11 +890,11 @@ export const SCENES: Scene[] = [
       vote(g, byPower(g)[0]);
       toChoice(g);
       apply(g, a, 'hold');
-      apply(g, b, 'fight');
+      apply(g, b, `fight ${g.raid!.sent[b][0]}`);
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the raider who held back beside it', client: 'tv', live: true, waitMs: 3300 }],
+    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the dragons held back beside it', client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     name: 'discard-4p',
@@ -1271,15 +1272,15 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       const t = g.turn;
-      for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 4 ? [2] : [0]);
+      for (const p of g.players.keys()) arm(g, p, p === t ? [2, 2] : p === (t + 1) % 4 ? [2] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, t, 'fight');
+      apply(g, t, `fight ${g.raid!.sent[t][0]}`);
     },
     shots: (g) => [
       { file: 'phone-raid-not-in-4p', caption: "Phone, fight or hold back: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.sent[p].length) },
-      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or hold back: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.sent[p].length > 0 && !!g!.raid!.choices[p]) },
+      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or hold back: already chosen, one dragon fights and one holds back', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.sent[p].length > 0 && !!g!.raid!.choices[p]) },
     ],
   },
   {

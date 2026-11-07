@@ -1215,7 +1215,7 @@ function raidView(g: PublicState, me: Me): string {
     // Fight with the ticked ones or Hold back all. Once chosen, your pick stays on screen.
     const chose = me.myFight;
     const chosen = new Set(chose ?? fightDraft ?? mine);
-    const note = `Every dragon of yours in the raid not knocked out, fought or held back, shares the loot by power${others ? ' with the others' : ''}. Held back, a dragon takes no hits.`;
+    const note = 'Fought or held back, every dragon in the raid not knocked out shares the loot by power. Held back, a dragon takes no hits.';
     const hold = `<button id="hold" class="big${chose && !chose.length ? ' on' : ''}">Hold back</button>`;
     const picked = sendPicker(g, me, chosen, 'fighter', { go: 'fight', out: hold, ids: mine, ask: chose ? (chose.length ? 'You fight with' : 'You hold back') : 'Choose dragons to fight', verb: 'Fight with', note: chose ? undefined : note, locked: !!chose });
     return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}${picked}`;
