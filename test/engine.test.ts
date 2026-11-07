@@ -142,11 +142,9 @@ test('votes are public as cast; fight-or-hold-back choices stay secret until rev
   assert.ok(playerView(g, 1, 1000).includes(`P1 votes for ${name}`));
   assert.deepEqual(publicState(g).raid!.votes, [1, null]);
   apply(g, 1, 'vote 2');
-  apply(g, 0, `commit ${g.dragons[0].id}`);
-  apply(g, 0, 'ready');
-  apply(g, 1, `commit ${g.dragons[1].id}`);
-  apply(g, 1, 'ready');
+  // No commit step: everyone with a raid-ready dragon is in, with all of them.
   assert.equal(g.raid!.step, 'choose');
+  assert.deepEqual(waitingOn(g), [0, 1]);
   apply(g, 0, 'hold');
   assert.ok(!playerView(g, 1, 1000).includes('holds back'));
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
@@ -172,9 +170,11 @@ test('only a player with a raid-ready dragon votes, and one without is told why'
   assert.equal(seatState(g, 0).whyNoVote, null);
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 2');
-  // Both voters voted: the target is picked without waiting on P3.
-  assert.equal(g.raid!.step, 'commit');
+  // Both voters voted: the target is picked without waiting on P3, who isn't in the raid.
+  assert.equal(g.raid!.step, 'choose');
   assert.deepEqual(waitingOn(g), [0, 1]);
+  assert.deepEqual(g.raid!.sent[2], []);
+  assert.throws(() => apply(g, 2, 'fight'), /aren't in this raid/);
 });
 
 test("each vote counts its voter's raid-ready power, and the most power wins", () => {
@@ -436,15 +436,14 @@ test('a hurt dragon heals instead of growing, and still fights', () => {
   g.players[a.owner].resources.livestock = 5;
   const ga = a.growth + a.stage * 10;
   advanceToRaidVote(g);
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(g.round, 2);
   assert.equal(a.damage, 3);
   assert.equal(a.growth + a.stage * 10, ga, 'a hurt dragon does not grow while it heals');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  apply(g, a.owner, `commit ${a.id}`); // hurt, it still raids
-  assert.deepEqual(g.raid!.commits[a.owner], [a.id]);
+  assert.ok(g.raid!.sent[a.owner].includes(a.id), 'hurt, it still raids');
 });
 
 test('a hungry dragon neither heals nor grows, but still fights', () => {
@@ -457,7 +456,7 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   g.dragons.unshift({ ...a, id: 'd99' });
   g.players[a.owner].resources.livestock = 0;
   a.damage = 3;
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.ok(canRaid(a), 'a hungry dragon with health left still fights');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
@@ -477,7 +476,7 @@ test('production says what the dragons eat apart from what is made, and so does 
   advanceToRaidVote(g);
   g.players[p].resources.livestock = 5;
   const from = g.log.length;
-  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
   assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
@@ -593,8 +592,6 @@ test('a hurt dragon starts its fight hurt: the fight event carries its health', 
     { id: 'd2', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
   ];
   apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-  apply(g, 0, 'commit d1'); apply(g, 1, 'commit d2');
-  apply(g, 0, 'ready'); apply(g, 1, 'ready');
   apply(g, 0, 'fight'); apply(g, 1, 'fight');
   const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
   assert.ok(fight.k === 'fight');
@@ -612,7 +609,7 @@ test('a knocked-out dragon cannot fight until a fed production heals it, then fi
   const passRound = () => {
     for (const pl of g.players) pl.hand = []; // nothing to discard
     advanceToRaidVote(g);
-    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'hold');
+    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
     while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   };
   assert.ok(!canRaid(a));
@@ -633,8 +630,6 @@ test('raid loot is split by the combat power still fighting at the end, when eve
       { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0 },
-      // Stays home, so the next raid has a raider and isn't skipped.
-      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 },
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2; // stop at the next raid's vote, before the next production
@@ -643,8 +638,6 @@ test('raid loot is split by the combat power still fighting at the end, when eve
     const hoard = { ...g.hoard };
     const before = g.players.map((pl) => ({ ...pl.resources }));
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-    apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
-    apply(g, 0, 'ready'); apply(g, 1, 'ready');
     apply(g, 0, 'fight'); apply(g, 1, 'fight');
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd' || !end.won) continue;
@@ -675,13 +668,10 @@ test('a dragon held back takes no hits and shares the loot by its power; a knock
       { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd3', owner: 1, key: 'air_whelp', stage: 3, growth: 0, damage: 0 },
-      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 }, // stays home
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2;
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-    apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
-    apply(g, 0, 'ready'); apply(g, 1, 'ready');
     apply(g, 0, 'fight'); apply(g, 1, 'hold');
     const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
     assert.ok(fight.k === 'fight');
@@ -700,13 +690,31 @@ test('a dragon held back takes no hits and shares the loot by its power; a knock
   assert.ok(held > 0, 'some raids should fall');
 });
 
+test("after the vote, every raid-ready dragon is in the raid, the ones whose power the vote counted", () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd2', owner: 0, key: 'ice_whelp', stage: 1, growth: 0, damage: 0 },
+    { id: 'd3', owner: 0, key: 'air_whelp', stage: 3, growth: 0, damage: 999 }, // knocked out
+    { id: 'd4', owner: 1, key: 'water_whelp', stage: 0, growth: 0, damage: 0 }, // an egg
+    { id: 'd5', owner: 1, key: 'fire_whelp', stage: 2, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  assert.equal(g.raid!.step, 'choose');
+  assert.deepEqual(g.raid!.sent, [['d1', 'd2'], ['d5']]);
+  const lock = g.log.findLast((e) => e.ev?.k === 'locked')!.ev!;
+  assert.deepEqual(lock, { k: 'locked', ps: [0, 1], sent: [['d1', 'd2'], ['d5']] });
+  assert.throws(() => apply(g, 0, 'commit d1'), RuleError);
+});
+
 test('everyone holding back calls the raid off', () => {
   const g = newGame(2, 3);
   hatchAll(g);
   advanceToRaidVote(g);
   apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-  apply(g, 0, `commit ${g.dragons[0].id}`); apply(g, 1, `commit ${g.dragons[1].id}`);
-  apply(g, 0, 'ready'); apply(g, 1, 'ready');
   apply(g, 0, 'hold'); apply(g, 1, 'hold');
   assert.ok(g.log.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'held'));
   assert.ok(!g.log.some((e) => e.ev?.k === 'fight' || e.ev?.k === 'raidEnd'), 'no fight, so no loot');
@@ -723,14 +731,11 @@ test('a scoring kingdom gives its points to the most power standing, ties in tur
     g.dragons = [
       ...['d1', 'd2', 'd3', 'd4', 'd5'].map((id) => ({ id, owner: 0, key: 'ember_wyrm', stage: 3, growth: 0, damage: 0 })),
       ...['d6', 'd7', 'd8', 'd9', 'd10'].map((id) => ({ id, owner: 1, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0 })),
-      { id: 'd11', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 }, // stays home
     ];
     g.raid!.candidates = ['cinderkeep'];
     g.raidsLeft = 2;
     const before = [score(g, 0).raids, score(g, 1).raids];
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-    apply(g, 0, 'commit d1 d2 d3 d4 d5'); apply(g, 1, 'commit d6 d7 d8 d9 d10');
-    apply(g, 0, 'ready'); apply(g, 1, 'ready');
     apply(g, 0, 'fight'); apply(g, 1, 'fight');
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd') continue;
@@ -978,8 +983,7 @@ test('clearing fauna: any player may, the loot is theirs, and those dragons can 
   assert.ok(ev.some((e) => e?.k === 'cleared' && e.won && e.p === 1));
   apply(g, 1, 'end');
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  apply(g, 1, `commit ${d.id}`); // it cleared a hex, and raids the same round
-  assert.deepEqual(g.raid!.commits[1], [d.id]);
+  assert.ok(g.raid!.sent[1].includes(d.id), 'it cleared a hex, and raids the same round');
 });
 
 test('a lost fight leaves the beast at full health on its hex', () => {

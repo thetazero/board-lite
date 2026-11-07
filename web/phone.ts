@@ -48,10 +48,6 @@ let bank = { give: 'stone', get: 'timber', times: 1 };
 // command still waiting (the same button twice) is a double tap, and is dropped.
 const outbox: string[] = [];
 let sending = false;
-// The dragons this phone has picked to send on the raid, ahead of the server:
-// each tap toggles one against the last pick, not against a snapshot that
-// hasn't caught up yet. Null once the server shows the same.
-let commitDraft: string[] | null = null;
 let menu = false; // the menu under your name (Quit game) is open
 let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
@@ -229,7 +225,6 @@ function onSnapshot(s: Snapshot) {
     eggOpen = false;
     if (s.game.phase !== 'action') trade = fresh();
   }
-  settleDraft();
   // The TV (or, with no TV, each phone's table view) is playing a scene (a
   // fight, the round's roll): the whole table watches it, and the next
   // decision waits until it's over. Nothing that
@@ -518,22 +513,10 @@ async function flush() {
     } catch (e) {
       // What was tapped after it was tapped expecting it to work: drop it too.
       outbox.length = 0;
-      const drafted = commitDraft;
-      commitDraft = null;
       toast(e);
-      if (drafted && snap?.game) render(); // back to the dragons the server has
     }
   }
   sending = false;
-  settleDraft();
-}
-
-// The server has caught up with the dragons picked: show its state again.
-function settleDraft() {
-  if (!commitDraft || sending) return;
-  const raid = snap?.game?.raid;
-  const mine = raid && raid.step === 'commit' ? raid.commits[snap!.seat] : null;
-  if (!mine || (mine.length === commitDraft.length && mine.every((id) => commitDraft!.includes(id)))) commitDraft = null;
 }
 
 function on(id: string, fn: () => unknown) {
@@ -622,7 +605,7 @@ function waitText(g: PublicState): string {
   if (!w) return 'Waiting for the table.';
   const step = g.raid?.step;
   const what = g.phase === 'discard' ? 'to discard' : g.phase === 'cards' ? 'to keep a card' : g.phase === 'action' ? 'to answer an offer'
-    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : step === 'commit' ? 'to send dragons or stay home' : 'to fight or hold back') : '';
+    : g.phase === 'raid' ? (step === 'vote' ? 'to vote' : 'to fight or hold back') : '';
   return `Waiting for ${w}${what ? ` ${what}` : ''}.`;
 }
 
@@ -630,7 +613,7 @@ function waitText(g: PublicState): string {
 // which every raid screen shows, whatever you've done.
 function raidStep(g: PublicState): string {
   const r = g.raid!;
-  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : r.step === 'commit' ? 'Commit' : 'Fight or hold back'}`;
+  return `${icon('raid', 1.3)} ${r.step === 'vote' ? 'Vote' : 'Fight or hold back'}`;
 }
 
 // The menu under your name: quitting is there, out of the way of the game.
@@ -677,10 +660,9 @@ function render() {
   else if (g.phase === 'cards') body = me.choice.length ? keepView(me) : '';
   else body = actionView(g, me);
   // Your dragons are on every screen of the game, so their cards are always a tap away,
-  // but each only once: a dragon the screen lists below (to send, or sent) isn't in the roost too.
+  // but each only once: a dragon the screen lists below (to send, or in the raid) isn't in the roost too.
   const listed = choosing && body ? me.raidReady
-    : g.phase === 'raid' && g.raid?.step === 'commit' ? me.raidReady
-    : g.phase === 'raid' && g.raid?.step === 'choose' ? g.raid.commits[me.seat] : [];
+    : g.phase === 'raid' && g.raid?.step === 'choose' ? g.raid.sent[me.seat] : [];
   const den = !picking && g.phase !== 'over' ? roost(g, me, new Set(listed)) : '';
   const open = !picking ? me.hand.find((c) => c.id === openCard) : undefined;
   const dragonOpen = !picking ? g.dragons.find((d) => d.id === openDragon && d.owner === me.seat) : undefined;
@@ -1038,26 +1020,24 @@ function huntView(g: PublicState, me: Me): string {
     ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? '1 try each round' : undefined })}`;
 }
 
-// Choosing dragons to send into a fight, the same on every screen that asks
-// (a raid's commit step, a beast to clear or slay): under "Choose dragons to
-// send", your raid-ready dragons, each with a box that ticks when you tap it,
-// then Send (with the power you send) beside the way out. Locked in, the
-// picks stay on screen, ticked, and the buttons go.
-function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o: { go: string; out: string; note?: string; locked?: boolean }): string {
+// Choosing dragons to send into a fight (a beast to clear or slay): under
+// "Choose dragons to send", your raid-ready dragons, each with a box that
+// ticks when you tap it, then Send (with the power you send) beside the way out.
+function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o: { go: string; out: string; note?: string }): string {
   const list = me.raidReady.map((id) => {
     const d = g.dragons.find((x) => x.id === id)!;
-    return dragonOption(id, `data-${attr}="${id}" ${o.locked ? 'disabled' : ''}`, `${powerTag(d.power)} ${statTag('Health', d.hp)} ${statTag('Attack', esc(d.attack))}`, chosen.has(id));
+    return dragonOption(id, `data-${attr}="${id}"`, `${powerTag(d.power)} ${statTag('Health', d.hp)} ${statTag('Attack', esc(d.attack))}`, chosen.has(id));
   }).join('');
   const n = chosen.size;
   const sent = [...chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
   const note = o.note ? `<p class="hint">${o.note}</p>` : '';
-  const buttons = o.locked ? '' : `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button>${o.out}</div>`;
+  const buttons = `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button>${o.out}</div>`;
   // With 2 or more to choose from, a tick on the prompt's line, in the column of
   // the dragons' own, chooses them all in one tap (or, all chosen, none).
   const all = n > 0 && n === me.raidReady.length;
   const ask = '<h3 class="ask">Choose dragons to send</h3>';
   const head = me.raidReady.length > 1 ? `<div class="askrow">${ask}<button id="${attr}all" class="allpick${all ? ' on' : ''}">Choose all<i class="tick"></i></button></div>` : ask;
-  return `${o.locked ? '' : head}${list}${note}${buttons}`;
+  return `${head}${list}${note}${buttons}`;
 }
 
 // Picking a hex: the map, what you're placing and Cancel, on one screen. The
@@ -1213,19 +1193,15 @@ function raidView(g: PublicState, me: Me): string {
     return worth + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names,
       { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
   }
-  const lead = pointsLeader(g, raid.commits);
-  if (raid.step === 'commit') {
-    if (!me.raidReady.length) return targetPanel(raid.target!, lead); // nobody fit to go: the roost above shows why
-    const out = `<button id="stayhome" class="big ghost">${buildingIcon('roost', 26, '#f1e7d0')} Stay home</button>`;
-    return `${targetPanel(raid.target!, lead)}${sendPicker(g, me, new Set(commitDraft ?? raid.commits[me.seat]), 'commit', { go: 'ready', out, locked: raid.ready[me.seat] })}`;
-  }
+  const lead = pointsLeader(g, raid.sent);
   if (raid.step === 'choose') {
-    const mine = raid.commits[me.seat];
+    // Everyone's raid-ready dragons are in, all of them: the ones whose power counted in the vote.
+    const mine = raid.sent[me.seat];
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
-    const others = g.players.flatMap((_, p) => (p !== me.seat && raid.commits[p].length
-      ? [`<div class="ally">${playerTag(p, names)} ${raid.commits[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.commits[p]))}</div>`] : [])).join('');
-    // Under the kingdom, the dragons sent against it: yours first, under "You", then each other player's.
-    const sentHead = `<h3 class="ask">Dragons sent</h3>`;
+    const others = g.players.flatMap((_, p) => (p !== me.seat && raid.sent[p].length
+      ? [`<div class="ally">${playerTag(p, names)} ${raid.sent[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.sent[p]))}</div>`] : [])).join('');
+    // Under the kingdom, the dragons in the raid: yours first, under "You", then each other player's.
+    const sentHead = `<h3 class="ask">In the raid</h3>`;
     if (!mine.length) return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
     const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
     const chose = me.myChoice;
@@ -1708,30 +1684,6 @@ function wire(g: PublicState, me: Me) {
   });
   // raid
   bind('[data-vote]', (el) => send(`vote ${el.dataset.vote}`));
-  bind('[data-commit]', (el) => {
-    const cur = new Set(commitDraft ?? g.raid!.commits[me.seat]);
-    const id = el.dataset.commit!;
-    if (cur.has(id)) cur.delete(id);
-    else cur.add(id);
-    commitDraft = [...cur];
-    render();
-    send(`commit ${commitDraft.join(' ') || 'none'}`);
-  });
-  on('commitall', () => {
-    const cur = commitDraft ?? g.raid!.commits[me.seat];
-    commitDraft = cur.length === me.raidReady.length ? [] : [...me.raidReady];
-    render();
-    send(`commit ${commitDraft.join(' ') || 'none'}`);
-  });
-  on('ready', () => send('ready'));
-  // Staying home drops any dragons tapped first, then locks in with none.
-  on('stayhome', () => {
-    if ((commitDraft ?? g.raid!.commits[me.seat]).length) {
-      commitDraft = [];
-      send('commit none');
-    }
-    send('ready');
-  });
   on('fight', () => send('fight'));
   on('hold', () => send('hold'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));

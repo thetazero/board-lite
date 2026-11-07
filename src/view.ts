@@ -27,7 +27,7 @@ const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', bas
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 const faunaCode = (key: string) => FAUNA_CODE[key] ?? key[0].toUpperCase();
 const STAGES = ['hatchling', 'young', 'adult'];
-const STEP_NAMES: Record<string, string> = { vote: 'vote', commit: 'commit', bail: 'fight or bail' }; // a dragon card's stages, in order (STAGE_NAMES in src/data.ts)
+const STEP_NAMES: Record<string, string> = { vote: 'vote', choose: 'fight or hold back' }; // a raid's steps
 
 function unitStats(u: { power: number; hp: number; attack: string; weak: string[] }): string {
   return `Power ${u.power}, Health ${u.hp}, Attack ${u.attack}${u.weak.length ? `, weak to ${u.weak.join('/')}` : ''}`;
@@ -84,7 +84,7 @@ export function faunaText(f: FaunaView): string {
   return `${f.name} (${unitStats(f)}; ${prize})`;
 }
 
-function commitPower(g: PublicState, ids: string[]): number {
+function sentPower(g: PublicState, ids: string[]): number {
   return ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0);
 }
 
@@ -102,14 +102,9 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
     return out;
   }
   out.push(`Raid: ${targetText(raid.target!)}`);
-  if (raid.step === 'commit') {
-    out.push(`Commit (open until everyone is ready):`);
-    raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'none'}${raid.ready[q] ? ', ready' : ''}`));
-  } else {
-    out.push(`Locked in: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-    out.push(`Fight or hold back, in secret: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
-    if (you?.myChoice) out.push(`  You ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
-  }
+  out.push(`In the raid (every raid-ready dragon): ${raid.sent.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${sentPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
+  out.push(`Fight or hold back, in secret: ${raid.sent.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
+  if (you?.myChoice) out.push(`  You ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
   return out;
 }
 
@@ -178,10 +173,6 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   }
   const raid = g.raid;
   if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
-  if (raid?.step === 'commit') {
-    out.push(`commit <dragon ids...>   (raid-ready: ${you.raidReady.join(' ')}; "commit none" for none; replaces what you sent)`);
-    out.push('ready   (lock in)');
-  }
   if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
