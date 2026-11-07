@@ -261,6 +261,27 @@ function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: numbe
   return `<div class="tvdragon${d.status === 'out' ? ' out' : ''}">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
 }
 
+// A player's dragons in brief, for a board too crowded for the list (#406):
+// each dragon a picture (its size its stage) over its health bar, grouped by
+// element, biggest first; knocked out ones greyed, perched ones ringed. Then
+// the power of the raid-ready ones (what their vote is worth), and how many
+// can't fight and why.
+const ELEMENT_ORDER = Object.keys(ELEMENT_COLORS);
+function tvDragonsBrief(ds: DragonView[], all: DragonView[]): string {
+  if (!ds.length) return '<div class="none">No dragons</div>';
+  const sorted = [...ds].sort((a, b) => ELEMENT_ORDER.indexOf(a.element) - ELEMENT_ORDER.indexOf(b.element) || b.stage - a.stage);
+  const tiles = sorted.map((d, i) => {
+    const gap = i && d.element !== sorted[i - 1].element ? ' gap' : '';
+    const st = d.status === 'out' ? ' out' : d.perch ? ' perched' : '';
+    return `<span class="bdragon${st}${gap}" title="${esc(dragonLabel(d, all))}">${dragonBadge(d, 40)}${d.stage ? hpBar(d.hp, d.maxHp) : '<i></i>'}</span>`;
+  }).join('');
+  const power = ds.filter((d) => d.canRaid).reduce((s, d) => s + d.power, 0);
+  const out = ds.filter((d) => d.status === 'out').length;
+  const perched = ds.filter((d) => d.perch).length;
+  const tags = `${powerTag(power)}${out ? ` <em class="st-out">${out} knocked out</em>` : ''}${perched ? ` <em class="st-perched">${perched} perched</em>` : ''}`;
+  return `<div class="btiles">${tiles}<span class="bsum">${tags}</span></div>`;
+}
+
 // Why a seat isn't a person playing right now.
 function seatTag(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   if (!seat || seat.standIn) return '';
@@ -291,7 +312,8 @@ function renderGame(g: PublicState) {
   const players = g.players.map((p, i) => {
     const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge" title="${esc(t.name)}">${icon(TITLE_ICON[t.key], 1.1)}</span>`).join('')
       + g.beasts.filter((b) => b.slainBy === i).map((b) => `<span class="title-badge" title="${esc(b.name)} slain">${icon(b.key, 1.1)}</span>`).join('');
-    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => tvDragon(d, g.dragons, n <= 4, g.round)).join('') || '<div class="none">No dragons</div>';
+    const mine = g.dragons.filter((d) => d.owner === i);
+    const dragons = mine.map((d) => tvDragon(d, g.dragons, n <= 4, g.round)).join('') || '<div class="none">No dragons</div>';
     const seat = snap!.lobby.seats[i];
     const turn = g.phase === 'action' && g.turn === i;
     const what = doing(g, i);
@@ -306,6 +328,7 @@ function renderGame(g: PublicState) {
         ${g.phase === 'over' ? '' : pointsTrack(p, g.pointsToWin)}
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
+        ${remote ? '' : `<div class="dragons brief">${tvDragonsBrief(mine, g.dragons)}</div>`}
       </div>`;
   });
   const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} <b>${iconText(esc(o.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(o.get))}</b> ${o.to === null ? '<b>Anyone</b>' : playerTag(o.to, names)}</li>`).join('');
@@ -363,20 +386,38 @@ function renderGame(g: PublicState) {
 
 // The player cards start as large as their count allows (style.css) and step
 // down until both columns fit, together, so every card is the same size:
-// many dragons in a big game take more room.
+// many dragons in a big game take more room. When the cards are still too
+// tall once the lists of dragons have shrunk as far as they read well at TV
+// distance, every card shows its dragons in brief instead (#406), from the
+// starting size again.
 function fitSide() {
   if (remote) return; // a phone's table view scrolls instead
   const sides = [...app.querySelectorAll<HTMLElement>('.side')];
   if (!sides.length) return;
-  let px = parseFloat(getComputedStyle(sides[0]).fontSize);
+  const start = parseFloat(getComputedStyle(sides[0]).fontSize);
   const min = parseFloat(getComputedStyle(document.body).fontSize) * 1.05;
-  const rows = app.querySelectorAll<HTMLElement>('.phead, .dragons, .corner');
-  const over = () => sides.some((s) => s.scrollHeight > s.clientHeight + 1) || [...rows].some((r) => r.scrollWidth > r.clientWidth + 1);
-  while (over() && px > min) {
-    px = Math.max(min, px * 0.95);
+  // (A corner's size is its own, so a corner too wide isn't helped by shrinking the cards.)
+  const rows = app.querySelectorAll<HTMLElement>('.phead, .dragons');
+  const tall = () => sides.some((s) => s.scrollHeight > s.clientHeight + 1);
+  const over = () => tall() || [...rows].some((r) => r.scrollWidth > r.clientWidth + 1);
+  const fit = (floor: number) => {
+    let px = start;
     for (const s of sides) s.style.fontSize = `${px}px`;
-  }
+    while (over() && px > floor) {
+      px = Math.max(floor, px * 0.95);
+      for (const s of sides) s.style.fontSize = `${px}px`;
+    }
+  };
+  fit(Math.max(min, start * BRIEF_BELOW));
+  if (!over()) return;
+  if (!tall()) return fit(min);
+  // In brief, a card is mostly pictures and a few numbers: it may go a little smaller.
+  for (const s of sides) s.classList.add('brief');
+  fit(min * 0.85);
 }
+// How far the list of dragons may shrink, from the size the cards start at,
+// before they show in brief instead.
+const BRIEF_BELOW = 0.8;
 
 // "P2 says: "hi"" -> the speaker's name, then what they said.
 function talkLine(text: string, g: PublicState): string {
