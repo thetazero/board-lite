@@ -519,13 +519,6 @@ body.recap-page { font-size: 16px; }
 .raider { --text: var(--ink); --muted: var(--ink-soft); color: var(--text); display: flex; align-items: center; gap: .6em; background: var(--sheet); box-shadow: var(--lift); padding: .3em .8em; border-radius: 2px; border-left: 5px solid var(--pc); min-height: 3.3em; }
 .raider > .ptag { min-width: 3.5em; text-align: left; }
 .raider .rds { flex: 1; display: flex; gap: .4em; align-items: center; }
-.raider.out { opacity: .55; }
-.rd { display: inline-flex; flex-direction: column; align-items: center; gap: .1em; opacity: .28; }
-.rd.sent { opacity: 1; filter: drop-shadow(0 0 .3em var(--pc)); display: inline-flex; flex-wrap: nowrap; } /* not the phone's .sent row, which wraps */
-.rd .hpbar { width: 2.2em; height: .35em; }
-.rd small { font-size: .55em; color: var(--text); white-space: nowrap; }
-.home { display: inline-flex; align-items: center; gap: .4em; font-size: 1.1em; }
-.home.none { font-style: italic; opacity: .55; font-size: .95em; }
 .unit-art { filter: drop-shadow(0 1px 1px #0008); }
 /* Fight or hold back (tv.ts renderRaid): the raiders' rows line up in columns
    (name, dragons, power, choice); a raider who has chosen shows a card face
@@ -991,7 +984,6 @@ button.on:disabled { opacity: 1; }
 .allies { display: flex; flex-wrap: wrap; gap: .4em .9em; margin-bottom: .6em; }
 .ally { display: inline-flex; align-items: center; gap: .2em; padding: .2em .6em; }
 .row.big2 > button { flex-direction: column; }
-#ready { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
 /* Narrow phones: a defender's stats wrap under its picture, the loot under the defenders */
 .ptarget { flex-wrap: wrap; }
 .ptarget .foes, .choice .foes { min-width: 0; }

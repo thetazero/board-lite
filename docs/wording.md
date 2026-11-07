@@ -24,7 +24,7 @@ The game should read like a well-edited board game: the box's rulebook, the card
 | **At a glance** (previews, stat lines) | Numbers and icons, no sentence; a change is before → after. | "5 → 7 [stone]", "1 → 2 [point]" |
 | **Button** | A verb, plus its object only when the screen doesn't already show it. The verb is the card's or the rules' own. Sentence case, no full stop. | "Build", "Play", "Hatch", "Place", "Send 2 dragons", "End turn", "Accept" |
 | **Prompt** (what to do now, above a choice) | An imperative naming the choice: "Choose a <thing> for <what>". No question marks. Every choice among several options has one, and each option's button still carries the verb ("Gain", not a bare icon). | "Choose a hex for the Quarry", "Choose a building for the Workshop", "Choose a beast to clear", "Choose a resource to gain" |
-| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Commit", "Fight or hold back", "End of round" |
+| **Heading / phase name** | The rules' name for the step, sentence case, no full stop. | "Production", "Actions", "Vote", "Fight or hold back", "End of round" |
 | **Status** (what someone is doing, on a TV panel or the phone's top bar) | Sentence case, present tense, short: a present participle for what a player is doing. The TV's top bar names the phase (a heading), never a sentence. | "Taking a turn", "Voting", "Discarding" |
 | **State tag** (a dragon or building, at a glance) | Sentence case, one to four words: why it's out of play. A number in a tag says what it counts, and the tag claims only what the rules make sure of. | "Knocked out", "Perched" |
 | **Event** (the log, the TV feed, banners) | Present tense, third person, a statement: what just happened as if narrating the table. | "Ada builds a Quarry.", "Brindle falls", "Dax holds back", "No one raids" |
@@ -42,7 +42,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **each round** | a round, per round, every round | How often |
 | **adjacent** | neighbouring, next to, touching | Hexes sharing an edge. The rules' word for what building cards count |
 | **place** (a beast) | put, send | Putting a beast on a hex with Rouse the Bear or Wake the Basilisk |
-| **send** (dragons) | commit, go | Dragons you put into a raid or against a beast. "Commit" stays the name of the raid step |
+| **send** (dragons) | commit, go | Dragons you put against a beast or on a perch. A raid has no sending: every raid-ready dragon is in it |
 | **clear** (a hex: fauna, perched dragons) | hunt, fight | Sending dragons against what holds a hex: its beast and rivals' dragons perched there |
 | **perch** (a dragon, on a rival's building) | sit, block, occupy | Sending a dragon to sit on a rival's building so it's suppressed |
 | **suppressed** (a building) | shut down, blocked, disabled | A building under a beast, held by a great beast, or with a dragon perched on it: it counts as if it weren't there, but nothing is built on its hex |
@@ -53,7 +53,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **beast**, **fauna** | animal, monster | One wild creature on a hex is a beast; all of them, and the rules about them, are fauna |
 | **kingdom** | target, town | What a raid attacks. "target" only in the vote ("vote for a target") |
 | **falls** / **holds** | is defeated, wins, survives | A kingdom's or a beast's fate after a fight |
-| **hold back** | bail, hide, sit out, stay back | A committed player keeping their dragons out of a raid's combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
+| **hold back** | bail, hide, sit out, stay back | A player in a raid keeping some or all of their dragons out of its combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
 | **no one** | nobody | No player |
 | **the merchants** | the bank, the market | Who you trade resources with at a fixed rate (4:1, or a port's 2:1). "Market" is a building, so it isn't this |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |

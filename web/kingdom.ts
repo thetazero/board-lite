@@ -28,10 +28,10 @@ export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; name
 }
 
 // Who would score a kingdom's points if the fight ended now: the most power
-// sent (commits[p] is each player's dragons, power[id] each dragon's), equal
+// in the raid (sent[p] is each player's dragons, power[id] each dragon's), equal
 // powers in turn order. Null if no one has sent any.
-export function pointsLeader(g: PublicState, commits: string[][]): number | null {
-  const power = commits.map((ids) => ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0));
+export function pointsLeader(g: PublicState, sent: string[][]): number | null {
+  const power = sent.map((ids) => ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0));
   const best = Math.max(0, ...power);
   return best ? g.turnOrder.find((p) => power[p] === best) ?? null : null;
 }

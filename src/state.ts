@@ -87,15 +87,14 @@ export interface TargetView {
 }
 
 export interface RaidView {
-  step: 'vote' | 'commit' | 'choose';
+  step: 'vote' | 'choose';
   candidates: TargetView[];
   votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   voters: boolean[]; // who votes: only players with a raid-ready dragon
   votePower: number[]; // what each player's vote is worth: their raid-ready dragons' combat power, summed (0 for no vote)
   target: TargetView | null; // units carry current health once the fight starts
-  commits: string[][];
-  ready: boolean[];
-  decided: boolean[]; // fight or hold back chosen (not what)
+  sent: string[][]; // each player's dragons in the raid, once the vote ends: all their raid-ready dragons
+  decided: boolean[]; // chosen which dragons fight (not which)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
 }
@@ -189,7 +188,7 @@ export interface SeatState {
   // Upgrades added without the card, as a special project (the Workshop): on
   // which of your buildings, and what each would do with it.
   upgradeProjects: { key: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes>; why: string | null }[];
-  raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
+  raidReady: string[]; // my dragons that can raid, or be sent against fauna on my turn
   huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
   autoClear: string[]; // my buildings auto clear would clear, weakest first: under fauna (not a great beast) or rivals' perched dragons
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
@@ -197,7 +196,7 @@ export interface SeatState {
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
-  myChoice: 'fight' | 'hold' | null;
+  myFight: string[] | null; // the dragons I chose to fight with in this raid ([]: I hold back), once chosen
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
@@ -313,8 +312,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       voters: Array.from({ length: n }, (_, p) => canVote(g, p)),
       votePower: Array.from({ length: n }, (_, p) => votePower(g, p)),
       target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
-      commits: raid.commits,
-      ready: raid.ready,
+      sent: raid.sent,
       decided: raid.choices.map((c) => c !== null),
       fighting: Array.from({ length: n }, (_, p) => raid.fighters.some((id) => g.dragons.find((d) => d.id === id)!.owner === p)),
       fighters: raid.fighters,
@@ -457,7 +455,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     cantAccept: Object.fromEntries(g.offers.filter((o) => offerFor(o, p)).flatMap((o) => { const why = acceptProblem(g, o, p); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     whyNoVote: raid?.step === 'vote' && !canVote(g, p) ? NO_VOTE : null,
-    myChoice: raid?.choices[p] ?? null,
+    myFight: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
     talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),
   };
