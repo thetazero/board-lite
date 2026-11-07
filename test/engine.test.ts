@@ -710,6 +710,44 @@ test("after the vote, every raid-ready dragon is in the raid, the ones whose pow
   assert.throws(() => apply(g, 0, 'commit d1'), RuleError);
 });
 
+test('a player picks which of their dragons fight; the rest hold back and still count for the loot', () => {
+  let won = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    hatchAll(g);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    g.dragons = [
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 3, growth: 0, damage: 0 },
+    ];
+    g.raid!.candidates = ['archers_hold'];
+    g.raidsLeft = 2;
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    assert.throws(() => apply(g, 0, 'fight d3'), /isn't one of your dragons/);
+    assert.throws(() => apply(g, 0, 'hold d1'), RuleError);
+    apply(g, 0, 'fight d1');
+    assert.deepEqual(g.raid!.choices[0], ['d1']);
+    assert.throws(() => apply(g, 0, 'fight'), /already chose/);
+    apply(g, 1, 'fight');
+    const hold = g.log.find((e) => e.ev?.k === 'hold')!.ev!;
+    assert.deepEqual(hold, { k: 'hold', p: 0, ds: ['d2'] });
+    const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+    assert.ok(fight.k === 'fight');
+    assert.deepEqual(fight.ps, [0, 1]);
+    assert.deepEqual(fight.ds, ['d1', 'd3']);
+    assert.equal(g.dragons.find((d) => d.id === 'd2')!.damage, 0, 'held back, so never hit');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd' || !end.won) continue;
+    won++;
+    // P1's credit is every dragon of theirs in the raid still standing: the one held back too.
+    const standing = ['d1', 'd2'].map((id) => g.dragons.find((d) => d.id === id)!).filter((d) => d.damage < DRAGONS[d.key].stages[2].hp);
+    assert.equal(end.power[end.winners.indexOf(0)], standing.reduce((s, d) => s + dragonPower(d), 0));
+  }
+  assert.ok(won > 0, 'some raids should fall');
+});
+
 test('everyone holding back calls the raid off', () => {
   const g = newGame(2, 3);
   hatchAll(g);

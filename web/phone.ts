@@ -38,6 +38,8 @@ let picking: {
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
 // Sending dragons to a hex: to clear what holds it, or to perch on a rival's building.
 let hunting: { hex: string; chosen: Set<string>; perch?: boolean } | null = null;
+// The dragons ticked to fight in this raid, before Fight is tapped (null: all of them).
+let fightDraft: string[] | null = null;
 let openCard: string | null = null;
 let openDragon: string | null = null; // one of your dragons tapped open: its card
 let selected = new Set<string>(); // discard picks
@@ -219,6 +221,7 @@ function onSnapshot(s: Snapshot) {
   if (key(prev) !== key(s)) {
     picking = null;
     hunting = null;
+    fightDraft = null;
     selected = new Set();
     openCard = null;
     openDragon = null;
@@ -1020,23 +1023,28 @@ function huntView(g: PublicState, me: Me): string {
     ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? '1 try each round' : undefined })}`;
 }
 
-// Choosing dragons to send into a fight (a beast to clear or slay): under
-// "Choose dragons to send", your raid-ready dragons, each with a box that
-// ticks when you tap it, then Send (with the power you send) beside the way out.
-function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string, o: { go: string; out: string; note?: string }): string {
-  const list = me.raidReady.map((id) => {
+// Choosing dragons to send into a fight (a beast to clear or slay, or which
+// of your dragons in a raid fight): under "Choose dragons to send", your
+// raid-ready dragons, each with a box that ticks when you tap it, then Send
+// (with the power you send) beside the way out. Locked in, the picks stay on
+// screen, ticked, and the buttons go.
+function sendPicker(g: PublicState, me: Me, chosen: Set<string>, attr: string,
+  o: { go: string; out: string; note?: string; ids?: string[]; ask?: string; verb?: string; locked?: boolean }): string {
+  const ids = o.ids ?? me.raidReady;
+  const verb = o.verb ?? 'Send';
+  const list = ids.map((id) => {
     const d = g.dragons.find((x) => x.id === id)!;
-    return dragonOption(id, `data-${attr}="${id}"`, `${powerTag(d.power)} ${statTag('Health', d.hp)} ${statTag('Attack', esc(d.attack))}`, chosen.has(id));
+    return dragonOption(id, `data-${attr}="${id}"${o.locked ? ' disabled' : ''}`, `${powerTag(d.power)} ${statTag('Health', d.hp)} ${statTag('Attack', esc(d.attack))}`, chosen.has(id));
   }).join('');
   const n = chosen.size;
   const sent = [...chosen].reduce((s, id) => s + (g.dragons.find((x) => x.id === id)?.power ?? 0), 0);
   const note = o.note ? `<p class="hint">${o.note}</p>` : '';
-  const buttons = `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `Send ${dragons(n)} ${powerTag(sent)}` : 'Send'}</button>${o.out}</div>`;
+  const buttons = o.locked ? '' : `<div class="row big2"><button id="${o.go}" class="primary big" ${n ? '' : 'disabled'}>${icon('raid', 1.3)} ${n ? `${verb} ${dragons(n)} ${powerTag(sent)}` : verb}</button>${o.out}</div>`;
   // With 2 or more to choose from, a tick on the prompt's line, in the column of
   // the dragons' own, chooses them all in one tap (or, all chosen, none).
-  const all = n > 0 && n === me.raidReady.length;
-  const ask = '<h3 class="ask">Choose dragons to send</h3>';
-  const head = me.raidReady.length > 1 ? `<div class="askrow">${ask}<button id="${attr}all" class="allpick${all ? ' on' : ''}">Choose all<i class="tick"></i></button></div>` : ask;
+  const all = n > 0 && n === ids.length;
+  const ask = `<h3 class="ask">${o.ask ?? 'Choose dragons to send'}</h3>`;
+  const head = ids.length > 1 && !o.locked ? `<div class="askrow">${ask}<button id="${attr}all" class="allpick${all ? ' on' : ''}">Choose all<i class="tick"></i></button></div>` : ask;
   return `${head}${list}${note}${buttons}`;
 }
 
@@ -1200,19 +1208,17 @@ function raidView(g: PublicState, me: Me): string {
     // Who else is going, and with what: the more dragons fight, the fewer hits each takes.
     const others = g.players.flatMap((_, p) => (p !== me.seat && raid.sent[p].length
       ? [`<div class="ally">${playerTag(p, names)} ${raid.sent[p].map((id) => dragonBadge(dragon(id), 34)).join('')} ${powerTag(sum(raid.sent[p]))}</div>`] : [])).join('');
-    // Under the kingdom, the dragons in the raid: yours first, under "You", then each other player's.
+    // Under the kingdom, the other players' dragons in the raid, then yours to choose from.
     const sentHead = `<h3 class="ask">In the raid</h3>`;
     if (!mine.length) return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}`;
-    const sent = mine.map((id) => myDragon(dragon(id), g)).join('');
-    const chose = me.myChoice;
-    // Alone, the loot is all yours if you fight, so Fight shows it; shared, how much is yours depends on who's knocked out.
-    const loot = others ? '' : `<small>${resChips(raid.target!.loot, 1.1)}</small>`;
-    const split = others ? '<p class="hint">Fought or held back, every dragon not knocked out splits the loot by power.</p>' : '';
-    return `${targetPanel(raid.target!, lead)}${sentHead}
-      <div class="sent"><b class="sentwho">You</b>${sent}${mine.length > 1 ? powerTag(sum(mine), '', 'Total power') : ''}</div>
-      ${others ? `<div class="allies">${others}</div>` : ''}${split}
-      <div class="row big2"><button id="fight" class="primary big${chose === 'fight' ? ' on' : ''}" ${chose ? 'disabled' : ''}>${icon('raid', 1.3)} Fight${loot}</button>
-      <button id="hold" class="big${chose === 'hold' ? ' on' : ''}" ${chose ? 'disabled' : ''}>Hold back</button></div>`;
+    // Which of yours fight, ticked: all of them until you untick some, then
+    // Fight with the ticked ones or Hold back all. Once chosen, your pick stays on screen.
+    const chose = me.myFight;
+    const chosen = new Set(chose ?? fightDraft ?? mine);
+    const note = `Every dragon of yours in the raid not knocked out, fought or held back, shares the loot by power${others ? ' with the others' : ''}. Held back, a dragon takes no hits.`;
+    const hold = `<button id="hold" class="big${chose && !chose.length ? ' on' : ''}">Hold back</button>`;
+    const picked = sendPicker(g, me, chosen, 'fighter', { go: 'fight', out: hold, ids: mine, ask: chose ? (chose.length ? 'You fight with' : 'You hold back') : 'Choose dragons to fight', verb: 'Fight with', note: chose ? undefined : note, locked: !!chose });
+    return `${targetPanel(raid.target!, lead)}${others ? `${sentHead}<div class="allies">${others}</div>` : ''}${picked}`;
   }
   return '';
 }
@@ -1684,7 +1690,20 @@ function wire(g: PublicState, me: Me) {
   });
   // raid
   bind('[data-vote]', (el) => send(`vote ${el.dataset.vote}`));
-  on('fight', () => send('fight'));
+  bind('[data-fighter]', (el) => {
+    const cur = new Set(fightDraft ?? g.raid!.sent[me.seat]);
+    const id = el.dataset.fighter!;
+    if (cur.has(id)) cur.delete(id);
+    else cur.add(id);
+    fightDraft = [...cur];
+    render();
+  });
+  on('fighterall', () => {
+    const mine = g.raid!.sent[me.seat];
+    fightDraft = (fightDraft ?? mine).length === mine.length ? [] : [...mine];
+    render();
+  });
+  on('fight', () => send(`fight ${(fightDraft ?? g.raid!.sent[me.seat]).join(' ')}`));
   on('hold', () => send('hold'));
   on('discard', () => send(`discard ${[...selected].join(' ')}`));
   on('newgame', () => {

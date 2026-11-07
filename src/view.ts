@@ -103,8 +103,11 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   }
   out.push(`Raid: ${targetText(raid.target!)}`);
   out.push(`In the raid (every raid-ready dragon): ${raid.sent.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${sentPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-  out.push(`Fight or hold back, in secret: ${raid.sent.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
-  if (you?.myChoice) out.push(`  You ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
+  out.push(`Which dragons fight, in secret: ${raid.sent.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
+  if (you?.myFight) {
+    const held = raid.sent[you.seat].filter((id) => !you.myFight!.includes(id));
+    out.push(`  You ${!you.myFight.length ? 'hold back' : held.length ? `fight with ${you.myFight.join(' ')} and hold back ${held.join(' ')}` : 'fight'}.`);
+  }
   return out;
 }
 
@@ -173,7 +176,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   }
   const raid = g.raid;
   if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
-  if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
+  if (raid?.step === 'choose') out.push('fight  |  fight <dragon ids>  |  hold   (secret: all, some or none of your dragons fight; held back, they stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 

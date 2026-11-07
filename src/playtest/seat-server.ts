@@ -90,7 +90,7 @@ const TOOLS = [
   },
   {
     name: 'act',
-    description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "offer anyone give 1 crystal get 1 timber", "accept o40", "clear 2,-1 d3", "end", "vote 2", "fight", "hold", "discard c4". Returns what happened and your next options.',
+    description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "offer anyone give 1 crystal get 1 timber", "accept o40", "clear 2,-1 d3", "end", "vote 2", "fight", "fight d3 d5", "hold", "discard c4". Returns what happened and your next options.',
     inputSchema: { type: 'object', properties: { command: { type: 'string' }, why: WHY }, required: ['command', 'why'] },
     run: (a: { command: string; why?: string }) => act(String(a.command ?? ''), a.why),
   },

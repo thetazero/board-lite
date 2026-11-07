@@ -53,7 +53,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **beast**, **fauna** | animal, monster | One wild creature on a hex is a beast; all of them, and the rules about them, are fauna |
 | **kingdom** | target, town | What a raid attacks. "target" only in the vote ("vote for a target") |
 | **falls** / **holds** | is defeated, wins, survives | A kingdom's or a beast's fate after a fight |
-| **hold back** | bail, hide, sit out, stay back | A player in a raid keeping their dragons out of its combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
+| **hold back** | bail, hide, sit out, stay back | A player in a raid keeping some or all of their dragons out of its combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
 | **no one** | nobody | No player |
 | **the merchants** | the bank, the market | Who you trade resources with at a fixed rate (4:1, or a port's 2:1). "Market" is a building, so it isn't this |
 | **keep** | pick, choose (a card) | Keeping 1 of the 2 building cards drawn |

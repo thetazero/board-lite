@@ -81,7 +81,9 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
   }
   const raid = g.raid!;
   if (raid.step === 'vote') return [`vote ${1 + Math.floor(next(rng) * raid.candidates.length)}`];
-  return [next(rng) < 0.85 ? 'fight' : 'hold'];
+  // Each dragon fights 85% of the time; the rest hold back.
+  const fight = raid.sent[p].filter(() => next(rng) < 0.85);
+  return [fight.length ? `fight ${fight.join(' ')}` : 'hold'];
 }
 
 function isNeighbour(a: string, b: string): boolean {

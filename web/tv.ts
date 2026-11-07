@@ -610,10 +610,10 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
-  // Who held back in this raid: the ones logged since the vote put everyone in
+  // Who held back in this raid, and which dragons: the ones logged since the vote put everyone in
   // (maybe in an earlier update than the fight's, so from the whole log).
   const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
-  const held = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [x.ev.p] : []));
+  const held = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [{ p: x.ev.p, ds: x.ev.ds }] : []));
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
   // Their dragons: the ones the lock lists (in an old save, the ones they last committed).
   const lock = g.log[lockAt]?.ev as Extract<EventView['ev'], { k: 'locked' }> | undefined;
@@ -622,8 +622,8 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     const old = g.log.slice(0, lockAt + 1).findLast((x) => x.ev?.k === 'commit' && x.ev.p === p)?.ev as Extract<EventView['ev'], { k: 'commit' }> | undefined;
     return old?.ds ?? [];
   };
-  const back = held.map((p) => {
-    const ds = sentBy(p).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
+  const back = held.map(({ p, ds: heldDs }) => {
+    const ds = (heldDs ?? sentBy(p)).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
     return `<div class="heldback" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<small>Holds back</small></div>`;
   }).join('');
   const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;

@@ -94,7 +94,7 @@ export interface RaidView {
   votePower: number[]; // what each player's vote is worth: their raid-ready dragons' combat power, summed (0 for no vote)
   target: TargetView | null; // units carry current health once the fight starts
   sent: string[][]; // each player's dragons in the raid, once the vote ends: all their raid-ready dragons
-  decided: boolean[]; // fight or hold back chosen (not what)
+  decided: boolean[]; // chosen which dragons fight (not which)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
 }
@@ -196,7 +196,7 @@ export interface SeatState {
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
-  myChoice: 'fight' | 'hold' | null;
+  myFight: string[] | null; // the dragons I chose to fight with in this raid ([]: I hold back), once chosen
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
@@ -455,7 +455,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     cantAccept: Object.fromEntries(g.offers.filter((o) => offerFor(o, p)).flatMap((o) => { const why = acceptProblem(g, o, p); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     whyNoVote: raid?.step === 'vote' && !canVote(g, p) ? NO_VOTE : null,
-    myChoice: raid?.choices[p] ?? null,
+    myFight: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
     talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),
   };

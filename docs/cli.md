@@ -64,7 +64,7 @@ Any time in the action phase: `accept o40` / `decline o40` for an offer made to 
 
 Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
 
-Raid phase: `vote 2`; then, if you have a raid-ready dragon (all of them are in the raid), `fight` or `hold` (hold back). The fight then plays out to the end with no further choices.
+Raid phase: `vote 2`; then, if you have a raid-ready dragon (all of them are in the raid), `fight` (all your dragons in it fight), `fight d3 d7` (those fight, the rest hold back) or `hold` (all hold back). The fight then plays out to the end with no further choices.
 
 End of round, if over 7 cards: `discard c4 c9`.
 
