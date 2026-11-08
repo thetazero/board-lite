@@ -81,11 +81,9 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
   }
   const raid = g.raid!;
   if (raid.step === 'vote') return [`vote ${1 + Math.floor(next(rng) * raid.candidates.length)}`];
-  if (raid.step === 'commit') {
-    const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
-    return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
-  }
-  return [next(rng) < 0.85 ? 'fight' : 'hold'];
+  // Each dragon fights 85% of the time; the rest hold back.
+  const fight = raid.sent[p].filter(() => next(rng) < 0.85);
+  return [fight.length ? `fight ${fight.join(' ')}` : 'hold'];
 }
 
 function isNeighbour(a: string, b: string): boolean {
@@ -155,7 +153,6 @@ export function standInCommands(g: Game, p: number): string[] {
   if (g.phase === 'discard') return [`discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`];
   const raid = g.raid!;
   if (raid.step === 'vote') return ['vote 1'];
-  if (raid.step === 'commit') return raid.commits[p].length ? ['commit none'] : ['ready'];
   return ['hold'];
 }
 

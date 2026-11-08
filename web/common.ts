@@ -378,9 +378,16 @@ export function dragonBadge(d: DragonView, size = 30): string {
 // staying home. `all` numbers same-named dragons.
 export function dragonChip(d: DragonView, all: DragonView[], round: number): string {
   const state = dragonState(d, round);
+  const hunger = hungerTags(d);
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
-  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
+  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}${hunger ? `<span class="hunger">${hunger}</span>` : ''}</div></div>`;
+}
+
+// "Hungry" (#362): it went hungry at this round's production, so it didn't
+// heal or grow. Anyone can see that. No forecast of the next production.
+export function hungerTags(d: DragonView): string {
+  return d.hungry ? '<em class="st-hungry" title="It went hungry this round, so it didn\'t heal or grow.">Hungry</em>' : '';
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
