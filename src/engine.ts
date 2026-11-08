@@ -57,13 +57,12 @@ export interface Offer {
 }
 
 export interface Raid {
-  step: 'vote' | 'commit' | 'choose';
+  step: 'vote' | 'choose';
   candidates: string[];
   votes: (number | null)[];
   target: string | null;
-  commits: string[][];
-  ready: boolean[];
-  choices: ('fight' | 'hold' | null)[]; // hold: held back, out of the combat but still in for loot
+  sent: string[][]; // each player's dragons in the raid: all their raid-ready dragons when the vote ends
+  choices: (string[] | null)[]; // the dragons each player fights with, once chosen; the rest of theirs hold back, out of the combat but still in for loot
   units: { key: string; hp: number }[];
   fighters: string[];
 }
@@ -126,16 +125,16 @@ export type GameEvent =
   | { k: 'voted'; p: number; t: string }
   | { k: 'votes'; votes: (number | null)[] }
   | { k: 'target'; t: string; name: string; votes: number[]; coin: boolean }
-  | { k: 'commit'; p: number; ds: string[]; ready?: boolean }
-  | { k: 'locked'; ps: number[] }
-  | { k: 'hold'; p: number } // holds back
+  | { k: 'commit'; p: number; ds: string[]; ready?: boolean } // old saves only: the commit step is gone
+  | { k: 'locked'; ps: number[]; sent?: string[][] } // who is in the raid, and each player's dragons (lined up with ps; absent in old saves)
+  | { k: 'hold'; p: number; ds?: string[] } // holds back these dragons (absent in old saves: all of theirs)
   // `hps`: each of `ds`'s health as the fight starts, lined up with `ds`, so a
   // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
   // `first`: who won the coin flip and strikes first each combat round (absent in old saves: the dragons).
   | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[]; first?: Side } // el: each defender's element (absent in old saves)
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
-  | { k: 'noRaid'; why: 'unable' | 'nobody' | 'held' } // unable: no dragon was raid-ready; held: everyone held back
+  | { k: 'noRaid'; why: 'unable' | 'nobody' | 'held' } // unable: no dragon was raid-ready; held: everyone held back; nobody: old saves (no one committed)
   | { k: 'again' }
   | { k: 'begin'; players: number }
   | { k: 'final'; totals: number[]; winner: number }
@@ -699,8 +698,7 @@ function startRaid(g: Game) {
     candidates: Object.keys(TARGETS),
     votes: Array(n).fill(null),
     target: null,
-    commits: Array.from({ length: n }, () => []),
-    ready: Array(n).fill(false),
+    sent: Array.from({ length: n }, () => []),
     choices: Array(n).fill(null),
     units: [],
     fighters: [],
@@ -803,19 +801,10 @@ function resolveVote(g: Game) {
   const target: GameEvent = { k: 'target', t: raid.target, name: TARGETS[raid.target].name, votes: counts, coin: tied.length > 1 };
   log(g, `Votes: ${raid.votes.flatMap((v, p) => (v === null ? [] : [`${pname(p)} (power ${votePower(g, p)})→${TARGETS[raid.candidates[v]].name}`])).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
   log(g, `The raid target is ${TARGETS[raid.target].name}${tied.length > 1 ? ' (tie broken by a coin flip)' : ''}.`, target);
-  raid.step = 'commit';
-  for (let p = 0; p < g.players.length; p++) raid.ready[p] = eligibleDragons(g, p).length === 0;
-  if (raid.ready.every(Boolean)) resolveCommit(g);
-}
-
-function resolveCommit(g: Game) {
-  const raid = g.raid!;
-  const committed = raid.commits.flatMap((c, p) => (c.length ? [p] : []));
-  if (committed.length === 0) {
-    log(g, 'No one raids.', { k: 'noRaid', why: 'nobody' });
-    return finishRaid(g);
-  }
-  log(g, `Locked in: ${committed.map((p) => `${pname(p)} (${raid.commits[p].join(' ')})`).join(', ')}. Each chooses in secret: fight or hold back.`, { k: 'locked', ps: committed });
+  // Every raid-ready dragon is in the raid: the ones whose power counted in the vote.
+  raid.sent = g.players.map((_, p) => eligibleDragons(g, p).map((d) => d.id));
+  const ins = raid.sent.flatMap((c, p) => (c.length ? [p] : []));
+  log(g, `In the raid: ${ins.map((p) => `${pname(p)} (${raid.sent[p].join(' ')})`).join(', ')}. Each chooses in secret which dragons fight; the rest hold back.`, { k: 'locked', ps: ins, sent: ins.map((p) => [...raid.sent[p]]) });
   raid.step = 'choose';
 }
 
@@ -823,14 +812,19 @@ function resolveChoices(g: Game) {
   const raid = g.raid!;
   const fighters: number[] = [];
   for (let p = 0; p < g.players.length; p++) {
-    if (raid.choices[p] === 'fight') fighters.push(p);
-    if (raid.choices[p] === 'hold') log(g, `${pname(p)} holds back.`, { k: 'hold', p });
+    const fight = raid.choices[p];
+    if (!fight) continue;
+    if (fight.length) fighters.push(p);
+    const held = raid.sent[p].filter((id) => !fight.includes(id));
+    if (!held.length) continue;
+    if (!fight.length) log(g, `${pname(p)} holds back.`, { k: 'hold', p, ds: held });
+    else log(g, `${pname(p)} holds back ${held.join(' ')}.`, { k: 'hold', p, ds: held });
   }
   if (fighters.length === 0) {
     log(g, 'Everyone holds back. The raid is off.', { k: 'noRaid', why: 'held' });
     return finishRaid(g);
   }
-  raid.fighters = fighters.flatMap((p) => raid.commits[p]);
+  raid.fighters = fighters.flatMap((p) => raid.choices[p]!);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
   const first = coinFlip(g);
   log(g, `${andList(fighters.map(pname))} ${fighters.length === 1 ? 'attacks' : 'attack'} ${TARGETS[raid.target!].name}. ${firstText(first, 'the defenders')}`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })), first });
@@ -993,7 +987,7 @@ function checkRaidOver(g: Game): boolean {
   if (raid.units.every((u) => u.hp <= 0)) {
     // Loot is split by the combat power each player has in the raid not
     // knocked out: the dragons still fighting and the ones held back.
-    const standing = raid.commits.flat().map((id) => dragonById(g, id)).filter((d) => healthOf(d) > 0);
+    const standing = raid.sent.flat().map((id) => dragonById(g, id)).filter((d) => healthOf(d) > 0);
     const power = g.players.map((_, p) => standing.reduce((s, d) => s + (d.owner === p ? dragonPower(d) : 0), 0));
     const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
     const loot = lootOf(g, raid.target!);
@@ -1547,32 +1541,20 @@ function raidCommand(g: Game, p: number, verb: string, args: string[]) {
     if (raid.votes.every((v, q) => v !== null || !canVote(g, q))) resolveVote(g);
     return;
   }
-  if (raid.step === 'commit') {
-    if (raid.ready[p]) fail(`You're already locked in.`);
-    if (verb === 'commit') {
-      const ids = args.filter((a) => a !== 'none');
-      for (const id of ids) {
-        const d = ownDragon(g, p, id);
-        if (!canRaid(d)) fail(`${id} isn't raid-ready (hatched, not knocked out, not perched).`);
-      }
-      raid.commits[p] = [...new Set(ids)];
-      return log(g, `${pname(p)} sends ${ids.length ? ids.join(' ') : 'no dragons'}.`, { k: 'commit', p, ds: raid.commits[p] });
-    }
-    if (verb === 'ready') {
-      raid.ready[p] = true;
-      log(g, `${pname(p)} is ready, sending ${raid.commits[p].join(' ') || 'no dragons'}.`, { k: 'commit', p, ds: raid.commits[p], ready: true });
-      if (raid.ready.every(Boolean)) resolveCommit(g);
-      return;
-    }
-    return fail(`Send dragons with "commit d1 d4" (or "commit none"), then "ready".`);
-  }
   if (raid.step === 'choose') {
-    if (!raid.commits[p].length) fail(`You aren't in this raid.`);
+    if (!raid.sent[p].length) fail(`You aren't in this raid: you had no raid-ready dragon when the vote ended.`);
     if (raid.choices[p]) fail(`You already chose.`);
-    if (verb !== 'fight' && verb !== 'hold') fail(`Choose "fight" or "hold".`);
-    raid.choices[p] = verb as 'fight' | 'hold';
-    log(g, `You choose to ${verb === 'hold' ? 'hold back' : 'fight'}.`, { k: 'mine' }, { to: [p] });
-    if (raid.commits.every((c, q) => !c.length || raid.choices[q])) resolveChoices(g);
+    const mine = raid.sent[p];
+    const usage = `Choose the dragons that fight: "fight" (all of them), "fight ${mine.join(' ')}" (some), or "hold" (none).`;
+    if (verb !== 'fight' && verb !== 'hold') fail(usage);
+    if (verb === 'hold' && args.length) fail(usage);
+    const ids = [...new Set(args)];
+    for (const id of ids) if (!mine.includes(id)) fail(`${id} isn't one of your dragons in this raid (${mine.join(' ')}).`);
+    const fight = verb === 'hold' ? [] : ids.length ? mine.filter((id) => ids.includes(id)) : [...mine];
+    raid.choices[p] = fight;
+    const held = mine.filter((id) => !fight.includes(id));
+    log(g, !fight.length ? 'You hold back.' : held.length ? `You fight with ${fight.join(' ')} and hold back ${held.join(' ')}.` : 'You fight.', { k: 'mine' }, { to: [p] });
+    if (raid.sent.every((c, q) => !c.length || raid.choices[q])) resolveChoices(g);
   }
 }
 
@@ -1653,6 +1635,5 @@ export function waitingOn(g: Game): number[] {
   if (g.phase === 'cards') return all.filter((p) => g.players[p].choice.length);
   const raid = g.raid!;
   if (raid.step === 'vote') return all.filter((p) => raid.votes[p] === null && canVote(g, p));
-  if (raid.step === 'commit') return all.filter((p) => !raid.ready[p]);
-  return all.filter((p) => raid.commits[p].length && !raid.choices[p]);
+  return all.filter((p) => raid.sent[p].length && !raid.choices[p]);
 }
