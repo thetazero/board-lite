@@ -6,9 +6,9 @@
 // (phone.ts): the flat map, laid out for a phone, and it tells the phone when
 // a cutscene (a banner) starts and ends, so the phone can cut to it.
 
-import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
+import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -34,6 +34,7 @@ let snap: Snapshot | null = null;
 let names: string[] = [];
 let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
 let seenLog = -1; // highest log index already animated
+let savedGames: SavedGame[] = []; // the server's saved games, offered in a new room's lobby
 // The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
 let board3d: Board3D | null | undefined;
 let Board3DClass: typeof Board3D | null = null; // loaded only on a real TV: three.js is the heaviest thing on the page
@@ -93,6 +94,7 @@ async function boot() {
     history.replaceState(null, '', `/tv?room=${code}`);
   }
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
+  savedGames = await fetch('/api/saved').then((r) => r.json()).catch(() => []);
   // A room the server no longer has (forgotten after hours idle): open a new one.
   // As a TV: while it watches, the table plays with a TV.
   watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), true);
@@ -103,8 +105,10 @@ function onSnapshot(s: Snapshot) {
   if (snap?.game && s.game) seatNews(snap, s);
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
-  // Before the game, and while a saved game hosted again takes its seats, the TV shows the lobby.
-  if (!s.game || s.lobby.seating) {
+  document.body.classList.toggle('playing', isHost && !!s.game && !s.lobby.seating && !s.lobby.saved && s.game.phase !== 'over');
+  // Before the game, while a game file hosted again takes its seats, and
+  // while the game is saved, the TV shows the lobby.
+  if (!s.game || s.lobby.seating || s.lobby.saved) {
     clearOverlay();
     if (remote) return void (app.innerHTML = '');
     if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
@@ -165,11 +169,14 @@ setInterval(() => {
   el.textContent = TIPS[tip];
 }, TIP_MS);
 
-// The lobby: who's at the table, and how to join. A saved game hosted again
+// The lobby: who's at the table, and how to join. A game file hosted again
 // comes back here until every seat is taken: its seats are the game's, the
-// open ones waiting in their player's colour.
+// open ones waiting in their player's colour. A saved game waits here too,
+// with Continue in place of Start game, until someone continues it. A new
+// room offers the server's saved games.
 function renderLobby() {
   const l = snap!.lobby;
+  if (l.saved) return renderSaved();
   const seated = l.seats.map((_, i) => PLAYER_COLORS[i]);
   const open = l.seats.filter((s) => s.kind === 'open').length;
   // Each seat a place card with its tower; empty places wait, dashed, up to a full table.
@@ -187,21 +194,9 @@ function renderLobby() {
     : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
   app.innerHTML = `
     <div class="lobby">
-      <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}
-        <div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p></div>
-      </div>
+      <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}${nameplate()}</div>
       <div class="lobby-main">
-        <div class="join-box">
-          ${qrSvg(`http://${joinUrl()}`, 'the room\'s address')}
-          <div class="join-text">
-            <div class="step">${l.seating ? 'Take your seat on your phone' : 'Join on your phone'}</div>
-            <div class="how">Point its camera at the code, or open</div>
-            <div class="url">${esc(joinUrl())}</div>
-            ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
-            <div class="step">Room code</div>
-            <div class="code">${[...l.code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
-          </div>
-        </div>
+        ${joinBox(l.seating ? 'Take your seat on your phone' : 'Join on your phone')}
         <div class="table">
           ${l.seating ? `<h2 class="seating">${open} open seat${open > 1 ? 's' : ''}</h2>` : ''}
           <ul class="seatcards">${seats}</ul>
@@ -212,12 +207,62 @@ function renderLobby() {
           ${hint ? `<p class="hint">${hint}</p>` : ''}
         </div>
       </div>
-      <p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>
+      ${(isHost && !snap!.game && savedList()) || `<p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>`}
     </div>`;
   if (!isHost) return;
+  app.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => location.assign(`/tv?room=${b.dataset.open}`)));
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
   if (!l.seating) $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
   app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, seat: Number(b.dataset.remove) }).catch(toast)));
+}
+
+const nameplate = () => `<div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p></div>`;
+
+// How to join: the room's QR code, address and code.
+function joinBox(step: string): string {
+  return `<div class="join-box">
+          ${qrSvg(`http://${joinUrl()}`, 'the room\'s address')}
+          <div class="join-text">
+            <div class="step">${step}</div>
+            <div class="how">Point its camera at the code, or open</div>
+            <div class="url">${esc(joinUrl())}</div>
+            ${tailscaleUrl() ? `<div class="alt">or over Tailscale <b>${esc(tailscaleUrl()!)}</b></div>` : ''}
+            <div class="step">Room code</div>
+            <div class="code">${[...snap!.lobby.code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+          </div>
+        </div>`;
+}
+
+// The saved games a new room's TV can open instead (the newest few), along
+// the bottom in the tip's place: each opens on its own lobby, where the table
+// takes its seats and continues it.
+function savedList(): string {
+  const games = savedGames.filter((s) => s.code !== code).slice(0, 3);
+  if (!games.length) return '';
+  return `<div class="savedgames"><h3>Saved games</h3><ul>${games.map((s) => `<li><span class="who"><b>${esc(s.names.join(', '))}</b><small>Round ${s.round}, saved ${esc(savedWhen(s.savedAt))}</small></span><button data-open="${esc(s.code)}">Open</button></li>`).join('')}</ul></div>`;
+}
+
+// A saved game: who sat where, the join code for their phones, and Continue.
+function renderSaved() {
+  const l = snap!.lobby;
+  const g = snap!.game!;
+  const seats = l.seats.map((s, i) => `<li class="seatcard" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}
+      <span class="pname">${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}</li>`).join('');
+  app.innerHTML = `
+    <div class="lobby saved">
+      <div class="hero">${tableScene(l.seats.map((_, i) => PLAYER_COLORS[i]), 480, 124, 0.4, 1)}${nameplate()}</div>
+      <div class="lobby-main">
+        ${joinBox('Take your seat on your phone')}
+        <div class="table">
+          <h2 class="seating">Game saved</h2>
+          <ul class="seatcards">${seats}</ul>
+          ${isHost ? '<div class="lobby-actions"><button id="continue" class="primary">Continue</button></div>' : ''}
+          <p class="hint">Round ${g.round}, saved ${esc(savedWhen(l.saved!))}. ${isHost ? 'Continue' : 'Continue on a phone'} when everyone is back.</p>
+        </div>
+      </div>
+      <p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>
+    </div>`;
+  if (isHost) $('continue').onclick = () => post(`/api/rooms/${code}/continue`, { token: hostToken }).catch(toast);
 }
 
 // ---------- the board ----------
@@ -1162,7 +1207,7 @@ function fullscreenButton() {
   b.className = 'ghost';
   b.textContent = 'Full screen';
   b.onclick = () => void document.documentElement.requestFullscreen().catch(toast);
-  document.body.append(b);
+  corner().append(b);
   // (F11 fills the screen without the page knowing: the button stays, and
   // pressing it changes nothing a player sees.)
   document.addEventListener('fullscreenchange', () => document.body.classList.toggle('fullscreen', !!document.fullscreenElement));
@@ -1174,5 +1219,30 @@ function fullscreenButton() {
   });
 }
 
+// The top corner's buttons (Full screen, Save game), side by side.
+function corner(): HTMLElement {
+  let c = document.getElementById('tvbtns');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'tvbtns';
+    document.body.append(c);
+  }
+  return c;
+}
+
+// Save game, for leaving partway through: in a game, beside Full screen while
+// the mouse moves (only on the TV with the room's buttons). The game stops for
+// everyone and waits in the lobby until someone continues it, here or on a phone.
+function saveButton() {
+  if (remote) return;
+  const b = document.createElement('button');
+  b.id = 'savegame';
+  b.className = 'ghost';
+  b.textContent = 'Save game';
+  b.onclick = () => void post(`/api/rooms/${code}/save`, { token: hostToken }).catch(toast);
+  corner().prepend(b);
+}
+
 fullscreenButton();
+saveButton();
 boot().catch(toast);

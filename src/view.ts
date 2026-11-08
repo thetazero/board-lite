@@ -210,6 +210,8 @@ function tableText(s: Snapshot, you = -1): string {
   return s.lobby.seats.map((t, i) => `${P(i)} ${t.name}${i === you ? ' (you)' : t.kind === 'bot' ? ' (bot)' : t.kind === 'open' ? ' (open seat)' : ''}`).join(', ');
 }
 
+const SAVED = 'The game is saved: someone at the table continues it on the TV or a phone.';
+
 /** The public summary: the table, the phase, who the game waits on, the public scores. */
 export function statusText(s: Snapshot): string {
   const names = tableText(s);
@@ -217,6 +219,7 @@ export function statusText(s: Snapshot): string {
   if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'no one yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
   const out = [`Room ${s.lobby.code}: ${names}.`, phaseText(g)];
   if (s.lobby.seating) out.push('The game goes on once every seat is taken.');
+  else if (s.lobby.saved) out.push(SAVED);
   else if (g.waitingOn.length) out.push(`Waiting for ${waitingText(g)}.`);
   g.players.forEach((pl, q) => out.push(`${P(q)}: ${pl.publicPoints} public points, ${pl.handSize} cards in hand`));
   return out.join('\n');
@@ -233,7 +236,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`Table: ${tableText(s, p)}.`);
   out.push(`You are ${P(p)}. ${phaseText(g)}`);
   const hints = commandHints(g, you);
-  out.push(s.lobby.seating ? 'The game goes on once every seat is taken.' : hints.length ? '>>> Your decision.' : `Waiting for ${waitingText(g)}.`);
+  out.push(s.lobby.seating ? 'The game goes on once every seat is taken.' : s.lobby.saved ? SAVED : hints.length ? '>>> Your decision.' : `Waiting for ${waitingText(g)}.`);
   out.push('');
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {

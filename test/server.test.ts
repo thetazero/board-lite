@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,7 +8,7 @@ import { after, test } from 'node:test';
 import { promisify } from 'node:util';
 import { candidateCommands, endingTarget, playToEnd } from '../src/bot.ts';
 import { apply, newGame, waitingOn } from '../src/engine.ts';
-import { Room, RoomError } from '../src/server/room.ts';
+import { Room, RoomError, addClaudeRunner, claudeRunners } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
 import type { Rulebook, Snapshot } from '../src/state.ts';
@@ -649,5 +649,72 @@ test("the phone's rulebook holds every building, card, beast and kingdom", async
     assert.deepEqual(book.kingdoms.map((k) => k.key), Object.keys(TARGETS));
   } finally {
     server.close();
+  }
+});
+
+test('saving a game: it stops for everyone, survives a restart however old, and anyone at the table continues it', async () => {
+  const roomsDir = mkdtempSync(join(dir, 'saved-'));
+  const serve = async () => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 20 }, [], '127.0.0.1', true);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    const post = async (path: string, body: object) => {
+      const r = await fetch(base + path, { method: 'POST', body: JSON.stringify(body) });
+      const v = (await r.json()) as Record<string, string>;
+      if (!r.ok) throw new Error(v.error);
+      return v;
+    };
+    return { ...s, base, stop, post };
+  };
+  const first = await serve();
+  const made = await first.post('/api/rooms', {});
+  const ada = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Ada' })).token;
+  const bram = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Bram' })).token;
+  await first.post(`/api/rooms/${made.code}/bot`, { token: made.hostToken });
+  await assert.rejects(first.post(`/api/rooms/${made.code}/save`, { token: ada }), /isn't under way/);
+  await first.post(`/api/rooms/${made.code}/start`, { token: ada });
+  const room = first.rooms.get(made.code)!;
+  // The bot's opening keep happens; then Ada saves.
+  for (const p of [0, 1]) room.command([ada, bram][p], `keep ${room.game!.players[p].choice[0].id}`);
+  await sleep(100);
+  await assert.rejects(first.post(`/api/rooms/${made.code}/save`, { token: 'nobody' }), /not in this game/);
+  await first.post(`/api/rooms/${made.code}/save`, { token: ada });
+  assert.ok(room.snapshot(bram).lobby.saved, 'every phone hears it');
+  assert.throws(() => room.command(ada, 'end'), /saved: continue it first/);
+  const log = room.game!.log.length;
+  const waited = await room.wait(ada, 100);
+  assert.equal(waited.code, 2, "a CLI or Claude player's wait doesn't wake on a saved game");
+  assert.equal(room.game!.log.length, log, 'and no bot moves');
+  const listed = (await (await fetch(`${first.base}/api/saved`)).json()) as { code: string; round: number; names: string[] }[];
+  assert.deepEqual(listed.map((s) => [s.code, s.round, s.names]), [[made.code, 1, ['Ada', 'Bram', 'Tick']]]);
+  const file = room.file;
+  first.stop();
+
+  // Long after the rooms' 6 hours, the server restarts: the saved game is still there.
+  const long = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  for (const f of [file, file.replace(/\.json$/, '.seats.json')]) utimesSync(f, long, long);
+  // A Claude runner listed itself beside the game: continuing brings it back.
+  addClaudeRunner(file, '/somewhere/claude-run');
+  const again = await serve();
+  try {
+    const back = again.rooms.get(made.code)!;
+    assert.ok(back, 'hosted again after the restart');
+    assert.ok(back.savedAt, 'still saved');
+    const continued: string[] = [];
+    again.server.on('continue', (r: Room) => continued.push(...claudeRunners(r.file)));
+    await again.post(`/api/rooms/${made.code}/continue`, { token: bram });
+    assert.deepEqual(continued, ['/somewhere/claude-run']);
+    assert.equal(back.lobby().saved, null);
+    await again.post(`/api/rooms/${made.code}/continue`, { token: bram }); // a second tap does nothing
+    assert.equal(continued.length, 1);
+    back.command(ada, 'end');
+    assert.deepEqual((await (await fetch(`${again.base}/api/saved`)).json()), []);
+  } finally {
+    again.stop();
   }
 });

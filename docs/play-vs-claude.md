@@ -27,6 +27,12 @@ Claude players start the moment the game does. Each is a `claude -p` process of 
 
 Other `run.ts` options work here too: `--budget-usd` (default $5 per Claude player for the whole game), `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
 
+## Saving and continuing
+
+**Save game** on the TV or a phone stops the game for everyone, the Claude players too: their runner sees it and stops (its `runner.log` says so). When someone at the table presses **Continue**, the server starts that runner again with `--resume`, and the Claude players come back to their own seats with their memory of the game. Nobody needs a terminal. See [Saving a game](clients.md#saving-a-game).
+
+This works for a runner on the same machine as the server: when it takes its seats, it lists its `--out` directory beside the game (`~/.cache/board-lite/rooms/<code>.claude.json`), and Continue starts every runner listed there. A runner started again this way writes what it does to `runner.log` as usual, and anything it fails on to `runner.errors.log` in the same directory.
+
 ## If the Claude players stop
 
 If the runner stops before the game ends (Ctrl-C, low memory, a crash, a restart), the game waits on the Claude players' seats. Bring the same players back into their own seats, remembering the game so far:

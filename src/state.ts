@@ -470,12 +470,21 @@ export interface Lobby {
   code: string;
   started: boolean;
   seating: boolean; // a saved game hosted again, waiting in the lobby until every seat is taken
+  saved: number | null; // when someone at the table saved the game (ms epoch): it waits until someone continues it
   // standIn: a bot makes this player's moves (they quit: left, or they're away).
   seats: { name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean }[];
   minPlayers: number;
   maxPlayers: number;
   file: string; // where the server saves the game
   remote: boolean; // no TV: a phone made the room, and each phone shows the table itself
+}
+
+/** A saved game, as the TV's lobby and the phone's join form list it (GET /api/saved). */
+export interface SavedGame {
+  code: string;
+  savedAt: number; // ms epoch
+  round: number;
+  names: string[]; // everyone at the table, in seat order
 }
 
 export interface Snapshot {

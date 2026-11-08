@@ -22,7 +22,7 @@ export interface Shot {
   caption: string;
   client: 'tv' | 'phone';
   seat?: number; // phone: whose phone; none means a phone that hasn't joined
-  path?: string | ((room: Room) => string); // a phone that hasn't joined: the address it opens (default: the room's, /CODE)
+  path?: string | ((room: Room) => string); // a phone that hasn't joined: the address it opens (default: the room's, /CODE); TV: opens this instead of the room (/tv makes a new room)
   remember?: string; // a phone that hasn't joined: the name it remembers from an earlier game
   fill?: { code?: string; name?: string }; // the join form: typed in, then Join tapped
   guest?: boolean; // TV: a second screen opened on the room's address, without the room's host token
@@ -54,6 +54,7 @@ export interface Scene {
   away?: number[]; // seats whose player has gone quiet (shown "(away)")
   resume?: boolean; // a saved game hosted again: every seat open until a phone claims it
   remote?: boolean; // a game with no TV: made from a phone, each phone shows the table
+  saved?: boolean; // someone at the table saved the game, an hour and a half ago
   // Play bot moves until this holds. Only a point every game reaches: a
   // round, a phase, whose turn. What the shots need is staged in `setup`.
   until?: (g: Game) => boolean;
@@ -356,7 +357,7 @@ export const SCENES: Scene[] = [
     setup: canBuild,
     shots: (g) => [
       { file: 'tv-early-3p', caption: 'TV, early game (3 players, round 2)', client: 'tv', sizes: true },
-      { file: 'tv-pointing-3p', caption: 'TV, in a game: the mouse moves, and Full screen shows in the corner', client: 'tv', run: "dispatchEvent(new PointerEvent('pointermove'))", waitFor: 'body.pointing #fullscreen', hold: true },
+      { file: 'tv-pointing-3p', caption: 'TV, in a game: the mouse moves, and Full screen and Save game show in the corner', client: 'tv', run: "dispatchEvent(new PointerEvent('pointermove'))", waitFor: 'body.pointing #fullscreen', hold: true },
       { file: 'phone-card-open-3p', caption: 'Phone: a building card tapped open', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)'], sizes: true },
       { file: 'phone-build-pick-3p', caption: 'Phone: choosing where to build', client: 'phone', seat: g!.turn, clicks: ['.card.k-building[data-card]:not(.dim)', '[data-pickhex]'], sizes: true },
       { file: 'phone-build-3p', caption: 'Phone: basic buildings and the egg project', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'], sizes: true },
@@ -1130,6 +1131,24 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'saved-4p',
+    players: 4,
+    seed: 1,
+    bots: [3],
+    names: ['Ada', 'Bram', 'Rowan', 'Quinn'],
+    away: [2],
+    saved: true,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    shots: () => [
+      { file: 'tv-saved-4p', caption: 'TV: a saved game, waiting for the table to come back and continue it', client: 'tv' },
+      { file: 'phone-saved-4p', caption: 'Phone: a saved game, with Continue', client: 'phone', seat: 0 },
+      { file: 'phone-join-saved', caption: 'Phone: the join form offers the saved games', client: 'phone', path: '/', waitFor: '.savedgames' },
+      { file: 'phone-seats-saved', caption: "Phone: a saved game's address: tap your name to take your seat back", client: 'phone', waitFor: '.seats' },
+      { file: 'tv-lobby-saved-games', caption: "TV: a new room's lobby offers the saved games", client: 'tv', path: '/tv', waitFor: '.savedgames' },
+      { file: 'tv-saved-continue-4p', caption: 'TV: Continue pressed: the game goes on where it was', client: 'tv', clicks: ['#continue'], waitFor: '.board' },
+    ],
+  },
+  {
     name: 'resume-3p',
     players: 3,
     seed: 1,
@@ -1719,7 +1738,7 @@ export const SCENES: Scene[] = [
     shots: () => [
       { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
-      { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
+      { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Save game and Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
       { file: 'phone-wheel-3p', caption: 'Phone: the rulebook at its elements tab: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], waitFor: '.bookpage .wheel', sizes: true },
       ...(['board', 'buildings', 'beasts', 'dragons', 'kingdoms', 'cards'] as const).map((t): Shot => ({
         file: `phone-rules-${t}-3p`, caption: `Phone: the rulebook, from Rules in the header, at its ${t} tab`, client: 'phone', seat: 2,
