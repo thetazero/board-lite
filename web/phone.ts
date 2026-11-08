@@ -5,9 +5,9 @@
 // plays. In a game with no TV (remote mode: the room was made on a phone) that's
 // from the start; in a game with a TV, once the player first opens the table.
 
-import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
+import type { CardView, DragonStageView, DragonView, PublicState, SavedGame, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, savedWhen, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
@@ -50,7 +50,7 @@ let bank = { give: 'stone', get: 'timber', times: 1 };
 // command still waiting (the same button twice) is a double tap, and is dropped.
 const outbox: string[] = [];
 let sending = false;
-let menu = false; // the menu under your name (Quit game) is open
+let menu = false; // the menu under your name (Save game, Quit game) is open
 let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
@@ -106,6 +106,8 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
   const room = /^[A-Za-z]{4}$/.test(c) ? await roomInfo(c.toUpperCase()) : null;
   if (room?.lobby.started) return renderSeats(room.lobby, err, name, news);
   const known = !!room; // the room is there: no code to type
+  // With no room yet, the server's saved games are offered too: each opens on its seats.
+  const saved: SavedGame[] = known ? [] : await fetch('/api/saved').then((r) => (r.ok ? r.json() : [])).catch(() => []);
   app.innerHTML = `
     <div class="joinpage">
       <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
@@ -118,6 +120,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         <button class="primary big" type="submit">Join</button>
         <p class="error">${esc(err)}</p>
         ${known ? '' : '<div class="hostline"><p>No TV: start a game on this phone, and the others join from it.</p><button id="host" type="button">New game</button></div>'}
+        ${saved.length ? `<div class="hostline savedgames"><p>Saved games</p><ul>${saved.slice(0, 5).map((g) => `<li><a class="button" href="/${esc(g.code)}"><b>${esc(g.names.join(', '))}</b><small>Round ${g.round}, saved ${esc(savedWhen(g.savedAt))}</small></a></li>`).join('')}</ul></div>` : ''}
       </form>
     </div>`;
   wireJoin();
@@ -172,7 +175,7 @@ function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '')
       <div class="hero">${tableScene(l.seats.map((_, i) => PLAYER_COLORS[i]), 360, 200)}<h1 class="title">board-lite</h1></div>
       <div class="joinform seats">
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
-        <p class="roomline">Room <b>${esc(l.code)}</b>: the game has started.</p>
+        <p class="roomline">Room <b>${esc(l.code)}</b>: the game ${l.saved ? 'is saved' : 'has started'}.</p>
         ${free.length ? `<p>Tap your name to take your seat back.</p><div class="seatlist">${seats}</div>` : open ? '' : '<p>Every seat is taken.</p>'}
         ${open ? `<form id="join" class="joinform inner"><p>${free.length ? 'Or take' : 'Take'} an open seat:</p><input id="code" type="hidden" value="${esc(l.code)}">
           <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
@@ -213,6 +216,7 @@ function onSnapshot(s: Snapshot) {
   }
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
+  if (s.lobby.saved) return renderSaved();
   table.show(code, s.lobby.remote);
   table.hold(s.lobby.remote && s.scene > 0);
   noteOffers(s.game, s.seat);
@@ -363,6 +367,36 @@ function renderLobby() {
     await post(`/api/rooms/${code}/leave`, { token });
     leaveToJoin('');
   });
+}
+
+// A saved game: the table stopped partway through, to continue later. Anyone
+// at it continues it here, on the TV, or on another phone; the Claude players
+// come back by themselves. Leave goes to the join form, where the game is
+// under Saved games.
+function renderSaved() {
+  const l = snap!.lobby;
+  const me = seatIndex();
+  const pc = PLAYER_COLORS[me] ?? '#888';
+  menu = false;
+  bookTab = null;
+  table.hide();
+  talk.el.remove();
+  document.body.classList.remove('has-hand', 'hand-below', 'hand-tucked');
+  const seat = (s: Snapshot['lobby']['seats'][number], i: number) => `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}</li>`;
+  morph(app, screen('saved', `
+    <div class="plobby" style="--pc:${pc}">
+      <div class="hero">${tableScene([pc])}</div>
+      <div class="lobbybody">
+        <h1>Game saved</h1>
+        <p class="muted">Room <b>${esc(l.code)}</b>: round ${snap!.game!.round}, saved ${esc(savedWhen(l.saved!))}</p>
+        <ul class="seatlist">${l.seats.map(seat).join('')}</ul>
+        ${act('Continue', 'id="continue"')}
+        <p class="hint">Continue when everyone is back, here or on the TV.</p>
+        <button id="leave" class="ghost">Leave</button>
+      </div>
+    </div>`));
+  on('continue', () => post(`/api/rooms/${code}/continue`, { token }));
+  on('leave', () => leaveToJoin('The game is saved. To continue it, open it under Saved games and tap your name.'));
 }
 
 // A game with no TV: the others join from this phone's screen, at the address
@@ -621,7 +655,10 @@ function raidStep(g: PublicState): string {
 
 // The menu under your name: quitting is there, out of the way of the game.
 function menuSheet(): string {
-  return `<div class="menuback" id="menuclose"></div><div class="menu"><h3>Quit game</h3>
+  const saving = snap!.game?.phase !== 'over';
+  return `<div class="menuback" id="menuclose"></div><div class="menu">${saving ? `<h3>Save game</h3>
+    <p>The game stops here for everyone, to continue later from the TV or any phone.</p>
+    <div class="row"><button id="save" class="primary">Save game</button></div>` : ''}<h3>Quit game</h3>
     <p>A bot plays your seat for the rest of the game, as little as it can. To come back, open the room's address and tap your name.</p>
     <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
 }
@@ -1755,6 +1792,10 @@ function wire(g: PublicState, me: Me) {
     }
     menu = false;
     leaveToJoin('You quit. A bot plays your seat.');
+  });
+  on('save', async () => {
+    menu = false;
+    await post(`/api/rooms/${code}/save`, { token });
   });
   bind('[data-standin]', (el) => post(`/api/rooms/${code}/standin`, { token, seat: Number(el.dataset.standin) }));
 }

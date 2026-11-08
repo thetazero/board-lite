@@ -8,15 +8,17 @@
 // The TV opens http://<this machine>:<port>/tv, phones open
 // http://<this machine>:<port>/ and type the room code.
 
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { existsSync, openSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { stripTypeScriptTypes } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Room, RoomError, recapsDir, type RoomOptions } from './room.ts';
-import { rulebook } from '../state.ts';
+import { Room, RoomError, claudeRunners, recapsDir, type RoomOptions } from './room.ts';
+import { rulebook, type SavedGame } from '../state.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 // Found the way Node finds any package, so a checkout that shares a parent's
@@ -29,7 +31,7 @@ const THREE_BUILD = (() => {
   }
 })();
 const VENDOR: Record<string, string> = { '/vendor/three/three.module.js': 'three.module.js', '/vendor/three/three.core.js': 'three.core.js' };
-const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours
+const ROOM_IDLE_MS = 6 * 60 * 60 * 1000; // forget rooms untouched for 6 hours (never a saved game)
 const ABANDONED_MS = 10 * 60 * 1000; // and a game every player quit after 10 minutes, if no one is back
 const MAX_BODY = 4096;
 export const PING_MS = 15000; // web/common.ts's STALE_MS allows for a couple missed
@@ -46,7 +48,7 @@ const TYPES: Record<string, string> = {
 // A browser that ignores the pages' icon link still asks for /favicon.ico.
 const PAGES: Record<string, string> = { '/': 'phone.html', '/tv': 'tv.html', '/favicon.ico': 'favicon.svg' };
 
-// `resume`: host again every room saved in the last few hours (a restart), each
+// `resume`: host again every room active in the last few hours, and every saved game (a restart), each
 // under its own code, so the TV and phones reconnect to the same seats.
 export function startServer(port: number, opts: RoomOptions = {}, hostFiles: string[] = [], host = '0.0.0.0', resume = false): { server: Server; rooms: Map<string, Room> } {
   const rooms = new Map<string, Room>();
@@ -73,6 +75,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
   setInterval(() => {
     for (const [code, room] of rooms) {
       const idle = Date.now() - room.lastActive;
+      if (room.savedAt) continue; // kept until someone continues it
       if ((idle > ROOM_IDLE_MS || (room.abandoned && idle > ABANDONED_MS)) && !hostFiles.includes(room.file)) {
         room.close();
         rooms.delete(code);
@@ -131,6 +134,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     // GET /api/rulebook -> every building, card, beast and kingdom, for the phone's rulebook
     if (parts[0] === 'rulebook' && req.method === 'GET') return json(res, 200, rulebook());
     if (parts[0] === 'recaps' && parts.length === 2 && req.method === 'GET') return recap(res, parts[1]);
+    // GET /api/saved -> the saved games, newest first, for the TV's lobby and the join form to offer
+    if (parts[0] === 'saved' && req.method === 'GET') return json(res, 200, savedGames());
     if (parts[0] !== 'rooms') return json(res, 404, { error: 'Not found.' });
     // POST /api/rooms -> a new room, for the TV; {remote: true} from a phone or the CLI, for a game with no TV (yet: a TV can open it any time)
     if (parts.length === 1 && req.method === 'POST') {
@@ -190,12 +195,24 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       case 'start':
         room.start(tok);
         return json(res, 200, {});
+      case 'save': // the TV or a player stops the game here, for everyone, to continue later
+        room.save(tok);
+        return json(res, 200, {});
+      case 'continue':
+        // Whoever runs the server brings back the Claude players who were at the table (see below).
+        if (room.continue(tok)) server.emit('continue', room);
+        return json(res, 200, {});
       case 'do':
         if (host) throw new RoomError('The TV has no seat.');
         room.command(tok, str(b.command));
         return json(res, 200, { state: room.snapshot(tok) });
     }
     return json(res, 404, { error: 'Not found.' });
+  }
+
+  function savedGames(): SavedGame[] {
+    return [...rooms.values()].filter((r) => r.savedAt && r.game).sort((a, b) => b.savedAt! - a.savedAt!)
+      .map((r) => ({ code: r.code, savedAt: r.savedAt!, round: r.game!.round, names: r.seats.map((s) => s.name) }));
   }
 
   async function recap(res: ServerResponse, id: string) {
@@ -263,6 +280,25 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
   return { server, rooms };
 }
 
+// Continuing a saved game brings back the Claude players who were at it:
+// each of their runners (src/playtest/run.ts, listed beside the game file)
+// starts again with --resume, in this room, and its players take their own
+// seats with their memory of the game. It notes what it does in its folder's
+// runner.log as always; anything it fails on goes to runner.errors.log there.
+// Only runners on this machine that listed themselves are started: nothing a
+// phone sends names a folder.
+export function bringBackClaude(room: Room, port: number) {
+  const run = fileURLToPath(new URL('../playtest/run.ts', import.meta.url));
+  for (const dir of claudeRunners(room.file)) {
+    if (!existsSync(dir)) continue;
+    const errors = openSync(join(dir, 'runner.errors.log'), 'a');
+    const child = spawn(process.execPath, [run, '--resume', dir, '--room', `http://127.0.0.1:${port}/${room.code}`], { stdio: ['ignore', 'ignore', errors] });
+    child.on('error', (e) => console.error(`Room ${room.code}: could not bring the Claude players in ${dir} back:`, e));
+    child.unref();
+    console.log(`Room ${room.code} continues: bringing back the Claude players in ${dir}.`);
+  }
+}
+
 // The machine's own network addresses, by interface. Container and VM bridges
 // (docker0, br-..., veth..., virbr...) aren't reachable from a phone, so they're left out.
 function addresses(): { iface: string; address: string }[] {
@@ -308,4 +344,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`  Claude players: node src/playtest/run.ts --room ${url} --models opus,haiku`);
     console.log(`  On a TV, any time: http://localhost:${port}/tv?room=${room.code}`);
   });
+  server.on('continue', (room: Room) => bringBackClaude(room, port));
 }

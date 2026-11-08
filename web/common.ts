@@ -28,6 +28,11 @@ const POST_MS = 15000;
 // or a turn never shows up until a reload.
 const STALE_MS = 40000;
 
+// When a game was saved, as the TV and the phone say it: "Nov 7, 9:40 PM".
+export function savedWhen(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 export async function post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   // A request that never comes back (the server restarted under it, the
   // network dropped it) gives up, rather than holding up every tap after it.

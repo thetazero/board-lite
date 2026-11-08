@@ -396,6 +396,7 @@ function makeRoom(staged: Staged, code: string): Room {
   }
   // Seats count as here unless the scene says they've gone quiet.
   room.seats.forEach((s, i) => (s.seen = scene.away?.includes(i) || s.kind === 'open' ? 0 : Number.MAX_SAFE_INTEGER));
+  if (scene.saved) room.savedAt = FROZEN_NOW - 90 * 60 * 1000;
   room.changed();
   return room;
 }
@@ -477,7 +478,8 @@ async function main() {
     return;
   }
 
-  const { server, rooms } = startServer(0, { recaps: join(CACHE, 'recaps') });
+  // (A room a TV makes here, opening /tv, stays in the shots' own folder.)
+  const { server, rooms } = startServer(0, { dir: join(CACHE, 'rooms'), recaps: join(CACHE, 'recaps') });
   await new Promise<void>((ok) => (server.listening ? ok() : server.on('listening', () => ok())));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const chrome = await launchChrome();
@@ -515,6 +517,9 @@ async function main() {
             let url: string;
             if (shot.table) {
               url = `${base}/tv?room=${code}&remote&n=${n++}`;
+            } else if (shot.client === 'tv' && shot.path) {
+              url = `${base}${typeof shot.path === 'function' ? shot.path(room) : shot.path}?n=${n++}`;
+              tab.info = LAN;
             } else if (shot.client === 'tv') {
               url = `${base}/tv?room=${code}&n=${n++}`;
               if (!shot.guest) storage[`tv:${code}`] = room.hostToken; // the TV that made the room: its buttons work

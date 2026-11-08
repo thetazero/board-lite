@@ -32,12 +32,21 @@ board-lite is running on port 8080.
 
 - **Element wheel:** the ring of colored dots by your points on the phone opens the rulebook at **Elements**: which element beats which.
 - **Rules:** **Rules** at the top of the phone opens a small rulebook over whatever screen you are on: every hex, border, building, beast, dragon, element, kingdom and action card, each building, beast and dragon drawn as the TV draws it. **Close** goes back to where you were. The TV carries no labels for these; the rulebook is where you look them up.
+- **Save:** to stop partway through and pick the game up another day, **⋯** next to your name → **Save game**, or **Save game** in the TV's top corner (it shows while the mouse moves). The game stops for everyone; see [Saving a game](#saving-a-game).
 - **Quit:** **⋯** next to your name → **Quit game**. A bot plays your seat; tap your name at the room's address to come back.
 - **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The seat goes back to them when their phone returns.
 
 The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for the game to go on.
 
-**Restarts:** the server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change. After a restart, `npm run serve` hosts every room from the last 6 hours again, and everyone reconnects to their own seat. `npm run serve -- --game <file>` hosts one saved game. A saved game with no seats file has every seat open: the TV and phones show the lobby, and the game goes on once every seat is taken by a player or a bot.
+**Restarts:** the server saves each game to `~/.cache/board-lite/rooms/<code>.json` after every change. After a restart, `npm run serve` hosts every room from the last 6 hours again, and every saved game however old, and everyone reconnects to their own seat. `npm run serve -- --game <file>` hosts one game file. A game file with no seats file has every seat open: the TV and phones show the lobby, and the game goes on once every seat is taken by a player or a bot.
+
+## Saving a game
+
+**Save game** (on any phone's **⋯** menu, or the TV's top corner) stops the game where it is, for everyone: no one can move, bots and Claude players included. The TV and the phones show **Game saved**, with who sits where and the room's code. Everyone can leave; Claude players stop too.
+
+To pick it up later, on the TV, open the TV address: a new room's lobby lists the **Saved games** along the bottom (the newest 3), and **Open** shows that game's room. On a phone with no TV, the join form lists them too. Everyone takes their seat back on their phone (a phone that still remembers the seat goes straight back; others open the room's address and tap their name), and anyone presses **Continue**, on the TV or a phone. The game goes on where it was, and the Claude players come back to their own seats by themselves, remembering the game so far (the server starts their runner again with `--resume`; see [`play-vs-claude.md`](play-vs-claude.md#saving-and-continuing)).
+
+A saved game is kept until it's continued, however long that is: the server never forgets it, and hosts it again after a restart. It's saved as its room's files, `~/.cache/board-lite/rooms/<code>.json` and `<code>.seats.json`.
 
 ## After the game
 

@@ -8,9 +8,13 @@
 // Who sits where is saved beside it (<game>.seats.json: the code, the TV's and
 // each seat's token), so after a restart the room comes back under its own
 // code and every phone, the TV and each CLI player reconnect to their own seat.
+// Someone at the table can save the game partway through (Room.save): it stops
+// for everyone, the server keeps it however long it waits, and anyone at the
+// table picks it up again with Continue, Claude players included
+// (<game>.claude.json says which runners to bring back: src/playtest/run.ts).
 
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
@@ -85,11 +89,31 @@ interface SavedRoom {
   code: string;
   hostToken: string;
   remote: boolean; // no TV, when last saved
+  savedAt?: number; // the game was saved partway through then (ms epoch), to continue later
   seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
 }
 
 /** Where a game file's seats are saved. */
 export const seatsFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.seats.json`;
+
+/** Where a game file's Claude runners are listed: their --out directories, to bring back when a saved game continues. */
+export const claudeFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.claude.json`;
+
+/** The --out directories of the Claude runners that have played in this game (src/playtest/run.ts writes them). */
+export function claudeRunners(gameFile: string): string[] {
+  try {
+    const v = JSON.parse(readFileSync(claudeFile(gameFile), 'utf8'));
+    return Array.isArray(v?.runners) ? v.runners.filter((d: unknown): d is string => typeof d === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A Claude runner playing in this game, so continuing a saved game brings its players back. */
+export function addClaudeRunner(gameFile: string, dir: string) {
+  const runners = claudeRunners(gameFile);
+  if (!runners.includes(dir)) writeFileSync(claudeFile(gameFile), `${JSON.stringify({ runners: [...runners, dir] }, null, 2)}\n`);
+}
 
 function readSaved(file: string): SavedRoom | null {
   try {
@@ -107,6 +131,9 @@ export class Room {
   readonly opts: RoomOptions;
   seats: Seat[] = [];
   lastActive = Date.now();
+  // When someone at the table saved the game (ms epoch), until someone
+  // continues it: nothing moves, and the server keeps the room for good.
+  savedAt: number | null = null;
   private cached: Game | null = null;
   private botTimer: NodeJS.Timeout | null = null;
   private awayTimer: NodeJS.Timeout | null = null;
@@ -139,6 +166,7 @@ export class Room {
     this.opts = opts;
     this.hasTv = saved ? !saved.remote : !opts.remote;
     if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
+    this.savedAt = saved?.savedAt ?? null;
     if (existsSync(this.file)) {
       this.cached = load(this.file);
       // A saved game with no seats file: every seat starts open, and players
@@ -157,7 +185,7 @@ export class Room {
     return readSaved(seatsFile(gameFile))?.code ?? null;
   }
 
-  /** Rooms saved in `dir` and active in the last `withinMs`: their codes and game files, to host again after a restart. */
+  /** Rooms saved in `dir` and active in the last `withinMs`, and every saved game however old: their codes and game files, to host again after a restart. */
   static saved(dir = ROOMS_DIR, withinMs = Infinity): { code: string; file: string }[] {
     let names: string[];
     try {
@@ -170,13 +198,13 @@ export class Room {
       const file = join(dir, `${n.slice(0, -'.seats.json'.length)}.json`);
       const saved = readSaved(path);
       const touched = Math.max(statSync(path).mtimeMs, existsSync(file) ? statSync(file).mtimeMs : 0);
-      if (!saved || Date.now() - touched > withinMs) return [];
+      if (!saved || (!saved.savedAt && Date.now() - touched > withinMs)) return [];
       return [{ code: saved.code, file }];
     });
   }
 
   private saveSeats() {
-    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, ...(this.savedAt ? { savedAt: this.savedAt } : {}), seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
     const text = JSON.stringify(saved);
     if (text === this.savedSeats) return;
     this.savedSeats = text;
@@ -357,6 +385,37 @@ export class Room {
     this.changed();
   }
 
+  // ---- saving ----
+
+  // The TV or a player at the table saves the game partway through: it stops
+  // where it is, for everyone (bots and Claude players too), until someone
+  // continues it. Everyone can leave; the server keeps it however long it waits.
+  save(tok: string) {
+    this.atTable(tok);
+    const g = this.game;
+    if (!g || this.seating) throw new RoomError("The game isn't under way.");
+    if (g.phase === 'over') throw new RoomError('The game is over.');
+    if (this.savedAt) return;
+    this.savedAt = Date.now();
+    this.changed();
+  }
+
+  // Someone at the table picks a saved game up again. True if it was saved
+  // (the server then brings its Claude players back).
+  continue(tok: string): boolean {
+    this.atTable(tok);
+    if (!this.savedAt) return false;
+    this.savedAt = null;
+    this.changed();
+    return true;
+  }
+
+  // The TV, or a player in one of the seats.
+  private atTable(tok: string) {
+    const p = this.seatOf(tok);
+    if (tok !== this.hostToken && (p < 0 || this.seats[p].kind !== 'player')) throw new RoomError('You are not in this game.');
+  }
+
   // The TV (host token) or the first player to join can start the game.
   canStart(tok: string): boolean {
     return tok === this.hostToken || (tok === this.seats[0]?.token && this.seats[0].kind === 'player');
@@ -427,7 +486,7 @@ export class Room {
       const check = (): boolean => {
         const g = this.game;
         if (g?.phase === 'over') return finish(0);
-        if (g && waitingOn(g).includes(p) && !this.sceneLeft() && !this.seating) return finish(0);
+        if (g && waitingOn(g).includes(p) && !this.sceneLeft() && !this.seating && !this.savedAt) return finish(0);
         return false;
       };
       const finish = (code: number) => {
@@ -461,7 +520,7 @@ export class Room {
       const others = visibleEvents(g, p, since).filter((e) => !e.text.startsWith(`P${p + 1} `));
       if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
       const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
-      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft() && !this.seating;
+      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft() && !this.seating && !this.savedAt;
     };
     if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
     const left = this.holding(p);
@@ -482,6 +541,7 @@ export class Room {
   private act(p: number, cmd: string) {
     if (!this.game) throw new RoomError("The game hasn't started.");
     if (this.seating) throw new RoomError('The game goes on once every seat is taken.');
+    if (this.savedAt) throw new RoomError('The game is saved: continue it first.');
     try {
       this.mutate((g) => apply(g, p, cmd));
     } catch (e) {
@@ -516,7 +576,7 @@ export class Room {
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.seating) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.seating || this.savedAt) return;
     if (this.sceneLeft()) {
       if (!this.sceneTimer) this.wakeAfterScene(); // something must end the wait
       return;
@@ -526,7 +586,7 @@ export class Room {
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
-        if (this.abandoned) return;
+        if (this.abandoned || this.savedAt) return;
         // A scene began while this bot was waiting to move: it moves once the
         // scene is over, when the scene's timer wakes the room.
         if (this.sceneLeft()) return this.scheduleBot();
@@ -549,6 +609,7 @@ export class Room {
       code: this.code,
       started: !!this.game,
       seating: this.seating,
+      saved: this.savedAt,
       // Phones hold a stream open; a CLI player counts as here if it asked anything in the last minute.
       seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left })),
       minPlayers: MIN_PLAYERS,

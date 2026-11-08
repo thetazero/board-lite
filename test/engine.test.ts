@@ -10,7 +10,7 @@ import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, par
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
-  const lobby = { code: 'TEST', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+  const lobby = { code: 'TEST', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
   return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
 }
 
@@ -475,7 +475,7 @@ test('everyone sees which dragons went hungry at production (#362)', () => {
   g.dragons.push({ ...a, id: 'd98' }, { ...a, id: 'd99' });
   const mine = g.dragons.filter((d) => d.owner === p).map((d) => d.id);
   g.players[p].resources.livestock = 0;
-  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const seen = publicState(g, 1000).dragons.filter((d) => d.owner === p).map((d) => d.hungry);
   assert.deepEqual(seen, mine.map((_, i) => i >= tower), 'the first is fed, the rest went hungry');

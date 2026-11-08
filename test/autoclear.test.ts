@@ -103,7 +103,7 @@ test("auto clear is refused with nothing to clear, no raid-ready dragon, or off 
 test('the phone and the CLI offer auto clear only with something to clear and a dragon to send', () => {
   const { g, mine: [a] } = setup();
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
-  const view = () => seatView({ lobby: { code: 'T', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...seatState(g, 0), name: 'P1' } }, 10);
+  const view = () => seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...seatState(g, 0), name: 'P1' } }, 10);
   g.map[a].fauna = 'wolf_pack';
   assert.deepEqual(seatState(g, 0).autoClear, [a]);
   assert.doesNotMatch(view(), /^\s*autoclear /m); // no dragon

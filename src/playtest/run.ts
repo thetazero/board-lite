@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import { pname, score, type Game } from '../engine.ts';
 import { load } from '../store.ts';
-import { Room } from '../server/room.ts';
+import { Room, addClaudeRunner } from '../server/room.ts';
 import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.ts';
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
@@ -105,6 +105,18 @@ async function call(path: string, body?: object): Promise<Record<string, any>> {
 }
 
 const lobby = async (): Promise<Lobby> => (await call('')).lobby;
+
+// In a room someone else hosts on this machine: list this runner beside the
+// game, so when the table saves the game and later continues it (on the TV or
+// a phone), the server starts it again with --resume.
+function listBesideGame() {
+  if (hosted || !gameFile || !existsSync(gameFile)) return;
+  try {
+    addClaudeRunner(gameFile, out);
+  } catch (e) {
+    note(`Could not list this runner beside ${gameFile} (continuing a saved game won't bring these Claude players back): ${(e as Error).message}`);
+  }
+}
 
 async function host() {
   gameFile = join(out, 'game.json');
@@ -186,7 +198,7 @@ function startSeat(s: Seat) {
       ? 'The game is under way: you are taking your seat partway through. Read the rules, call view to see where things stand, then play until the game is over.'
       : 'The game has started. Read the rules, then play until the game is over.'
     : resumed && s.startsHere === 0
-      ? 'You were away from the table for a while (your connection to the game dropped), and now you are back in your seat. The game is not over yet and may have moved on: call view to see where things stand, then keep playing: call wait, and act when it is your decision.'
+      ? 'You were away from the table for a while (your connection to the game dropped, or the table took a break), and now you are back in your seat. The game is not over yet and may have moved on: call view to see where things stand, then keep playing: call wait, and act when it is your decision.'
       : 'The game is not over yet. Keep playing: call wait, and act when it is your decision.';
   const argv = [
     '-p', prompt,
@@ -341,6 +353,7 @@ async function main() {
     if (interrupted) status = 'interrupted';
     table = (await lobby()).seats;
     gameFile ||= (await lobby()).file;
+    listBesideGame();
     note(`The table: ${table.map((t, q) => `${pname(q)} ${t.name} (${seatLabel(q)})`).join(', ')}.`);
   }
   const started = Date.now();
@@ -353,14 +366,21 @@ async function main() {
     if (status !== 'running') break;
     await new Promise((r) => setTimeout(r, 1000));
     if (interrupted) { status = 'interrupted'; break; }
-    let over = false;
+    let over = false, saved = false;
     if (watcher) {
       const r = await call(`/listen?token=${watcher.token}&since=${since}&timeout=0`).catch(() => null);
       if (r) {
         if (r.next !== since) { since = r.next; lastChange = Date.now(); }
         over = r.state?.game?.phase === 'over';
+        saved = !!r.state?.lobby?.saved;
       }
-    } else over = hosted?.game?.phase === 'over';
+    } else {
+      over = hosted?.game?.phase === 'over';
+      saved = !!hosted?.savedAt;
+    }
+    // Someone at the table saved the game: the Claude players leave with
+    // everyone else, and come back when it continues.
+    if (saved) { status = 'saved'; break; }
     // Free memory under the floor for 10 s: stop this game before the machine OOMs.
     if (pool.memAvailableMb() >= FLOOR_MB) lowSince = 0;
     else if (!lowSince) lowSince = Date.now();
@@ -385,6 +405,7 @@ async function main() {
   const results = writeResults(finalGame(), status, started);
   note(`Finished (${results.status}) after ${results.rounds} rounds. Winner: ${results.winner ? `${results.winner.seat} (${results.winner.model})` : 'none'}.`);
   note(`Results: ${join(out, 'results.json')}${results.rounds ? `; full log with talk: ${join(out, 'log.txt')}` : ''}.`);
+  if (status === 'saved' && !hosted) note('The game is saved. Continue it on the TV or a phone, and the Claude players come back to their seats.');
   if (status !== 'over' && seats.length && table.length) note(`The game isn't over. To bring the Claude players back to their seats: node src/playtest/run.ts --resume ${out}`);
   process.exit(0); // the hosted server would keep the process alive
 }
@@ -411,6 +432,7 @@ async function reclaim(state: RunnerState) {
     note(`${name} (${s.model}) is back in seat ${s.p + 1}${s.starts ? ', with its memory of the game so far' : ''}.`);
   }
   saveState();
+  listBesideGame();
   note(`The table: ${table.map((t, q) => `${pname(q)} ${t.name} (${seatLabel(q)})`).join(', ')}.`);
 }
 

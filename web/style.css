@@ -173,9 +173,21 @@ svg.token { flex: none; }
 .hint { color: var(--muted); }
 /* Full screen (tv.ts): top right, over the lobby's sky or the board's goal;
    in a game only while the mouse moves. */
-#fullscreen { display: none; position: fixed; top: .8em; right: 1em; z-index: 50; font-size: 1.2em; }
+#tvbtns { position: fixed; top: .8em; right: 1em; z-index: 50; font-size: 1.2em; display: flex; gap: .6em; }
+#fullscreen, #savegame { display: none; }
 body.tv:has(#app > .lobby) #fullscreen, body.tv.pointing #fullscreen { display: block; }
 body.tv.fullscreen #fullscreen { display: none; }
+/* Save game (tv.ts): beside it, in a game, while the mouse moves, even full screen. */
+body.tv.pointing.playing #savegame { display: block; }
+/* A new room's lobby offers the saved games; a saved game's lobby has Continue. */
+.tv .savedgames { flex: none; display: flex; align-items: center; gap: 1em; margin: 0 2em 1.2em; font-size: 1.15em; }
+.tv .savedgames h3 { flex: none; margin: 0; font-family: var(--serif); color: var(--accent); font-size: 1.1em; }
+.tv .savedgames ul { flex: 1; min-width: 0; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6em; }
+.tv .savedgames li { min-width: 0; display: flex; align-items: center; gap: .8em; padding: .35em .5em .35em .8em; background: #f3ead714; border: 1px solid #f3ead730; border-radius: 3px; }
+.tv .savedgames .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tv .savedgames .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv .savedgames .who small { color: var(--muted); }
+.tv .savedgames button { flex: none; }
 
 /* The board is read from a couch about 3 m away: nothing on it is smaller
    than 1.1em of the TV's base size (about 22px at 1080p). */
@@ -1020,6 +1032,7 @@ button.on:disabled { opacity: 1; }
 .menu h3 { margin: 0 0 .3em; font-family: var(--serif); }
 .menu p { margin: 0 0 .7em; color: var(--ink-soft); }
 .menu .row { display: flex; gap: .5em; }
+.menu .row + h3 { margin-top: 1.1em; }
 /* The rulebook (book.ts): Rules in the header opens it over the screen; Close goes back. */
 .me .bookbtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-weight: 700; font-size: .9em; padding: .2em .35em; margin: 0 0 0 .4em; }
 .menu.booksheet { bottom: .6em; display: flex; flex-direction: column; padding: .6em .8em .4em; max-width: 34em; }
@@ -1100,6 +1113,11 @@ body:has(.talkbar.open) .viewswitch { display: none; }
 .tvhint .url { color: var(--text); word-break: break-all; }
 .hostline { display: flex; flex-direction: column; gap: .5em; border-top: 1px dashed var(--line); padding-top: 1em; text-align: center; }
 .hostline p { margin: 0; color: var(--muted); }
+/* The join form's saved games (phone.ts): each opens on its seats. */
+.hostline.savedgames ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .4em; }
+.hostline.savedgames a.button { display: flex; flex-direction: column; align-items: flex-start; gap: .1em; text-align: left; text-decoration: none; }
+.hostline.savedgames a.button b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hostline.savedgames a.button small { color: var(--ink-soft); font-weight: 600; }
 
 /* The table view itself (tv.ts with ?remote): the board, then the players,
    then the feed and the titles, one after another down a phone's screen. */
