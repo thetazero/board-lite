@@ -25,7 +25,9 @@ npm run serve -- --flee-seconds 60
 
 Claude players start the moment the game does. Each is a `claude -p` process of 300 to 400 MB, and they share the machine-wide limit of 6 Claude seats with any playtests running (see [`playtest.md`](playtest.md#how-many-games-run-at-once)). If the slots aren't free, the runner prints `Waiting to start: ...` and only joins the lobby once they are, so wait for the Claude players to show up on the TV before you press Start.
 
-Other `run.ts` options work here too: `--budget-usd` (default $5 per Claude player for the whole game), `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
+Each Claude player may spend up to **$30** over the whole game. That's enough for a full game: in one 14-round game an Opus player had spent $6.80 and the game wasn't over. A player that reaches it stops, and so does the runner (`Finished (P2 hit its budget)`). Change it with `--budget-usd N`. Continuing a saved game keeps the budget the runner had, and counts what each player has already spent.
+
+Other `run.ts` options work here too: `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
 
 ## Saving and continuing
 

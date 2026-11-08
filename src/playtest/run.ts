@@ -29,7 +29,7 @@ import { Room, addClaudeRunner } from '../server/room.ts';
 import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.ts';
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
-import { readState, stateFile, type RunnerState } from './resume.ts';
+import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
@@ -41,7 +41,8 @@ node src/playtest/run.ts --resume DIR [options]
   --out DIR                         where everything goes (default ~/.cache/board-lite/playtests/<time>-<models>)
   --serve PORT                      when hosting, also open the TV and phone pages to the network on PORT
   --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
-  --budget-usd N                    spending cap per Claude seat, over the whole game (default 5)
+  --budget-usd N                    spending cap per Claude seat, over the whole game (default 30 with --room,
+                                    5 for a playtest this runner hosts); --resume keeps the one it had
   --max-minutes N                   stop after this long (default 240)
   --stall-minutes N                 stop if nothing happens in the game for this long (default 15; 60 with --room)
   --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
@@ -76,7 +77,7 @@ if (resumed) {
 } else if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
 const seed = Number(opt(args, '--seed') ?? resumed?.seed ?? Math.floor(Math.random() * 2 ** 31));
 const effort = opt(args, '--effort') ?? resumed?.effort;
-const budget = Number(opt(args, '--budget-usd') ?? 5);
+const budget = budgetUsd(opt(args, '--budget-usd'), resumed, !!joinUrl);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
 const advice = opt(args, '--advice') ?? resumed?.advice;
@@ -156,7 +157,7 @@ let table: Lobby['seats'] = []; // everyone at the table, once the game starts
 // Everything --resume needs to bring these Claude players back, rewritten as it changes.
 function saveState() {
   const state: RunnerState = {
-    pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}),
+    pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}), budget,
     seats: seats.map(({ p, model, token, session, starts, cost }) => ({ p, model, token, session, starts, cost })),
   };
   writeFileSync(stateFile(out), `${JSON.stringify(state, null, 2)}\n`);
@@ -336,7 +337,7 @@ async function main() {
     roomUrl = `${m[1]}/${m[2].toUpperCase()}`;
     api = `${m[1]}/api/rooms/${m[2].toUpperCase()}`;
   } else await host();
-  note(`${resumed ? 'Resuming: ' : ''}${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}.`);
+  note(`${resumed ? 'Resuming: ' : ''}${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}; budget $${budget} per Claude player.`);
   if (status === 'running' && resumed) await reclaim(resumed);
   else if (status === 'running') {
     for (const model of models) {

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { readState, stateFile } from '../src/playtest/resume.ts';
+import { budgetUsd, readState, stateFile } from '../src/playtest/resume.ts';
 
 function dir(): string {
   const base = join(homedir(), '.cache', 'board-lite');
@@ -53,4 +53,16 @@ test('runner.json wins, and a directory with no Claude player has nothing to res
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
+});
+
+test('the budget: $30 in a room, $5 for a hosted playtest, and resuming keeps the one the runner had', () => {
+  assert.equal(budgetUsd(undefined, null, true), 30);
+  assert.equal(budgetUsd(undefined, null, false), 5);
+  assert.equal(budgetUsd('12', null, true), 12);
+  const seats = [{ p: 1, model: 'opus', token: 't', session: 's', starts: 4, cost: 6.8 }];
+  // Continue starts the runner again with only --resume and --room.
+  assert.equal(budgetUsd(undefined, { room: 'http://h/ABCD', hosted: false, budget: 15, seats }, true), 15);
+  assert.equal(budgetUsd('40', { room: 'http://h/ABCD', hosted: false, budget: 15, seats }, true), 40);
+  // A runner from before runner.json kept its budget: a player past $5 still plays on.
+  assert.ok(budgetUsd(undefined, { room: 'http://h/ABCD', hosted: false, seats }, true) > seats[0].cost);
 });

@@ -18,7 +18,24 @@ export interface RunnerState {
   seed?: number;
   effort?: string;
   advice?: string;
+  budget?: number; // --budget-usd, per Claude seat over the whole game
   seats: SavedSeat[];
+}
+
+/** Default --budget-usd for a runner seated in someone else's room (a game with people in it). */
+export const ROOM_BUDGET_USD = 30;
+/** Default --budget-usd for a playtest the runner hosts itself. */
+export const PLAYTEST_BUDGET_USD = 5;
+
+/**
+ * The spending cap per Claude seat, over the whole game. A game with people
+ * in it runs long (14 rounds cost an Opus player $6.80), so it gets room to
+ * finish; a playtest the runner hosts keeps the cheaper cap. Resuming keeps
+ * the budget the runner had, unless --budget-usd is given again.
+ */
+export function budgetUsd(given: string | undefined, resumed: RunnerState | null, inRoom: boolean): number {
+  if (given !== undefined) return Number(given);
+  return resumed?.budget ?? (inRoom ? ROOM_BUDGET_USD : PLAYTEST_BUDGET_USD);
 }
 
 export const stateFile = (out: string) => join(out, 'runner.json');
