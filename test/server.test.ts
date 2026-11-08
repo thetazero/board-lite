@@ -174,9 +174,9 @@ test('lobby rules: names, size, joining late', () => {
   const room = new Room('LOBY', { dir });
   room.join('Ada');
   assert.throws(() => room.join('ada'), /already called/);
-  assert.throws(() => room.join('   '), /Pick a name/);
-  assert.throws(() => room.join('\u200B\u200B\u200B'), /Pick a name/, 'zero-width spaces are no name');
-  assert.throws(() => room.join('\u3164\u2800\u200D'), /Pick a name/, 'nor are blank fillers');
+  assert.throws(() => room.join('   '), /Choose a name/);
+  assert.throws(() => room.join('\u200B\u200B\u200B'), /Choose a name/, 'zero-width spaces are no name');
+  assert.throws(() => room.join('\u3164\u2800\u200D'), /Choose a name/, 'nor are blank fillers');
   assert.equal(room.join('Bo\u200Bb').name, 'Bob', 'an invisible character inside a name is dropped');
   room.leave(1);
   assert.throws(() => room.start(room.hostToken), /at least 2/);
@@ -184,7 +184,7 @@ test('lobby rules: names, size, joining late', () => {
   assert.throws(() => room.join('Late'), /full/);
   room.leave(5);
   room.start(room.hostToken);
-  assert.throws(() => room.join('Late'), /already started/);
+  assert.throws(() => room.join('Late'), /has started/);
   assert.equal(room.game!.players.length, 5);
   room.close();
 });
@@ -355,7 +355,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
 
     const bad = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'build c999 0,0' });
     assert.equal(bad.status, 400);
-    assert.match(bad.body.error, /Keep one of the building cards/); // the round opens with picking a card
+    assert.match(bad.body.error, /Keep 1 of your 2 building cards/); // the round opens with picking a card
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: made.hostToken, command: 'end' })).status, 400, 'the TV has no seat');
     // The round opens with everyone keeping one of two building cards.
     assert.equal(snap.you!.choice.length, 2);
@@ -612,6 +612,11 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     }
     assert.deepEqual((await reply(2)).result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
     assert.match((await reply(3)).result.content[0].text, /^Table: P1 Ada, P2 Opus \(you\)\.\nYou are P2\./);
+    // The view carries a picture of the board beside the text map (#384).
+    const picture = (await reply(3)).result.content[1];
+    assert.equal(picture.type, 'image');
+    assert.equal(picture.mimeType, 'image/png');
+    assert.equal(Buffer.from(picture.data, 'base64').subarray(1, 4).toString(), 'PNG');
     assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
     assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
     // The moves file pairs each move's private reason with what really happened.
@@ -622,7 +627,7 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     await sleep(200);
     assert.ok(!lines.some((l) => l.id === 6), 'wait blocks while nothing happens');
     await post(`/api/rooms/${code}/do`, { token: ada.token, command: 'say hi Opus, want to trade?' });
-    assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Not your decision/);
+    assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Waiting for/);
     child.kill();
   } finally {
     server.closeAllConnections();

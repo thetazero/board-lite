@@ -26,45 +26,45 @@ const BUILDING_CODE: Record<string, string> = {
 const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 const faunaCode = (key: string) => FAUNA_CODE[key] ?? key[0].toUpperCase();
-const STAGES = ['hatchling', 'young', 'adult']; // a dragon card's stages, in order (STAGE_NAMES in src/data.ts)
+const STAGES = ['hatchling', 'young', 'adult'];
+const STEP_NAMES: Record<string, string> = { vote: 'vote', commit: 'commit', bail: 'fight or bail' }; // a dragon card's stages, in order (STAGE_NAMES in src/data.ts)
 
 function unitStats(u: { power: number; hp: number; attack: string; weak: string[] }): string {
-  return `combat power ${u.power}; ${u.hp}hp ${u.attack}${u.weak.length ? ` weak:${u.weak.join('/')}` : ''}`;
+  return `Power ${u.power}, Health ${u.hp}, Attack ${u.attack}${u.weak.length ? `, weak to ${u.weak.join('/')}` : ''}`;
 }
 
 export function cardText(c: CardView): string {
   const kind = c.kind === 'dragon' ? 'dragon egg' : c.kind;
-  const stages = c.dragon ? ` ${c.dragon.stages.map((s, i) => `${STAGES[i]} ${s.hp}hp ${s.attack} power ${s.power}`).join(' / ')}.` : '';
+  const stages = c.dragon ? ` ${c.dragon.stages.map((s, i) => `${STAGES[i]}: Power ${s.power}, Health ${s.hp}, Attack ${s.attack}`).join('; ')}.` : '';
   return `${c.id} ${c.name} [${kind}] cost ${resText(c.cost)}: ${c.text}${stages}`;
 }
 
 function dragonLine(d: DragonView): string {
-  const growth = d.stage === 3 ? 'fully grown' : `growth ${d.growth}/${d.growthTime}`;
-  const health = d.stage ? `${d.hp}/${d.maxHp}hp` : 'egg';
-  const status = d.canRaid ? `can raid, clear or perch${d.hp < d.maxHp ? ' (hurt: heals instead of growing)' : ''}` : d.stage === 0 ? 'egg, cannot raid' : d.perch ? `perched on ${d.perch}: no raids until recalled` : 'knocked out: cannot fight until it heals';
+  const growth = d.stage === 3 ? 'grown' : `growth ${d.growth}/${d.growthTime}`;
+  const stats = d.stage ? `Power ${d.power}, Health ${d.hp}/${d.maxHp}, Attack ${d.attack}, ` : '';
+  const status = d.canRaid ? `raid-ready${d.hp < d.maxHp ? ', hurt: heals instead of growing' : ''}` : d.stage === 0 ? 'egg' : d.perch ? `perched on ${d.perch}` : 'knocked out';
   const hungry = d.hungry ? ', went hungry this round: did not heal or grow' : '';
-  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${growth}, ${d.stage ? `power ${d.power}, ` : ''}${health}, ${status}${hungry}) — ${d.targeting}${d.attack ? `, attacks ${d.attack}` : ''}`;
+  return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${stats}${growth}; ${status}${hungry}) ${d.targeting}`;
 }
 
 function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
-  return Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat).map(([r, v]) => `${r} ${v.base}${v.dice.map((d) => `+d${d}`).join('')}${v.eat ? ` (your dragons eat ${v.eat})` : ''}`).join(', ') || 'nothing';
+  return Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat).map(([r, v]) => `${r} ${[...(v.base || !v.dice.length ? [v.base] : []), ...v.dice.map((d) => `1d${d}`)].join('+')}${v.eat ? ` (dragons eat ${v.eat})` : ''}`).join(', ') || 'nothing';
 }
 
 function mapText(g: PublicState): string[] {
   const lines: string[] = [];
   const built = new Map(g.map.flatMap((h) => (h.building ? [[h.building.type, h.building.name] as const] : [])));
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
-  lines.push('Map (axial q,r). Terrain: M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean (no buildings). ^ marks the peak.');
-  lines.push(`Buildings show as <owner><code>, + if upgraded: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
-  lines.push("Perched dragons show as <ids>: the building there is suppressed, as if it weren't there, while they stay.");
-  if (fauna.size) lines.push(`Fauna shows as {code} (no building there; a building under it is suppressed, as if it weren't there): ${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}${f.points !== undefined ? ' (great beast)' : ''}`).join(', ')}. A great beast also holds the hexes adjacent to it (shown as {x}): nothing is built there until it is slain.`);
+  lines.push('Map (axial q,r). M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean, ^ peak.');
+  lines.push(`[<owner><code>] a building, + per upgrade: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
+  lines.push(`<ids> perched dragons; {code} a beast${fauna.size ? ` (${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}`).join(', ')})` : ''}; {x} held by an adjacent great beast. A building under either is suppressed.`);
   const rows = new Map<number, HexView[]>();
   for (const h of g.map) rows.set(h.r, [...(rows.get(h.r) ?? []), h]);
   for (const r of [...rows.keys()].sort((a, b) => a - b)) {
     const cells = rows.get(r)!.sort((a, b) => a.q - b.q).map((h) => {
       const b = h.building;
-      const label = b ? `[${b.owner + 1}${code(b.type)}${b.upgrade ? '+' : ''}]` : '';
-      const held = h.fauna ? `{${faunaCode(h.fauna.key)}}` : h.held ? '{x}' : '';
+      const label = b ? `[${b.owner + 1}${code(b.type)}${'+'.repeat(b.upgrades.length)}]` : '';
+      const held = `${h.fauna ? `{${faunaCode(h.fauna.key)}}` : ''}${h.held ? '{x}' : ''}`;
       const perched = h.perched.length ? `<${h.perched.map((x) => x.d).join(' ')}>` : '';
       return `${h.k}:${TERRAIN_LETTER[h.terrain] ?? '?'}${h.peak ? '^' : ''}${label}${held}${perched}`;
     });
@@ -74,11 +74,14 @@ function mapText(g: PublicState): string[] {
 }
 
 export function targetText(t: TargetView): string {
-  return `${t.name} — combat power ${t.power}; defenders: ${t.units.map((u) => `${u.name} (${unitStats(u)})`).join(', ')}; loot ${resText(t.loot)} (split by the combat power each player still has fighting at the end)${t.points ? `; worth ${t.points} point${t.points === 1 ? '' : 's'} each time it falls, to the player with the most combat power still fighting at the end` : ''}`;
+  // Identical defenders once, counted: "Knights x4 (...)".
+  const groups = new Map<string, number>();
+  for (const u of t.units) { const k = `${u.name} (${unitStats(u)})`; groups.set(k, (groups.get(k) ?? 0) + 1); }
+  return `${t.name} (Power ${t.power}): ${[...groups].map(([k, n]) => (n > 1 ? k.replace(' (', ` x${n} (`) : k)).join(', ')}; loot ${resText(t.loot)}${t.points ? `; ${plural(t.points, 'point')} to the most power standing` : ''}`;
 }
 
 export function faunaText(f: FaunaView): string {
-  const prize = f.points !== undefined ? `great beast: ${f.points} point${f.points === 1 ? '' : 's'} for good to whoever slays it; 1 try each round` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot: a card sent it';
+  const prize = f.points !== undefined ? `great beast: ${plural(f.points, 'point')} to whoever slays it` : Object.keys(f.loot).length ? `loot ${resText(f.loot)}` : 'no loot';
   return `${f.name} (${unitStats(f)}; ${prize})`;
 }
 
@@ -90,23 +93,23 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
   const raid = g.raid!;
   const out: string[] = [];
   if (raid.step === 'vote') {
-    out.push("Raid: vote for a target. Each vote counts its voter's power (their raid-ready dragons' combat power, summed); the most power wins. Candidates:");
+    out.push("Raid vote (a vote is worth its voter's raid-ready power; the kingdom with the most is raided):");
     raid.candidates.forEach((t, i) => {
       const got = raid.votes.reduce<number>((s, v, q) => s + (v === i ? raid.votePower[q] : 0), 0);
-      out.push(`  ${i + 1}. ${targetText(t)}${got ? `; votes worth ${got} power` : ''}`);
+      out.push(`  ${i + 1}. ${targetText(t)}${got ? `; ${got} power voted` : ''}`);
     });
-    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)}${raid.voters[q] ? ` (power ${raid.votePower[q]})` : ''} ${v !== null ? v + 1 : raid.voters[q] ? 'not yet' : 'no vote (no raid-ready dragon)'}`).join(', ')}`);
+    out.push(`  Votes: ${raid.votes.map((v, q) => `${P(q)}${raid.voters[q] ? ` (power ${raid.votePower[q]})` : ''} ${v !== null ? v + 1 : raid.voters[q] ? 'not yet' : 'no vote'}`).join(', ')}`);
     if (you?.whyNoVote) out.push(`  ${you.whyNoVote}`);
     return out;
   }
-  out.push(`Raid target: ${targetText(raid.target!)}`);
+  out.push(`Raid: ${targetText(raid.target!)}`);
   if (raid.step === 'commit') {
-    out.push(`Commitments (public, not locked until everyone is ready):`);
-    raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'nothing'}${raid.ready[q] ? ' (ready)' : ''}`));
+    out.push(`Commit (open until everyone is ready):`);
+    raid.commits.forEach((c, q) => out.push(`  ${P(q)}: ${c.length ? `${c.join(' ')} (power ${commitPower(g, c)})` : 'none'}${raid.ready[q] ? ', ready' : ''}`));
   } else {
-    out.push(`Locked commitments: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
-    out.push(`Secret fight-or-bail choice. Decided: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'yes' : 'not yet'}`] : [])).join(', ')}`);
-    if (you?.myChoice) out.push(`  You chose to ${you.myChoice}.`);
+    out.push(`Locked in: ${raid.commits.map((c, q) => (c.length ? `${P(q)} ${c.join(' ')} (power ${commitPower(g, c)})` : '')).filter(Boolean).join(', ')}`);
+    out.push(`Fight or hold back, in secret: ${raid.commits.flatMap((c, q) => (c.length ? [`${P(q)} ${raid.decided[q] ? 'chosen' : 'not yet'}`] : [])).join(', ')}`);
+    if (you?.myChoice) out.push(`  You ${you.myChoice === 'hold' ? 'hold back' : 'fight'}.`);
   }
   return out;
 }
@@ -115,14 +118,14 @@ function raidText(g: PublicState, you: SeatState | null): string[] {
 export function commandHints(g: PublicState, you: SeatState): string[] {
   if (!you.deciding) return [];
   const out: string[] = [];
-  const afford = (c: { affordable: boolean }) => (c.affordable ? '' : ' (cannot afford yet)');
+  const afford = (c: { affordable: boolean }) => (c.affordable ? '' : " (can't afford yet)");
   if (g.phase === 'action') {
     for (const o of g.offers.filter((x) => (x.to === null ? x.from !== you.seat && !x.passed.includes(you.seat) : x.to === you.seat))) {
       const why = you.cantAccept[o.id];
-      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? '; to anyone, the first to accept trades' : ''})${why ? ` ${why}` : ''}`);
+      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? ', to anyone' : ''})${why ? ` ${why}` : ''}`);
     }
     if (!you.myTurn) {
-      out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn you may only trade with ${P(g.turn)})`);
+      out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn, only with ${P(g.turn)})`);
       return out;
     }
     for (const c of you.hand) {
@@ -130,18 +133,18 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         // For a building that counts its neighbours, each hex shows its count, like 2,-1(x3).
         const hexes = c.hexes.map((k) => (c.counts ? `${k}(x${c.counts[k]})` : k));
         if (c.needs === 'none') out.push(`build ${c.id}   (${c.name})${afford(c)}`);
-        else out.push(`build ${c.id} <hex>   (${c.name}; open hexes: ${hexes.join(' ') || 'none'})${afford(c)}`);
+        else out.push(`build ${c.id} <hex>   (${c.name}; hexes: ${hexes.join(' ') || 'none'})${afford(c)}`);
       } else if (c.kind === 'upgrade') {
         out.push(`upgrade ${c.id} <hex>   (${c.name}; on: ${c.hexes.join(' ') || 'none'})${afford(c)}`);
       } else if (c.kind === 'dragon') {
         out.push(`play ${c.id}   (hatch ${c.name})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
       } else if (c.needs !== 'unplayable') {
         const arg = { resource: ' <stone|timber|crystal|livestock>', dragon: ' <dragon id>', hex: ' <hex>', none: '' }[c.needs];
-        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: any land hex without fauna or a tower; ${faunaText(c.fauna)}` : ''})${afford(c)}`);
+        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: a land hex with no tower or beast; ${faunaText(c.fauna)}` : ''})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
       }
     }
     for (const b of you.basics) {
-      if (b.hexes.length) out.push(`build ${b.key}${b.onTower ? '' : ' <hex>'}   (basic, no card: ${b.text} Costs ${resText(b.cost)}${b.onTower ? '' : `; open hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
+      if (b.hexes.length) out.push(`build ${b.key}${b.onTower ? '' : ' <hex>'}   (no card, cost ${resText(b.cost)}: ${b.text}${b.onTower ? '' : ` Hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
     }
     if (you.huntable.length && you.raidReady.length) {
       const foes = you.huntable.map((k) => {
@@ -149,46 +152,47 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight what holds the hex, its beast and any rival dragons perched there, to the end; the hits they take stay on them. One try at a great beast a round. Your ready dragons: ${you.raidReady.join(' ')}; you can fight: ${foes.join(', ')})`);
+      out.push(`clear <hex> <dragon ids...>   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
     }
-    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (perch on a rival's building, not a tower: it is suppressed, as if it weren't there, while they stay, and they don't raid. Rivals' buildings: ${you.perchable.join(' ')})`);
-    if (you.perched.length) out.push(`recall <dragon ids...>   (bring perched dragons home: ${you.perched.join(' ')})`);
-    out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card needed, costs ${resText(you.eggProject.cost)})`);
+    if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: ${you.autoClear.join(' ')})`);
+    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: ${you.perchable.join(' ')})`);
+    if (you.perched.length) out.push(`recall <dragon ids...>   (perched: ${you.perched.join(' ')})`);
+    out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card, cost ${resText(you.eggProject.cost)})`);
     for (const u of you.upgradeProjects) {
-      if (u.hexes.length) out.push(`project ${u.key} <hex>   (${u.name}, no card needed: ${u.text} Costs ${resText(u.cost)}; on: ${u.hexes.join(' ')})${afford(u)}`);
+      if (u.hexes.length) out.push(`project ${u.key} <hex>   (${u.name}, no card, cost ${resText(u.cost)}: ${u.text} On: ${u.hexes.join(' ')})${afford(u)}`);
     }
-    out.push(`merchants <give resource> <get resource> [times]   (stone, timber, crystal or livestock, not gold; your rates: ${rateText(you.bankRates)})`);
-    out.push(`offer <player|anyone> give <items> get <items>   (items: "2 stone", card ids like "c12"; to anyone: the first to accept trades)`);
+    out.push(`merchants <give resource> <get resource> [times]   (not gold; ${rateText(you.bankRates)})`);
+    out.push(`offer <player|anyone> give <items> get <items>   (items like "2 stone" or "c12"; to anyone: the first to accept trades)`);
     for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);
-    out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (end your turn, once you have answered the offers to you)' : 'end   (end your turn)');
+    out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (after answering the offers to you)' : 'end');
     return out;
   }
   if (g.phase === 'cards') {
-    out.push(`keep <${you.choice.map((c) => c.id).join('|')}>   (keep one of the building cards you drew; the other is discarded)`);
+    out.push(`keep <${you.choice.map((c) => c.id).join('|')}>   (the other is discarded)`);
     for (const c of you.choice) out.push(`  ${cardText(c)}`);
     return out;
   }
   if (g.phase === 'discard') {
     const n = you.hand.length - you.handCap;
-    out.push(`discard <${n} card ids>   (discard exactly ${n} of your ${you.hand.length} cards, like "discard ${you.hand.slice(0, n).map((c) => c.id).join(' ')}"; the hand limit is ${you.handCap})`);
+    out.push(`discard <${n} card ids>   (hand limit ${you.handCap})`);
     return out;
   }
   const raid = g.raid;
   if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
   if (raid?.step === 'commit') {
-    out.push(`commit <dragon ids...>   (your raid-ready dragons: ${you.raidReady.join(' ')}; "commit none" to withdraw; replaces your commitment)`);
-    out.push('ready   (lock in your commitment)');
+    out.push(`commit <dragon ids...>   (raid-ready: ${you.raidReady.join(' ')}; "commit none" for none; replaces what you sent)`);
+    out.push('ready   (lock in)');
   }
-  if (raid?.step === 'bail') out.push('fight  |  bail   (secret)');
+  if (raid?.step === 'choose') out.push('fight  |  hold   (secret; held back, your dragons stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 
 function phaseText(g: PublicState): string {
-  if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
-  if (g.phase === 'cards') return `Round ${g.round}, cards: everyone keeps one of the two building cards they drew.`;
-  if (g.phase === 'action') return `Round ${g.round}, action phase, ${P(g.turn)}'s turn.`;
-  if (g.phase === 'discard') return `Round ${g.round}, end of round: everyone over the hand limit discards down to it.`;
-  return `Round ${g.round}, raid phase (${g.raid!.step}), ${plural(g.raidsLeft, 'raid')} left this round.`;
+  if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} wins!` : ''}`;
+  if (g.phase === 'cards') return `Round ${g.round}, cards: keep 1 of 2 building cards.`;
+  if (g.phase === 'action') return `Round ${g.round}, actions: ${P(g.turn)}'s turn.`;
+  if (g.phase === 'discard') return `Round ${g.round}, end of round: discard down to the hand limit.`;
+  return `Round ${g.round}, raid: ${STEP_NAMES[g.raid!.step]}${g.raidsLeft > 1 ? ` (${plural(g.raidsLeft, 'raid')} left)` : ''}.`;
 }
 
 const waitingText = (g: PublicState) => g.waitingOn.map(P).join(', ') || 'no one';
@@ -211,10 +215,10 @@ function tableText(s: Snapshot, you = -1): string {
 export function statusText(s: Snapshot): string {
   const names = tableText(s);
   const g = s.game;
-  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'nobody yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
+  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'no one yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
   const out = [`Room ${s.lobby.code}: ${names}.`, phaseText(g)];
   if (s.lobby.seating) out.push('The game goes on once every seat is taken.');
-  else if (g.waitingOn.length) out.push(`Waiting on: ${waitingText(g)}`);
+  else if (g.waitingOn.length) out.push(`Waiting for ${waitingText(g)}.`);
   g.players.forEach((pl, q) => out.push(`${P(q)}: ${pl.publicPoints} public points, ${pl.handSize} cards in hand`));
   return out.join('\n');
 }
@@ -230,12 +234,12 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`Table: ${tableText(s, p)}.`);
   out.push(`You are ${P(p)}. ${phaseText(g)}`);
   const hints = commandHints(g, you);
-  out.push(s.lobby.seating ? 'The game goes on once every seat is taken.' : hints.length ? `>>> It's your decision.` : `Waiting on: ${waitingText(g)}.`);
+  out.push(s.lobby.seating ? 'The game goes on once every seat is taken.' : hints.length ? '>>> Your decision.' : `Waiting for ${waitingText(g)}.`);
   out.push('');
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}, titles ${pl.titles}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; produces ${amounts(pl.production)}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}${pl.titles ? `, titles ${pl.titles}` : ''}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${amounts(pl.production)}`);
   });
   const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
   if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);
@@ -244,11 +248,11 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
   out.push(`Each round you make: ${amounts(you.income)}.`);
-  out.push(`Merchants' rates ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over your room, so you hatch no more until there's room` : ''}.`);
+  out.push(`Merchants ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over, no hatching until there's room` : ''}.`);
   const over = you.hand.length - you.handCap;
-  out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `, over the limit: at the end of the round you discard ${over}, unless you play ${over === 1 ? 'a card' : 'some'} first` : ''}:`);
+  out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `: ${over} over the limit, discarded at the end of the round` : ''}:`);
   for (const c of you.hand) out.push(`  ${cardText(c)}`);
-  if (you.choice.length) out.push(`Drawn, keep one: ${you.choice.map(cardText).join(' | ')}`);
+  if (you.choice.length) out.push(`Keep 1: ${you.choice.map(cardText).join(' | ')}`);
   out.push('');
   out.push('== Dragons (public) ==');
   for (const d of g.dragons) out.push(`  ${dragonLine(d)}`);
@@ -257,17 +261,17 @@ export function seatView(s: Snapshot, logLines = 25): string {
   g.players.forEach((_, q) => {
     const list = g.map.filter((h) => h.building?.owner === q).map((h) => {
       const b = h.building!;
-      return `${b.type === 'tower' ? `Tower(${b.floors} floors)` : b.name}${b.upgradeName ? `+${b.upgradeName}` : ''}@${h.k}`;
+      return `${b.type === 'tower' ? `Tower${b.floors ? `(${plural(b.floors, 'floor')})` : ''}` : b.name}${b.upgradeName ? `+${b.upgradeName}` : ''}@${h.k}`;
     });
     out.push(`  ${P(q)}: ${list.join(', ')}`);
   });
   out.push(...mapText(g));
   const fauna = g.map.filter((h) => h.fauna).sort((a, b) => (a.k < b.k ? -1 : 1));
-  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}. Any player clears fauna, or rivals' perched dragons, on their turn with "clear <hex> <dragons>"; a beast's loot goes to them. In production, each beast (not a great beast) has a 1 in ${g.faunaWanderOdds} chance to move to an adjacent land hex with no tower or beast; one beside no other beast is ${g.faunaSpreadWeight === 2 ? 'twice' : `${g.faunaSpreadWeight} times`} as likely.`);
+  out.push(`Fauna: ${fauna.length ? fauna.map((h) => `${h.k} ${faunaText(h.fauna!)}${h.building ? ` on ${P(h.building.owner)}'s ${h.building.type}` : ''}`).join('; ') : 'none'}.`);
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
-  out.push(`Great beasts: ${g.beasts.map((b) => b.name).join(' and ')}, each worth ${g.beasts[0]?.points ?? 0} point${g.beasts[0]?.points === 1 ? '' : 's'} for good to whoever slays it, and never back. Once the Thunderbird falls, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more. Slain so far: ${slain.join(', ') || 'none'}.`);
-  out.push(`Kingdoms (raid loot now; each adds 1 gold after every raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (power ${t.power}) ${resText(t.loot)}${t.points ? `, worth ${t.points} point${t.points === 1 ? '' : 's'}` : ''}`).join('; ')}.`);
+  out.push(`Great beasts slain: ${slain.join(', ') || 'none'}. Once the Thunderbird is slain, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more each round.`);
+  out.push(`Kingdoms (loot now; +1 gold after each raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (Power ${t.power}) ${resText(t.loot)}${t.points ? `, ${plural(t.points, 'point')}` : ''}`).join('; ')}.`);
   if (g.raid) {
     out.push('');
     out.push(...raidText(g, you));
@@ -275,7 +279,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   if (g.offers.length) {
     out.push('');
     out.push('== Open offers ==');
-    for (const o of g.offers) out.push(`  ${o.id}: ${P(o.from)} offers ${o.to === null ? 'anyone' : P(o.to)} ${o.give} for ${o.get}${o.passed.length ? `; declined by ${o.passed.map(P).join(', ')}` : ''}`);
+    for (const o of g.offers) out.push(`  ${o.id}: ${P(o.from)} offers ${o.to === null ? 'anyone' : P(o.to)} ${o.give} for ${o.get}${o.passed.length ? `; ${o.passed.map(P).join(', ')} ${o.passed.length === 1 ? 'declines' : 'decline'}` : ''}`);
   }
   out.push('');
   out.push(`== Recent events ==`);
@@ -285,18 +289,18 @@ export function seatView(s: Snapshot, logLines = 25): string {
     out.push('== Your options ==');
     for (const h of hints) out.push(`  ${h}`);
   }
-  if (g.phase !== 'over') out.push(`Talk any time: say <message> (everyone hears), tell <P#> <message> (private). Talk binds no one; only accepted offers do.`);
+  if (g.phase !== 'over') out.push(`Talk any time: say <message>, or tell <P#> <message> (private). Promises bind no one.`);
   return out.join('\n');
 }
 
 /** One line for a seat: its options when it's its decision, else who the game waits on. */
 export function seatStatus(s: Snapshot): string {
   const g = s.game;
-  if (!g) return 'The game has not started yet.';
-  if (g.phase === 'over') return `The game is over.${g.winner !== null ? ` ${P(g.winner)} won.` : ''}`;
+  if (!g) return "The game hasn't started.";
+  if (g.phase === 'over') return `Game over.${g.winner !== null ? ` ${P(g.winner)} wins!` : ''}`;
   const hints = s.you ? commandHints(g, s.you) : [];
-  if (hints.length) return `It's your decision. Your options:\n${hints.map((h) => `  ${h}`).join('\n')}`;
-  return `Not your decision. Waiting on: ${waitingText(g)}.`;
+  if (hints.length) return `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}`;
+  return `Waiting for ${waitingText(g)}.`;
 }
 
 /** After a move: the events this seat sees from log index `since` on, then its options or who the game waits on. */
@@ -304,7 +308,7 @@ export function afterMove(s: Snapshot, since: number): string {
   const lines = snapshotEvents(s).filter((e) => e.i >= since).map((e) => `  ${eventLine(e)}`);
   const g = s.game;
   const hints = g && s.you ? commandHints(g, s.you) : [];
-  const tail = !g ? 'The game has not started yet.' : g.phase === 'over' ? 'The game is over.' : hints.length ? `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}` : `Waiting on: ${waitingText(g)}.`;
+  const tail = !g ? "The game hasn't started." : g.phase === 'over' ? 'Game over.' : hints.length ? `Your options:\n${hints.map((h) => `  ${h}`).join('\n')}` : `Waiting for ${waitingText(g)}.`;
   return [...lines, tail].join('\n');
 }
 

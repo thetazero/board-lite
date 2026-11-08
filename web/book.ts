@@ -72,7 +72,7 @@ function portraitList(b: Rulebook, seat: number): { id: string; p: Portrait }[] 
   add('perched', { terrain: 'meadow', building: 'pasture', dragon: { element: 'ice', stage: 3 } });
   add('held thunderbird', { terrain: 'meadow', held: 'thunderbird' });
   add('held leviathan', { terrain: 'harbor', held: 'leviathan' });
-  add('peak zone', { terrain: 'meadow', peakZone: true });
+  add('peak zone', { terrain: 'meadow', peakZone: b.peakBonus });
   add('tower', { terrain: 'plains', building: 'tower' });
   for (const x of b.buildings) add(`building ${x.key}`, x.key === 'tower_floor' ? { terrain: 'plains', building: 'tower', floors: 3 } : { terrain: x.terrain ?? 'plains', building: x.key });
   for (const u of b.upgrades) add(`upgrade ${u.key}`, { ...UPGRADE_ON[u.key], upgrade: u.key });
@@ -140,57 +140,58 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
   board(b) {
     const land = b.terrains.filter((t) => t !== 'ocean').map((t) => {
       const here = b.buildings.filter((x) => x.terrain === t).map((x) => `the ${x.name}`);
-      const line = here.length ? `${cap(here.length < 2 ? here[0] : `${here.slice(0, -1).join(', ')} and ${here.at(-1)}`)} ${here.length < 2 ? 'is' : 'are'} built only here.` : 'No building needs it.';
+      const ports = here.length > 1 && here.every((x) => x.endsWith(' Port'));
+      const line = ports ? 'Ports are built only here.' : here.length ? `${cap(here.length < 2 ? here[0] : `${here.slice(0, -1).join(', ')} and ${here.at(-1)}`)} ${here.length < 2 ? 'is' : 'are'} built only here.` : 'No building needs it.';
       return entry(pic(`terrain ${t}`, cap(TERRAIN_NOUN[t])), cap(TERRAIN_NOUN[t]), text(line), `terrain ${t}`);
     }).join('');
     return `${head('Hexes', 'A building whose card names no terrain goes on any land hex.')}${land}
       ${entry(pic('terrain ocean', 'Ocean hex'), 'Ocean hex', text('Nothing is built on it.'), 'terrain ocean')}
       ${head('Borders and marks')}
-      ${entry(pic('border', 'A border in your color'), 'A border in a player’s color', text('Runs round the hexes that player’s buildings stand on.'), 'border')}
-      ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('A beast holds it: it’s suppressed, as if it weren’t there, until someone clears the beast.'), 'shut')}
-      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('The dragon perches there: the building is suppressed, as if it weren’t there, until its owner recalls it or it’s knocked out.'), 'perched')}
-      ${b.greatBeasts.map((f) => entry(pic(`held ${f.key}`, `Held by the ${f.name}`), `A border in the ${f.name}’s color`, text(`The ${f.name} holds this hex: nothing is built here while the ${f.name} lives.`), `held ${f.key}`)).join('')}
-      ${entry(pic('peak zone', 'A gold border'), 'A gold border', text(`On or adjacent to the Thunderbird’s peak, once the Thunderbird is slain: a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
+      ${entry(pic('border', 'A border in your color'), 'A border in a player’s color', text('Runs around the hexes that player’s buildings stand on.'), 'border')}
+      ${entry(pic('shut', 'A grey building with a beast'), 'A grey building', text('Under a beast: suppressed, as if it weren’t there, until the beast is cleared.'), 'shut')}
+      ${entry(pic('perched', 'A dragon on a building'), 'A dragon on a building', text('Suppressed until the dragon is recalled or knocked out.'), 'perched')}
+      ${b.greatBeasts.map((f) => entry(pic(`held ${f.key}`, `Held by the ${f.name}`), `A border in the ${f.name}’s color`, text(`Nothing is built here while the ${f.name} lives.`), `held ${f.key}`)).join('')}
+      ${entry(pic('peak zone', `A gold border and a +${b.peakBonus}`), `A gold border and a +${b.peakBonus}`, text(`Once the Thunderbird is slain, a production building here makes ${b.peakBonus} more each round.`), 'peak zone')}`;
   },
   buildings(b) {
     const one = (x: BookBuilding) => entry(pic(`building ${x.key}`, x.name), x.name, `${text(x.text)}${cost(x.cost)}`, `building ${x.key}`);
     const made = (['stone', 'timber', 'crystal', 'livestock'] as const).filter((r) => b.tower.makes[r]).join(', ').replace(/, (\w+)$/, ' and $1');
-    const tower = entry(pic('tower', 'Your tower'), 'Tower', text(`Makes 1 ${made} each round. Houses ${b.tower.houses} dragon${b.tower.houses === 1 ? '' : 's'}. Every player starts with one. No beast or dragon goes on it.`), 'tower');
+    const tower = entry(pic('tower', 'Your tower'), 'Tower', text(`Makes 1 ${made} each round. Houses ${b.tower.houses} dragon${b.tower.houses === 1 ? '' : 's'}. No beast or dragon goes on it.`), 'tower');
     const basics = b.buildings.filter((x) => x.basic).map(one).join('');
     const classes = [...new Set(b.buildings.filter((x) => !x.basic).map((x) => x.cls))];
     const cards = classes.map((c) => `${head(CLASS_HEAD[c] ?? c)}${b.buildings.filter((x) => !x.basic && x.cls === c).map(one).join('')}`).join('');
-    const ups = b.upgrades.map((u) => entry(pic(`upgrade ${u.key}`, u.name), u.name, `${text(`${u.text} On the board: a golden rim, and a mark beside the building.${u.base ? ' Also added as a special project, for double the cost.' : ''}`)}${cost(u.cost)}`, `upgrade ${u.key}`)).join('');
-    return `${tower}${head('Basic buildings', 'Built without a card.')}${basics}${cards}${head('Upgrades', 'Each building takes 1 upgrade.')}${ups}`;
+    const ups = b.upgrades.map((u) => entry(pic(`upgrade ${u.key}`, u.name), u.name, `${text(`${u.text} Shown as a golden rim and a mark.${u.base ? ' Also a special project, at double the cost.' : ''}`)}${cost(u.cost)}`, `upgrade ${u.key}`)).join('');
+    return `${tower}${head('Basic buildings', 'Built without a card.')}${basics}${cards}${head('Upgrades', 'A building may take any number.')}${ups}`;
   },
   beasts(b) {
     const beast = (f: FaunaView, more: string) => entry(pic(`beast ${f.key}`, f.name), f.name,
       `<div class="bstats">${powerTag(f.power)}${statTag('Health', f.maxHp)}${statTag('Attack', esc(f.attack))}</div>${f.weak.length ? `<p class="btext">Weak to ${elemWords(f.weak)}</p>` : ''}${f.points !== undefined ? lootLine({}, 1.1, f.points) : lootLine(f.loot, 1.1)}${more ? text(more) : ''}`, `beast ${f.key}`);
-    return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under a beast is suppressed: it counts as if it weren’t there. Clear a beast with your dragons for its loot; a beast a card placed has none. In production each beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
+    return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under one is suppressed. Clear a beast for its loot (none if a card placed it). Each round a beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
       ${b.fauna.map((f) => beast(f, '')).join('')}
-      ${head('Great beasts', 'Each holds its hex and every adjacent hex: nothing is built there while it lives. Each player gets 1 try at a great beast each round. Whoever slays it scores its points for good.')}
-      ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center of the map.' : 'Lives in the ocean. In production it swims to another ocean hex, most likely a far one.')).join('')}`;
+      ${head('Great beasts', 'Nothing is built on or adjacent to one while it lives. You may try to slay each once a round; whoever slays it scores its points for good.')}
+      ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center.' : 'Lives in the ocean. Each round it swims to another ocean hex, usually a far one.')).join('')}`;
   },
   dragons(b) {
     const groups = ELEMENTS.map((e) => {
       const cards = b.dragons.filter((d) => d.element === e).map((d) => {
         const rows = d.stages.map((s, i) => `<div class="bstage"><small>${STAGE_LABEL[i + 1]}</small>${statTag('Health', s.hp)}${statTag('Attack', esc(s.attack))}</div>`).join('');
         return `<div class="bdragon" data-key="b dragon ${d.key}"><div class="bdhead"><b>${esc(d.name)}</b>${cost(d.cost)}</div>${rows}
-          <p class="btext">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it’s fed. ${esc(cap(d.targeting))}.${d.base ? ' Also hatched as a special project.' : ''}</p></div>`;
+          <p class="btext">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it’s fed. ${esc(cap(d.targeting))}.${d.base ? ' Also a special project.' : ''}</p></div>`;
       }).join('');
       return `<section class="belem" style="--ec:${ELEMENT_COLORS[e]}"><div class="bepics">${pic(`dragon ${e} 0`, `A ${e} dragon egg`)}${pic(`dragon ${e} 3`, `An adult ${e} dragon`)}</div>
         <h3 class="bhead">${cap(e)} dragons</h3>${cards}</section>`;
     }).join('');
-    return `<p class="bintro">On the board a dragon is the color of its element, whatever its card, and grows bigger at each life stage: egg, hatchling, young, adult.</p>${groups}`;
+    return `<p class="bintro">On the board a dragon wears its element’s color and grows at each life stage: egg, hatchling, young, adult.</p>${groups}`;
   },
   elements(b) {
     return `${wheel(b.elementBeats)}<p class="wheelrule">Double damage where the arrow points.</p>`;
   },
   kingdoms(b) {
-    return `<p class="bintro">Raids attack these. A kingdom that doesn’t fall adds 1 gold to its loot after every raid.</p>
+    return `<p class="bintro">After each raid, each kingdom that didn’t fall adds 1 gold to its loot.</p>
       ${b.kingdoms.map((t) => `<section class="ptarget bking" data-key="b king ${t.key}"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.6)}${lootLine(t.loot, 1.2)}${pointsLine(t, 1.2)}</section>`).join('')}`;
   },
   cards(b) {
-    return `<p class="bintro">Action cards. Building cards and upgrades are under Buildings, dragon cards under Dragons.</p>
+    return `<p class="bintro">Action cards. Buildings and dragons have their own tabs.</p>
       ${b.actions.map((a) => entry(`<span class="bpic bcard" style="--kc:${frameColor('action')}">${cardArt('action', a.key)}</span>`, a.name, `${text(a.text)}${cost(a.cost)}`, `action ${a.key}`)).join('')}`;
   },
 };

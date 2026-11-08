@@ -180,15 +180,15 @@ export function lastRoundHtml(g: PublicState, names: string[], me?: { seat: numb
   const goal = g.pointsToWin;
   const who = g.players.map((p, i) => ({ i, n: i === me?.seat ? me.total : p.publicPoints })).filter((x) => x.n >= goal);
   if (!who.length) return '';
-  const pts = (n: number) => `${n} points`;
+  const pts = (n: number) => `${n}${icon('points', 1.1)}`;
   if (who.length > 1) {
-    const tags = who.map((x, k) => (x.i === me?.seat ? (k ? 'you' : 'You') : playerTag(x.i, names)));
-    return `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more, so this is the last round.`;
+    const tags = who.map((x) => (x.i === me?.seat ? 'you' : playerTag(x.i, names)));
+    return `Last round: ${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more`;
   }
   const [x] = who;
-  if (x.i !== me?.seat) return `${playerTag(x.i, names)} has ${pts(x.n)}, so this is the last round.`;
-  const hidden = g.players[x.i].publicPoints < goal ? ' with the cards in your hand' : '';
-  return `You have ${pts(x.n)}${hidden}, so this is the last round.`;
+  if (x.i !== me?.seat) return `Last round: ${playerTag(x.i, names)} has ${pts(x.n)}`;
+  const hidden = g.players[x.i].publicPoints < goal ? ' with your hand' : '';
+  return `Last round: you have ${pts(x.n)}${hidden}`;
 }
 
 // ---------- icons ----------
@@ -301,14 +301,14 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': {
       const d = g.dragons.find((x) => x.id === ev.d);
-      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][ev.stage]}` : '';
+      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} ${['', 'hatches', 'is now young', 'is now an adult'][ev.stage]}` : '';
     }
     case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${whose(ev.p)} tower ${buildingChip('tower', ev.p)} rises to ${ev.floors} floor${ev.floors === 1 ? '' : 's'}`;
     case 'upgrade': return `${who(ev.p)} adds ${a(ev.name)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'perch': {
       const b = g.map.find((h) => h.k === ev.hex)?.building;
-      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrade ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
+      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrades[0] ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
     }
     case 'recall': return `${who(ev.p)} recalls ${ev.ds.map((id) => dragon(id)).join('')} home`;
     case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
@@ -326,16 +326,16 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'discard': return `${who(ev.p)} discards ${ev.n} card${ev.n === 1 ? '' : 's'}`;
     case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
-    case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
+    case 'hold': return `${who(ev.p)} <span class="no">holds back</span>`;
     case 'raidEnd': return ev.won
       ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}${p === ev.scorer ? ` +${ev.points} ${icon('points', 1.2)}` : ''}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
+    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'held' ? 'Everyone holds back' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
     // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
     case 'cleared': {
       const home = (ev.home ?? []).map((id) => dragon(id)).join('');
-      if (!ev.fauna) return ev.won ? `${who(ev.p)} drives off ${home} <span class="ok">home</span>` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
+      if (!ev.fauna) return ev.won ? `The perched dragons <span class="ok">fall</span> to ${who(ev.p)}${home ? `; ${home} go home` : ''}` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
       const it = beast(ev.fauna, ev.name);
       const The = it.replace(/^the/, 'The');
       if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
@@ -343,7 +343,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'wander': {
       const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;
-      return b && b.type !== 'tower' ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}` : '';
+      if (b && b.type !== 'tower') return `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrades[0] ?? null, 26, b.cls)} ${esc(b.name)}`;
+      // The Leviathan surfacing holds the hexes adjacent to it: each building there is suppressed (#370).
+      const there = g.map.some((h) => h.k === ev.to && h.fauna?.key === ev.fauna);
+      const held = !there ? [] : g.map.filter((h) => h.held === ev.fauna && h.suppressed && h.building).map((h) => h.building!);
+      return held.length ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} holds ${held.map((x) => `${whose(x.owner)} ${buildingChip(x.type, x.owner, x.upgrades[0] ?? null, 26, x.cls)} ${esc(x.name)}`).join(', ')}` : '';
     }
     default: return '';
   }
@@ -494,9 +498,10 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      // Shut down by a beast or a perched dragon on it: the building's mark goes grey (the hex's rim keeps its owner).
-      cells.push(`<g transform="translate(${x} ${y})"${h.fauna || h.perched?.length ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
-      if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
+      // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey (the hex's rim keeps its owner).
+      cells.push(`<g transform="translate(${x} ${y})"${h.suppressed ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
+      // One badge per upgrade, overlapping toward the middle (Workshops stack, #400).
+      b.upgrades.forEach((u, i) => cells.push(`<g transform="translate(${x + r * 0.85 - i * size * 0.3} ${y - r * 0.85})">${upgradeBadge(u, size * 0.3)}</g>`));
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
     // A great beast's hold on the hexes round it, and the freed peak's richer ground.
@@ -542,7 +547,7 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
 // How the winner won a tie, if they did.
 export function tiebreakNote(g: PublicState): string {
   const w = g.standings![0];
-  return w.tiebreak === 'gold' ? `Wins the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+  return w.tiebreak === 'gold' ? `Tie: most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Tie: earliest in turn order' : '';
 }
 
 // A toast or note fades as it goes (style.css, .toast.gone), then leaves; at

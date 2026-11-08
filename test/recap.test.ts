@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
+import { TARGETS, targetPower } from '../src/data.ts';
 import { newGame, score, standings, titleValues } from '../src/engine.ts';
 import { buildRecap } from '../src/recap.ts';
 import { Room } from '../src/server/room.ts';
@@ -46,6 +47,13 @@ test("a recap tells the race round by round, ends on the final scores, and lists
     const holders = titles.filter((m) => m.t === t).map((m) => m.p);
     assert.ok(holders.every((p, i) => i === 0 || p !== holders[i - 1]), `${t} changes hands each time it's told`);
   }
+  // Kingdoms: only the turning points, not every fall. A fall that scores no
+  // points is told only when it's the strongest kingdom to fall yet.
+  const falls = g.log.filter((e) => e.ev?.k === 'raidEnd' && e.ev.won && !e.to);
+  const powerOf = (name: string) => targetPower(Object.keys(TARGETS).find((k) => TARGETS[k].name === name)!);
+  const plain = r.moments.filter((m) => m.k === 'fall' && m.scorer === undefined).map((m) => m.k === 'fall' ? powerOf(m.name) : 0);
+  assert.ok(plain.every((v, i) => i === 0 || v > plain[i - 1]), 'each plain fall told is a stronger kingdom than the last');
+  assert.ok(falls.length > r.moments.filter((m) => m.k === 'fall').length, 'routine falls are left out');
   assert.ok(JSON.stringify(r).length < 20000, 'small enough to keep and share');
 });
 
@@ -89,4 +97,20 @@ test("no recap until the game is over", () => {
   room.start(room.hostToken, 1);
   assert.equal(room.snapshot(null).recap ?? null, null);
   room.close();
+});
+
+test("the recap's charts leave room at the right for the longest name and its number", async () => {
+  const { madeSvg, powerSvg, raceSvg } = await import('../web/recap-view.ts');
+  const g = finished(3, 4);
+  const r = buildRecap(g, ['Maximilianus', 'Wilhelmina W', 'tom donnelly', 'Ada'], 'abc', new Date(0));
+  for (const svg of [raceSvg(r, { width: 600, height: 400 }), powerSvg(r, { width: 600, height: 300 }), madeSvg(r, { width: 600, height: 300 })]) {
+    const W = Number(svg.match(/viewBox="0 0 (\d+)/)![1]);
+    for (const [, x, name, n] of svg.matchAll(/<text class="who"[^>]* x="([\d.]+)"[^>]*>([^<]*) <tspan class="pts">(\d+)</g)) {
+      // Heavy 22px letters run about 12 wide on average (Maximilianus 156 measures 192 on a phone): the label ends inside the chart.
+      assert.ok(Number(x) + 13 * `${name} ${n}`.length <= W, `${name} ${n} fits`);
+    }
+  }
+  // The three charts line up: the same room on the right.
+  const right = (svg: string) => Number(svg.match(/<line class="grid" x1="[\d.]+" x2="([\d.]+)"/)![1]);
+  assert.equal(right(raceSvg(r, { width: 600 })), right(powerSvg(r, { width: 600 })));
 });

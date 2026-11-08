@@ -219,7 +219,7 @@ export class Room {
   // The only way the room changes the game: through the engine, then saved.
   mutate(fn: (g: Game) => void) {
     const g = this.cached;
-    if (!g) throw new RoomError('The game has not started yet.');
+    if (!g) throw new RoomError("The game hasn't started.");
     const before = g.log.length;
     fn(g); // apply() leaves the game untouched when it refuses a command
     withLock(this.file, () => save(this.file, g));
@@ -257,7 +257,7 @@ export class Room {
 
   private cleanName(name: string): string {
     const clean = tidyName(name);
-    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
+    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Choose a name.');
     if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}: choose another name.`);
     return clean;
   }
@@ -302,7 +302,7 @@ export class Room {
       }
       const clean = this.cleanName(name);
       const open = this.seats.find((s) => s.kind === 'open');
-      if (!open) throw new RoomError('That game has already started and every seat is taken.');
+      if (!open) throw new RoomError('The game has started and every seat is taken.');
       open.name = clean;
       open.kind = kind;
       open.token = token();
@@ -365,7 +365,7 @@ export class Room {
   start(tok: string, seed = Date.now()) {
     if (!this.canStart(tok)) throw new RoomError('Only the TV or the first player can start the game.');
     if (this.game) throw new RoomError('The game has already started.');
-    if (this.seats.length < MIN_PLAYERS) throw new RoomError(`Need at least ${MIN_PLAYERS} players.`);
+    if (this.seats.length < MIN_PLAYERS) throw new RoomError(`The game needs at least ${MIN_PLAYERS} players.`);
     if (existsSync(this.file)) throw new RoomError(`A game already exists at ${this.file}.`);
     this.cached = newGame(this.seats.length, seed);
     withLock(this.file, () => save(this.file, this.cached!));
@@ -480,7 +480,7 @@ export class Room {
   }
 
   private act(p: number, cmd: string) {
-    if (!this.game) throw new RoomError('The game has not started yet.');
+    if (!this.game) throw new RoomError("The game hasn't started.");
     if (this.seating) throw new RoomError('The game goes on once every seat is taken.');
     try {
       this.mutate((g) => apply(g, p, cmd));

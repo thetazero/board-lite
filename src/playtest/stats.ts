@@ -40,7 +40,7 @@ export interface GameStats {
   elements: Count; // every dragon a seat ended with, by element, starting ones included
   projects: Count; // special projects: building type, 'tower_floor', upgrade key or 'egg'
   hoards: number[]; // Secret Hoards in hand at the end
-  raids: { targets: Record<string, { chosen: number; fell: number }>; joined: number[]; fell: number[]; loot: number[]; bailed: number[]; gold: number[] };
+  raids: { targets: Record<string, { chosen: number; fell: number }>; joined: number[]; fell: number[]; loot: number[]; held: number[]; gold: number[] };
   fauna: Record<string, { tried: number[]; cleared: number[] }>;
   trades: { offers: number[]; accepted: number[]; declined: number[] }; // accepted: trades a seat was in
   bank: { trades: number[]; gave: number[]; got: number[] };
@@ -72,7 +72,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     seats: g.players.map((_, p) => ({ seat: `P${p + 1}`, name: res.seats[p]?.name ?? '', model: res.seats[p]?.model ?? '?', final: fin?.totals[p] ?? score(g, p).total, hidden: score(g, p).hidden })),
     points: [], power: [], titles: [], titleRounds: {}, offered: {}, kept: {}, built: {}, upgraded: {}, played: {}, hatched: {}, elements: {}, projects: {},
     hoards: g.players.map((_, p) => score(g, p).hidden),
-    raids: { targets: {}, joined: zeros(n), fell: zeros(n), loot: zeros(n), bailed: zeros(n), gold: zeros(n) },
+    raids: { targets: {}, joined: zeros(n), fell: zeros(n), loot: zeros(n), held: zeros(n), gold: zeros(n) },
     fauna: {}, trades: { offers: zeros(n), accepted: zeros(n), declined: zeros(n) },
     bank: { trades: zeros(n), gave: zeros(n), got: zeros(n) }, talk: { said: zeros(n), told: zeros(n), words: zeros(n) }, check: [],
   };
@@ -95,7 +95,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     ...g,
     players: g.players.map((pl) => ({ ...pl, hand: [] })),
     map: Object.fromEntries(Object.entries(g.map).map(([k, h]) => { const { fauna: _, ...rest } = h; return [k, fauna[k] ? { ...rest, fauna: fauna[k] } : rest]; })),
-    buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrade: null, floors: 0 }])),
+    buildings: Object.fromEntries(g.towers.map((k, p) => [k, { type: 'tower', owner: p, upgrades: [], floors: 0 }])),
     dragons: g.dragons.filter((d) => !hatchedIds.has(d.id)).map((d) => { const { perch: _, ...rest } = d; return { ...rest, stage: TUNING.startingDragonStage }; }),
     titles: { army: null, tower: null, hoard: null }, slain: {}, raidPoints: g.players.map(() => 0),
   };
@@ -124,7 +124,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         break;
       }
       case 'build':
-        r.buildings[ev.hex] = { type: ev.b, owner: ev.p, upgrade: null, floors: 0 };
+        r.buildings[ev.hex] = { type: ev.b, owner: ev.p, upgrades: [], floors: 0 };
         bump(s.built, ev.b, ev.p, n);
         if (ev.project) bump(s.projects, ev.b, ev.p, n);
         break;
@@ -134,7 +134,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         if (ev.project) bump(s.projects, 'tower_floor', ev.p, n);
         break;
       case 'upgrade':
-        r.buildings[ev.hex].upgrade = ev.u;
+        r.buildings[ev.hex].upgrades.push(ev.u);
         bump(s.upgraded, ev.u, ev.p, n);
         if (ev.project) bump(s.projects, ev.u, ev.p, n);
         break;
@@ -166,7 +166,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
         break;
       case 'target': target = ev.t; (s.raids.targets[ev.t] ??= { chosen: 0, fell: 0 }).chosen++; break;
       case 'fight': for (const p of ev.ps) s.raids.joined[p]++; break;
-      case 'bail': s.raids.bailed[ev.p]++; break;
+      case 'hold': s.raids.held[ev.p]++; break;
       case 'raidEnd':
         if (ev.won) s.raids.targets[target].fell++;
         if (ev.scorer !== undefined) r.raidPoints[ev.scorer] += ev.points ?? 0;
@@ -328,7 +328,7 @@ export function gameMarkdown(s: GameStats): string {
   L.push(`- **Dragons hatched:** ${counted(s.hatched, nm)}. Elements at the end: ${counted(s.elements, (k) => k)}.`);
   L.push(`- **Special projects:** ${counted(s.projects, nm)}.`);
   const tg = Object.entries(s.raids.targets);
-  L.push(`- **Raids:** ${tg.length ? tg.map(([k, v]) => `${nm(k)} ${v.fell}/${v.chosen} fell`).join(', ') : 'none'}. Joined: ${bySeat(s.raids.joined)}; on the winning side: ${bySeat(s.raids.fell)}; took loot: ${bySeat(s.raids.loot)}; raid gold: ${bySeat(s.raids.gold)}; bailed: ${bySeat(s.raids.bailed)}.`);
+  L.push(`- **Raids:** ${tg.length ? tg.map(([k, v]) => `${nm(k)} ${v.fell}/${v.chosen} fell`).join(', ') : 'none'}. Joined: ${bySeat(s.raids.joined)}; on the winning side: ${bySeat(s.raids.fell)}; took loot: ${bySeat(s.raids.loot)}; raid gold: ${bySeat(s.raids.gold)}; held back: ${bySeat(s.raids.held)}.`);
   const fa = Object.entries(s.fauna);
   L.push(`- **Fauna and great beasts:** ${fa.length ? fa.map(([k, v]) => `${nm(k)} ${sum(v.cleared)}/${sum(v.tried)} cleared (${bySeat(v.cleared)})`).join('; ') : 'none fought'}.`);
   L.push(`- **Trades:** offers ${bySeat(s.trades.offers)}; accepted (either side) ${bySeat(s.trades.accepted)}; declined ${bySeat(s.trades.declined)}. **Merchants:** ${bySeat(s.bank.trades)} trades, ${sum(s.bank.gave)} given for ${sum(s.bank.got)}.`);
@@ -364,7 +364,7 @@ function modelRolls(games: GameStats[]): ModelRoll[] {
     add('raids joined that fell', s.raids.fell[p]);
     add('raids with loot', s.raids.loot[p]);
     add('raid gold', s.raids.gold[p]);
-    add('bailed', s.raids.bailed[p]);
+    add('held back', s.raids.held[p]);
     add('fauna cleared', sum(Object.entries(s.fauna).filter(([k]) => FAUNA[k]).map(([, v]) => v.cleared[p])));
     add('great beasts slain', sum(Object.entries(s.fauna).filter(([k]) => BEASTS[k]).map(([, v]) => v.cleared[p])));
     add('trade offers', s.trades.offers[p]);

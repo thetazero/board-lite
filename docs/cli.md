@@ -34,7 +34,7 @@ node src/cli.ts do http://localhost:8080/ABCD <token> keep c49
 node src/cli.ts wait http://localhost:8080/ABCD <token>    # until it's your decision again
 ```
 
-Repeat: `wait`, `view`, `do`. To play several seats yourself, `join` once per seat, each with its own name and token. In the simultaneous steps (raid vote, commit, fight-or-bail, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only. Phones can join the same room from the join form with its code.
+Repeat: `wait`, `view`, `do`. To play several seats yourself, `join` once per seat, each with its own name and token. In the simultaneous steps (raid vote, commit, fight or hold back, discards) several seats are waiting at once, in any order. To stay fair when playing every seat yourself, decide each seat from its own `view` only. Phones can join the same room from the join form with its code.
 
 ## Decision commands
 
@@ -49,8 +49,8 @@ Action phase, on your turn:
 | `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
 | `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
 | `play c40 2,-1` | play a fauna card (Rouse the Bear, Wake the Basilisk): put its beast on hex 2,-1 |
-| `clear 2,-1 d3 d7` | send your raid-ready dragons d3 and d7 against what holds 2,-1 (its beast and any rival dragons perched there); the hits they take stay on them |
-| `perch 2,-1 d3` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it's suppressed (counts as if it weren't there) while d3 stays, and d3 doesn't raid |
+| `clear 2,-1 d3 d7` | send your raid-ready dragons d3 and d7 against what holds 2,-1 (its beast and every rival dragon perched there, together; a coin flip says which side strikes first); the hits they take stay on them. Dragons not knocked out can clear again this turn, and still raid |
+| `perch 2,-1 d3` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it's suppressed (counts as if it weren't there) while d3 stays, and d3 doesn't raid. Dragons perched on one building fight together when it's cleared |
 | `recall d3` | bring your perched dragon d3 home |
 | `project fire` | special project: a base dragon egg of that element, no card, double cost |
 | `project workshop 2,-1` | special project: a Workshop on that building of yours, no card, double cost |
@@ -64,10 +64,10 @@ Any time in the action phase: `accept o40` / `decline o40` for an offer made to 
 
 Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
 
-Raid phase: `vote 2`; then `commit d3 d7` (or `commit none`) and `ready`; then, if committed, `fight` or `bail`. The fight then plays out to the end with no further choices.
+Raid phase: `vote 2`; then `commit d3 d7` (or `commit none`) and `ready`; then, if committed, `fight` or `hold` (hold back). The fight then plays out to the end with no further choices.
 
 End of round, if over 7 cards: `discard c4 c9`.
 
 ## Hex coordinates
 
-Hexes are axial `q,r`. The six neighbours of `q,r` are `q+1,r`, `q-1,r`, `q,r+1`, `q,r-1`, `q+1,r-1` and `q-1,r+1`. The map in a view prints one row per `r`, each cell as `q,r:<terrain>[<owner><building>]`; your options list the open hexes where each of your building cards can go.
+Hexes are axial `q,r`. The six neighbours of `q,r` are `q+1,r`, `q-1,r`, `q,r+1`, `q,r-1`, `q+1,r-1` and `q-1,r+1`. The map in a view prints one row per `r`, each cell as `q,r:<terrain>[<owner><building>]`; your options list the hexes where each of your building cards can go.

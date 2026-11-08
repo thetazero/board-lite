@@ -41,7 +41,7 @@ The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for
 
 ## After the game
 
-When the game ends in front of the TV, it plays a short summary (about half a minute): the points race drawn a round at a time, with the titles taken, great beasts slain and kingdoms that fell, then where everyone's points came from. **Skip** jumps to the final scores. They come with a QR code to the game's **recap page** (`/recap/<id>`), the same story to keep or share on a phone; **Watch again** plays the summary again.
+When the game ends in front of the TV, it plays a short summary (about half a minute): the points race drawn a round at a time, with its turning points (titles taken, great beasts slain, kingdoms that score points and the strongest kingdom yet to fall), then everyone's dragon power and production over the game, then where everyone's points came from. **Skip** jumps to the final scores. They come with a QR code to the game's **recap page** (`/recap/<id>`), the same story to keep or share on a phone; **Watch again** plays the summary again.
 
 The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/recap.ts` when the game ends), so its link still opens after the table starts a new game and the old room is gone. The page (`web/recap.html`) draws everything from that file: to put recaps on a website later, host the page and the files, and point the TV's QR code there.
 

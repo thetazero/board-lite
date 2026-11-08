@@ -112,9 +112,9 @@ async function main(argv: string[]): Promise<number> {
         if (r.code === 2 && Date.now() - start < timeout * 1000) continue;
         const s = r.state as Snapshot;
         const g = s.game;
-        if (g?.phase === 'over') console.log('The game is over.');
+        if (g?.phase === 'over') console.log('Game over.');
         else if (r.code === 0) console.log(`${pname(s.seat)}: your decision. Run "view" to see the board.`);
-        else console.log(g ? `Still waiting on: ${g.waitingOn.map(pname).join(', ')}.` : 'The game has not started yet.');
+        else console.log(g ? `Waiting for ${g.waitingOn.map(pname).join(', ')}.` : "The game hasn't started.");
         return Number(r.code);
       }
     }

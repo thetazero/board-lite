@@ -7,7 +7,7 @@
 
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
-import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
+import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, stageStats, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
 import { PEAK, distance, leviathanWaters, nearBeast, neighbors, parseKey } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
@@ -123,7 +123,7 @@ const bots = (until: (g: Game) => boolean) => (g: Game, rng: Rng) => void drive(
 // ---------- staging ----------
 
 // The moves that change as little as they can (the stand-in's: end the turn,
-// keep the first card, vote for the first target, send nothing, bail), made
+// keep the first card, vote for the first target, send nothing, hold back), made
 // for whoever is waited on until `until` holds.
 function pass(g: Game, until: (g: Game) => boolean) {
   for (let steps = 0; !until(g); steps++) {
@@ -151,8 +151,8 @@ function sendAll(g: Game, p: number) {
   apply(g, p, `commit ${g.dragons.filter((d) => d.owner === p && ready(d)).map((d) => d.id).join(' ')}`);
   apply(g, p, 'ready');
 }
-// To the fight-or-bail step: the raiders send everything, everyone else stays home.
-function toBail(g: Game, raiders: number[]) {
+// To the fight-or-hold-back step: the raiders send everything, everyone else stays home.
+function toChoice(g: Game, raiders: number[]) {
   for (const p of raiders) sendAll(g, p);
   for (const p of g.players.keys()) if (!g.raid!.ready[p]) apply(g, p, 'ready');
 }
@@ -166,7 +166,7 @@ function arm(g: Game, p: number, stages: number[]) {
   while (dragonCapacity(g, p) < stages.length) {
     const k = buildableHexes(g, p, 'roost').sort()[0];
     if (!k) throw new Error(`arm: no room for a roost for P${p + 1}`);
-    g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+    g.buildings[k] = { type: 'roost', owner: p, upgrades: [], floors: 0 };
   }
   const keys = Object.keys(DRAGONS);
   stages.forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0 }));
@@ -182,7 +182,7 @@ function producers(g: Game, p: number, n: number) {
     if (i >= keys.length * n) throw new Error(`producers: no room for P${p + 1}'s`);
     const k = buildableHexes(g, p, keys[i % keys.length])[0];
     if (!k) continue;
-    g.buildings[k] = { type: keys[i % keys.length], owner: p, upgrade: null, floors: 0 };
+    g.buildings[k] = { type: keys[i % keys.length], owner: p, upgrades: [], floors: 0 };
     placed++;
   }
 }
@@ -248,7 +248,7 @@ function buildingsAtLeast(g: Game, n: number, seats = g.players.map((_, p) => p)
     if (i > 50) throw new Error('buildingsAtLeast: no room');
     const p = seats[i % seats.length];
     const k = buildableHexes(g, p, 'roost').sort()[0];
-    if (k) g.buildings[k] = { type: 'roost', owner: p, upgrade: null, floors: 0 };
+    if (k) g.buildings[k] = { type: 'roost', owner: p, upgrades: [], floors: 0 };
   }
 }
 
@@ -260,7 +260,7 @@ function pointsToWin(g: Game, p: number) {
   for (let i = 0; score(g, p).public < TUNING.pointsToWin; i++) {
     const at = worth.flatMap((type) => buildableHexes(g, p, type).sort().slice(0, 1).map((k) => ({ type, k })))[0];
     if (i > 50) throw new Error('pointsToWin: no room');
-    if (at) g.buildings[at.k] = { type: at.type, owner: p, upgrade: null, floors: 0 };
+    if (at) g.buildings[at.k] = { type: at.type, owner: p, upgrades: [], floors: 0 };
     else g.raidPoints[p] += TUNING.pointsToWin - score(g, p).public;
   }
 }
@@ -282,13 +282,13 @@ const card = (id: string) => `[data-card="${id}"]`;
 function blockedReasons(g: Game, p: number) {
   const seen = new Map<string, { id: string; key: string }>();
   for (const c of seatState(g, p).hand) {
-    const reason = c.blocked?.replace(/No empty [\w ]+ is adjacent/, 'No empty hex is adjacent').replace(/no [\w ,]+ without an upgrade/, 'no building without an upgrade');
+    const reason = c.blocked?.replace(/No empty [\w ]+ is adjacent/, 'No empty hex is adjacent');
     if (reason && !seen.has(reason)) seen.set(reason, { id: c.id, key: c.key });
   }
   return [...seen.values()];
 }
 // How the last raid ended, as the log says it.
-const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone bails|No one raids|no raid this round/.test(e.text))?.text ?? '';
+const raidOutcome = (g: Game) => g.log.findLast((e) => /falls\.|holds\.|Everyone holds back|No one raids|no raid this round/.test(e.text))?.text ?? '';
 const raidOver = (g: Game) => g.raid === null || g.raid.step === 'vote';
 const drain = (g: Game, p: number) => Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 0));
 
@@ -342,6 +342,13 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'early-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    shots: () => [{ file: 'tv-early-5p', caption: 'TV, early game (5 players, round 2): where the five towers stand', client: 'tv' }],
+  },
+  {
     name: 'early-3p',
     players: 3,
     seed: 1,
@@ -365,6 +372,7 @@ export const SCENES: Scene[] = [
   {
     // #350: a Workshop as a special project. The acting player has a quarry
     // and can afford double the card, so Upgrade opens the choice of building.
+    // The quarry already has 2 Workshops, so a third adds 1 (#400).
     name: 'workshop-project-3p',
     players: 3,
     seed: 1,
@@ -374,11 +382,12 @@ export const SCENES: Scene[] = [
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 12));
       const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
       g.map[k].terrain = 'mountain';
-      g.buildings[k] = { type: 'quarry', owner: p, upgrade: null, floors: 0 };
+      g.buildings[k] = { type: 'quarry', owner: p, upgrades: ['workshop', 'workshop'], floors: 0 };
     },
     shots: (g) => [
+      { file: 'tv-workshops-3p', caption: 'TV: a quarry with 2 Workshops, a mark for each', client: 'tv', waitMs: 4800 },
       { file: 'phone-workshop-project-3p', caption: 'Phone: special projects, with the Workshop affordable', client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]'] },
-      { file: 'phone-workshop-project-pick-3p', caption: "Phone: the Workshop project's Upgrade tapped and a building picked, before confirming", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-upproject=workshop]', '[data-hex]'] },
+      { file: 'phone-workshop-project-pick-3p', caption: "Phone: the Workshop project's Upgrade tapped and a building picked, before confirming", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-upproject=workshop]', `[data-hex="${Object.keys(g!.buildings).find((k) => g!.buildings[k].type === 'quarry' && g!.buildings[k].owner === g!.turn)}"]`] },
     ],
   },
   {
@@ -426,7 +435,7 @@ export const SCENES: Scene[] = [
       const owner = g.turn;
       const ks = Object.keys(g.map).filter((x) => g.map[x].terrain === 'harbor' && !g.buildings[x]).sort((a, b) => dist(a, g.towers[owner]) - dist(b, g.towers[owner]) || a.localeCompare(b));
       g.players[owner].resources.timber = Math.max(g.players[owner].resources.timber, 6);
-      ['timber_port', 'stone_port', 'crystal_port', 'livestock_port'].forEach((type, i) => ks[i] && (g.buildings[ks[i]] = { type, owner, upgrade: null, floors: 0 }));
+      ['timber_port', 'stone_port', 'crystal_port', 'livestock_port'].forEach((type, i) => ks[i] && (g.buildings[ks[i]] = { type, owner, upgrades: [], floors: 0 }));
     },
     shots: (g) => {
       return [
@@ -453,7 +462,7 @@ export const SCENES: Scene[] = [
       for (const p of [0, 1]) {
         for (const [type, terrain] of want) {
           const k = near(p, (k) => (terrain ? g.map[k].terrain === terrain : !['ocean', 'harbor'].includes(g.map[k].terrain)));
-          if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+          if (k) g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
         }
         Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 9));
       }
@@ -486,7 +495,7 @@ export const SCENES: Scene[] = [
       ];
       for (const p of [0, 1]) for (const [type, ok] of want[p]) {
         const k = near(p, ok);
-        if (k) g.buildings[k] = { type, owner: p, upgrade: null, floors: 0 };
+        if (k) g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
       }
       giveHand(g, g.turn, PRODUCTION_CARDS);
     },
@@ -514,18 +523,20 @@ export const SCENES: Scene[] = [
       const land = (k: string) => g.map[k].terrain !== 'harbor';
       const want: [string, (k: string) => boolean, string | null][][] = [
         [['crystal_port', (k) => g.map[k].terrain === 'harbor', null], ['market', land, null], ['hatchery', land, 'nesting_grounds'], ['roost', land, null], ['quarry', land, 'workshop'], ['monument', land, null]],
+        // (the quarry gets a second Workshop below: they stack, #400)
         [['monument', land, null], ['standing_stones', (k) => land(k) && by('ley')(k), null], ['lighthouse', (k) => land(k) && by('ocean')(k), null], ['guildhall', land, null], ['market', land, null], ['roost', land, 'nesting_grounds'], ['quarry', land, null]],
       ];
       for (const p of [0, 1]) for (const [type, ok, upgrade] of want[p]) {
         const k = near(p, ok);
-        if (k) g.buildings[k] = { type, owner: p, upgrade, floors: 0 };
+        if (k) g.buildings[k] = { type, owner: p, upgrades: upgrade ? [upgrade] : [], floors: 0 };
       }
       g.buildings[g.towers[0]].floors = 2;
-      g.buildings[g.towers[1]].upgrade = 'nesting_grounds';
+      for (const b of Object.values(g.buildings)) if (b.type === 'quarry' && b.owner === 0) b.upgrades.push('workshop');
+      g.buildings[g.towers[1]].upgrades = ['nesting_grounds'];
       giveHand(g, g.turn, CIVIC_CARDS);
     },
     shots: (g) => [
-      { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building', client: 'tv', waitMs: 4800 },
+      { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building (2 Workshops on one quarry)', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
@@ -682,12 +693,33 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
       toVote(g);
       vote(g, 'cinderkeep');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-points-result-3p', caption: 'TV: Cinderkeep falls, and the crown comes down on the most power standing, then its point', client: 'tv', live: true, waitFor: '#overlay .scored', waitMs: 600 }],
+  },
+  {
+    // Cinderkeep falls to all six, long names and all: the loot row wraps
+    // inside its sheet, which stands clear of the fighters, and one crown
+    // comes down (#364).
+    name: 'points-result-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [3, 3]);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      const all = [...g.players.keys()];
+      toChoice(g, all);
+      for (const p of all.slice(1)) apply(g, p, 'fight');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-points-result-6p', caption: 'TV: Cinderkeep falls to six players with long names: the loot wraps inside its sheet, clear of the fighters, and one crown comes down', client: 'tv', live: true, waitFor: '#overlay .scored', waitMs: 600 }],
   },
   {
     // The same fight on Cinderkeep, mid-replay: its Fire Giant looms over the Knights (#326).
@@ -700,7 +732,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === a ? [3, 3, 3] : p === b ? [3, 3, 3, 3, 3, 3] : [0]);
       toVote(g);
       vote(g, 'cinderkeep');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
@@ -719,7 +751,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       g.raid!.candidates[0] = 'titans_throne';
       vote(g, 'titans_throne');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
@@ -739,14 +771,14 @@ export const SCENES: Scene[] = [
       toVote(g);
       g.raid!.candidates[0] = 'titans_throne';
       vote(g, 'titans_throne');
-      toBail(g, [a, b]);
+      toChoice(g, [a, b]);
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
     shots: () => [{ file: 'phone-remote-titan-fight-3p', caption: "No TV: Titan's Throne on a phone: each side in columns of up to four", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2900 }],
   },
   {
-    name: 'bail-3p',
+    name: 'choose-3p',
     players: 3,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
@@ -756,13 +788,70 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, [2]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, t, 'fight');
     },
     shots: (g) => [
-      { file: 'tv-raid-bail-3p', caption: 'TV, fight or bail (3 players): one has chosen', client: 'tv' },
-      { file: 'phone-raid-bail-3p', caption: 'Phone: fight or bail, in secret', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !g!.raid!.choices[p]) },
+      { file: 'tv-raid-choose-3p', caption: 'TV, fight or hold back (3 players): one has chosen', client: 'tv' },
+      { file: 'phone-raid-choose-3p', caption: 'Phone: fight or hold back, in secret', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !g!.raid!.choices[p]) },
     ],
+  },
+  {
+    name: 'choose-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    // Four raiders against the strongest kingdom on offer, one with two
+    // dragons; two have chosen, two are still choosing; the fifth stays home.
+    setup: (g) => {
+      const t = g.turn;
+      const raiders = [0, 1, 2, 3].map((i) => (t + i) % 5);
+      for (const p of g.players.keys()) arm(g, p, p === raiders[1] ? [3, 2] : p === raiders[3] ? [1] : [2]);
+      toVote(g);
+      vote(g, byPower(g).at(-1)!);
+      toChoice(g, raiders);
+      apply(g, raiders[0], 'fight');
+      apply(g, raiders[2], 'hold');
+    },
+    shots: () => [{ file: 'tv-raid-choose-5p', caption: 'TV, fight or hold back (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
+  },
+  {
+    // Late in a game: two raiders send 8 dragons each, one sends 4, against
+    // Cinderkeep, whose sheet is tall; long names; a few dragons are hurt.
+    name: 'choose-many-3p',
+    players: 3,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      const many = [3, 3, 3, 2, 3, 3, 2, 3];
+      for (const p of g.players.keys()) arm(g, p, p === (t + 1) % 3 ? [3, 2, 3, 3] : many);
+      toVote(g);
+      vote(g, 'cinderkeep');
+      toChoice(g, [0, 1, 2]);
+      const hurt = g.dragons.filter((d) => d.stage === 3);
+      hurt[2].damage = 3;
+      hurt[9].damage = 8;
+      apply(g, t, 'fight');
+    },
+    shots: () => [{ file: 'tv-raid-choose-many-3p', caption: 'TV, fight or hold back: 8 dragons each for two raiders, on Cinderkeep', client: 'tv', sizes: true }],
+  },
+  {
+    name: 'remote-choose-3p',
+    players: 3,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn;
+      for (const p of g.players.keys()) arm(g, p, [2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toChoice(g, [t, (t + 1) % 3]);
+      apply(g, t, 'fight');
+    },
+    shots: () => [{ file: 'tv-remote-choose-3p', caption: 'No TV: fight or hold back on the table view', client: 'tv', table: true, sizes: true }],
   },
   {
     name: 'raid-result-3p',
@@ -797,24 +886,24 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'phone-raid-watch-3p', caption: 'Phone, while the TV replays a fight: everyone watches, and the next decision waits', client: 'phone', seat: 1, live: true, screen: true, waitMs: 600 }],
   },
   {
-    // A fight one raider bailed out of: they're shown flown home beside it.
-    name: 'raid-fled-4p',
+    // A fight one raider held back from: they're shown beside it.
+    name: 'raid-held-4p',
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // Three raiders: the first bails, the second fights, the third decides live.
+    // Three raiders: the first holds back, the second fights, the third decides live.
     setup: (g) => {
       const [a, b, c] = turnOrder(g);
       for (const p of g.players.keys()) arm(g, p, [a, b, c].includes(p) ? [3, 3] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [a, b, c]);
-      apply(g, a, 'bail');
+      toChoice(g, [a, b, c]);
+      apply(g, a, 'hold');
       apply(g, b, 'fight');
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-fled-4p', caption: 'TV: a fight mid-replay, with the raider who bailed flown home', client: 'tv', live: true, waitMs: 3300 }],
+    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the raider who held back beside it', client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     name: 'discard-4p',
@@ -865,7 +954,7 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       for (const type of ['quarry', 'lumber_camp', 'crystal_mine', 'pasture']) {
         const free = Object.keys(g.map).sort().filter((k) => g.map[k].terrain === BUILDINGS[type].terrain && !g.buildings[k] && !g.map[k].fauna && !nearBeast(g.map, k));
-        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrade: null, floors: 0 };
+        for (const k of free.slice(0, 6)) g.buildings[k] = { type, owner: 0, upgrades: [], floors: 0 };
       }
       toDiscard(g, [1]);
     },
@@ -885,6 +974,26 @@ export const SCENES: Scene[] = [
         { file: 'phone-late-6p', caption: 'Phone, late game: the leader', client: 'phone', seat: leader, sizes: true },
       ];
     },
+  },
+  {
+    // Late in a big game: 12 or 13 dragons each, of every stage, long names;
+    // some hurt, a few knocked out (#406).
+    name: 'late-many-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    until: late(6, 1),
+    setup: (g) => {
+      const stages = [3, 3, 2, 3, 1, 3, 2, 0, 3, 3, 2, 1, 3];
+      // More than their roosts hold: the TV draws them all the same.
+      const keys = Object.keys(DRAGONS);
+      g.dragons = [];
+      for (const p of g.players.keys()) stages.slice(0, 12 + (p % 2)).forEach((stage, i) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key: keys[(p + i) % keys.length], stage, growth: 0, damage: 0 }));
+      const adults = g.dragons.filter((d) => d.stage === 3);
+      adults.forEach((d, i) => { if (i % 5 === 1) d.damage = 6; if (i % 11 === 4) d.damage = 99; });
+      for (const d of g.dragons) d.damage = Math.min(d.damage, stageStats(d)?.hp ?? 0);
+    },
+    shots: () => [{ file: 'tv-late-many-6p', caption: 'TV, late game (6 players): 12 or 13 dragons each', client: 'tv', sizes: true }],
   },
   {
     name: 'late-2p',
@@ -908,6 +1017,20 @@ export const SCENES: Scene[] = [
       { file: 'tv-late-5p', caption: 'TV, late game (5 players)', client: 'tv' },
       { file: 'phone-late-5p-turn', caption: 'Phone, late game: your turn', client: 'phone', seat: g!.turn },
     ],
+  },
+  {
+    // A crowded panel header (#398): one player holds every title and slew
+    // both great beasts, five badges between their name and their points.
+    name: 'many-badges-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 8 && g.phase === 'action',
+    setup: (g) => {
+      for (const t of Object.keys(g.titles) as (keyof typeof g.titles)[]) g.titles[t] = 0;
+      for (const k of Object.keys(g.map)) if (g.map[k].fauna && BEASTS[g.map[k].fauna!]) delete g.map[k].fauna;
+      for (const b of Object.keys(BEASTS)) g.slain[b] = 0;
+    },
+    shots: () => [{ file: 'tv-many-badges-3p', caption: "TV: a player with every title and both great beasts: their points still show in full", client: 'tv' }],
   },
   {
     name: 'last-round-4p',
@@ -934,12 +1057,26 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-game-over-4p', caption: "TV: final scores, with a QR code to the game's recap", client: 'tv' },
       { file: 'tv-recap-race-4p', caption: 'TV, at the end: the points race, drawn a round at a time (here round 12), with what happened lately', client: 'tv', run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
-      { file: 'tv-recap-race-end-4p', caption: 'TV, at the end: the whole race', client: 'tv', run: summaryAt(-2), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+      { file: 'tv-recap-race-end-4p', caption: 'TV, at the end: the whole race', client: 'tv', run: summaryAt(-3), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
+      { file: 'tv-recap-growth-4p', caption: "TV, at the end: everyone's dragon power and production over the game", client: 'tv', run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
       { file: 'tv-recap-points-4p', caption: "TV, at the end: where everyone's points came from", client: 'tv', run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
       { file: 'phone-recap-page', caption: "The recap page the TV's QR code opens", client: 'phone', path: (room) => `/recap/${room.recapId}`, waitFor: '.recap-page .sheet' },
       { file: 'phone-game-over-winner', caption: 'Phone: the winner', client: 'phone', seat: g!.winner!, sizes: true },
       { file: 'phone-game-over-loser', caption: 'Phone: everyone else', client: 'phone', seat: (g!.winner! + 1) % 4 },
       { file: 'phone-join-another', caption: 'Phone: after "Join another game", back at the join form', client: 'phone', seat: (g!.winner! + 1) % 4, clicks: ['#newgame'], waitFor: '#join' },
+    ],
+  },
+  {
+    // The recap's charts with the longest names: each line's name and number fit at its end.
+    name: 'over-long-4p',
+    players: 4,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.phase === 'over',
+    shots: (g) => [
+      { file: 'phone-recap-page-long', caption: 'The recap page with long names: every chart shows each name and number in full', client: 'phone', path: (room) => `/recap/${room.recapId}`, waitFor: '.recap-page .sheet' },
+      { file: 'tv-recap-growth-long-4p', caption: 'TV, at the end: dragon power and production with long names', client: 'tv', run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
+      { file: 'tv-recap-race-end-long-4p', caption: 'TV, at the end: the whole race with long names', client: 'tv', run: summaryAt(-3), waitFor: `[data-step="race-${g!.round}"]`, hold: true },
     ],
   },
   {
@@ -1041,7 +1178,7 @@ export const SCENES: Scene[] = [
       g.dragons.filter((d) => d.owner === t)[1].damage = 3;
       if (!upgradeTargets(g, t, 'workshop').length) {
         const [type, k] = ['pasture', 'quarry', 'lumber_camp', 'crystal_mine'].map((b) => [b, buildableHexes(g, t, b).sort()[0]]).find(([, k]) => k)!;
-        g.buildings[k] = { type, owner: t, upgrade: null, floors: 0 };
+        g.buildings[k] = { type, owner: t, upgrades: [], floors: 0 };
       }
       giveHand(g, t, PLAYABLE);
       for (const r of Object.keys(g.players[t].resources)) g.players[t].resources[r as 'gold'] = 20;
@@ -1062,7 +1199,7 @@ export const SCENES: Scene[] = [
         { ...me, file: 'phone-zoom-monument', caption: 'Phone: Monument tapped open', clicks: [card(id('monument'))] },
         { ...me, file: 'phone-zoom-upgrade', caption: 'Phone: an upgrade card tapped open', clicks: [card(id('workshop'))] },
         { ...me, file: 'phone-pick-upgrade', caption: 'Phone: choosing the building to upgrade', clicks: [card(id('workshop')), '[data-pickhex]'], sizes: true },
-        { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: what it makes now and with it, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
+        { ...me, file: 'phone-pick-upgrade-picked', caption: 'Phone: a building tapped for the Workshop: its name and each change, before → after, then Upgrade', clicks: [card(id('workshop')), '[data-pickhex]', '.pmap [data-hex]'], sizes: true },
         { ...me, file: 'phone-pick-basic', caption: 'Phone: choosing where a basic building goes (no card)', clicks: ['[data-tab=more]', '[data-basic]:not([disabled])'] },
         { ...me, file: 'phone-bank-picks', caption: 'Phone: the merchants, giving crystal for 2 stone', clicks: ['[data-tab=trade]', '[data-bank="give crystal"]', '[data-bank="get stone"]', '[data-btimes="1"]'] },
       ];
@@ -1099,9 +1236,9 @@ export const SCENES: Scene[] = [
     setup: (g) => {
       const t = g.turn;
       for (const [k, b] of Object.entries(g.buildings)) {
-        if (b.owner !== t || b.upgrade) continue;
+        if (b.owner !== t || b.upgrades.length) continue;
         const u = Object.keys(UPGRADES).find((u) => upgradeTargets(g, t, u).includes(k));
-        if (u) b.upgrade = u;
+        if (u) b.upgrades = [u];
       }
       arm(g, t, []);
       arm(g, t, Array(dragonCapacity(g, t)).fill(3));
@@ -1179,7 +1316,7 @@ export const SCENES: Scene[] = [
     },
   },
   {
-    name: 'bail-4p',
+    name: 'choose-4p',
     players: 4,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
@@ -1188,12 +1325,12 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 4 ? [2] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 4]);
+      toChoice(g, [t, (t + 1) % 4]);
       apply(g, t, 'fight');
     },
     shots: (g) => [
-      { file: 'phone-raid-not-in-4p', caption: "Phone, fight or bail: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
-      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or bail: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
+      { file: 'phone-raid-not-in-4p', caption: "Phone, fight or hold back: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.commits[p].length) },
+      { file: 'phone-raid-chose-4p', caption: 'Phone, fight or hold back: already chosen', client: 'phone', seat: seatWhere(g!, (p) => g!.raid!.commits[p].length > 0 && !!g!.raid!.choices[p]) },
     ],
   },
   {
@@ -1207,7 +1344,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [1] : [0]);
       toVote(g);
       vote(g, byPower(g).at(-1)!);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, (t + 1) % 3, 'fight');
     },
     live: bots(raidOver),
@@ -1215,21 +1352,21 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-raid-lost-3p', caption: 'TV: a lost raid, at the end of the replay ("… holds")', client: 'tv', live: true, waitFor: '#overlay .outcome.show', waitMs: 400 }],
   },
   {
-    name: 'raid-bailed-2p',
+    name: 'raid-held-2p',
     players: 2,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
-    // Both send a dragon; the first bails, and the second bails live.
+    // Both send a dragon; the first holds back, and the second holds back live.
     setup: (g) => {
       for (const p of [0, 1]) arm(g, p, [1]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [0, 1]);
-      apply(g, 0, 'bail');
+      toChoice(g, [0, 1]);
+      apply(g, 0, 'hold');
     },
-    live: (g) => apply(g, 1, 'bail'),
-    liveEnd: (g) => /Everyone bails/.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-bailed-2p', caption: 'TV: everyone bailed (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
+    live: (g) => apply(g, 1, 'hold'),
+    liveEnd: (g) => /Everyone holds back/.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-held-2p', caption: 'TV: everyone held back (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
   {
     name: 'raid-nobody-3p',
@@ -1254,7 +1391,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, p === t || p === (t + 1) % 3 ? [3] : [0]);
       toVote(g);
       vote(g, byPower(g)[0]);
-      toBail(g, [t, (t + 1) % 3]);
+      toChoice(g, [t, (t + 1) % 3]);
       apply(g, (t + 1) % 3, 'fight');
     },
     live: bots((g) => g.phase === 'action'),
@@ -1406,13 +1543,54 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // Fauna beside a great beast (#357): a Basilisk on a hex the Thunderbird
+    // holds. The hex is still held, so it keeps its border.
+    name: 'beast-hold-fauna-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      const n = neighbors(PEAK).sort().find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.map[x].fauna && !g.buildings[x])!;
+      g.map[n].fauna = 'basilisk';
+    },
+    shots: () => [{ file: 'tv-beast-hold-fauna-3p', caption: 'TV: a Basilisk beside the Thunderbird, on a hex it holds: still ringed', client: 'tv', waitMs: 4800 }],
+  },
+  {
+    // The Leviathan surfacing by a port holds it (#370): the port is
+    // suppressed, its hex dark grey, the feed says so, and its owner's
+    // merchants are back to 4:1 for timber until the Leviathan moves off.
+    name: 'leviathan-port-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const at = Object.keys(g.map).find((x) => g.map[x].fauna === 'leviathan')!;
+      const waters = leviathanWaters(g.map, 3);
+      const harbor = Object.keys(g.map).sort().find((x) => g.map[x].terrain === 'harbor' && !g.buildings[x] && !g.map[x].fauna && neighbors(x).some((n) => waters.includes(n)))!;
+      // No other beast near it, so the Leviathan's hold is all that greys it.
+      for (const n of [harbor, ...neighbors(harbor), ...neighbors(harbor).flatMap(neighbors)]) if (g.map[n]?.fauna && !BEASTS[g.map[n].fauna!]) delete g.map[n].fauna;
+      g.buildings[harbor] = { type: 'timber_port', owner: g.turn, upgrades: [], floors: 0 };
+      g.players[g.turn].resources.timber = Math.max(g.players[g.turn].resources.timber, 6);
+      // It has just surfaced beside the port, as in production, and the feed says so.
+      const to = neighbors(harbor).find((x) => waters.includes(x))!;
+      delete g.map[at].fauna;
+      g.map[to].fauna = 'leviathan';
+      g.log.push({ round: g.round, text: `The Leviathan dives at ${at} and surfaces at ${to}.`, ev: { k: 'wander', from: at, to, fauna: 'leviathan', name: BEASTS.leviathan.name } });
+    },
+    shots: (g) => [
+      { file: 'tv-leviathan-port-3p', caption: "TV: the Leviathan holds a Timber Port: it's suppressed, its hex dark grey", client: 'tv', waitMs: 4800 },
+      { file: 'phone-bank-leviathan-port-3p', caption: 'Phone: the merchants while the Leviathan holds your Timber Port: timber at 4:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
+    ],
+  },
+  {
     // The same fight, at its end.
     name: 'beasts-slain-3p',
     players: 3,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
-    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
+    shots: () => [{ file: 'tv-beast-slain-3p', caption: 'TV: the Thunderbird slain: +4 points for good, and the freed peak\'s +2 pops up', client: 'tv', waitMs: 4800, then: (room) => room.mutate((g2) => huntPeak(g2)) }],
   },
   {
     // After the Thunderbird falls: the peak is free and its ring is rich
@@ -1426,9 +1604,37 @@ export const SCENES: Scene[] = [
       huntPeak(g);
       const ring = neighbors(PEAK).find((k) => !g.buildings[k])!;
       g.map[ring].terrain = 'meadow';
-      g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrade: null, floors: 0 };
+      g.buildings[ring] = { type: 'pasture', owner: g.turn, upgrades: [], floors: 0 };
     },
     shots: () => [{ file: 'tv-peak-free-3p', caption: 'TV: the Thunderbird slain, its peak free and the ground round it rich (gold)', client: 'tv', waitMs: 4800 }],
+  },
+  {
+    // Building by the freed peak (#366): a hex tapped shows what the building
+    // would do there before Build, a Pasture with the peak's 2 more, and a
+    // Hatchery, which makes no resource, told it makes nothing more.
+    name: 'peak-build-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      huntPeak(g);
+      const ring = neighbors(PEAK).filter((k) => !g.buildings[k]);
+      g.map[ring[0]].terrain = 'meadow';
+      g.buildings[ring[0]] = { type: 'pasture', owner: g.turn, upgrades: [], floors: 0 };
+      g.map[ring[1]].terrain = 'meadow';
+      giveHand(g, g.turn, ['hatchery']);
+      for (const r of Object.keys(g.players[g.turn].resources)) g.players[g.turn].resources[r as 'gold'] = 20;
+    },
+    shots: (g) => {
+      const me = seatState(g!, g!.turn);
+      const peakHex = (hexes: string[]) => hexes.find((k) => k === PEAK || neighbors(PEAK).includes(k))!;
+      const pasture = peakHex(me.basics.find((b) => b.key === 'pasture')!.hexes);
+      return [
+        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that it makes nothing more', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
+        { file: 'phone-peak-build-pasture-3p', caption: "Phone: a hex by the freed peak tapped for a Pasture: what it makes there, the peak's 2 more included", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-basic=pasture]', `.pmap [data-hex="${pasture}"]`] },
+      ];
+    },
   },
   {
     // Clearing ordinary fauna (#96): a Cave Bear beside the acting player's
@@ -1461,7 +1667,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => perchers(g),
     shots: (g) => [
-      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, suppressed and grey", client: 'tv', waitMs: 4800 },
+      { file: 'tv-perch-3p', caption: "TV: dragons perched on a rival's buildings, suppressed: their hexes go dark grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-perch-turn-3p', caption: 'Phone: your turn, with perched dragons to clear, a building to perch on and a dragon to recall', client: 'phone', seat: g!.turn },
       { file: 'phone-perch-pick-3p', caption: "Phone: choosing a rival's building to perch on", client: 'phone', seat: g!.turn, clicks: ['#perch'] },
       { file: 'phone-perch-send-3p', caption: 'Phone: choosing dragons to perch there', client: 'phone', seat: g!.turn, clicks: ['#perch', '[data-hex]', '[data-hunter]'] },
@@ -1480,7 +1686,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => roostPerched(g),
     shots: (g) => [
-      { file: 'tv-perch-roost-3p', caption: "TV: a dragon perched on a rival's roost, which goes grey", client: 'tv', waitMs: 4800 },
+      { file: 'tv-perch-roost-3p', caption: "TV: a dragon perched on a rival's roost, whose hex goes dark grey", client: 'tv', waitMs: 4800 },
       { file: 'phone-perch-roost-3p', caption: 'Phone: your roost suppressed, so you have 1 dragon more than room', client: 'phone', seat: g!.turn },
     ],
   },
@@ -1694,6 +1900,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-remote-over-4p', caption: 'No TV: the end, on your own view', client: 'phone', seat: g!.winner! },
       { file: 'tv-remote-over-4p', caption: "No TV: the final scores on the table view, with a link to the game's recap", client: 'tv', table: true, sizes: true },
       { file: 'tv-remote-recap-race-4p', caption: 'No TV, at the end: the points race on the table view, here round 12', client: 'tv', table: true, sizes: true, run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
+      { file: 'tv-remote-recap-growth-4p', caption: "No TV, at the end: everyone's dragon power and production, on the table view", client: 'tv', table: true, sizes: true, run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
       { file: 'tv-remote-recap-points-4p', caption: "No TV, at the end: where everyone's points came from, on the table view", client: 'tv', table: true, run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
     ],
   },
@@ -1707,7 +1914,7 @@ function wonRaid(g: Game) {
   for (const p of g.players.keys()) arm(g, p, p === a || p === b ? [3, 3] : [0]);
   toVote(g);
   vote(g, byPower(g)[0]);
-  toBail(g, [a, b]);
+  toChoice(g, [a, b]);
   // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
   g.dragons.find((d) => d.id === g.raid!.commits[a][0])!.damage = 8;
   apply(g, b, 'fight');
@@ -1736,7 +1943,7 @@ function besideTower(g: Game, q: number, type: 'pasture' | 'lumber_camp'): strin
   const k = neighbors(g.towers[q]).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x))!;
   delete g.map[k].fauna;
   g.map[k].terrain = type === 'pasture' ? 'meadow' : 'forest';
-  g.buildings[k] = { type, owner: q, upgrade: null, floors: 0 };
+  g.buildings[k] = { type, owner: q, upgrades: [], floors: 0 };
   return k;
 }
 
@@ -1761,7 +1968,7 @@ function perchers(g: Game) {
 function roostBeside(g: Game, q: number): string {
   const k = [g.towers[q], ...neighbors(g.towers[q])].flatMap((t) => neighbors(t)).find((x) => g.map[x] && g.map[x].terrain !== 'ocean' && !g.buildings[x] && !nearBeast(g.map, x) && neighbors(x).some((n) => g.buildings[n]?.owner === q))!;
   delete g.map[k].fauna;
-  g.buildings[k] = { type: 'roost', owner: q, upgrade: null, floors: 0 };
+  g.buildings[k] = { type: 'roost', owner: q, upgrades: [], floors: 0 };
   return k;
 }
 

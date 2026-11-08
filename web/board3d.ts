@@ -344,7 +344,7 @@ function decor(h: HexView, seaward: number): THREE.Group {
   const g = new THREE.Group();
   const built = crowded(h);
   if (h.held) g.add(hexBorder(HOLD_COLORS[h.held] ?? '#555'));
-  if (h.peakZone) g.add(hexBorder(GOLD));
+  if (h.peakZone) g.add(hexBorder(GOLD), bonusToken(h.peakZone, !!h.building, !!h.peak && !h.building));
   // Spots around the hex: the middle is kept for a building or a beast.
   const spot = (min: number, max: number): [number, number] => {
     const a = r() * Math.PI * 2, d = min + r() * (max - min);
@@ -916,6 +916,50 @@ function hexBorder(color: string): THREE.Group {
   return g;
 }
 
+// The freed peak's bonus, printed on each of its hexes like a board game's
+// number token: a gold paper disc with "+2" inked on it, lying at the hex's
+// front edge (on the summit, its top), where nothing hides it. With the gold border it
+// reads at a glance: these hexes make 2 more (#354).
+function bonusToken(n: number, built: boolean, summit: boolean): THREE.Group {
+  const R = 0.25, H = 0.04, y = TILE_H + TILE_LIFT + 0.04; // over the fold, so its crease never cuts it
+  const ink = new THREE.Mesh(new THREE.CircleGeometry(R * 0.92, 24), inkMat(`+${n}`));
+  ink.rotation.x = -Math.PI / 2;
+  ink.position.y = H / 2 + 0.002;
+  const g = group(part(cyl(R, R, H, 12), GOLD), ink);
+  if (summit) {
+    // On the freed summit, where the Thunderbird perched: the mountain hides
+    // the hex's front, so the token is pinned to the top, facing the room.
+    g.position.set(0, TOP + PEAK_H - 0.08, 0.06);
+    g.rotation.x = 0.75;
+    g.scale.setScalar(1.25);
+  } else {
+    g.position.set(built ? 0.34 : 0, y, built ? 0.5 : 0.48);
+    g.rotation.x = 0.12; // tipped a little to the camera, on the tile's fold
+  }
+  return g;
+}
+
+// Ink on paper: text drawn on a transparent sheet, for a token's face.
+const INKS = new Map<string, THREE.MeshLambertMaterial>();
+function inkMat(text: string): THREE.MeshLambertMaterial {
+  let m = INKS.get(text);
+  if (m) return m;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#3a2710';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = 'bold 76px "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif';
+  x.fillText(text, 64, 70);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  m = new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false });
+  INKS.set(text, m);
+  return m;
+}
+
 function nest(): THREE.Mesh {
   return part(new THREE.TorusGeometry(0.16, 0.05, 3, 7), WOOD_DARK, { at: [0, 0.03, 0], rot: [Math.PI / 2, 0, 0] });
 }
@@ -1444,6 +1488,7 @@ function buildingModel(b: NonNullable<HexView['building']>): { model: THREE.Grou
 
 // Where an upgrade's mark stands: the plate's front-left corner, toward the room.
 const UPGRADE_AT: [number, number] = [-0.56, 0.4];
+const UPGRADE_STEP: [number, number] = [0.32, 0.2]; // from one upgrade's mark to the next's
 
 // What each upgrade puts beside the building it's on, as its card and icon
 // show it (icons.ts): a workshop's cog, nesting grounds' nest
@@ -1493,16 +1538,17 @@ function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry 
   geo.rotateX(-Math.PI / 2); // lie flat, its depth going up
   return geo;
 }
-function plate(upgrade: string | null, ground: string): THREE.Group {
+function plate(upgrades: string[], ground: string): THREE.Group {
   const g = new THREE.Group();
   g.add(part(cyl(0.76, 0.76, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
-  if (upgrade) {
-    g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
-    const mark = bake(upgradeMark(upgrade));
+  if (upgrades.length) g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
+  // One mark per upgrade (Workshops stack, #400), each the next along the front edge.
+  upgrades.forEach((u, i) => {
+    const mark = bake(upgradeMark(u));
     mark.scale.setScalar(1.6);
-    mark.position.set(UPGRADE_AT[0], GROUND, UPGRADE_AT[1]);
+    mark.position.set(UPGRADE_AT[0] + i * UPGRADE_STEP[0], GROUND, UPGRADE_AT[1] + i * UPGRADE_STEP[1]);
     g.add(mark);
-  }
+  });
   return g;
 }
 
@@ -1795,8 +1841,15 @@ const CASCADE_S = 0.3, CASCADE_MAX = 8;
 const turnTo = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 // A building on its plate, as it stands on a hex (shut: a beast or a perched dragon holds it).
+// A shut-down building's whole hex: dark ash, so it reads at a glance from
+// across the room, darker than any terrain (mountains are a light grey).
+const SHUT_GROUND = '#4a474d';
+let shutTop: THREE.BufferGeometry | null = null;
 function buildingPiece(b: NonNullable<HexView['building']>, terrain: string, facing: number, shut: boolean): THREE.Group {
-  const g = plate(b.upgrade, tileColor(terrain));
+  const g = plate(b.upgrades, shut ? SHUT_GROUND : tileColor(terrain));
+  // Shut down: the tile goes dark too, a cap of ash paper over its folded top
+  // (just above the tile's own small lift), under its owner's border.
+  if (shut) g.add(part((shutTop ??= tileGeometry().top), SHUT_GROUND, { at: [0, 0.012, 0], crease: false }));
   const { model: parts, offset } = buildingModel(b);
   const model = bake(parts);
   // Shut down by a beast or a perched dragon: the building goes to dull grey
@@ -1953,9 +2006,9 @@ export class Board3D {
     if (regrow) this.regrowDecor();
     for (const h of g.map) {
       const b = h.building;
-      // Shut down (a beast or a perched dragon on it): it makes nothing and is worth no points, so it goes grey.
-      const shut = !!h.fauna || h.perched.length > 0;
-      const bsig = b ? `${b.type}|${b.owner}|${b.upgrade}|${b.floors}|${shut ? 'shut' : ''}` : '';
+      // Suppressed (a beast on it or holding it, or a perched dragon): it makes nothing and is worth no points, so it goes grey.
+      const shut = !!h.suppressed;
+      const bsig = b ? `${b.type}|${b.owner}|${b.upgrades.join('+')}|${b.floors}|${shut ? 'shut' : ''}` : '';
       const had = this.built.get(h.k);
       if (had?.sig === bsig) continue;
       if (had) {
@@ -2262,14 +2315,14 @@ export class Board3D {
     const towers = new Map<number, THREE.Vector3>();
     for (const h of g.map) {
       const b = h.building;
-      if (!b || !(PERCHES[b.type] || b.upgrade === 'nesting_grounds')) continue;
+      if (!b || !(PERCHES[b.type] || b.upgrades.includes('nesting_grounds'))) continue;
       const [x, z] = hexXZ(h.q, h.r);
       const center = new THREE.Vector3(x, 0, z);
       if (b.type === 'tower') towers.set(b.owner, center);
       const n = b.type === 'tower' ? 1 : b.type === 'roost' ? 2 : 1;
       const list = perches.get(b.owner) ?? [];
       (PERCHES[b.type] ?? []).slice(0, n).forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: b.type === 'hatchery' }));
-      if (b.upgrade === 'nesting_grounds') NESTING_PERCHES.forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: false }));
+      if (b.upgrades.includes('nesting_grounds')) NESTING_PERCHES.forEach((p) => list.push({ pos: new THREE.Vector3(x + p.x, GROUND + p.y, z + p.z), face: p.face, home: center, egg: false }));
       perches.set(b.owner, list);
     }
     const want = new Map<string, { pos: THREE.Vector3; face: number; home: THREE.Vector3 }>();
@@ -2642,7 +2695,7 @@ export interface Portrait {
   beast?: string; // a beast on the hex (on the building, if there is one)
   dragon?: { element: string; stage: number }; // a dragon at home on the hex
   held?: string; // the hex is held by this great beast (its border)
-  peakZone?: boolean; // the freed peak's gold border
+  peakZone?: number; // the freed peak's gold border and token: what a production building here makes more
   border?: boolean; // the owner's territory border round the hex
 }
 
@@ -2707,13 +2760,13 @@ function portraitScene(p: Portrait): THREE.Scene {
   scene.add(sun, sun.target);
   const k = `p${p.terrain}${p.building ?? ''}${p.beast ?? ''}`;
   const owner = p.owner ?? 0;
-  const building = p.building ? { type: p.building, cls: '', name: '', owner, upgrade: p.upgrade ?? null, upgradeName: null, floors: p.floors ?? 0, does: { makes: {}, houses: 0, points: 0 } } : null;
+  const building = p.building ? { type: p.building, cls: '', name: '', owner, upgrades: p.upgrade ? [p.upgrade] : [], upgradeName: null, floors: p.floors ?? 0, does: { makes: {}, houses: 0, points: 0 } } : null;
   const hex: HexView = {
     k, q: 0, r: 0, terrain: p.terrain, building, perched: [],
     fauna: p.beast ? { key: p.beast, name: '', hp: 1, maxHp: 1, attack: '', power: 0, element: 'neutral', weak: [], loot: {} } : null,
     ...(p.held ? { held: p.held } : {}),
     ...(p.beast === 'thunderbird' ? { peak: 'held' as const } : {}),
-    ...(p.peakZone ? { peakZone: true } : {}),
+    ...(p.peakZone ? { peakZone: p.peakZone } : {}),
   };
   if (p.terrain === 'ocean') {
     // The open sea, cut to the hex: the sheet the map lies on.

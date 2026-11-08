@@ -11,7 +11,7 @@ import {
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText, specialProjectCost } from './engine.ts';
-import { mapRadius } from './map.ts';
+import { distance, mapRadius, parseKey, towerSpots } from './map.ts';
 
 
 // ---------- plain numbers ----------
@@ -73,7 +73,7 @@ function production(): string {
     const p = b.produces!;
     return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
-  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost(workshop.cost))}.` : ''}` : '';
+  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round${workshop.stackBonus !== undefined ? `, and each more ${workshop.name} on the same building ${workshop.stackBonus} more` : ''}.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost(workshop.cost))}.` : ''}` : '';
   return `## Basic production buildings
 
 Anyone may build these, no card needed.
@@ -101,12 +101,36 @@ function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
   const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
   const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
-  const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
+  const counts = [2, 3, 4, 5, 6];
+  const size = counts.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
 The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
 
+Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+${table(['Players', 'Towers', 'From the centre', 'Land within 3 steps', 'Land nearest each tower'], counts.map(towerRow))}
+
 ${table(['Terrain', 'For', 'Share of land'], rows)}`;
+}
+
+// Each seat's land at the start: within 3 steps of its tower, and nearest its
+// tower (a hex as near two towers counts half to each).
+function towerRow(p: number): string[] {
+  const R = mapRadius(p);
+  const towers = towerSpots(p).map((k) => parseKey(k)!);
+  const land: [number, number][] = [];
+  for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (distance(q, r) <= R) land.push([q, r]);
+  const near = towers.map(() => 0);
+  for (const [q, r] of land) {
+    const d = towers.map(([a, b]) => distance(q - a, r - b));
+    const m = Math.min(...d);
+    const ties = d.filter((x) => x === m).length;
+    d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
+  }
+  const span = (xs: number[]) => { const lo = Math.min(...xs), hi = Math.max(...xs); return lo === hi ? `${lo}` : `${lo}–${hi}`; };
+  const within3 = towers.map(([a, b]) => land.filter(([q, r]) => distance(q - a, r - b) <= 3).length);
+  return [`${p}`, towerSpots(p).join(' '), span(towers.map(([q, r]) => distance(q, r))), span(within3), span(near.map((x) => Math.round(x)))];
 }
 
 function growth(gt: number, perRound: number, stage: number) {
@@ -130,7 +154,7 @@ function points(): string {
   const rows = pointSources().map((s) => [s.name, s.shown, s.points, perPoint(s.pays, s.points), s.ready]);
   return `## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power standing (see Raids).
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
@@ -181,7 +205,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot', 'Points'], targetRows)}
 
@@ -220,7 +244,7 @@ function beasts(): string {
   const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
   return `## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 

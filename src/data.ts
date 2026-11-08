@@ -183,6 +183,7 @@ export interface UpgradeDef {
   cost: Bundle;
   text: string;
   baseBonus?: number; // more of what the building makes
+  stackBonus?: number; // instead of baseBonus, for each one after the first on the same building (#400)
   dragonCapacity?: number;
   points?: number; // added to the building's
   copies: number;
@@ -190,8 +191,8 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, points: 1, text: 'This stone, timber, crystal or livestock building makes 2 more; worth 1 point.', copies: 4, base: true },
-  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, stackBonus: 1, points: 1, text: 'This production building makes 2 more (1 if it already has a Workshop); worth 1 point.', copies: 4, base: true },
+  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This dragon building houses 2 more dragons.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';

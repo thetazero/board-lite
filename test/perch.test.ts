@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { standInMove } from '../src/bot.ts';
-import { RuleError, apply, buildableHexes, canRaid, dragonCapacity, faunaHexes, newGame, production, score, waitingOn, type Dragon, type Game } from '../src/engine.ts';
+import { RuleError, apply, bankRates, buildableHexes, canRaid, dragonCapacity, faunaHexes, newGame, production, score, waitingOn, type Dragon, type Game } from '../src/engine.ts';
 import { BEASTS, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, TUNING, UNITS, UNIT_ELEMENTS, elementalDamage } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -103,7 +103,7 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
   const { g, pasture } = perchGame();
   // A Market of P1's beside the Pasture counts it as an adjacent production building.
   const market = neighbors(pasture).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-  g.buildings[market] = { type: 'market', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[market] = { type: 'market', owner: 0, upgrades: [], floors: 0 };
   const gold = () => production(g, 0).gold.base;
   const points = score(g, 0).buildings;
   const goldBefore = gold();
@@ -128,7 +128,7 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
 test('a suppressed roost houses no dragons, and too many dragons only stops hatching (#352)', () => {
   const { g, pasture } = perchGame();
   const roost = neighbors(g.towers[0]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-  g.buildings[roost] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[roost] = { type: 'roost', owner: 0, upgrades: [], floors: 0 };
   const room = dragonCapacity(g, 0);
   for (let i = 0; i < room; i++) addDragon(g, 0, 1);
   // Nothing is built beside the Pasture through it while it's suppressed.
@@ -145,7 +145,7 @@ test('a suppressed roost houses no dragons, and too many dragons only stops hatc
   assert.ok(me.dragonsHoused > me.dragonCapacity);
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = seatView({ lobby: { code: 'T', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...me, name: 'P1' } }, 10);
-  assert.match(view, /2 over your room/);
+  assert.match(view, /2 over, no hatching until there.s room/);
 });
 
 test('nothing blocks a tower: no dragon perches there and no beast is placed there', () => {
@@ -258,7 +258,7 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   apply(g, 1, 'end');
   toTurnOf(g, 0);
   assert.ok(seatState(g, 0).huntable.includes(pasture));
-  assert.match(view(0), new RegExp(`you can fight: .*${pasture} ${d.id}`));
+  assert.match(view(0), new RegExp(`Hexes: .*${pasture} ${d.id}`));
   assert.ok(h);
 });
 
@@ -307,4 +307,61 @@ test('the chart works both ways when dragons fight dragons: water doubles on fir
   // A perched fire dragon defending against ice: every hit it lands is doubled.
   const fire = fightHits('ice_whelp', 1).filter((h) => h.by === 'unit');
   assert.ok(fire.length && fire.every((h) => h.dmg % 2 === 0), `fire on ice: ${fire.map((h) => h.dmg)}`);
+});
+
+test('a coin flip, once a fight, decides which side strikes first each combat round (#380)', () => {
+  const seen = new Set<string>();
+  for (let seed = 1; seen.size < 2 && seed < 40; seed++) {
+    const { g, pasture } = perchGame();
+    const [a, b] = [addDragon(g, 1, 3), addDragon(g, 1, 3)];
+    apply(g, 0, 'end');
+    apply(g, 1, `perch ${pasture} ${a.id} ${b.id}`);
+    apply(g, 1, 'end');
+    toTurnOf(g, 0);
+    g.rng.state = seed;
+    const ds = [addDragon(g, 0, 3), addDragon(g, 0, 3)];
+    apply(g, 0, `clear ${pasture} ${ds.map((d) => d.id).join(' ')}`);
+    const at = g.log.findLastIndex((e) => e.ev?.k === 'hunt');
+    const hunt = g.log[at].ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
+    assert.ok(hunt.first === 'dragons' || hunt.first === 'defenders');
+    assert.match(g.log[at].text, hunt.first === 'dragons' ? /Coin flip: the dragons strike first\./ : /Coin flip: the defenders strike first\./);
+    seen.add(hunt.first!);
+    // Every round, the winner's hits all come before the other side's.
+    const rounds = g.log.slice(at).flatMap((e) => (e.ev?.k === 'combat' ? [e.ev] : []));
+    assert.ok(rounds.length > 0);
+    for (const r of rounds) {
+      const sides = r.hits.map((h) => (h.by === 'dragon' ? 'dragons' : 'defenders'));
+      const firstOther = sides.findIndex((s) => s !== hunt.first);
+      if (firstOther >= 0) assert.ok(sides.slice(firstOther).every((s) => s !== hunt.first), `round ${r.round}: ${sides.join(' ')}`);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['defenders', 'dragons']);
+});
+
+// The Leviathan surfacing by a port holds it: suppressed, it trades at 4:1,
+// as under fauna or a perched dragon, until the Leviathan moves off (#370).
+test('a building the Leviathan holds from an adjacent hex is suppressed, and works again once it moves off', () => {
+  const { g } = perchGame();
+  const tower = g.towers[0];
+  const harbor = neighbors(tower).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
+  g.map[harbor].terrain = 'harbor';
+  g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
+  apply(g, 0, `build cport ${harbor}`);
+  assert.equal(bankRates(g, 0).stone, 2);
+  const before = score(g, 0).buildings;
+  // Somewhere beside the port but not beside the tower, as the ocean there would be.
+  const sea = neighbors(harbor).find((k) => g.map[k] && !neighbors(k).includes(tower) && k !== tower && !g.buildings[k])!;
+  for (const k of Object.keys(g.map)) if (g.map[k].fauna === 'leviathan') delete g.map[k].fauna;
+  g.map[sea].terrain = 'ocean';
+  g.map[sea].fauna = 'leviathan';
+  assert.equal(bankRates(g, 0).stone, TUNING.bankRate);
+  assert.ok(score(g, 0).buildings < before, 'the port scores nothing');
+  const hex = publicState(g).map.find((h) => h.k === harbor)!;
+  assert.equal(hex.suppressed, true);
+  assert.equal(hex.held, 'leviathan');
+  assert.equal(publicState(g).map.find((h) => h.k === tower)!.suppressed, undefined, 'nothing stops a tower');
+  delete g.map[sea].fauna;
+  assert.equal(bankRates(g, 0).stone, 2);
+  assert.equal(score(g, 0).buildings, before);
+  assert.equal(publicState(g).map.find((h) => h.k === harbor)!.suppressed, undefined);
 });

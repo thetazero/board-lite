@@ -8,14 +8,15 @@
 
 import type { DragonView, EventView, PublicState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D, Fighter } from './board3d.ts';
 import { qrSvg } from './qr.ts';
-import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
+import { nextTip, TIP_MS, TIPS } from './tips.ts';
+import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
 
@@ -135,9 +136,9 @@ function seatNews(before: Snapshot, now: Snapshot) {
     const was = before.lobby.seats[i];
     if (!was || s.kind !== 'player') return;
     const who = esc(s.name);
-    if (s.left && !was.left) note(`${who} quits. A bot plays for them.`);
-    else if (s.standIn && !was.standIn) note(`${who} is away. A bot plays for them.`);
-    else if (!s.standIn && was.standIn) note(`${who} is back.`);
+    if (s.left && !was.left) note(`${who} quits: a bot plays for them`);
+    else if (s.standIn && !was.standIn) note(`${who} is away: a bot plays for them`);
+    else if (!s.standIn && was.standIn) note(`${who} is back`);
   });
 }
 
@@ -153,6 +154,16 @@ function tailscaleUrl(): string | null {
   const t = lan.tailscale[0];
   return t && lan.lan.length ? joinUrl(t) : null;
 }
+
+// The lobby's tip (tips.ts): a random one, changed every TIP_MS. Only the
+// tip's text changes, so the rest of the lobby stays still under it.
+let tip = Math.floor(Math.random() * TIPS.length);
+setInterval(() => {
+  const el = document.getElementById('tip');
+  if (!el) return;
+  tip = nextTip(tip);
+  el.textContent = TIPS[tip];
+}, TIP_MS);
 
 // The lobby: who's at the table, and how to join. A saved game hosted again
 // comes back here until every seat is taken: its seats are the game's, the
@@ -170,8 +181,8 @@ function renderLobby() {
     + (l.seating ? '' : Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join(''));
   const canStart = l.seats.length >= l.minPlayers;
   const first = firstPlayer(l);
-  const hint = l.seating ? `The game goes on once every seat is taken${isHost ? ' (a bot can take one)' : ''}.`
-    : !canStart ? `${l.minPlayers - l.seats.length > 1 ? `${l.minPlayers - l.seats.length} more players` : 'One more player'} to start (a bot counts).`
+  const hint = l.seating ? 'The game goes on once every seat is taken.'
+    : !canStart ? `Waiting for ${l.minPlayers - l.seats.length} more player${l.minPlayers - l.seats.length > 1 ? 's' : ''} (a bot counts).`
     : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')
     : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
   app.innerHTML = `
@@ -192,7 +203,7 @@ function renderLobby() {
           </div>
         </div>
         <div class="table">
-          ${l.seating ? `<h2 class="seating">${open > 1 ? `${open} open seats` : 'One open seat'}</h2>` : ''}
+          ${l.seating ? `<h2 class="seating">${open} open seat${open > 1 ? 's' : ''}</h2>` : ''}
           <ul class="seatcards">${seats}</ul>
           ${isHost ? `<div class="lobby-actions">
             <button id="bot" ${(l.seating ? !open : l.seats.length >= l.maxPlayers) ? 'disabled' : ''}>Add a bot</button>
@@ -201,6 +212,7 @@ function renderLobby() {
           ${hint ? `<p class="hint">${hint}</p>` : ''}
         </div>
       </div>
+      <p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>
     </div>`;
   if (!isHost) return;
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
@@ -238,7 +250,7 @@ function doing(g: PublicState, p: number): string {
   if (g.phase === 'action') return g.turn === p ? 'Taking a turn' : 'Answering an offer';
   if (g.phase === 'discard') return 'Discarding';
   // The card step shows nothing: everyone keeps a card at once, and the phone asks (#229).
-  if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'Voting' : g.raid?.step === 'commit' ? 'Sending dragons' : 'Fighting or bailing';
+  if (g.phase === 'raid') return g.raid?.step === 'vote' ? 'Voting' : g.raid?.step === 'commit' ? 'Sending dragons' : 'Fighting or holding back';
   return '';
 }
 
@@ -248,6 +260,27 @@ function doing(g: PublicState, p: number): string {
 function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: number): string {
   const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   return `<div class="tvdragon${d.status === 'out' ? ' out' : ''}">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}${d.hungry ? ` ${hungerTags(d)}` : ''}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
+}
+
+// A player's dragons in brief, for a board too crowded for the list (#406):
+// each dragon a picture (its size its stage) over its health bar, grouped by
+// element, biggest first; knocked out ones greyed, perched ones ringed. Then
+// the power of the raid-ready ones (what their vote is worth), and how many
+// can't fight and why.
+const ELEMENT_ORDER = Object.keys(ELEMENT_COLORS);
+function tvDragonsBrief(ds: DragonView[], all: DragonView[]): string {
+  if (!ds.length) return '<div class="none">No dragons</div>';
+  const sorted = [...ds].sort((a, b) => ELEMENT_ORDER.indexOf(a.element) - ELEMENT_ORDER.indexOf(b.element) || b.stage - a.stage);
+  const tiles = sorted.map((d, i) => {
+    const gap = i && d.element !== sorted[i - 1].element ? ' gap' : '';
+    const st = d.status === 'out' ? ' out' : d.perch ? ' perched' : '';
+    return `<span class="bdragon${st}${gap}" title="${esc(dragonLabel(d, all))}">${dragonBadge(d, 40)}${d.stage ? hpBar(d.hp, d.maxHp) : '<i></i>'}</span>`;
+  }).join('');
+  const power = ds.filter((d) => d.canRaid).reduce((s, d) => s + d.power, 0);
+  const out = ds.filter((d) => d.status === 'out').length;
+  const perched = ds.filter((d) => d.perch).length;
+  const tags = `${powerTag(power)}${out ? ` <em class="st-out">${out} knocked out</em>` : ''}${perched ? ` <em class="st-perched">${perched} perched</em>` : ''}`;
+  return `<div class="btiles">${tiles}<span class="bsum">${tags}</span></div>`;
 }
 
 // Why a seat isn't a person playing right now.
@@ -269,7 +302,7 @@ function everyoneQuit(l: Snapshot['lobby']): boolean {
 function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   if (!seat?.standIn) return '';
   if (everyoneQuit(snap!.lobby)) return '<span class="seatnote">Quit</span>';
-  return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: a bot plays for them</span>`;
+  return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: bot plays</span>`;
 }
 
 let shown: PublicState | null = null; // the state the board is drawn from
@@ -280,7 +313,8 @@ function renderGame(g: PublicState) {
   const players = g.players.map((p, i) => {
     const titles = g.titles.filter((t) => t.holder === i).map((t) => `<span class="title-badge" title="${esc(t.name)}">${icon(TITLE_ICON[t.key], 1.1)}</span>`).join('')
       + g.beasts.filter((b) => b.slainBy === i).map((b) => `<span class="title-badge" title="${esc(b.name)} slain">${icon(b.key, 1.1)}</span>`).join('');
-    const dragons = g.dragons.filter((d) => d.owner === i).map((d) => tvDragon(d, g.dragons, n <= 4, g.round)).join('') || '<div class="none">No dragons</div>';
+    const mine = g.dragons.filter((d) => d.owner === i);
+    const dragons = mine.map((d) => tvDragon(d, g.dragons, n <= 4, g.round)).join('') || '<div class="none">No dragons</div>';
     const seat = snap!.lobby.seats[i];
     const turn = g.phase === 'action' && g.turn === i;
     const what = doing(g, i);
@@ -288,13 +322,14 @@ function renderGame(g: PublicState) {
       <div class="pcard${turn ? ' turn' : ''}" style="--pc:${PLAYER_COLORS[i]}">
         <div class="phead">
           <span class="pname">${esc(names[i])}${seatTag(seat)}</span>
-          ${titles}
+          ${titles ? `<span class="badges">${titles}</span>` : ''}
           <span class="hand" title="cards in hand">${icon('cards', 1.2)}${p.handSize}</span>
           <span class="pts">${icon('points', 1.3)}<b>${g.finalTotals?.[i] ?? p.publicPoints}</b></span>
         </div>
         ${g.phase === 'over' ? '' : pointsTrack(p, g.pointsToWin)}
         ${seatNote(seat)}${what ? `<span class="doing">${what}</span>` : ''}
         <div class="dragons">${dragons}</div>
+        ${remote ? '' : `<div class="dragons brief">${tvDragonsBrief(mine, g.dragons)}</div>`}
       </div>`;
   });
   const offers = g.offers.map((o) => `<li>${playerTag(o.from, names)} <b>${iconText(esc(o.give))}</b><span class="arrow">⇄</span><b>${iconText(esc(o.get))}</b> ${o.to === null ? '<b>Anyone</b>' : playerTag(o.to, names)}</li>`).join('');
@@ -352,20 +387,38 @@ function renderGame(g: PublicState) {
 
 // The player cards start as large as their count allows (style.css) and step
 // down until both columns fit, together, so every card is the same size:
-// many dragons in a big game take more room.
+// many dragons in a big game take more room. When the cards are still too
+// tall once the lists of dragons have shrunk as far as they read well at TV
+// distance, every card shows its dragons in brief instead (#406), from the
+// starting size again.
 function fitSide() {
   if (remote) return; // a phone's table view scrolls instead
   const sides = [...app.querySelectorAll<HTMLElement>('.side')];
   if (!sides.length) return;
-  let px = parseFloat(getComputedStyle(sides[0]).fontSize);
+  const start = parseFloat(getComputedStyle(sides[0]).fontSize);
   const min = parseFloat(getComputedStyle(document.body).fontSize) * 1.05;
-  const rows = app.querySelectorAll<HTMLElement>('.phead, .dragons, .corner');
-  const over = () => sides.some((s) => s.scrollHeight > s.clientHeight + 1) || [...rows].some((r) => r.scrollWidth > r.clientWidth + 1);
-  while (over() && px > min) {
-    px = Math.max(min, px * 0.95);
+  // (A corner's size is its own, so a corner too wide isn't helped by shrinking the cards.)
+  const rows = app.querySelectorAll<HTMLElement>('.phead, .dragons');
+  const tall = () => sides.some((s) => s.scrollHeight > s.clientHeight + 1);
+  const over = () => tall() || [...rows].some((r) => r.scrollWidth > r.clientWidth + 1);
+  const fit = (floor: number) => {
+    let px = start;
     for (const s of sides) s.style.fontSize = `${px}px`;
-  }
+    while (over() && px > floor) {
+      px = Math.max(floor, px * 0.95);
+      for (const s of sides) s.style.fontSize = `${px}px`;
+    }
+  };
+  fit(Math.max(min, start * BRIEF_BELOW));
+  if (!over()) return;
+  if (!tall()) return fit(min);
+  // In brief, a card is mostly pictures and a few numbers: it may go a little smaller.
+  for (const s of sides) s.classList.add('brief');
+  fit(min * 0.85);
 }
+// How far the list of dragons may shrink, from the size the cards start at,
+// before they show in brief instead.
+const BRIEF_BELOW = 0.8;
 
 // "P2 says: "hi"" -> the speaker's name, then what they said.
 function talkLine(text: string, g: PublicState): string {
@@ -394,12 +447,43 @@ function raidPips(g: PublicState): string {
 
 // Whether the table sees each choice as it's made, in words.
 const SECRET = '<span class="tag">Secret</span>';
-const OPEN = '<span class="tag">Everyone sees it</span>';
+const OPEN = '<span class="tag">Public</span>';
 
 // One dragon in a raider's row: lit if sent, faint if it could go but isn't.
 function raiderDragon(d: DragonView, sent: boolean, all: DragonView[]): string {
   const name = esc(dragonLabel(d, all));
   return `<span class="rd${sent ? ' sent' : ''}" title="${name}">${dragonBadge(d, 60)}${sent ? `${hpBar(d.hp, d.maxHp)}<small>${name}</small>` : ''}</span>`;
+}
+
+// A raider's dragons in brief, for however many they sent: one picture per
+// element with how many of it (drawn at its biggest stage), and their health
+// added up in one bar. The power beside it says how strong they are together.
+function dragonSummary(ds: DragonView[]): string {
+  const groups = Object.keys(ELEMENT_COLORS).flatMap((e) => {
+    const of = ds.filter((d) => d.element === e);
+    if (!of.length) return [];
+    const top = of.reduce((a, b) => (b.stage > a.stage ? b : a));
+    return [`<span class="rgroup" title="${of.map((d) => esc(d.name)).join(', ')}"><b>${of.length}</b>${dragonBadge(top, 56)}</span>`];
+  });
+  const hp = ds.reduce((s, d) => s + d.hp, 0);
+  const max = ds.reduce((s, d) => s + d.maxHp, 0);
+  return `<span class="rsum">${groups.join('')}<span class="rhp">${statTag('Health', `${hp}/${max}`)}${hpBar(hp, max)}</span></span>`;
+}
+
+// Whether a raider has chosen to fight or hold back, never which: a card laid face
+// down once they have, an empty place for it while they're choosing.
+function choiceMark(done: boolean): string {
+  return done ? '<span class="choice done"><i></i>Chosen</span>' : '<span class="choice"><i></i>Choosing</span>';
+}
+
+// The raiders' power, each player's share in their colour, pushing against the
+// kingdom's from the other end; past the middle, the raiders usually win
+// (rules.md, combat power). It counts everyone in, as no one has held back
+// yet that the table knows of.
+function balance(sides: { p: number; power: number }[], foe: number): string {
+  const ours = sides.reduce((s, x) => s + x.power, 0);
+  const segs = sides.map((x) => `<i style="--pc:${PLAYER_COLORS[x.p]};flex:${x.power}"></i>`).join('');
+  return `<div class="balance${ours > foe ? ' ahead' : ''}"><div class="bside">${powerTag(ours, 'big')}<small>If everyone fights</small></div><div class="bbar">${segs}<i class="foe" style="flex:${foe}"></i><b class="mid"></b></div><div class="bside foe">${powerTag(foe, 'big')}</div></div>`;
 }
 
 const HOME = buildingIcon('roost', 40, '#9aa1ad'); // staying home: the roost
@@ -409,7 +493,7 @@ function renderRaid(g: PublicState) {
   if (!raid) return;
   const dragonById = (id: string) => g.dragons.find((d) => d.id === id)!;
   const sum = (ids: string[]) => ids.reduce((s, id) => s + dragonById(id).power, 0);
-  const arena = (rows: string) => `<div class="arena"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!, pointsLeader(g, raid.commits))}</div>`;
+  const arena = (rows: string, cls = '') => `<div class="arena ${cls}"><ul class="raiders">${rows}</ul><div class="vs">${icon('raid', 3)}</div>${targetCard(raid.target!, pointsLeader(g, raid.commits))}</div>`;
   let body = '';
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
@@ -426,12 +510,13 @@ function renderRaid(g: PublicState) {
       return `<li class="raider${home ? ' out' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${ds}</span>${sent.size ? powerTag(sum(raid.commits[p])) : ''}${able.length ? check(raid.ready[p]) : ''}</li>`;
     };
     body = `<h1>${icon('raid', 1.1)} Commit ${OPEN}${raidPips(g)}</h1>${arena(names.map((_, p) => row(p)).join(''))}`;
-  } else if (raid.step === 'bail') {
-    // Who's in, with what; a tick once they've chosen (not what they chose).
-    const rows = names.flatMap((_, p) => (raid.commits[p].length
-      ? [`<li class="raider" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${raid.commits[p].map((id) => raiderDragon(dragonById(id), true, g.dragons)).join('')}</span>${powerTag(sum(raid.commits[p]))}${check(raid.decided[p])}</li>`]
-      : [])).join('');
-    body = `<h1>${icon('raid', 1.1)} Fight or bail ${SECRET}${raidPips(g)}</h1>${arena(rows)}`;
+  } else if (raid.step === 'choose') {
+    // Who's in, with what, and whether they've chosen (never what they chose):
+    // a face-down card once they have, an empty place while they're choosing.
+    // Above them, the power they'd bring together against the kingdom's.
+    const ins = names.flatMap((_, p) => (raid.commits[p].length ? [p] : []));
+    const rows = ins.map((p) => `<li class="raider${raid.decided[p] ? ' chosen' : ''}" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)}<span class="rds">${dragonSummary(raid.commits[p].map(dragonById))}</span>${powerTag(sum(raid.commits[p]))}${choiceMark(raid.decided[p])}</li>`).join('');
+    body = `<h1>${icon('raid', 1.1)} Fight or hold back ${SECRET}${raidPips(g)}</h1>${balance(ins.map((p) => ({ p, power: sum(raid.commits[p]) })), raid.target!.power)}${arena(rows, 'deciding')}`;
   }
   // A new step (or the next raid) rises in; ticks within a step update in place.
   showOverlay('raid', `raid ${g.round} ${g.raidsLeft} ${raid.step}`, `<div class="raidbox">${body}</div>`);
@@ -535,32 +620,33 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
 // attacker's element colour to what it hits, bursting when that element
 // beats the target's; the knocked out fall. Then who won and what they took,
 // and for a kingdom that scores, a beat of its own: the crown comes down on
-// the player with the most power standing, then their points. Whoever bailed
-// is shown flown home, in a corner.
+// the player with the most power standing, then their points. Whoever held
+// back is shown in a corner, out of the fight but still in for the loot.
 type Combat = Extract<EventView['ev'], { k: 'combat' }>;
 function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fresh: EventView[]): Banner {
   const e = fresh[sc.at];
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
-  // This raid's bails: the ones logged since its commitments locked (maybe
-  // in an earlier update than the fight's, so from the whole log).
+  // Who held back in this raid: the ones logged since its commitments locked
+  // (maybe in an earlier update than the fight's, so from the whole log).
   const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
-  const bailed = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'bail' ? [x.ev.p] : []));
+  const held = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [x.ev.p] : []));
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
-  // A bailer's dragons are the ones they last committed before the lock.
+  // Their dragons are the ones they last committed before the lock.
   const sentBy = (p: number) => g.log.slice(0, lockAt + 1).findLast((x) => x.ev?.k === 'commit' && x.ev.p === p)?.ev as Extract<EventView['ev'], { k: 'commit' }> | undefined;
-  const fled = bailed.map((p) => {
+  const back = held.map((p) => {
     const ds = (sentBy(p)?.ds ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
-    return `<div class="fled" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<span class="arrow">➜</span>${HOME}</div>`;
+    return `<div class="heldback" style="--pc:${PLAYER_COLORS[p]}">${playerTag(p, names)} ${ds}<small>Holds back</small></div>`;
   }).join('');
   const scored = end?.won && end.scorer !== undefined && end.points ? { p: end.scorer, points: end.points } : null;
   const outcome = !end ? '' : end.won
-    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils">${end.winners.map((p, i) => `<span>${playerTag(p, names)} ${gainChips(end.shares[i], 1.6)}</span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
+    ? `<h1>${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils${end.winners.length > 3 ? ' many' : ''}">${end.winners.map((p, i) => `<span>${playerTag(p, names)} <span class="gains">${gainChips(end.shares[i], 1.6)}</span></span>`).join('')}</div>${scored ? `<div class="score">${crown()}<span>${playerTag(scored.p, names)} has the most power standing</span><b class="pts">+${scored.points} ${icon('points', 1.3)}</b></div>` : ''}`
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
-  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), fled, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms);
+  const first = ev.first === 'defenders' ? 'Defenders' : 'Dragons';
+  return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), back, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms, first);
 }
 
 // A fight for a hex: one player's dragons against what holds it (a beast,
@@ -577,9 +663,9 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   const flown = home ? `<div class="spoils"><span>${home}<span class="arrow">➜</span>${HOME}</span></div>` : '';
   const The = ev.fauna ? `The ${esc(ev.name)}` : 'The perched dragons';
   const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
-    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>`
+    : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>${ev.fauna === 'thunderbird' ? peakBoon(g.peakBonus) : ''}`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
-    : `<h1>The perched dragons <span class="ok">are driven off</span></h1>${flown}`;
+    : `<h1>The perched dragons <span class="ok">fall</span></h1>${flown}`;
   const head = `${playerTag(ev.p, names)} ${icon('raid', 1.2)} ${ev.fauna ? esc(ev.name) : 'Perched dragons'}`;
   // Saves from before perching carry one beast and no units.
   const units = (ev.units ?? [{ name: ev.name, hp: ev.hp }]).map((u) => {
@@ -587,7 +673,14 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
-  return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms);
+  const first = ev.first !== 'defenders' ? 'Dragons' : units.length > 1 ? 'Defenders' : units[0].name;
+  return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);
+}
+
+// The Thunderbird's fall frees its peak: the rule pops up under the points,
+// on the gold token the board then shows on each of the peak's hexes (#354).
+function peakBoon(n: number): string {
+  return `<div class="boon"><span class="ptoken">+${n}</span><span>Each round, on and adjacent to its peak</span></div>`;
 }
 
 // Each fighting dragon's health as its fight started, by id: drawn after the
@@ -605,7 +698,8 @@ const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
 const STEEL = '#c9ced6';
 
 type Foe = { name: string; hp: number; max: number; d?: DragonView; el?: string };
-function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, fled: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number): Banner {
+// `first`: who won the fight's coin flip and strikes first each round (#380).
+function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, held: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number, first: string): Banner {
   const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
   // A figure: its health over its head, the figure standing on its shadow
   // (in its owner's colour, for a dragon), and its name at its feet.
@@ -668,10 +762,10 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
-      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div></header>
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first)}</b></div></header>
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
-      ${fled ? `<div class="fledrow">${fled}</div>` : ''}</div>`;
+      ${held ? `<div class="backrow">${held}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {
@@ -687,10 +781,20 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       if (f && n) f.style.setProperty('--plate', `${n.offsetHeight}px`); // its bar sits in the plate's foot
       return { w: (n?.offsetWidth ?? 80) + 6, h: (n?.offsetHeight ?? 20) + 8 };
     };
+    // The outcome's sheet stands under the heading, however many lines that
+    // takes, and the fighters stand under the sheet, however many lines the
+    // loot takes: it's laid out (unseen) from the start, so the fight is
+    // framed for it and nothing moves when it shows.
+    const fhead = el.querySelector<HTMLElement>('.fhead')!, sheet = el.querySelector<HTMLElement>('.outcome')!;
+    const gap = innerHeight * 0.01;
+    sheet.style.top = `${Math.max(sheet.offsetTop, fhead.getBoundingClientRect().bottom + gap)}px`;
+    const below = (sheet.getBoundingClientRect().bottom + gap) / innerHeight;
+    const safe = remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 };
+    safe.top = Math.max(safe.top, Math.min(below, 0.6));
     const stage = live ? new live.FightStage(place,
       dragons.map((d) => ({ key: `d${d.id}`, fighter: { dragon: { element: d.element, stage: d.stage } }, maxHp: d.maxHp, label: label(`d${d.id}`) })),
       units.map((u, i) => ({ key: `u${i}`, fighter: u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, maxHp: u.max, label: label(`u${i}`) })),
-      shape < 1, remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 }) : null;
+      shape < 1, safe) : null;
     if (stage) {
       stage.onLayout = () => {
         for (const key of hp.keys()) {
@@ -755,11 +859,13 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
       el.querySelector('.outcome')!.classList.add('show');
     }, shown);
     if (scorer === null) return;
-    // The scoring beat: the crown comes down on the scorer's dragons still
-    // standing, and on their name; then their points.
+    // The scoring beat: one crown comes down, on the scorer's biggest dragon
+    // still standing, and on their name; then their points.
     setTimeout(() => {
       el.classList.add('crowned');
-      el.querySelectorAll<HTMLElement>(`.fig[data-p="${scorer}"]:not(.down)`).forEach((f) => f.classList.add('king'));
+      const max = (f: HTMLElement) => dragons.find((d) => d.id === f.dataset.d)?.maxHp ?? 0;
+      const standing = [...el.querySelectorAll<HTMLElement>(`.fig-d[data-p="${scorer}"]:not(.down)`)];
+      standing.reduce<HTMLElement | null>((best, f) => (!best || max(f) > max(best) ? f : best), null)?.classList.add('king');
     }, shown + CROWN_AT_MS);
     setTimeout(() => el.classList.add('scored'), shown + CROWN_AT_MS + POINTS_AT_MS);
   };
@@ -789,7 +895,8 @@ function beam(battle: HTMLElement, a: HTMLElement, t: HTMLElement, color: string
 
 // When the game ends in front of it, the TV plays the game's recap
 // (src/recap.ts): the points race drawn a round at a time with what happened
-// in each, then where everyone's points came from, then the final scores with
+// in each, then everyone's dragon power and production over the game, then
+// where everyone's points came from, then the final scores with
 // a QR code to the recap page, for anyone to keep or share. A TV opened on a
 // game that's already over goes straight to the scores (Watch again plays it).
 // The table view in a game with no TV does the same, as a scene the phone cuts
@@ -800,8 +907,9 @@ let recapAsked = '';
 let summary: { step: number; timer: number } | null = null;
 let summaryPlayed = false;
 
-type SummaryStep = { kind: 'race'; upTo: number; ms: number } | { kind: 'points'; ms: number };
+type SummaryStep = { kind: 'race'; upTo: number; ms: number } | { kind: 'growth'; ms: number } | { kind: 'points'; ms: number };
 const RACE_MS = 24000; // the race at most, however long the game
+const GROWTH_MS = 9000;
 const POINTS_MS = 8000;
 
 function summarySteps(r: Recap): SummaryStep[] {
@@ -811,7 +919,9 @@ function summarySteps(r: Recap): SummaryStep[] {
   const want = Array.from({ length: last }, (_, i) => (told(i + 1) ? 1600 + 600 * Math.min(told(i + 1), 4) : 600));
   const sum = want.reduce((a, b) => a + b, 0);
   const scale = Math.min(1, RACE_MS / sum);
-  return [...want.map((ms, i) => ({ kind: 'race' as const, upTo: i + 1, ms: Math.max(250, ms * scale) })), { kind: 'points', ms: POINTS_MS }];
+  // Dragon power and production, whole, for a recap that kept them.
+  const growth: SummaryStep[] = r.power && r.made?.length ? [{ kind: 'growth', ms: GROWTH_MS }] : [];
+  return [...want.map((ms, i) => ({ kind: 'race' as const, upTo: i + 1, ms: Math.max(250, ms * scale) })), ...growth, { kind: 'points', ms: POINTS_MS }];
 }
 
 function showEnd(g: PublicState) {
@@ -870,9 +980,18 @@ function summaryStep() {
     told.innerHTML = momentsHtml({ ...r, moments: r.moments.filter((m) => recent.includes(m.round)) });
     told.querySelector(`.moments > li:last-child`)?.classList.toggle('now', recent.at(-1) === step.upTo);
     $('overlay').querySelector<HTMLElement>('.summary')!.dataset.step = `race-${step.upTo}`;
+  } else if (step.kind === 'growth') {
+    const box = showOverlay('end', 'end growth', `<div class="summary growth-step" data-step="growth">
+      <h1>Dragon power and production</h1>
+      <div class="growth">
+        <figure><figcaption>Dragon power</figcaption>${powerSvg(r, { width: 700, height: 460 })}</figure>
+        <figure><figcaption>Resources made each round</figcaption>${madeSvg(r, { width: 700, height: 460 })}</figure>
+      </div>
+      <button id="skip">Skip</button></div>`);
+    if (box) $('skip').onclick = stopSummary;
   } else {
     const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
-      <h1>Where the points came from</h1>
+      <h1>Points</h1>
       ${breakdownHtml(r)}
       <button id="skip">Skip</button></div>`);
     if (box) $('skip').onclick = stopSummary;
@@ -893,7 +1012,7 @@ function recapUrl(id: string): string {
 function showFinal(g: PublicState) {
   const w = g.standings![0].p;
   const qr = remote ? '' : recap ? `<div class="recapqr">${qrSvg(`http://${recapUrl(recap.id)}`, "the game's recap")}
-      <div class="step">Scan for the game's recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
+      <div class="step">Scan for the recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
   showOverlay('end', 'end', `<div class="endbox${qr ? ' with-recap' : ''}" data-step="final" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
       <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
       <div class="endbody">${standingsHtml(g, names)}${qr}</div>
