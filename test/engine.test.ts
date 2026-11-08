@@ -464,6 +464,25 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   assert.equal(a.damage, 3, 'a hungry dragon does not heal');
 });
 
+test('everyone sees which dragons went hungry at production (#362)', () => {
+  const g = newGame(2, 7);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  const a = g.dragons[0];
+  const p = a.owner;
+  const tower = TUNING.towerProduction.livestock ?? 0;
+  // Four dragons and no livestock in stock: the tower's livestock feeds the first.
+  g.dragons.unshift({ ...a, id: 'd97' });
+  g.dragons.push({ ...a, id: 'd98' }, { ...a, id: 'd99' });
+  const mine = g.dragons.filter((d) => d.owner === p).map((d) => d.id);
+  g.players[p].resources.livestock = 0;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const seen = publicState(g, 1000).dragons.filter((d) => d.owner === p).map((d) => d.hungry);
+  assert.deepEqual(seen, mine.map((_, i) => i >= tower), 'the first is fed, the rest went hungry');
+  assert.match(playerView(g, 1 - p), /went hungry this round/);
+});
+
 test('production says what the dragons eat apart from what is made, and so does the income', () => {
   const g = newGame(2, 7);
   const p = 0;

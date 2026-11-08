@@ -31,6 +31,9 @@ export interface Dragon {
   // The rival's building it perches on, if any: that building is suppressed
   // until the dragon is recalled or driven off.
   perch?: string;
+  // It went hungry at this round's production, so it didn't heal or grow
+  // (#362). Cleared at the next production it's fed.
+  hungry?: boolean;
 }
 
 export interface Player {
@@ -603,6 +606,8 @@ function startRound(g: Game) {
   for (const d of g.dragons) {
     const hurt = d.damage > 0;
     const fed = fedIds.has(d.id);
+    if (fed) delete d.hungry;
+    else d.hungry = true;
     if (!fed || hurt) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing' : 'goes hungry: it doesn\'t heal or grow'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
     if (!fed) continue;
     if (hurt) {

@@ -59,6 +59,7 @@ export interface DragonView {
   weak: string[]; // the elements that beat it on the element wheel, as for every fighter
   power: number; // combat power (0 for an egg)
   status: 'ready' | 'egg' | 'perched' | 'out'; // out: knocked out, at 0 health, until it heals
+  hungry: boolean; // it went hungry at this round's production: it didn't heal or grow
   targeting: string;
   attack: string;
   key: string; // its card, for the card's art
@@ -217,7 +218,7 @@ function dragonView(g: Game, d: Dragon): DragonView {
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0,
-    canRaid: canRaid(d), perch: d.perch ?? null, weak: ELEMENT_WEAK[def.element], power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    canRaid: canRaid(d), perch: d.perch ?? null, hungry: !!d.hungry, weak: ELEMENT_WEAK[def.element], power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
     key: d.key, stages: stageViews(def),
   };
 }

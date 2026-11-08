@@ -7,7 +7,7 @@
 
 import type { CardView, DragonStageView, DragonView, PublicState, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, firstPlayer, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
@@ -897,12 +897,14 @@ function dragonZoom(g: PublicState, d: DragonView): string {
   const i = mine.indexOf(d);
   const grow = d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const resting = d.status === 'out' || d.perch ? ` ${dragonState(d)}` : ''; // why it can't fight, as the roost says
+  const hunger = hungerTags(d);
   const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${statTag('Health', `${d.hp}/${d.maxHp}`)}` : ''}${resting}`;
   return `<div class="zoom" id="zoom" data-leave="fade">
     <div class="card big k-dragon" data-key="big ${d.id}" style="--kc:${frameColor('dragon', d.element)}">
       <div class="cart">${cardArt('dragon', d.key, d.element)}<span class="ckind">${elemIcon(d.element, 1)}</span></div>
       <b class="cname">${esc(dragonName(d, g.dragons))}</b>
       <div class="ccost"><span class="dnow">${now}</span><small>${KIND_LABEL.dragon}</small></div>
+      ${hunger ? `<div class="dhunger">${hunger}</div>` : ''}
       ${dragonStats(d.key, d.element, { growth: d.growthTime, targeting: d.targeting, stages: d.stages }, d.stage)}
     </div>
     ${mine.length > 1 ? `<div class="zoomnav"><button class="ghost" data-dragonnav="-1" aria-label="Previous dragon">‹</button><span>${i + 1} / ${mine.length}</span><button class="ghost" data-dragonnav="1" aria-label="Next dragon">›</button></div>` : ''}
