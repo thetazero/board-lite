@@ -98,16 +98,16 @@ const SETS: Record<string, Backdrop> = {
   mountain: { sky: ['#8aa0b8', '#d8dee6'], far: peaks([[240, 520, 320], [760, 640, 360], [1250, 560, 320], [1700, 660, 360]], '#77798a', '#5f6172', '#f1f3f6'), mid: ridge(4, 780, 70, 9, '#8d8f96'), ground: ['#9a9ca3', '#7d7f86'] },
   ley: { sky: ['#2e2456', '#7d68c0'], glow: [960, 560, '#c9b6ff'], far: ridge(9, 690, 90, 10, '#4a3c86'), mid: [[300, 140], [520, 90], [1380, 160], [1620, 100]].map(([x, h]) => `<polygon fill="#a58cf0" points="${x - 30},${GROUND} ${x},${GROUND - h} ${x + 30},${GROUND}"/><polygon fill="#7d62d0" points="${x},${GROUND - h} ${x + 30},${GROUND} ${x},${GROUND}"/>`).join(''), ground: ['#5d4a9c', '#4a3a80'] },
   meadow: { sky: ['#8fc6ea', '#eef6d8'], glow: [1500, 260, '#fff6c8'], far: ridge(6, 680, 80, 8, '#a8c070'), mid: ridge(12, 780, 50, 7, '#8fbf4f'), ground: ['#8fbf4f', '#76a63c'] },
-  plains: { sky: ['#9cc7e8', '#f2e6c0'], far: ridge(13, 700, 60, 8, '#c8b77c'), mid: ridge(14, 790, 40, 6, '#d9c68e'), ground: ['#d9c68e', '#c2ae74'] },
+  desert: { sky: ['#9cc7e8', '#f2e6c0'], far: ridge(13, 700, 60, 8, '#c8b77c'), mid: ridge(14, 790, 40, 6, '#d9c68e'), ground: ['#d9c68e', '#c2ae74'] },
   harbor: { sky: ['#7fc4d6', '#e3f2ec'], far: waves(690, '#4fb0a5', '#d8f3ee'), mid: '', ground: ['#d9c68e', '#c2ae74'] },
   ocean: { sky: ['#3f6f96', '#a6cbe0'], far: '', mid: '', ground: ['#2c5f8f', '#1f4a72'], extra: waves(GROUND - 120, '#2c5f8f', '#a6cbe0') },
 };
 
 // The backdrop for a kingdom (a TARGETS key) or a terrain.
 export function backdrop(key: string): string {
-  const s = SETS[key] ?? SETS.plains;
+  const s = SETS[key] ?? SETS.desert;
   // Ids by place: a scene fading out over the next one may hold the same ids, and both then mean the same colours.
-  const id = `bd-${SETS[key] ? key : 'plains'}`;
+  const id = `bd-${SETS[key] ? key : 'desert'}`;
   const glow = s.glow ? `<radialGradient id="${id}-g" cx="${s.glow[0] / W}" cy="${s.glow[1] / H}" r=".45"><stop offset="0" stop-color="${s.glow[2]}" stop-opacity=".85"/><stop offset="1" stop-color="${s.glow[2]}" stop-opacity="0"/></radialGradient>` : '';
   return `<svg class="backdrop" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
     <defs><linearGradient id="${id}-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.sky[0]}"/><stop offset="1" stop-color="${s.sky[1]}"/></linearGradient>${glow}

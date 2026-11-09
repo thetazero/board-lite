@@ -449,12 +449,12 @@ function decor(h: HexView, seaward: number): THREE.Group {
       }
       break;
     }
-    case 'plains':
+    case 'desert':
       if (!built) {
         // Folded furrows, and now and then a haystack.
         const spin = r() * Math.PI;
         const field = group();
-        for (let i = -1; i <= 1; i++) field.add(part(cyl(0.06, 0.06, 0.9 - Math.abs(i) * 0.25, 3), mix(TERRAIN_COLORS.plains, '#b8913f', 0.45), { at: [0, 0.035, i * 0.2], rot: [0, 0, Math.PI / 2] }));
+        for (let i = -1; i <= 1; i++) field.add(part(cyl(0.06, 0.06, 0.9 - Math.abs(i) * 0.25, 3), mix(TERRAIN_COLORS.desert, '#b8913f', 0.45), { at: [0, 0.035, i * 0.2], rot: [0, 0, Math.PI / 2] }));
         place(field, [0, 0], spin);
         if (r() < 0.5) place(part(cone(0.14, 0.24, 6), '#d6ad55', { at: [0, 0.12, 0] }), spot(0.45, 0.6));
       } else if (h.building?.type !== 'tower') {
@@ -3417,7 +3417,7 @@ const PLACES: Record<string, Place> = {
     sky: ['#8fc6ea', '#eef6d8'], sun: [6, 7, '#fff6c8'], ground: '#8fbf4f',
     build: (g) => { g.add(hill(10, 2, '#a8c070', -7, -18), hill(12, 2.4, '#9cc060', 8, -20, 1)); g.add(wood('meadow', 7, -12, 12, -12, -7, [1.8, 2.6])); g.add(placed(sheep(), -4, -6, 2.2, 0.5), placed(sheep(), 4.5, -7, 2.2, 2.4)); },
   },
-  plains: {
+  desert: {
     sky: ['#9cc7e8', '#f2e6c0'], ground: '#d9c68e',
     build: (g) => {
       g.add(hill(12, 1.6, '#c8b77c', -6, -20), hill(12, 1.8, '#d0be84', 8, -22, 1));
@@ -3507,7 +3507,7 @@ export class FightStage {
     this.el.className = 'stage3d';
     GRAIN ??= paperTexture();
 
-    const p = PLACES[place] ?? PLACES.plains;
+    const p = PLACES[place] ?? PLACES.desert;
     this.scene.background = skyTexture(p.sky[0], p.sky[1]);
     const world = new THREE.Group();
     world.add(groundSheet(p.ground, place, p.shore));

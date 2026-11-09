@@ -107,9 +107,9 @@ function land(): string {
 
 The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
 
-Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+Towers sit on desert hexes at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
 
-The terrain is random, but the map is rolled again until every start has about as much room for basic buildings as the others: in each ring from 1 to ${TUNING.fairStart.rings} steps out from its tower, and in those rings together, a start's opportunity is within ${pct(TUNING.fairStart.tolerance)} of the average across starts. Opportunity is the hexes a basic building can go on, plus ${n1(1 - TUNING.fairStart.oceanCost)} for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+The terrain is random, but the map is rolled again until every start has about as much room for basic buildings as the others: in each ring from 1 to ${TUNING.fairStart.rings} steps out from its tower, and in those rings together, a start's opportunity is within ${pct(TUNING.fairStart.tolerance)} of the average across starts. Opportunity is the hexes a basic building can go on, plus ${n1(1 - TUNING.fairStart.oceanCost)} for each ocean hex (desert and harbor hexes count nothing). The average can differ from game to game, and which resources lie near each start is still random.
 
 ${table(['Players', 'Towers', 'From the centre', 'Land within 3 steps', 'Land nearest each tower'], counts.map(towerRow))}
 

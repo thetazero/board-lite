@@ -15,7 +15,7 @@ const rateText = (rates: Record<string, number>) => {
 };
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'C', meadow: 'G', plains: '.', harbor: 'H', ocean: '~' };
+const TERRAIN_LETTER: Record<string, string> = { mountain: 'M', forest: 'F', ley: 'C', meadow: 'G', desert: '.', harbor: 'H', ocean: '~' };
 // Two letters per building on the text map.
 const BUILDING_CODE: Record<string, string> = {
   tower: 'TW', quarry: 'qu', lumber_camp: 'lc', crystal_mine: 'cm', pasture: 'pa', roost: 'ro',
@@ -55,7 +55,7 @@ function mapText(g: PublicState): string[] {
   const lines: string[] = [];
   const built = new Map(g.map.flatMap((h) => (h.building ? [[h.building.type, h.building.name] as const] : [])));
   const fauna = new Map(g.map.flatMap((h) => (h.fauna ? [[h.fauna.key, h.fauna] as const] : [])));
-  lines.push('Map (axial q,r). M mountain, F forest, C crystal field, G meadow, . plains, H harbor, ~ ocean, ^ peak.');
+  lines.push('Map (axial q,r). M mountain, F forest, C crystal field, G meadow, . desert, H harbor, ~ ocean, ^ peak.');
   lines.push(`[<owner><code>] a building, + per upgrade: ${[...built].map(([k, name]) => `${code(k)} ${name}`).join(', ')}.`);
   lines.push(`<ids> perched dragons; {code} a beast${fauna.size ? ` (${[...fauna].map(([k, f]) => `${faunaCode(k)} ${f.name}`).join(', ')})` : ''}; {x} held by an adjacent great beast. A building under either is suppressed.`);
   const rows = new Map<number, HexView[]>();

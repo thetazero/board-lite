@@ -13,7 +13,7 @@ import { DIRECTIONS, key } from './map.ts';
 // The TV's seat colors (web/common.ts PLAYER_COLORS) and lightened terrain
 // colors, so owned land stands out from the land no one holds.
 const PLAYER = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
-const TERRAIN: Record<string, string> = { mountain: '#c4c5c9', forest: '#a9c4ad', ley: '#c6bedd', meadow: '#d6e8bf', plains: '#efe6cb', harbor: '#b5dfda', ocean: '#9fbad6' };
+const TERRAIN: Record<string, string> = { mountain: '#c4c5c9', forest: '#a9c4ad', ley: '#c6bedd', meadow: '#d6e8bf', desert: '#efe6cb', harbor: '#b5dfda', ocean: '#9fbad6' };
 const BG = '#ffffff';
 const LINE = '#6b6f78';
 const INK = '#111111';
@@ -172,7 +172,7 @@ export function mapImage(g: PublicState, you: number): Buffer {
         if (v > d) { d = v; side = sd; }
       }
       const own = h.building?.owner ?? -1;
-      let col = own >= 0 ? rgb(PLAYER[own]) : rgb(TERRAIN[h.terrain] ?? TERRAIN.plains);
+      let col = own >= 0 ? rgb(PLAYER[own]) : rgb(TERRAIN[h.terrain] ?? TERRAIN.desert);
       // Held by a great beast, or a suppressed building: dark stripes.
       if ((h.held || h.suppressed) && (Math.floor(px + py) % 8) < 2) col = mix(col, rgb(INK), 0.55);
       // A tower: a white ring inside its hex.
@@ -191,7 +191,7 @@ export function mapImage(g: PublicState, you: number): Buffer {
     const [x0, y0] = center(h.q, h.r);
     const x = x0 + ox, y = y0 + oy;
     const own = h.building?.owner ?? -1;
-    const fill = own >= 0 ? rgb(PLAYER[own]) : rgb(TERRAIN[h.terrain] ?? TERRAIN.plains);
+    const fill = own >= 0 ? rgb(PLAYER[own]) : rgb(TERRAIN[h.terrain] ?? TERRAIN.desert);
     const ink = light(fill) ? rgb(INK) : rgb(BG);
     if (h.fauna) {
       c.disc(x, y - S * 0.38, 8, rgb(INK));

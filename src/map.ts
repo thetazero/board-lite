@@ -54,7 +54,7 @@ function randomTerrain(rng: Rng): Terrain {
     x -= w;
     if (x < 0) return t;
   }
-  return 'plains';
+  return 'desert';
 }
 
 export const distance = (q: number, r: number) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
@@ -94,7 +94,7 @@ const BASIC_TERRAINS = new Set(BASIC_BUILDINGS.map((b) => BUILDINGS[b].terrain).
 
 // A start's opportunity in ring d around its tower: each hex there a basic
 // building can go on counts 1, each ocean hex 1 less TUNING.fairStart.oceanCost,
-// and any other hex (plains, harbor) nothing. Past the ocean is off the map.
+// and any other hex (desert, harbor) nothing. Past the ocean is off the map.
 export function opportunity(hexes: Record<string, Hex>, tower: string, d: number): number {
   const [tq, tr] = parseKey(tower)!;
   let sum = 0;
@@ -137,9 +137,9 @@ function rollMap(rng: Rng, players: number): Record<string, Hex> {
       hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : randomTerrain(rng) };
     }
   }
-  // Towers sit on plains; the land around them is as random as the rest, so
+  // Towers sit on desert hexes; the land around them is as random as the rest, so
   // players start with different terrain and different things to sell.
-  for (const spot of towerSpots(players)) hexes[spot].terrain = 'plains';
+  for (const spot of towerSpots(players)) hexes[spot].terrain = 'desert';
   // One natural harbor on each of the six coasts, somewhere between its
   // corners but not touching a tower: a port is something you build towards.
   const coast = ring(radius);
