@@ -572,7 +572,7 @@ function quarry(): THREE.Group {
 // A log, lying along x, its cut ends pale.
 function timberLog(len: number, r: number, at: [number, number, number], spin = 0): THREE.Group {
   const g = group(part(cyl(r, r, len, 6), WOOD, { rot: [0, 0, Math.PI / 2] }));
-  for (const sx of [-1, 1]) g.add(part(cyl(r * 0.92, r * 0.92, 0.012, 6), '#f0cb93', { at: [sx * len / 2, 0, 0], rot: [0, 0, Math.PI / 2], crease: false }));
+  for (const sx of [-1, 1]) g.add(part(cyl(r * 0.85, r * 0.85, 0.012, 6), '#f0cb93', { at: [sx * len / 2, 0, 0], rot: [0, 0, Math.PI / 2], crease: false }));
   g.position.set(...at);
   g.rotation.y = spin;
   return g;
@@ -641,15 +641,15 @@ function pasture(): THREE.Group {
     if (i % 6 === 2) continue; // a gate
     const mx = (Math.cos(a) + Math.cos(b)) / 2 * R, mz = (Math.sin(a) + Math.sin(b)) / 2 * R;
     const len = 2 * R * Math.sin(Math.PI / n);
-    for (const y of [0.09, 0.17]) g.add(part(box(len, 0.03, 0.02), mix(WOOD, WALL, 0.3), { at: [mx, y, mz], rot: [0, -(a + b) / 2 + Math.PI / 2, 0], crease: false }));
+    for (const y of [0.09, 0.17]) g.add(part(box(len, 0.03, 0.02), mix(WOOD, WALL, 0.3), { at: [mx, y + (i % 2) * 0.008, mz], rot: [0, -(a + b) / 2 + Math.PI / 2, 0], crease: false }));
   }
   const shed = cottage(0.32, 0.24, 0.2, WALL, STRAW);
   shed.position.set(-0.22, 0, -0.34);
   g.add(shed);
   g.add(part(cone(0.15, 0.26, 6), STRAW, { at: [0.3, 0.13, -0.32] }));
-  for (const [x, z, a] of [[0.2, 0.18, 0.6], [-0.24, 0.2, 2.4], [0.34, -0.06, -1], [-0.02, -0.02, 1.9]]) {
+  for (const [i, [x, z, a]] of [[0.2, 0.18, 0.6], [-0.24, 0.2, 2.4], [0.34, -0.06, -1], [-0.02, -0.02, 1.9]].entries()) {
     const s = sheep();
-    s.scale.setScalar(1.45);
+    s.scale.setScalar(1.45 + [0, 0.04, 0.04, 0][i]); // neighbours a little different in size, so their faces never lie in one plane // each a little bigger, so neighbours' faces never lie in one plane
     s.position.set(x, 0, z);
     s.rotation.y = a;
     g.add(s);
@@ -745,8 +745,8 @@ function wolf(phase: number): BeastRig {
     part(box(0.04, 0.04, 0.045), DARK, { at: [0.54, 0.4, 0], crease: false }),
     part(cone(0.05, 0.15, 3), WOLF_DARK, { at: [0.25, 0.57, 0.06], rot: [0.35, 0, 0.15] }),
     part(cone(0.05, 0.15, 3), WOLF_DARK, { at: [0.25, 0.57, -0.06], rot: [-0.35, 0, 0.15] }),
-    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, 0.065], glow: 0.6, crease: false }),
-    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, -0.065], glow: 0.6, crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, 0.07], glow: 0.6, crease: false }),
+    part(box(0.03, 0.025, 0.03), '#f2c230', { at: [0.35, 0.48, -0.07], glow: 0.6, crease: false }),
   );
   // Long and bushy, out behind and sloping down from the rump.
   const tail = joint([-0.21, 0.34, 0],
@@ -778,7 +778,7 @@ function caveBear(): THREE.Group {
   const head = joint([0.22, 0.36, 0],
     part(new THREE.DodecahedronGeometry(0.16, 0), BEAR, { at: [0.33, 0.38, 0] }),
     part(box(0.14, 0.1, 0.12), BEAR_LIGHT, { at: [0.47, 0.34, 0] }),
-    part(box(0.05, 0.04, 0.06), DARK, { at: [0.55, 0.37, 0], crease: false }),
+    part(box(0.05, 0.04, 0.06), DARK, { at: [0.55, 0.376, 0], crease: false }),
     part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, 0.1] }),
     part(new THREE.DodecahedronGeometry(0.055, 0), BEAR_DARK, { at: [0.3, 0.53, -0.1] }),
   );
@@ -811,7 +811,7 @@ function basilisk(): THREE.Group {
     }),
     // The forked tongue.
     part(box(0.07, 0.008, 0.012), '#d23a3a', { at: [0.6, 0.31, 0.012], rot: [0, 0.3, 0], crease: false }),
-    part(box(0.07, 0.008, 0.012), '#d23a3a', { at: [0.6, 0.31, -0.012], rot: [0, -0.3, 0], crease: false }),
+    part(box(0.07, 0.008, 0.012), '#d23a3a', { at: [0.6, 0.304, -0.012], rot: [0, -0.3, 0], crease: false }),
   );
   // Three coils on the ground, the tail tapering out of the last.
   const body = group(
@@ -849,7 +849,7 @@ function thunderbird(): THREE.Group {
       part(cone(0.2, 0.85, 3), STORM, { at: [0, 0.42, 0], scale: [1, 1, 0.22] }),
       part(cone(0.12, 0.6, 3), STORM_LIGHT, { at: [0.05, 0.36, 0.02], scale: [1, 1, 0.2] }),
       part(box(0.04, 0.16, 0.02), BOLT, { at: [0.02, 0.5, 0.04], rot: [0, 0, 0.5], glow: 0.5, crease: false }),
-      part(box(0.04, 0.16, 0.02), BOLT, { at: [0.02, 0.36, 0.04], rot: [0, 0, -0.5], glow: 0.5, crease: false }),
+      part(box(0.04, 0.16, 0.02), BOLT, { at: [0.02, 0.36, 0.047], rot: [0, 0, -0.5], glow: 0.5, crease: false }),
     );
     wing.position.set(-0.02, 0.36, side * 0.14);
     wing.rotation.set(side * -0.95, 0, 0.25);
@@ -979,7 +979,7 @@ function bonusToken(n: number, built: boolean, summit: boolean): THREE.Group {
   const R = 0.25, H = 0.04, y = TILE_H + TILE_LIFT + 0.04; // over the fold, so its crease never cuts it
   const ink = new THREE.Mesh(new THREE.CircleGeometry(R * 0.92, 24), inkMat(`+${n}`));
   ink.rotation.x = -Math.PI / 2;
-  ink.position.y = H / 2 + 0.002;
+  ink.position.y = H / 2 + 0.006;
   const g = group(part(cyl(R, R, H, 12), GOLD), ink);
   if (summit) {
     // On the freed summit, where the Thunderbird perched: the mountain hides
@@ -1036,7 +1036,7 @@ const dragonEgg = (c: string, at: [number, number, number], s = 1) =>
 
 // A crate of one of the goods: a box of its colour with a darker band.
 function crate(c: string, s: number, at: [number, number, number], spin = 0): THREE.Group {
-  const g = group(part(box(s, s, s), c), part(box(s * 1.02, s * 0.18, s * 1.02), mix(c, DARK, 0.3), { crease: false }));
+  const g = group(part(box(s, s, s), c), part(box(s * 1.12, s * 0.18, s * 1.12), mix(c, DARK, 0.3), { crease: false }));
   g.position.set(at[0], at[1] + s / 2, at[2]);
   g.rotation.y = spin;
   return g;
@@ -1066,7 +1066,7 @@ function hatchery(): THREE.Group {
   g.add(part(cyl(0.06, 0.07, 0.22, 6), mix(CLAY, DARK, 0.2), { at: [0.0, 0.66, -0.3] }));
   // The mouth, glowing.
   g.add(part(box(0.2, 0.18, 0.04), '#ff9a3c', { at: [-0.12, 0.11, 0.17], glow: 0.6, crease: false }));
-  g.add(part(box(0.11, 0.1, 0.045), '#ffd23f', { at: [-0.12, 0.08, 0.175], glow: 0.7, crease: false }));
+  g.add(part(box(0.11, 0.1, 0.045), '#ffd23f', { at: [-0.12, 0.08, 0.18], glow: 0.7, crease: false }));
   // The nest: a big twig ring with three eggs.
   g.add(part(cyl(0.2, 0.18, 0.04, 9), '#a8743e', { at: [0.32, 0.03, 0.26], crease: false }));
   g.add(part(new THREE.TorusGeometry(0.22, 0.06, 3, 9), WOOD_DARK, { at: [0.32, 0.05, 0.26], rot: [Math.PI / 2, 0, 0] }));
@@ -1085,7 +1085,9 @@ function portPile(r: string): THREE.Group {
   if (r === 'stone') {
     const s = 0.17;
     const pile: [number, number, number][] = [[-0.17, 0, 0.04], [0, 0, 0.04], [0.17, 0, 0.04], [-0.085, 0, -0.13], [0.085, 0, -0.13], [-0.085, 1, -0.03], [0.085, 1, -0.03], [0, 2, -0.04]];
-    for (const [x, lvl, z] of pile) g.add(stoneBlock(s, [x, s * 0.4 + lvl * s * 0.8, z], (x * 7) % 0.2, lvl === 2 ? '#e4e6ea' : STONE_BLOCK));
+    // Each a little higher or lower than the next, so their tops never lie in one plane.
+    const lift = [0, 0.008, 0, 0, 0.016, 0, 0.008, 0];
+    pile.forEach(([x, lvl, z], i) => g.add(stoneBlock(s, [x, s * 0.4 + lvl * s * 0.8 + lift[i], z], (x * 7) % 0.2, lvl === 2 ? '#e4e6ea' : STONE_BLOCK)));
   } else if (r === 'timber') {
     // End-on to the room, so the pale cut ends show.
     const rr = 0.08, len = 0.34;
@@ -1102,9 +1104,9 @@ function portPile(r: string): THREE.Group {
     }
   } else {
     // Sheep penned on the quay, waiting for the boat.
-    for (const [x, z, a] of [[-0.14, 0.06, 0.4], [0.14, 0.02, 2.6], [0, -0.16, -0.9]]) {
+    for (const [i, [x, z, a]] of [[-0.14, 0.06, 0.4], [0.14, 0.02, 2.6], [0, -0.16, -0.9]].entries()) {
       const sh = sheep();
-      sh.scale.setScalar(1.35);
+      sh.scale.setScalar(1.35 + i * 0.04); // each a little bigger, so neighbours' faces never lie in one plane
       sh.position.set(x, 0, z);
       sh.rotation.y = a;
       g.add(sh);
@@ -1119,17 +1121,17 @@ function port(r: string): THREE.Group {
   const shed = cottage(0.46, 0.32, 0.3, WALL, TRADE_RED);
   shed.position.set(-0.18, 0, -0.32);
   g.add(shed);
-  g.add(awning(0.46, 0.18, 4, 0.27, -0.08).translateX(-0.18));
+  g.add(awning(0.48, 0.18, 4, 0.27, -0.08).translateX(-0.18));
   g.add(portPile(r).translateX(-0.2).translateZ(0.12));
   // The pier: planks on posts, running out past the hex's edge.
   g.add(part(box(0.22, 0.04, 1.05), WOOD, { at: [0.24, 0.1, 0.35] }));
-  for (const z of [0, 0.35, 0.7]) for (const x of [0.14, 0.34]) g.add(part(box(0.04, 0.22, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
+  for (const z of [0, 0.35, 0.7]) for (const x of [0.14, 0.34]) g.add(part(box(0.04, 0.2, 0.04), WOOD_DARK, { at: [x, 0.01, z], crease: false }));
   g.add(crate(PORT_GOODS[r] ?? TRADE_GOODS[4], 0.1, [0.24, 0.12, 0.5], 0.4));
   const boat = new THREE.Group();
   boat.add(part(cyl(0.12, 0.06, 0.4, 4), WOOD, { at: [0, 0, 0], rot: [Math.PI / 2, Math.PI / 4, 0], scale: [1, 1, 0.55] }));
   boat.add(part(box(0.02, 0.5, 0.02), DARK, { at: [0, 0.27, 0], crease: false }));
   boat.add(part(sheet([[0, 0.5, 0], [0, 0.05, 0.02], [0, 0.08, 0.26]], [[0, 1, 2]]), WALL, { two: true }));
-  boat.add(part(sheet([[0.003, 0.3, 0.008], [0.003, 0.22, 0.013], [0.003, 0.24, 0.15], [0.003, 0.32, 0.1]], [[0, 1, 2], [0, 2, 3]]), TRADE_RED, { two: true, crease: false }));
+  boat.add(part(sheet([[0.016, 0.3, 0.008], [0.016, 0.22, 0.013], [0.016, 0.24, 0.15], [0.016, 0.32, 0.1]], [[0, 1, 2], [0, 2, 3]]), TRADE_RED, { two: true, crease: false }));
   boat.position.set(0.58, 0.0, 0.7);
   g.add(boat);
   return g;
@@ -1251,7 +1253,7 @@ function cliffWorks(): THREE.Group {
   for (let i = 0; i < 4; i++) g.add(part(box(0.11, 0.018, 0.018), WOOD_DARK, { at: [0.25, 0.06 + i * 0.1, 0.27 - i * 0.025], crease: false }));
   // Blocks cut and waiting, one up on the top deck.
   g.add(stoneBlock(0.17, [-0.15, 0.85, 0.07], 0.2));
-  for (const [x, y, z, a] of [[-0.3, 0.07, 0.38, 0.1], [-0.1, 0.07, 0.4, -0.2], [-0.2, 0.21, 0.38, 0]]) g.add(stoneBlock(0.18, [x, y, z], a));
+  for (const [x, y, z, a] of [[-0.3, 0.07, 0.38, 0.1], [-0.1, 0.062, 0.4, -0.2], [-0.2, 0.21, 0.38, 0]]) g.add(stoneBlock(0.18, [x, y, z], a));
   return g;
 }
 
@@ -1271,7 +1273,7 @@ function stonemason(): THREE.Group {
   g.add(part(cyl(0.05, 0.06, 0.24, 6), '#eef0f2', { at: [0, 0.25, 0.14] }));
   g.add(part(box(0.1, 0.06, 0.06), WOOD_DARK, { at: [0.48, 0.03, 0.38], rot: [0, 0.5, 0] }));
   g.add(part(box(0.025, 0.025, 0.16), WOOD, { at: [0.43, 0.03, 0.45], rot: [0, 0.5, 0], crease: false }));
-  for (const [x, z] of [[-0.48, 0.38], [-0.36, 0.48]]) g.add(stoneBlock(0.15, [x, 0.06, z], x));
+  for (const [x, z, y] of [[-0.48, 0.38, 0.06], [-0.36, 0.48, 0.052]]) g.add(stoneBlock(0.15, [x, y, z], x));
   return g;
 }
 
@@ -1282,8 +1284,9 @@ function woodcutter(): THREE.Group {
   const w = 0.5, d = 0.38, r = 0.04, rows = 4;
   for (let i = 0; i < rows; i++) {
     const y = r + i * r * 1.8;
-    for (const z of [-d / 2, d / 2]) g.add(timberLog(w + 0.1, r, [0, y + (i % 2 ? r * 0.9 : 0), z - 0.15], 0));
-    for (const x of [-w / 2, w / 2]) g.add(timberLog(d + 0.1, r, [x, y + (i % 2 ? 0 : r * 0.9), -0.15], Math.PI / 2));
+    const more = (i % 2) * 0.03; // the next row's ends stick out further, so the overlapping ends don't lie in one plane
+    for (const z of [-d / 2, d / 2]) g.add(timberLog(w + 0.1 + more, r, [0, y + (i % 2 ? r * 0.9 : 0), z - 0.15], 0));
+    for (const x of [-w / 2, w / 2]) g.add(timberLog(d + 0.1 + more, r, [x, y + (i % 2 ? 0 : r * 0.9), -0.15], Math.PI / 2));
   }
   const top = r + rows * r * 1.8;
   g.add(part(box(w - 0.04, top, d - 0.04), mix(WOOD, WALL, 0.25), { at: [0, top / 2, -0.15], crease: false }));
@@ -1296,7 +1299,7 @@ function woodcutter(): THREE.Group {
   g.add(part(cyl(0.15, 0.15, 0.012, 7), '#f0cb93', { at: [0.34, 0.185, 0.28], crease: false }));
   g.add(part(box(0.045, 0.5, 0.045), '#c48a4e', { at: [0.42, 0.38, 0.28], rot: [0, 0, -0.5] }));
   g.add(part(box(0.2, 0.13, 0.03), '#d3d6db', { at: [0.3, 0.22, 0.28], rot: [0, 0, -0.5] }));
-  for (const [x, z, a] of [[-0.05, 0.32, 0.3], [-0.2, 0.36, -0.4], [0.12, 0.42, 1.2]]) g.add(timberLog(0.2, 0.045, [x, 0.045, z], a));
+  for (const [x, z, a, y] of [[-0.05, 0.32, 0.3, 0.045], [-0.2, 0.36, -0.4, 0.051], [0.12, 0.42, 1.2, 0.045]]) g.add(timberLog(0.2, 0.045, [x, y, z], a));
   const t = tree(1.25, PINE);
   t.position.set(-0.48, 0, 0.12);
   g.add(t);
@@ -1332,7 +1335,7 @@ function sawmill(): THREE.Group {
 // Logs hauled up on a strip of beach, an upturned rowboat and an oar: facing the sea.
 function driftwoodYard(): THREE.Group {
   const g = new THREE.Group();
-  g.add(part(cyl(0.62, 0.66, 0.03, 7), SAND, { at: [0, 0.015, 0.05], scale: [1, 1, 0.85], crease: false }));
+  g.add(part(cyl(0.62, 0.66, 0.024, 7), SAND, { at: [0, 0.012, 0.05], scale: [1, 1, 0.85], crease: false }));
   const r = 0.085, len = 0.42;
   const pile: [number, number][] = [[-0.17, 0], [0, 0], [0.17, 0], [-0.085, 1], [0.085, 1]];
   for (const [x, lvl] of pile) g.add(timberLog(len, r, [-0.15 + x, 0.03 + r + lvl * r * 1.7, -0.18], Math.PI / 2));
@@ -1386,8 +1389,8 @@ function gemCutter(): THREE.Group {
   // The grindstone, on edge to the room.
   g.add(part(cyl(0.22, 0.22, 0.07, 10), '#b9b2a6', { at: [-0.25, 0.3, 0.15], rot: [Math.PI / 2, 0, 0] }));
   g.add(part(cyl(0.05, 0.05, 0.09, 6), WOOD_DARK, { at: [-0.25, 0.3, 0.15], rot: [Math.PI / 2, 0, 0], crease: false }));
-  for (const x of [-0.42, -0.08]) g.add(part(box(0.04, 0.32, 0.04), WOOD, { at: [x, 0.16, 0.15] }));
-  g.add(part(box(0.4, 0.035, 0.035), WOOD, { at: [-0.25, 0.3, 0.15], crease: false }));
+  for (const x of [-0.42, -0.08]) g.add(part(box(0.04, 0.33, 0.04), WOOD, { at: [x, 0.165, 0.15] }));
+  g.add(part(box(0.4, 0.035, 0.03), WOOD, { at: [-0.25, 0.3, 0.15], crease: false }));
   // The bench of cut gems: wide faceted stones, not the mine's long spires.
   g.add(part(box(0.38, 0.04, 0.2), WOOD, { at: [0.3, 0.2, 0.18] }));
   for (const x of [0.14, 0.46]) g.add(part(box(0.035, 0.18, 0.035), WOOD_DARK, { at: [x, 0.09, 0.18], crease: false }));
@@ -1430,11 +1433,11 @@ function shepherdsFold(): THREE.Group {
   const n = 9, R = 0.36, cx = 0.18, cz = 0.18;
   for (let i = 0; i < n; i++) {
     const a = -0.6 + (i / (n - 1)) * Math.PI * 1.3;
-    g.add(part(box(0.2, 0.15, 0.1), i % 2 ? STONE : mix(STONE, WALL, 0.3), { at: [cx + Math.cos(a) * R, 0.075, cz + Math.sin(a) * R], rot: [0, -a + Math.PI / 2, 0] }));
+    g.add(part(box(0.2, 0.15, 0.1), i % 2 ? STONE : mix(STONE, WALL, 0.3), { at: [cx + Math.cos(a) * R, 0.075 - (i % 2) * 0.008, cz + Math.sin(a) * R], rot: [0, -a + Math.PI / 2, 0] }));
   }
-  for (const [x, z, a] of [[0.14, 0.16, 0.5], [0.3, 0.02, 2.6]]) {
+  for (const [i, [x, z, a]] of [[0.14, 0.16, 0.5], [0.34, -0.02, 2.6]].entries()) {
     const s = sheep();
-    s.scale.setScalar(1.45);
+    s.scale.setScalar(1.45 + i * 0.04); // each a little bigger, so neighbours' faces never lie in one plane
     s.position.set(x, 0, z);
     s.rotation.y = a;
     g.add(s);
@@ -1456,9 +1459,9 @@ function droversBarn(): THREE.Group {
   g.add(part(box(0.26, 0.28, 0.02), DARK, { at: [0, 0.14, -0.18 + d / 2 + 0.005], crease: false }));
   for (const sx of [-1, 1]) g.add(part(box(0.13, 0.28, 0.02), WOOD_DARK, { at: [sx * 0.2, 0.14, -0.18 + d / 2 + 0.05], rot: [0, sx * 0.9, 0] }));
   g.add(part(box(0.1, 0.08, 0.02), DARK, { at: [0, 0.46, -0.18 + d / 2 + 0.035], crease: false }));
-  for (const [x, z, a] of [[0.05, 0.3, 1.4], [-0.3, 0.42, 0.9], [0.36, 0.4, 2.0]]) {
+  for (const [i, [x, z, a]] of [[0.05, 0.3, 1.4], [-0.3, 0.42, 0.9], [0.36, 0.4, 2.0]].entries()) {
     const s = sheep();
-    s.scale.setScalar(1.35);
+    s.scale.setScalar(1.35 + i * 0.04); // each a little bigger, so neighbours' faces never lie in one plane
     s.position.set(x, 0, z);
     s.rotation.y = a;
     g.add(s);
@@ -1477,7 +1480,7 @@ function fishery(): THREE.Group {
   g.add(hut);
   // The drying rack: two posts, a pole, fish hanging from it.
   for (const x of [0.02, 0.6]) g.add(part(box(0.04, 0.5, 0.04), WOOD, { at: [x, 0.25, 0.14] }));
-  g.add(part(box(0.62, 0.035, 0.035), WOOD_DARK, { at: [0.31, 0.49, 0.14], crease: false }));
+  g.add(part(box(0.66, 0.035, 0.03), WOOD_DARK, { at: [0.31, 0.49, 0.14], crease: false }));
   for (let i = 0; i < 4; i++) {
     const x = 0.12 + i * 0.13;
     g.add(part(new THREE.OctahedronGeometry(1, 0), i % 2 ? FISH : mix(FISH, WALL, 0.3), { at: [x, 0.34, 0.14], scale: [0.065, 0.13, 0.035] }));
@@ -1559,7 +1562,7 @@ function upgradeMark(key: string): THREE.Group {
       cog.add(part(cyl(0.13, 0.13, 0.05, 10), '#c9ced6', { rot: [Math.PI / 2, 0, 0] }));
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2;
-        cog.add(part(box(0.06, 0.06, 0.05), '#8d949e', { at: [Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0], rot: [0, 0, a], crease: false }));
+        cog.add(part(box(0.06, 0.06, 0.04), '#8d949e', { at: [Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0], rot: [0, 0, a], crease: false }));
       }
       cog.add(part(cyl(0.045, 0.045, 0.06, 8), DARK, { rot: [Math.PI / 2, 0, 0], crease: false }));
       cog.position.set(0, 0.36, 0);
@@ -1596,7 +1599,7 @@ function hexRing(outer: number, inner: number, h: number): THREE.BufferGeometry 
 function plate(upgrades: string[], ground: string): THREE.Group {
   const g = new THREE.Group();
   g.add(part(cyl(0.76, 0.76, PLATE_H, 6), ground, { at: [0, TOP + PLATE_H / 2, 0], crease: false }));
-  if (upgrades.length) g.add(part(hexRing(0.76, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
+  if (upgrades.length) g.add(part(hexRing(0.77, 0.68, PLATE_H * 1.4), GOLD, { at: [0, TOP, 0] }));
   // One mark per upgrade (Workshops stack, #400), each the next along the front edge.
   upgrades.forEach((u, i) => {
     const mark = bake(upgradeMark(u));
@@ -1786,7 +1789,7 @@ function egg(element: string): THREE.Group {
   const c = ELEMENT_COLORS[element] ?? '#ccc';
   const g = new THREE.Group();
   const shell = part(new THREE.IcosahedronGeometry(0.14, 0), mix(c, '#fff8ea', 0.15), { at: [0, 0.18, 0], scale: [1, 1.3, 1] });
-  shell.add(part(new THREE.IcosahedronGeometry(0.142, 0), mix(c, '#1d1712', 0.3), { scale: [1.02, 0.25, 1.02], at: [0, 0.03, 0], crease: false }));
+  shell.add(part(new THREE.IcosahedronGeometry(0.142, 0), mix(c, '#1d1712', 0.3), { scale: [1.06, 0.25, 1.06], at: [0, 0.03, 0], crease: false }));
   g.add(nest(), shell);
   g.userData.shell = shell;
   return g;
@@ -3317,7 +3320,7 @@ const PLACES: Record<string, Place> = {
       g.add(leaf(pleatWall(12.1, 2.3, 30, 0.3, true), WOOD, { at: [-5.95, 0, -6] }), leaf(pleatWall(10.1, 2.3, 26, 0.3, true), WOOD, { at: [7.05, 0, -6] }));
       for (const x of [-5, 6]) {
         for (const [dx, dz] of [[-0.6, -0.5], [0.6, -0.5], [-0.6, 0.5], [0.6, 0.5]]) g.add(part(cyl(0.09, 0.09, 3.6, 4), WOOD_DARK, { at: [x + dx, 1.8, -6.8 + dz], crease: false }));
-        g.add(part(box(1.7, 0.18, 1.5), WOOD, { at: [x, 3.6, -6.8] }), part(box(1.7, 0.6, 0.1), WOOD, { at: [x, 3.95, -6.1] }));
+        g.add(part(box(1.7, 0.18, 1.5), WOOD, { at: [x, 3.6, -6.8] }), part(box(1.74, 0.6, 0.1), WOOD, { at: [x, 3.95, -6.09] }));
         g.add(leaf(pleatCone(1.35, 1.1, 4, 0.2), '#8a3a2a', { at: [x, 4.8, -6.8], rot: [0, Math.PI / 4, 0] }));
         g.add(placed(flag('#e5484d', 1), x, -6.8, 1.6, 0, 5.3));
       }
@@ -3827,4 +3830,53 @@ export class FightStage {
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   }
+}
+
+// ---------- for the tests ----------
+
+// Every model the board, the rulebook and the fights draw, built as they're
+// drawn, by name: test/zfight.test.ts looks through them for faces that lie
+// in the same plane and overlap, which the renderer flickers between.
+export function modelsForTest(hexes: Portrait[]): Record<string, () => THREE.Object3D> {
+  const out: Record<string, () => THREE.Object3D> = {};
+  // Each model on its own first, so a fight is found where it's made.
+  const buildings = ['tower', ...PORTS, 'quarry', 'lumber_camp', 'crystal_mine', 'pasture', 'roost', 'hatchery', 'market', 'monument', 'standing_stones', 'lighthouse', 'guildhall', 'cliff_works', 'stonemason', 'woodcutter', 'sawmill', 'driftwood_yard', 'ley_spire', 'gem_cutter', 'smelter', 'shepherds_fold', 'drovers_barn', 'fishery'];
+  for (const type of buildings) {
+    for (const floors of type === 'tower' ? [1, 2, 3, 4] : [0]) {
+      out[`building ${type}${floors ? ` ${floors}` : ''}`] = () => buildingModel({ type, cls: '', name: '', owner: 0, upgrades: [], upgradeName: null, floors, does: { makes: {}, houses: 0, points: 0 } }).model;
+    }
+  }
+  for (const u of ['workshop', 'nesting_grounds']) out[`upgrade ${u}`] = () => upgradeMark(u);
+  out['plate'] = () => plate(['workshop', 'workshop'], '#ccc');
+  for (const k of BEASTS) {
+    out[`beast ${k}`] = () => {
+      const m = beastModel(k);
+      for (const r of m.userData.rigs as BeastRig[]) animateBeast(r, 0, 0, 0);
+      return m;
+    };
+  }
+  out['lair'] = () => lair(0.58);
+  for (const e of Object.keys(ELEMENT_COLORS)) {
+    out[`dragon ${e}`] = () => dragonRig(e).root;
+    out[`egg ${e}`] = () => egg(e);
+  }
+  for (const n of [1, 2, 3]) for (const built of [false, true]) out[`bonus token ${n}${built ? ' built' : ''}`] = () => bonusToken(n, built, !built);
+  for (const p of hexes) out[`hex ${JSON.stringify(p)}`] = () => portraitScene(p);
+  for (const [k, place] of Object.entries(PLACES)) {
+    out[`place ${k}`] = () => {
+      const world = group(groundSheet(place.ground, k, place.shore));
+      place.build(world);
+      return world;
+    };
+  }
+  for (const e of Object.keys(ELEMENT_COLORS)) out[`fighting dragon ${e}`] = () => fightingDragon(e);
+  for (const [k, make] of Object.entries(DEFENDERS)) out[`defender ${k}`] = make;
+  for (const k of BEASTS) {
+    out[`fighting beast ${k}`] = () => {
+      const m = beastModel(k);
+      for (const r of m.userData.rigs as BeastRig[]) animateBeast(r, 0, 0, 0);
+      return m;
+    };
+  }
+  return out;
 }
