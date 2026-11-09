@@ -891,7 +891,8 @@ function dragonStats(key: string, element: string, d: { growth: number; targetin
   return `<div class="dstats">${rows}<div class="dgrow">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it's fed</div></div><p class="ctext">${esc(sentence)}</p>`;
 }
 
-// A card tapped open: full size, its rule text, and how to play it.
+// A card tapped open: full size, its rule text, and how to play it. The ✕ on
+// its corner closes it, for whoever doesn't know a tap outside does too.
 function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): string {
   let actions = '';
   const left = me.hand.length - me.handCap - selected.size;
@@ -909,6 +910,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
   else actions = act(c.verb, `data-play="${c.id}"`);
   return `<div class="zoom" id="zoom" data-leave="fade">
     <div class="card big k-${c.kind}" data-key="big ${c.id}" style="--kc:${frameColor(c.kind, c.element)}">
+      <button class="ghost zoomx" data-zoomclose aria-label="Close">✕</button>
       <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
       <b class="cname">${esc(c.name)}</b>
       <div class="ccost"><span>${costChips(c.cost, me)}</span><small>${KIND_LABEL[c.kind]}</small></div>
@@ -921,7 +923,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
 
 // One of your dragons tapped open: its card, as it was in your hand, with the
 // stage it's at now, its growth and health, and the stage marked on the card.
-// Read only; tap outside to close, or leaf through your other dragons.
+// Read only; ✕ or a tap outside closes it, or leaf through your other dragons.
 function dragonZoom(g: PublicState, d: DragonView): string {
   const mine = g.dragons.filter((x) => x.owner === d.owner);
   const i = mine.indexOf(d);
@@ -931,6 +933,7 @@ function dragonZoom(g: PublicState, d: DragonView): string {
   const now = `${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${statTag('Health', `${d.hp}/${d.maxHp}`)}` : ''}${resting}`;
   return `<div class="zoom" id="zoom" data-leave="fade">
     <div class="card big k-dragon" data-key="big ${d.id}" style="--kc:${frameColor('dragon', d.element)}">
+      <button class="ghost zoomx" data-zoomclose aria-label="Close">✕</button>
       <div class="cart">${cardArt('dragon', d.key, d.element)}<span class="ckind">${elemIcon(d.element, 1)}</span></div>
       <b class="cname">${esc(dragonName(d, g.dragons))}</b>
       <div class="ccost"><span class="dnow">${now}</span><small>${KIND_LABEL.dragon}</small></div>
@@ -1689,7 +1692,12 @@ function wire(g: PublicState, me: Me) {
     openDragon = mine[(i + Number(el.dataset.dragonnav) + mine.length) % mine.length].id;
     render();
   });
-  // Tapping outside an open card closes it.
+  // The ✕ on an open card, or a tap outside it, closes it.
+  bind('[data-zoomclose]', () => {
+    openCard = null;
+    openDragon = null;
+    render();
+  });
   const zoomEl = document.getElementById('zoom');
   if (zoomEl) zoomEl.onpointerdown = (e) => (swipe = { x: e.clientX, y: e.clientY });
   if (zoomEl) zoomEl.onclick = (e) => {
