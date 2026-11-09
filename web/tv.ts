@@ -8,7 +8,7 @@
 
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, turnOrderHtml, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -413,6 +413,7 @@ function renderGame(g: PublicState) {
         ${phaseTrack(g)}
         ${last ? `<span class="goal last">${last}</span>` : `<span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>`}
       </header>
+      ${turnOrderHtml(g, names)}
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText(`${g.titlePoints} points`)}</span></h3><ul>${titles}</ul>
         <h3>Great beasts <span class="chip">+${iconText(`${g.beasts[0]?.points ?? 0} points`)}</span></h3><ul>${beasts}</ul></div></aside>
@@ -422,6 +423,9 @@ function renderGame(g: PublicState) {
     board3d.update(g, highlight);
   }
   fitSide();
+  // Open offers sit just below the turn order, however many lines it wraps to.
+  const orderEl = app.querySelector<HTMLElement>('.board > .turnorder'), offersEl = app.querySelector<HTMLElement>('.board > .offers');
+  if (!remote && orderEl && offersEl) offersEl.style.top = `${orderEl.getBoundingClientRect().bottom - app.querySelector<HTMLElement>('.board')!.getBoundingClientRect().top + 6}px`;
   // The feed shows the newest lines at the bottom; an older one that only
   // partly fits at the top is dropped rather than shown sliced in half.
   for (const ul of app.querySelectorAll<HTMLElement>('.side ul.feed')) {
