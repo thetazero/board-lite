@@ -878,7 +878,7 @@ function cardFace(c: CardView, me: Me, playable: boolean, style = '', cls = ''):
   return `<div class="card k-${c.kind}${dim}${dealt}${cls}${selected.has(c.id) ? ' picked' : ''}" data-card="${c.id}" style="--kc:${frameColor(c.kind, c.element)};${style}${dealStyle(c.id)}">
     <div class="cart">${cardArt(c.kind, c.key, c.element, c.cls)}<span class="ckind">${cornerMark(c)}</span></div>
     <b class="cname">${esc(c.name)}</b>
-    <div class="ccost">${costChips(c.cost, me)}</div>
+    <div class="ccost${RESOURCES.filter((r) => (c.cost[r] ?? 0) > 0).length >= 4 ? ' long' : ''}">${costChips(c.cost, me)}</div>
   </div>`;
 }
 

@@ -71,6 +71,19 @@ const COVERED = `(() => {
   }
   return [...hits];
 })()`;
+// On any screen, the cards whose cost spills past the card's edge: each chip
+// must sit inside the card's paper. Measured in the card's own layout (offsets,
+// not screen boxes), so a card tilted in the hand counts the same as one lying flat.
+const SPILLS = `(() => {
+  const out = new Set();
+  for (const card of document.querySelectorAll('.card')) {
+    if (!card.offsetWidth) continue;
+    const box = (el) => { let x = 0; for (let e = el; e && e !== card; e = e.offsetParent) x += e.offsetLeft; return [x, x + el.offsetWidth]; };
+    const spilt = [...card.querySelectorAll('.ccost > *, .ccost .chip')].some((el) => { const [l, r] = box(el); return l < -0.5 || r > card.clientWidth + 0.5; });
+    if (spilt) out.add((card.querySelector('.cname')?.textContent ?? '?').trim() + (card.classList.contains('big') ? ' (open)' : ''));
+  }
+  return [...out];
+})()`;
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const LAN = { lan: ['192.168.1.20'], tailscale: [] as string[], port: 8080 }; // the address the TV shows
 const TAILSCALE = ['100.86.12.40']; // and its Tailscale address, for shots with `tailscale`
@@ -341,16 +354,17 @@ class Tab {
   // (Shooting the whole page at once stretches the screen to the page's
   // height, and everything sized against the screen grows with it.)
   // Each screen comes with what the phone's hand of cards sits over, if anything (COVERED).
-  async images(device: Device): Promise<{ image: Buffer; covered: string[] }[]> {
+  async images(device: Device): Promise<{ image: Buffer; covered: string[]; spills: string[] }[]> {
     const shoot = async () => ({
       image: Buffer.from((await this.send('Page.captureScreenshot', { format: 'webp', quality: QUALITY })).data, 'base64'),
       covered: device.mobile ? await this.eval<string[]>(COVERED) : [],
+      spills: await this.eval<string[]>(SPILLS),
     });
     if (!device.mobile) return [await shoot()];
     const [page, screen] = await this.eval<[number, number]>('[document.documentElement.scrollHeight, innerHeight]');
     // A page that scrolls only a sliver (under 24px: padding, nothing more to see) is one screen.
     const n = page - screen < 24 ? 1 : Math.min(MAX_SCREENS, Math.ceil(page / screen));
-    const out: { image: Buffer; covered: string[] }[] = [];
+    const out: { image: Buffer; covered: string[]; spills: string[] }[] = [];
     for (let i = 0; i < n; i++) {
       await this.eval(`scrollTo(0, ${n > 1 ? Math.round(((page - screen) * i) / (n - 1)) : 0})`);
       await this.settle();
@@ -495,6 +509,7 @@ async function main() {
   }
   const done: Done[] = [];
   const covered: string[] = []; // phone screens where the hand sits over the page
+  const spills: string[] = []; // screens where a card's cost spills past its edge
   let failures = 0;
   try {
     const cdp = chrome.cdp;
@@ -573,8 +588,9 @@ async function main() {
               if (!shot.loading) await tab.settle();
               const images = await tab.images(device);
               let changed: boolean | null = null;
-              images.forEach(({ image, covered: c }, i) => {
+              images.forEach(({ image, covered: c, spills: sp }, i) => {
                 if (c.length) covered.push(`${imageName(name, i)}: ${c.join(', ')}`);
+                if (sp.length) spills.push(`${imageName(name, i)}: ${sp.join(', ')}`);
                 const before = join(prev, imageName(name, i));
                 const differs = existsSync(before) ? !readFileSync(before).equals(image) : existsSync(prev) ? true : null;
                 // The same as last time: the same file, not a second copy of it.
@@ -611,6 +627,7 @@ async function main() {
   console.log(`Contact sheet: file://${join(out, 'index.html')}`);
   if (done.some((d) => d.changed !== null)) console.log(changed.length ? `Changed since the previous run (*): ${changed.length}` : 'Nothing changed since the previous run.');
   if (covered.length) console.log(`\nThe hand of cards sits over the page on ${covered.length} phone screen(s):\n${covered.map((c) => `  ${c}`).join('\n')}`);
+  if (spills.length) console.log(`\nA card's cost spills past its edge on ${spills.length} screen(s):\n${spills.map((c) => `  ${c}`).join('\n')}`);
   if (failures) {
     console.error(`${failures} screenshot(s) failed.`);
     process.exitCode = 1;

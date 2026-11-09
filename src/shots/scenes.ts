@@ -538,6 +538,8 @@ export const SCENES: Scene[] = [
       { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building (2 Workshops on one quarry)', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
+      // The Market's cost is the longest, four kinds: it must stay on the card (#432).
+      { file: 'phone-hand-market-2p', caption: 'Phone: a thumb on the Market, the card with the longest cost, raised to read', client: 'phone', seat: g!.turn, press: { on: card(g!.players[g!.turn].hand.find((c) => c.key === 'market')!.id) } },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
     ],
   },
