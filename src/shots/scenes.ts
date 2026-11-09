@@ -1017,6 +1017,17 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // The turn order mid-round (#430): two players have had their turn, and
+    // the third is taking it.
+    name: 'turn-order-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action' && turnOrder(g).indexOf(g.turn) === 2,
+    shots: () => [
+      { file: 'tv-turn-order-5p', caption: 'TV: the turn order mid-round: two turns over, the third player acting, who goes first next round', client: 'tv' },
+    ],
+  },
+  {
     // A crowded panel header (#398): one player holds every title and slew
     // both great beasts, five badges between their name and their points.
     name: 'many-badges-3p',
