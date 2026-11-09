@@ -152,25 +152,6 @@ export function playerTag(i: number, names: string[]): string {
   return `<span class="ptag" style="--pc:${PLAYER_COLORS[i]}">${esc(names[i] ?? `P${i + 1}`)}</span>`;
 }
 
-// This round's turn order (#430), on the TV's top bar and under the phone's
-// status line: everyone in the order they act, those whose turn is over faded,
-// whose turn it is lit, and who goes first next round (the second in this
-// round's order, as the first player moves one seat each round). On a phone
-// `me` rings your own name. The last round has no next round to name.
-export function turnOrderHtml(g: PublicState, names: string[], me?: { seat: number; total: number }): string {
-  if (g.phase === 'over') return '';
-  const order = g.turnOrder;
-  // Before the actions no one has had a turn; after them, everyone has.
-  const at = g.phase === 'action' ? order.indexOf(g.turn) : g.phase === 'cards' ? 0 : order.length;
-  const items = order.map((p, k) => {
-    const cls = [k < at ? 'done' : k === at && g.phase === 'action' ? 'now' : '', p === me?.seat ? 'me' : ''].filter(Boolean).join(' ');
-    return `<li${cls ? ` class="${cls}"` : ''} style="--pc:${PLAYER_COLORS[p]}">${esc(names[p] ?? `P${p + 1}`)}</li>`;
-  }).join('');
-  const next = order.length > 1 && !lastRoundHtml(g, names, me) ? order[1] : null;
-  const nextText = next === null ? '' : `<span class="nextfirst">${next === me?.seat ? 'You go' : `${playerTag(next, names)} goes`} first next round</span>`;
-  return `<div class="turnorder"><small>Turn order</small><ol>${items}</ol>${nextText}</div>`;
-}
-
 // ---------- points ----------
 
 type PlayerPoints = PublicState['players'][number];

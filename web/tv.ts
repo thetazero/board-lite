@@ -8,7 +8,7 @@
 
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, turnOrderHtml, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -348,6 +348,20 @@ function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string 
   if (!seat?.standIn) return '';
   if (everyoneQuit(snap!.lobby)) return '<span class="seatnote">Quit</span>';
   return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: bot plays</span>`;
+}
+
+// This round's turn order (#430), under the top bar: everyone's name in the
+// order they act, those whose turn is over faded, whose turn it is lit.
+function turnOrderHtml(g: PublicState, names: string[]): string {
+  if (g.phase === 'over') return '';
+  const order = g.turnOrder;
+  // Before the actions no one has had a turn; after them, everyone has.
+  const at = g.phase === 'action' ? order.indexOf(g.turn) : g.phase === 'cards' ? 0 : order.length;
+  const items = order.map((p, k) => {
+    const cls = k < at ? 'done' : k === at && g.phase === 'action' ? 'now' : '';
+    return `<li${cls ? ` class="${cls}"` : ''} style="--pc:${PLAYER_COLORS[p]}">${esc(names[p] ?? `P${p + 1}`)}</li>`;
+  }).join('');
+  return `<ol class="turnorder">${items}</ol>`;
 }
 
 let shown: PublicState | null = null; // the state the board is drawn from

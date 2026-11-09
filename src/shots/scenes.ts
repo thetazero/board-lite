@@ -1015,15 +1015,14 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    // The turn order mid-round (#430): two players have had their turn, the
-    // third is taking it, and the phone's player is still to come.
+    // The turn order mid-round (#430): two players have had their turn, and
+    // the third is taking it.
     name: 'turn-order-5p',
     players: 5,
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action' && turnOrder(g).indexOf(g.turn) === 2,
-    shots: (g) => [
+    shots: () => [
       { file: 'tv-turn-order-5p', caption: 'TV: the turn order mid-round: two turns over, the third player acting, who goes first next round', client: 'tv' },
-      { file: 'phone-turn-order-5p', caption: "Phone: the turn order on someone else's turn, your own name in it still to come", client: 'phone', seat: turnOrder(g!)[3] },
     ],
   },
   {

@@ -206,22 +206,12 @@ body.tv.pointing.playing #savegame { display: block; }
 .topbar .phases li:not(.phase) { font-size: 1.15em; font-weight: 600; color: var(--muted); opacity: .75; white-space: nowrap; }
 .topbar .phases li.phase { white-space: nowrap; }
 .topbar .goal { margin-left: auto; font-size: 1.3em; display: inline-flex; align-items: center; gap: .2em; align-self: center; }
-/* This round's turn order (#430): on the TV's top bar, and under the phone's status line. */
-.turnorder { display: flex; align-items: center; gap: .25em .45em; min-width: 0; font-size: 1.15em; }
-.turnorder > small { color: var(--muted); font-weight: 600; font-size: .8em; white-space: nowrap; }
-.turnorder ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: .3em; min-width: 0; }
-.turnorder li { background: var(--pc); color: #111; font-weight: 800; padding: .05em .6em; border-radius: 1em; white-space: nowrap; max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
+/* This round's turn order (#430): centred under the TV's top bar, over the board's top edge; open offers sit below it (placed in tv.ts). */
+.turnorder { list-style: none; margin: 0; position: absolute; top: 2.45em; left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100vw - 2 * var(--colw) - 2em); display: flex; flex-wrap: wrap; justify-content: center; gap: .3em; font-size: 1.25em; padding: .2em .4em; border-radius: 1em; background: #0009; pointer-events: none; }
+.turnorder li { background: var(--pc); color: #111; font-weight: 800; padding: .05em .6em; border-radius: 1em; white-space: nowrap; max-width: 5.5em; overflow: hidden; text-overflow: ellipsis; }
 .turnorder li.done { opacity: .4; }
 .turnorder li.now { outline: .16em solid #ffd866; outline-offset: .12em; box-shadow: 0 0 .7em #ffd866aa; }
-.turnorder li.me { text-decoration: underline; text-underline-offset: .15em; text-decoration-thickness: .12em; }
-.turnorder .nextfirst { color: var(--muted); font-size: .85em; white-space: nowrap; }
-/* On the TV it stands centred under the top bar, over the board's top edge; open offers sit below it (placed in tv.ts). */
-.board > .turnorder { position: absolute; top: 2.45em; left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100vw - 2 * var(--colw) - 2em); flex-wrap: wrap; justify-content: center; font-size: 1.25em; padding: .2em .7em; border-radius: 1em; background: #0009; pointer-events: none; }
-.board > .turnorder li { max-width: 6.5em; }
 .remote .board > .turnorder { position: static; order: 0; transform: none; max-width: none; justify-content: flex-start; font-size: 1em; background: none; padding: 0; }
-.remote .board > .turnorder ol { flex-wrap: wrap; }
-.phone .turnorder { margin: .45em .9em 0; flex-wrap: wrap; font-size: .9em; }
-.phone .turnorder ol { flex-wrap: wrap; }
 .mapwrap { position: absolute; inset: 0 calc(var(--colw) - 6vw) 0; display: flex; flex-direction: column; }
 .mapwrap svg.map { flex: 1; min-height: 0; }
 /* The 3D board's canvas spans the whole screen, the sea running off every
