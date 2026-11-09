@@ -1294,3 +1294,6 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .fightscene .battle.live .fig .hpbar { position: absolute; z-index: 1; left: 50%; top: var(--foot); translate: -50% calc(var(--plate, 1.5em) - .3em); width: clamp(3em, 60%, 5em); height: .45em; margin: 0; box-shadow: none; }
 .fightscene .battle.live .fig-crown { top: 0; }
 .remote .fightscene .battle.live .fig-name { font-size: .7em; max-width: 6em; }
+/* End turn tapped once (#417): its confirm, in the same place. */
+.endask { margin-top: .4em; }
+.endask .hint { margin: 0 0 .2em; text-align: center; }
