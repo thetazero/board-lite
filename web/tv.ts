@@ -350,6 +350,20 @@ function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string 
   return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: bot plays</span>`;
 }
 
+// This round's turn order (#430), under the top bar: everyone's name in the
+// order they act, those whose turn is over faded, whose turn it is lit.
+function turnOrderHtml(g: PublicState, names: string[]): string {
+  if (g.phase === 'over') return '';
+  const order = g.turnOrder;
+  // Before the actions no one has had a turn; after them, everyone has.
+  const at = g.phase === 'action' ? order.indexOf(g.turn) : g.phase === 'cards' ? 0 : order.length;
+  const items = order.map((p, k) => {
+    const cls = k < at ? 'done' : k === at && g.phase === 'action' ? 'now' : '';
+    return `<li${cls ? ` class="${cls}"` : ''} style="--pc:${PLAYER_COLORS[p]}">${esc(names[p] ?? `P${p + 1}`)}</li>`;
+  }).join('');
+  return `<ol class="turnorder">${items}</ol>`;
+}
+
 let shown: PublicState | null = null; // the state the board is drawn from
 
 function renderGame(g: PublicState) {
@@ -413,6 +427,7 @@ function renderGame(g: PublicState) {
         ${phaseTrack(g)}
         ${last ? `<span class="goal last">${last}</span>` : `<span class="goal">First to <b>${g.pointsToWin}</b>${icon('points', 1.2)} wins</span>`}
       </header>
+      ${turnOrderHtml(g, names)}
       <aside class="side left p${n}">${players.slice(0, half).join('')}<div class="corner feedbox"><ul class="feed">${feed}</ul></div></aside>
       <aside class="side right p${n}">${players.slice(half).join('')}<div class="corner titles"><h3>Titles <span class="chip">+${iconText(`${g.titlePoints} points`)}</span></h3><ul>${titles}</ul>
         <h3>Great beasts <span class="chip">+${iconText(`${g.beasts[0]?.points ?? 0} points`)}</span></h3><ul>${beasts}</ul></div></aside>
@@ -422,6 +437,9 @@ function renderGame(g: PublicState) {
     board3d.update(g, highlight);
   }
   fitSide();
+  // Open offers sit just below the turn order, however many lines it wraps to.
+  const orderEl = app.querySelector<HTMLElement>('.board > .turnorder'), offersEl = app.querySelector<HTMLElement>('.board > .offers');
+  if (!remote && orderEl && offersEl) offersEl.style.top = `${orderEl.getBoundingClientRect().bottom - app.querySelector<HTMLElement>('.board')!.getBoundingClientRect().top + 6}px`;
   // The feed shows the newest lines at the bottom; an older one that only
   // partly fits at the top is dropped rather than shown sliced in half.
   for (const ul of app.querySelectorAll<HTMLElement>('.side ul.feed')) {
@@ -705,7 +723,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     const d = u.d ? g.dragons.find((x) => x.id === u.d) : undefined;
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
-  const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
+  const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'desert';
   const first = ev.first !== 'defenders' ? 'Dragons' : units.length > 1 ? 'Defenders' : units[0].name;
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);
 }

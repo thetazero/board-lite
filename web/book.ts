@@ -24,10 +24,10 @@ let loading: Promise<void> | null = null;
 let picsFor = -1; // the seat the pictures were drawn for (their buildings are in its color)
 const pics = new Map<string, string>();
 
-const TERRAIN_NOUN: Record<string, string> = { mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex' };
+const TERRAIN_NOUN: Record<string, string> = { mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', desert: 'desert hex', harbor: 'harbor hex', ocean: 'ocean hex' };
 const CLASS_HEAD: Record<string, string> = { quarry: 'Stone buildings', lumber: 'Timber buildings', mine: 'Crystal buildings', pasture: 'Livestock buildings', dragon: 'Dragon buildings', trade: 'Trade buildings', monument: 'Monuments' };
 // What each upgrade is shown on: a building of its class.
-const UPGRADE_ON: Record<string, { building: string; terrain: string }> = { workshop: { building: 'quarry', terrain: 'mountain' }, nesting_grounds: { building: 'roost', terrain: 'plains' } };
+const UPGRADE_ON: Record<string, { building: string; terrain: string }> = { workshop: { building: 'quarry', terrain: 'mountain' }, nesting_grounds: { building: 'roost', terrain: 'desert' } };
 const ELEMENTS = ['fire', 'ice', 'lightning', 'air', 'water'];
 const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
@@ -73,12 +73,12 @@ function portraitList(b: Rulebook, seat: number): { id: string; p: Portrait }[] 
   add('held thunderbird', { terrain: 'meadow', held: 'thunderbird' });
   add('held leviathan', { terrain: 'harbor', held: 'leviathan' });
   add('peak zone', { terrain: 'meadow', peakZone: b.peakBonus });
-  add('tower', { terrain: 'plains', building: 'tower' });
-  for (const x of b.buildings) add(`building ${x.key}`, x.key === 'tower_floor' ? { terrain: 'plains', building: 'tower', floors: 3 } : { terrain: x.terrain ?? 'plains', building: x.key });
+  add('tower', { terrain: 'desert', building: 'tower' });
+  for (const x of b.buildings) add(`building ${x.key}`, x.key === 'tower_floor' ? { terrain: 'desert', building: 'tower', floors: 3 } : { terrain: x.terrain ?? 'desert', building: x.key });
   for (const u of b.upgrades) add(`upgrade ${u.key}`, { ...UPGRADE_ON[u.key], upgrade: u.key });
-  for (const f of b.fauna) add(`beast ${f.key}`, { terrain: 'plains', beast: f.key });
+  for (const f of b.fauna) add(`beast ${f.key}`, { terrain: 'desert', beast: f.key });
   for (const f of b.greatBeasts) add(`beast ${f.key}`, { terrain: f.key === 'leviathan' ? 'ocean' : 'mountain', beast: f.key });
-  for (const e of ELEMENTS) for (const s of [0, 3]) add(`dragon ${e} ${s}`, { terrain: 'plains', dragon: { element: e, stage: s } });
+  for (const e of ELEMENTS) for (const s of [0, 3]) add(`dragon ${e} ${s}`, { terrain: 'desert', dragon: { element: e, stage: s } });
   return out;
 }
 

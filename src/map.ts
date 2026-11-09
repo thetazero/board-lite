@@ -63,15 +63,15 @@ export function ring(d: number): [number, number][] {
 
 // The fixed deck of terrains dealt onto the open land (#434): every hex but the
 // towers, the peak and the harbors. Each terrain gets its share of
-// TERRAIN_WEIGHTS, rounded down; the remainder is plains (the desert).
+// TERRAIN_WEIGHTS, rounded down; the remainder is desert.
 export function terrainCounts(players: number): Partial<Record<Terrain, number>> {
   const radius = mapRadius(players);
   const open = 3 * radius * (radius + 1) + 1 - towerSpots(players).length - 1 - 6;
   const weights = Object.entries(TERRAIN_WEIGHTS) as [Terrain, number][];
   const total = weights.reduce((s, [, w]) => s + w, 0);
   const counts: Partial<Record<Terrain, number>> = {};
-  for (const [t, w] of weights) if (t !== 'plains') counts[t] = Math.floor((open * w) / total);
-  counts.plains = open - Object.values(counts).reduce((a, b) => a + b!, 0)!;
+  for (const [t, w] of weights) if (t !== 'desert') counts[t] = Math.floor((open * w) / total);
+  counts.desert = open - Object.values(counts).reduce((a, b) => a + b!, 0)!;
   return counts;
 }
 
@@ -98,7 +98,7 @@ const BASIC_TERRAINS = new Set(BASIC_BUILDINGS.map((b) => BUILDINGS[b].terrain).
 
 // A start's opportunity in ring d around its tower: each hex there a basic
 // building can go on counts 1, each ocean hex 1 less TUNING.fairStart.oceanCost,
-// and any other hex (plains, harbor) nothing. Past the ocean is off the map.
+// and any other hex (desert, harbor) nothing. Past the ocean is off the map.
 export function opportunity(hexes: Record<string, Hex>, tower: string, d: number): number {
   const [tq, tr] = parseKey(tower)!;
   let sum = 0;
@@ -138,10 +138,10 @@ function rollMap(rng: Rng, players: number): Record<string, Hex> {
   const hexes: Record<string, Hex> = {};
   for (let q = -radius - 1; q <= radius + 1; q++) {
     for (let r = Math.max(-radius - 1, -q - radius - 1); r <= Math.min(radius + 1, -q + radius + 1); r++) {
-      hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : 'plains' };
+      hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : 'desert' };
     }
   }
-  // Towers sit on plains; the land around them is as random as the rest, so
+  // Towers sit on desert hexes; the land around them is as random as the rest, so
   // players start with different terrain and different things to sell.
   const towers = new Set(towerSpots(players));
   // One natural harbor on each of the six coasts, somewhere between its
@@ -156,7 +156,7 @@ function rollMap(rng: Rng, players: number): Record<string, Hex> {
   // The rest of the land gets a fixed deck of terrains, shuffled (#434), so
   // every map for a player count has the same mix.
   const deck = (Object.entries(terrainCounts(players)) as [Terrain, number][]).flatMap(([t, n]) => Array<Terrain>(n).fill(t));
-  const open = Object.keys(hexes).filter((k) => hexes[k].terrain === 'plains' && !towers.has(k) && k !== PEAK);
+  const open = Object.keys(hexes).filter((k) => hexes[k].terrain === 'desert' && !towers.has(k) && k !== PEAK);
   shuffle(rng, deck).forEach((t, i) => (hexes[open[i]].terrain = t));
   placeBeasts(rng, hexes, players);
   placeFauna(rng, hexes, players);

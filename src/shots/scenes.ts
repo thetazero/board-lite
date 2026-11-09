@@ -538,6 +538,8 @@ export const SCENES: Scene[] = [
       { file: 'tv-civic-2p', caption: 'TV: the dragon, trade and monument cards, and each upgrade on a building (2 Workshops on one quarry)', client: 'tv', waitMs: 4800 },
       { file: 'phone-civic-map-2p', caption: 'Phone: the map with them, choosing where to build a roost', client: 'phone', seat: g!.turn, clicks: ['[data-tab="more"]', '[data-basic="roost"]'] },
       { file: 'phone-civic-hand-2p', caption: 'Phone: a hand of the eight cards and the two upgrades (staged)', client: 'phone', seat: g!.turn },
+      // The Market's cost is the longest, four kinds: it must stay on the card (#432).
+      { file: 'phone-hand-market-2p', caption: 'Phone: a thumb on the Market, the card with the longest cost, raised to read', client: 'phone', seat: g!.turn, press: { on: card(g!.players[g!.turn].hand.find((c) => c.key === 'market')!.id) } },
       { file: 'phone-zoom-port', caption: 'Phone: a port card tapped open', client: 'phone', seat: g!.turn, clicks: [card('c901')] },
     ],
   },
@@ -1015,6 +1017,17 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // The turn order mid-round (#430): two players have had their turn, and
+    // the third is taking it.
+    name: 'turn-order-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action' && turnOrder(g).indexOf(g.turn) === 2,
+    shots: () => [
+      { file: 'tv-turn-order-5p', caption: 'TV: the turn order mid-round: two turns over, the third player acting, who goes first next round', client: 'tv' },
+    ],
+  },
+  {
     // A crowded panel header (#398): one player holds every title and slew
     // both great beasts, five badges between their name and their points.
     name: 'many-badges-3p',
@@ -1256,8 +1269,8 @@ export const SCENES: Scene[] = [
       }
       arm(g, t, []);
       arm(g, t, Array(dragonCapacity(g, t)).fill(3));
-      const terrain = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].terrain && BUILDINGS[k].terrain !== 'plains').sort((a, b) => buildableHexes(g, t, a).length - buildableHexes(g, t, b).length)[0];
-      for (const k of buildableHexes(g, t, terrain)) g.map[k].terrain = 'plains';
+      const terrain = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].terrain && BUILDINGS[k].terrain !== 'desert').sort((a, b) => buildableHexes(g, t, a).length - buildableHexes(g, t, b).length)[0];
+      for (const k of buildableHexes(g, t, terrain)) g.map[k].terrain = 'desert';
       drain(g, t);
       giveHand(g, t, ALL_CARDS);
       if (blockedReasons(g, t).length < 6) throw new Error(`blocked-3p: only ${blockedReasons(g, t).length} reasons`);
@@ -1697,7 +1710,7 @@ export const SCENES: Scene[] = [
       for (const h of Object.values(g.map)) if (h.fauna && !BEASTS[h.fauna]) delete h.fauna;
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
-      for (const t of ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor']) {
+      for (const t of ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor']) {
         const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k] && !g.map[k].fauna);
         open.slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       }

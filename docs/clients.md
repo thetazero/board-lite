@@ -114,6 +114,5 @@ npm run shots -- --out NAME                  # its own folder: ~/.cache/board-li
 - **One run at a time** on the machine (each takes a gigabyte or two). A second run waits for the first.
 - **Sizes:** TV 1920×1080, phone 390×844. Some shots also come at TV 1280×720 and phone 360×800, 320×568, landscape and tablet.
 - **A phone shot is one screen.** A longer page is shot a screen at a time, scrolling down (`name.webp`, `name.2.webp`, …).
-- **The hand never covers the page.** The run lists any phone screen where the hand of cards sits over text or buttons; there should be none.
 - **Same code, same images:** games are seeded and the clock is frozen. `npm test` checks every scene still stages.
 - **Adding a scene:** add an entry in `src/shots/scenes.ts`.

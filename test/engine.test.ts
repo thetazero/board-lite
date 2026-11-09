@@ -331,7 +331,7 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   const [sea, harbor, land] = neighbors(tower);
   g.map[sea].terrain = 'ocean';
   g.map[harbor].terrain = 'harbor';
-  g.map[land].terrain = 'plains';
+  g.map[land].terrain = 'desert';
   assert.throws(() => apply(g, 0, `build roost ${sea}`), RuleError); // nothing on the ocean
   g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
   assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
@@ -564,8 +564,8 @@ test('building cards count their neighbours; point buildings must go beside what
   rich(g, 0);
   const tower = g.towers[0];
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
-  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
-  g.map[spot].terrain = 'plains';
+  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'desert';
+  g.map[spot].terrain = 'desert';
   // Cliff Works makes 1 stone each round for each adjacent mountain hex.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);
@@ -925,12 +925,12 @@ test('fair starts: each start has about the average room for basic buildings, ri
   }
 });
 
-test('every map for a player count has the same terrain mix: equal counts, the remainder plains', () => {
+test('every map for a player count has the same terrain mix: equal counts, the remainder desert', () => {
   for (let players = 2; players <= 6; players++) {
     const counts = terrainCounts(players);
     const basics = (['mountain', 'forest', 'ley', 'meadow'] as const).map((t) => counts[t]!);
-    assert.ok(basics.every((n) => n === basics[0]) && counts.plains! - basics[0] >= 0 && counts.plains! - basics[0] < 5, `${players}p: ${JSON.stringify(counts)}`);
-    const expect = { ...counts, mountain: counts.mountain! + 1, plains: counts.plains! + players, harbor: 6 };
+    assert.ok(basics.every((n) => n === basics[0]) && counts.desert! - basics[0] >= 0 && counts.desert! - basics[0] < 5, `${players}p: ${JSON.stringify(counts)}`);
+    const expect = { ...counts, mountain: counts.mountain! + 1, desert: counts.desert! + players, harbor: 6 };
     for (let seed = 0; seed < 20; seed++) {
       const g = startingMap(players, seed);
       const got: Record<string, number> = {};

@@ -31,12 +31,12 @@ export function elementalDamage(dmg: number, by: UnitElement, to: UnitElement): 
   return by !== 'neutral' && ELEMENT_BEATS[by] === to ? dmg * 2 : dmg;
 }
 
-export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
+export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
 // How text names one hex of a terrain ("a mountain hex", "a crystal field hex"). Terrain
 // is a hex, so "meadow hex" can't be read as the building on it (#150).
 export const TERRAIN_NOUN: Record<Terrain, string> = {
-  mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex',
+  mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', desert: 'desert hex', harbor: 'harbor hex', ocean: 'ocean hex',
 };
 // "a, b or c": how card text lists choices.
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
@@ -72,7 +72,7 @@ export const TUNING = {
   landHexesPerFauna: 8,
   // Fair starts (#424): a start's opportunity in a ring around its tower is
   // how many of its hexes a basic building can go on. Each other land hex
-  // (plains, harbor) costs 1 of the ring, each ocean hex only this much. The
+  // (desert, harbor) costs 1 of the ring, each ocean hex only this much. The
   // map is rerolled until, in each of the first this-many rings and in their
   // total, every start's opportunity is within this share of the average
   // across starts. The average itself may drift from game to game.
@@ -419,6 +419,6 @@ export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => 
 
 // Share of each terrain on the generated land. The ocean rings the land, and
 // each of its six coasts has one natural harbor (src/map.ts).
-export const TERRAIN_WEIGHTS: Partial<Record<Terrain, number>> = { mountain: 1, forest: 1, ley: 1, meadow: 1, plains: 1 };
+export const TERRAIN_WEIGHTS: Partial<Record<Terrain, number>> = { mountain: 1, forest: 1, ley: 1, meadow: 1, desert: 1 };
 
 export const STAGE_NAMES = ['egg', 'hatchling', 'young', 'adult'] as const;
