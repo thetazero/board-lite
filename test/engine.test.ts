@@ -5,7 +5,7 @@ import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingC
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
-import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, towerSpots } from '../src/map.ts';
+import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, startOpportunity, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
@@ -899,6 +899,29 @@ test('every seat starts with as much land as the others', () => {
       d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
     }
     assert.ok(Math.max(...near) <= 1.2 * Math.min(...near), `${players}p: land nearest each tower ${near.map((x) => x.toFixed(1))}`);
+  }
+});
+
+test('fair starts: each start has about the average room for basic buildings, ring by ring, and the mix still varies', () => {
+  const tol = TUNING.fairStart.tolerance;
+  for (let players = 2; players <= 6; players++) {
+    const totals = new Set<number>();
+    const stoneNearFirst = new Set<number>();
+    for (let seed = 0; seed < 40; seed++) {
+      const g = startingMap(players, seed);
+      const rows = startOpportunity(g.map, players);
+      for (let c = 0; c < rows[0].length; c++) {
+        const col = rows.map((row) => row[c]);
+        const avg = col.reduce((a, b) => a + b, 0) / col.length;
+        for (const x of col) assert.ok(Math.abs(x - avg) <= tol * avg + 1e-9, `${players}p seed ${seed}: ${c < TUNING.fairStart.rings ? `ring ${c + 1}` : 'total'} ${col.map((v) => v.toFixed(1))}`);
+      }
+      totals.add(rows.reduce((s, row) => s + row[row.length - 1], 0));
+      const [a, b] = parseKey(g.towers[0])!;
+      stoneNearFirst.add(Object.values(g.map).filter((h) => h.terrain === 'mountain' && distance(h.q - a, h.r - b) <= 2).length);
+    }
+    assert.ok(totals.size > 1, `${players}p: the average never drifts`);
+    assert.ok(stoneNearFirst.size > 2, `${players}p: the mountains near a start never vary`);
+    assert.deepEqual(generateMap({ state: 9 }, players), generateMap({ state: 9 }, players), `${players}p: one seed, one map`);
   }
 });
 
