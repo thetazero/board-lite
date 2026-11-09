@@ -53,6 +53,9 @@ let sending = false;
 let menu = false; // the menu under your name (Save game, Quit game) is open
 let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
+// End turn tapped once, waiting for its confirm (#417): a mis-tap alone never ends a turn.
+// When it was tapped, so a double tap doesn't land on the confirm too.
+let endAsk: number | null = null;
 // The hand tucked down to the bottom edge is raised by a tap: on which screen (its key).
 // A new screen tucks it again, if no card can be played there either.
 let handUp: string | null = null;
@@ -536,6 +539,7 @@ const table = (() => {
 // A second tap on a button whose command is still on its way is a double tap,
 // and dropped, except the merchants' Trade: each tap trades again (#331).
 function send(command: string) {
+  endAsk = null; // doing anything else on your turn takes back an End turn waiting for its confirm
   if (outbox[outbox.length - 1] === command && !command.startsWith('merchants ')) return;
   outbox.push(command);
   if (!sending) void flush();
@@ -689,6 +693,7 @@ function away(g: PublicState): string {
 function render() {
   const g = snap!.game!;
   const me = snap!.you!;
+  if (!me.myTurn || g.phase !== 'action') endAsk = null; // a turn that ends drops its confirm
   let body = '';
   // Choosing a hex or the dragons to send is a choice of its own: the hand steps aside for it.
   const choosing = !!picking || !!(hunting && g.phase === 'action' && me.myTurn);
@@ -841,7 +846,10 @@ function actionView(g: PublicState, me: Me): string {
     return `<div class="proj" data-key="perched ${id}">${dragonBadge(d, 32)}<span class="what"><b>${esc(dragonName(d, g.dragons))}</b><small>Perched on ${b ? `${playerTag(b.owner, names)}'s ${esc(b.name)}` : d.perch}</small></span><button data-recall="${id}">Recall</button></div>`;
   }).join('') : '';
   // An offer to you needs your answer before your turn can end.
-  const end = !me.myTurn ? '' : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
+  // End turn takes a confirm (#417): the first tap swaps it for Keep playing and End turn.
+  const end = !me.myTurn ? '' : endAsk !== null && !incoming
+    ? `<div class="endask"><p class="hint">Your turn ends, and you can't take it back.</p><div class="row big2"><button class="big" id="endno">Keep playing</button><button class="primary big" id="endyes">End turn</button></div></div>`
+    : act('End turn', 'id="end"', incoming ? 'An offer to you is open: answer it first.' : null, 'primary big endturn');
   // End turn sits above an open panel, so a long one (Trade, with the merchants, runs past the
   // screen) never pushes it down under the hand.
   return `${incoming}${mine}${tabs}${clear}${auto}${perch}${recall}${end}${content}`;
@@ -1694,7 +1702,16 @@ function wire(g: PublicState, me: Me) {
     picking = null;
     render();
   });
-  on('end', () => send('end'));
+  on('end', () => {
+    endAsk = performance.now();
+    render();
+  });
+  on('endno', () => {
+    endAsk = null;
+    render();
+  });
+  // A tap within a moment of End turn is the same finger bouncing, not a confirm.
+  on('endyes', () => endAsk !== null && performance.now() - endAsk > 400 && send('end'));
   bind('[data-accept]', (el) => send(`accept ${el.dataset.accept}`));
   bind('[data-decline]', (el) => send(`decline ${el.dataset.decline}`));
   bind('[data-cancel]', (el) => send(`cancel ${el.dataset.cancel}`));
