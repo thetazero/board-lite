@@ -7,7 +7,7 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 - Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 50 points. Titles are 7 points each, from a minimum (see Points).
-- Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
+- Each hatched dragon eats 1 livestock a round; eggs don't eat. The tower makes 1.
 - Gold: no basic building makes it. It comes from raids, Markets and clearing fauna. The merchants don't trade it.
 - Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
@@ -315,7 +315,7 @@ When that force exists: a base egg (any element, by special project, or a dragon
 
 ## Resource demand
 
-How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (1 livestock per dragon a round) comes on top.
+How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (1 livestock per hatched dragon a round) comes on top.
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|

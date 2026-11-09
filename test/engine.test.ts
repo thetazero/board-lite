@@ -487,11 +487,11 @@ test('production says what the dragons eat apart from what is made, and so does 
   const p = 0;
   // Two dragons and only the tower's livestock left: both eat, from what's in stock too.
   g.dragons.push({ ...g.dragons.find((d) => d.owner === p)!, id: 'd98' });
+  hatchAll(g);
   g.players[p].resources.livestock = 5;
   const inc = seatState(g, p).income.livestock;
   assert.equal(inc.base, TUNING.towerProduction.livestock ?? 0, 'the income is what is made');
   assert.equal(inc.eat, 2 * TUNING.livestockPerDragon, 'and what the dragons eat, apart');
-  hatchAll(g);
   advanceToRaidVote(g);
   g.players[p].resources.livestock = 5;
   const from = g.log.length;
@@ -500,6 +500,26 @@ test('production says what the dragons eat apart from what is made, and so does 
   const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
   assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
   assert.match(playerView(g, p), /livestock [0-9+d]+ \(dragons eat 2\)/);
+});
+
+test('eggs do not eat livestock, and grow even with none (#415)', () => {
+  const g = newGame(2, 7);
+  const p = 0;
+  const egg = g.dragons.find((d) => d.owner === p)!;
+  assert.equal(egg.stage, 0, 'the starting dragon is an egg');
+  // A hatched dragon beside the egg: only it eats.
+  g.dragons.push({ ...egg, id: 'd98', stage: 1 });
+  assert.equal(seatState(g, p).income.livestock.eat, TUNING.livestockPerDragon, 'the income counts only the hatched dragon');
+  const before = egg.growth + egg.stage * 100;
+  advanceToRaidVote(g);
+  g.players[p].resources.livestock = 0;
+  const from = g.log.length;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { eat: number };
+  assert.equal(ev.eat, TUNING.livestockPerDragon, 'only the hatched dragon eats');
+  assert.ok(!egg.hungry, 'the egg never goes hungry');
+  assert.ok(egg.growth + egg.stage * 100 > before, 'the egg grows');
 });
 
 test('a tower floor is built without a card, for gold, and is worth no points', () => {

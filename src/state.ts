@@ -419,7 +419,8 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
   const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
   const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, eat: 0, blocked: shut.has(r) }])) as SeatState['income'];
-  income.livestock.eat = housed * TUNING.livestockPerDragon;
+  // Eggs don't eat (#415): an egg that hatches at the next production eats from the one after.
+  income.livestock.eat = g.dragons.filter((d) => d.owner === p && d.stage > 0).length * TUNING.livestockPerDragon;
   return {
     seat: p,
     resources: { ...pl.resources },

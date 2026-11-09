@@ -41,7 +41,7 @@ function economy(): string {
 - Start: ${cost(TUNING.startingResources)}. Tower income: ${cost(TUNING.towerProduction)} a round, no dice.
 - Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} card from the action deck (action cards and dragons; see Decks); hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
-- Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
+- Each hatched dragon eats ${TUNING.livestockPerDragon} livestock a round; eggs don't eat. The tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''} and clearing fauna. The merchants don't trade it.
 - Merchants: ${TUNING.bankRate}:1, basic resources only (not gold). With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
 }
@@ -311,7 +311,7 @@ function demand(): string {
   const rows = RESOURCES.map((r) => [r, spend[r], pct(spend[r] / total), sources(r)]);
   return `## Resource demand
 
-How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per dragon a round) comes on top.
+How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per hatched dragon a round) comes on top.
 
 ${table(['Resource', 'In all card costs', 'Share', 'Comes from'], rows)}`;
 }

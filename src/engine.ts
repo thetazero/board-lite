@@ -585,12 +585,16 @@ function startRound(g: Game) {
       }
     }
     gain(g.players[p], got);
-    // Then their dragons eat, each while there's livestock left (#309): said
+    // Then their hatched dragons eat, each while there's livestock left (#309): said
     // with what they made, so the table sees the livestock go. Nothing in
     // between (beasts wandering) touches resources, so eating here is the
-    // same as eating after.
+    // same as eating after. Eggs don't eat (#415): they always grow.
     let eat = 0;
     for (const d of g.dragons.filter((x) => x.owner === p)) {
+      if (d.stage === 0) {
+        fedIds.add(d.id);
+        continue;
+      }
       if (g.players[p].resources.livestock < TUNING.livestockPerDragon) break;
       g.players[p].resources.livestock -= TUNING.livestockPerDragon;
       eat += TUNING.livestockPerDragon;
