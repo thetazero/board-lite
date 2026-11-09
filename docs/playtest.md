@@ -15,7 +15,7 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--seed N` | random | game seed; same seed, same deal |
 | `--out DIR` | `~/.cache/board-lite/playtests/<time>-<models>` | where everything goes (refuses `/tmp`, which is RAM on the dev machine) |
 | `--effort LEVEL` | the model's own | effort for every Claude seat |
-| `--budget-usd N` | 5 | spending cap per Claude seat for the whole game |
+| `--budget-usd N` | 5 (30 with `--room`) | spending cap per Claude seat for the whole game |
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
 | `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
@@ -117,5 +117,5 @@ node src/playtest/run.ts --resume ~/.cache/board-lite/playtests/<time>-<models>
 
 - A playtest the runner hosted comes back from its `game.json` under the same room code (`--serve PORT` to watch it on a TV again).
 - A `--room` game must still be hosted (`npm run serve` restores its rooms after a restart). Give `--room URL` too if the room's address changed, such as a new port. If someone took over the seat or a stand-in bot is playing it, the Claude player takes it back, as a phone would by joining with the seat's name.
-- `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--effort` and `--serve` can be given again; the budget counts what each seat has already spent. A Claude player whose process was killed mid-turn never reported that turn's cost, so it isn't counted.
+- `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--effort` and `--serve` can be given again; without `--budget-usd` it keeps the budget the runner had (runners from before it was saved get the default), and the budget counts what each seat has already spent. A Claude player whose process was killed mid-turn never reported that turn's cost, so it isn't counted.
 - It refuses while the runner for that directory is still running, and if the game is over.
