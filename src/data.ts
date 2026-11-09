@@ -70,6 +70,13 @@ export const TUNING = {
   specialProjectMultiplier: 2,
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
+  // Fair starts (#424): a start's opportunity in a ring around its tower is
+  // how many of its hexes a basic building can go on. Each other land hex
+  // (plains, harbor) costs 1 of the ring, each ocean hex only this much. The
+  // map is rerolled until, in each of the first this-many rings and in their
+  // total, every start's opportunity is within this share of the average
+  // across starts. The average itself may drift from game to game.
+  fairStart: { rings: 4, oceanCost: 0.7, tolerance: 0.2 },
   // In production, each beast of the fauna (not a great beast) has a 1 in this
   // many chance to move to a random adjacent land hex with no tower or beast.
   faunaWanderOdds: 3,

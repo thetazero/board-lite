@@ -155,6 +155,8 @@ The land is ringed by ocean, where nothing is built. Each of its six coasts has 
 
 Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
 
+The terrain is random, but the map is rolled again until every start has about as much room for basic buildings as the others: in each ring from 1 to 4 steps out from its tower, and in those rings together, a start's opportunity is within 20% of the average across starts. Opportunity is the hexes a basic building can go on, plus 0.3 for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+
 | Players | Towers | From the centre | Land within 3 steps | Land nearest each tower |
 |---|---|---|---|---|
 | 2 | 3,0 -3,0 | 3 | 23 | 31 |

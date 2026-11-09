@@ -1,6 +1,6 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
-import { BEASTS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
+import { BASIC_BUILDINGS, BEASTS, BUILDINGS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
 import { type Rng, next, shuffle } from './rng.ts';
 
 export interface Hex {
@@ -71,7 +71,65 @@ export function ring(d: number): [number, number][] {
   return out;
 }
 
+// Fair starts (#424): roll maps until every start has about as much basic
+// production opportunity as the others, ring by ring (see TUNING.fairStart).
+// Rerolling from the same dice keeps one seed to one map. If no roll passes
+// within MAX_ROLLS, the fairest one seen is used.
+const MAX_ROLLS = 2000;
+
 export function generateMap(rng: Rng, players: number): Record<string, Hex> {
+  let best: Record<string, Hex> | null = null;
+  let bestSpread = Infinity;
+  for (let i = 0; i < MAX_ROLLS; i++) {
+    const hexes = rollMap(rng, players);
+    const spread = startSpread(hexes, players);
+    if (spread <= TUNING.fairStart.tolerance) return hexes;
+    if (spread < bestSpread) [best, bestSpread] = [hexes, spread];
+  }
+  return best!;
+}
+
+// Terrains a basic building goes on.
+const BASIC_TERRAINS = new Set(BASIC_BUILDINGS.map((b) => BUILDINGS[b].terrain).filter((t) => t));
+
+// A start's opportunity in ring d around its tower: each hex there a basic
+// building can go on counts 1, each ocean hex 1 less TUNING.fairStart.oceanCost,
+// and any other hex (plains, harbor) nothing. Past the ocean is off the map.
+export function opportunity(hexes: Record<string, Hex>, tower: string, d: number): number {
+  const [tq, tr] = parseKey(tower)!;
+  let sum = 0;
+  for (const [q, r] of ring(d)) {
+    const h = hexes[key(tq + q, tr + r)];
+    if (!h) continue;
+    if (BASIC_TERRAINS.has(h.terrain)) sum += 1;
+    else if (h.terrain === 'ocean') sum += 1 - TUNING.fairStart.oceanCost;
+  }
+  return sum;
+}
+
+// Each start's opportunity in rings 1 to TUNING.fairStart.rings, then in their total.
+export function startOpportunity(hexes: Record<string, Hex>, players: number): number[][] {
+  return towerSpots(players).map((t) => {
+    const rings = Array.from({ length: TUNING.fairStart.rings }, (_, i) => opportunity(hexes, t, i + 1));
+    return [...rings, rings.reduce((a, b) => a + b, 0)];
+  });
+}
+
+// The furthest any start's opportunity is from the average across starts, as
+// a share of that average, over every ring and the total.
+export function startSpread(hexes: Record<string, Hex>, players: number): number {
+  const rows = startOpportunity(hexes, players);
+  let worst = 0;
+  for (let c = 0; c < rows[0].length; c++) {
+    const col = rows.map((row) => row[c]);
+    const avg = col.reduce((a, b) => a + b, 0) / col.length;
+    if (avg === 0) continue;
+    for (const x of col) worst = Math.max(worst, Math.abs(x - avg) / avg);
+  }
+  return worst;
+}
+
+function rollMap(rng: Rng, players: number): Record<string, Hex> {
   const radius = mapRadius(players);
   const hexes: Record<string, Hex> = {};
   for (let q = -radius - 1; q <= radius + 1; q++) {
