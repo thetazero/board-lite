@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { botStep } from '../src/bot.ts';
+import { botStep, playToEnd } from '../src/bot.ts';
 import { apply, newGame, score, type Game } from '../src/engine.ts';
 import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../src/data.ts';
 import { batchMarkdown, batchStats, compareMarkdown, gameStats, loadBatch } from '../src/playtest/stats.ts';
@@ -47,8 +47,10 @@ test('a batch reads its finished games, flags what is never used, and compares w
   try {
     for (let i = 1; i <= 3; i++) {
       const g = newGame(3, i);
+      const rng = { state: i };
       // The third is stalled, so it never has to finish.
-      for (let n = 0; g.phase !== 'over' && n < (i === 3 ? 50 : 20000); n++) botStep(g, { state: i } as never);
+      if (i === 3) for (let n = 0; n < 50; n++) botStep(g, rng);
+      else playToEnd(g, () => botStep(g, rng));
       mkdirSync(join(dir, `g${i}`));
       writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
       writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status: i === 3 ? 'stalled' : 'over', ...seats(3) }));
@@ -75,7 +77,8 @@ test('every card seen or kept is counted under its own key (#136)', () => {
   const known = new Set([BUILDINGS, UPGRADES, ACTIONS, DRAGONS].flatMap((m) => Object.keys(m)));
   for (let seed = 1; seed <= 4; seed++) {
     const g = newGame(3, seed);
-    for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: seed } as never);
+    const rng = { state: seed };
+    playToEnd(g, () => botStep(g, rng));
     const s = gameStats(g, seats(3));
     assert.ok(Object.keys(s.offered).length > 5);
     for (const k of [...Object.keys(s.offered), ...Object.keys(s.kept)]) assert.ok(known.has(k), `seed ${seed}: ${k}`);
@@ -86,7 +89,8 @@ test('stats.json saved while a batch plays gains the games that finish later, an
   const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
   const game = (i: number, status: string) => {
     const g = newGame(3, i);
-    for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: i } as never);
+    const rng = { state: i };
+    playToEnd(g, () => botStep(g, rng));
     mkdirSync(join(dir, `g${i}`), { recursive: true });
     writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
     writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status, ...seats(3) }));
