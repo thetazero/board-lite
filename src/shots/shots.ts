@@ -28,6 +28,7 @@ import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Readable, Writable } from 'node:stream';
 import { Room, seatsFile } from '../server/room.ts';
+import { gameLogFile } from '../server/gamelog.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
 import { NAMES, picked, SCENES, stage, type Shot, type Staged } from './scenes.ts';
@@ -376,7 +377,7 @@ const NEVER = 2 ** 31 - 1;
 function makeRoom(staged: Staged, code: string): Room {
   const file = join(CACHE, 'rooms', `${code}.json`);
   // A fresh room: not the game or the seats an earlier run left under this code.
-  for (const f of [file, seatsFile(file)]) rmSync(f, { force: true });
+  for (const f of [file, seatsFile(file), gameLogFile(file)]) rmSync(f, { force: true });
   const { scene } = staged;
   const names = scene.names ?? NAMES;
   // A finished game's recap: dated by the page's frozen clock, with an id that's the same every run.

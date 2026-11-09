@@ -18,6 +18,7 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Room, RoomError, claudeRunners, recapsDir, type RoomOptions } from './room.ts';
+import { VIAS, type Via } from './gamelog.ts';
 import { rulebook, type SavedGame } from '../state.ts';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
@@ -104,6 +105,8 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
   }
 
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  // What a client says it is (a phone, the CLI, a Claude player), for the game log.
+  const via = (v: unknown) => (VIAS.includes(str(v)) ? (v as Via) : undefined);
 
   function json(res: ServerResponse, status: number, value: unknown) {
     res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -167,7 +170,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
     const host = tok === room.hostToken;
     switch (action) {
       case 'join': {
-        const seat = room.join(str(b.name));
+        const seat = room.join(str(b.name), 'player', via(b.via));
         return json(res, 200, { token: seat.token, seat: room.seats.indexOf(seat) + 1 });
       }
       case 'bot':
@@ -178,7 +181,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         // A player can leave the lobby; the TV or first player can remove anyone.
         const i = typeof b.seat === 'number' ? b.seat : room.seatOf(tok);
         if (i !== room.seatOf(tok) && !room.canStart(tok)) throw new RoomError('You can only remove yourself.');
-        room.leave(i);
+        room.leave(i, room.senderOf(tok));
         return json(res, 200, {});
       }
       case 'quit': // mid-game: a bot plays the seat from now on
@@ -204,7 +207,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         return json(res, 200, {});
       case 'do':
         if (host) throw new RoomError('The TV has no seat.');
-        room.command(tok, str(b.command));
+        room.command(tok, str(b.command), via(b.via));
         return json(res, 200, { state: room.snapshot(tok) });
     }
     return json(res, 404, { error: 'Not found.' });

@@ -48,6 +48,16 @@ To pick it up later, on the TV, open the TV address: a new room's lobby lists th
 
 A saved game is kept until it's continued, however long that is: the server never forgets it, and hosts it again after a restart. It's saved as its room's files, `~/.cache/board-lite/rooms/<code>.json` and `<code>.seats.json`.
 
+## The game log
+
+For development only: players never see it. Every room also writes `~/.cache/board-lite/rooms/<code>.log.jsonl`, one JSON object per line and only ever appended to, so games can be analyzed in a time-aware way later. Each line has its time (`t`, ISO; `ms`, ms epoch), who sent it (`by`: `phone`, `cli`, `claude`, `player` for a client that didn't say, `bot`, `standIn`, `tv` or `game`, with `seat` and `name` for a seat) and its `type`:
+
+- `event`: an entry of the game's log, with its index `i` there, its round, text and typed `ev`, and the `command` behind it. Dice, new rounds, fights and titles are the game's, with `cause` saying whose command set them off.
+- `refused`: a command the engine turned down, and why.
+- `join`, `bot`, `leave`, `handover` (a seat taken back or claimed mid-game), `quit`, `standIn` (a bot starts playing for someone), `back`, `connect` and `disconnect` (phones' and TVs' live streams), `start`, `save`, `continue`, and `load` (a game file hosted again, with how long its log was then).
+
+Games saved before the log existed still load and play; their old entries just have no time, and a `load` line says from which entry on the log covers the game. `jq -c 'select(.type=="event") | [.t, .by.kind, .by.name, .text]' <code>.log.jsonl` prints the game as it went. The format is documented in `src/server/gamelog.ts`.
+
 ## After the game
 
 When the game ends in front of the TV, it plays a short summary (about half a minute): the points race drawn a round at a time, with its turning points (titles taken, great beasts slain, kingdoms that score points and the strongest kingdom yet to fall), then everyone's dragon power and production over the game, then where everyone's points came from. **Skip** jumps to the final scores. They come with a QR code to the game's **recap page** (`/recap/<id>`), the same story to keep or share on a phone; **Watch again** plays the summary again.
