@@ -343,7 +343,7 @@ async function main() {
     for (const model of models) {
       if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
       const name = seatName((await lobby()).seats.map((t) => t.name));
-      const r = await call('/join', { name });
+      const r = await call('/join', { name, via: 'claude' });
       seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });
       saveState();
       note(`${name} (${model}) takes seat ${r.seat}.`);
@@ -426,7 +426,7 @@ async function reclaim(state: RunnerState) {
     if (!name) throw new Error(`Seat ${saved.p + 1} isn't in the game in ${roomUrl}; is this the right room?`);
     const s: Seat = { ...saved, proc: null, startsHere: 0, exitedAt: 0 };
     if (!(await call(`?token=${s.token}`)).seated) {
-      const r = await call('/join', { name }).catch((e: Error) => { throw new Error(`Can't take seat ${saved.p + 1} (${name}) back: ${e.message}`); });
+      const r = await call('/join', { name, via: 'claude' }).catch((e: Error) => { throw new Error(`Can't take seat ${saved.p + 1} (${name}) back: ${e.message}`); });
       s.token = r.token;
     }
     seats.push(s);

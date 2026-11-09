@@ -156,7 +156,7 @@ function wireJoin() {
 async function join(c: string, name: string, typed: string) {
   code = c;
   try {
-    const r = await post(`/api/rooms/${c}/join`, { name });
+    const r = await post(`/api/rooms/${c}/join`, { name, via: 'phone' });
     localStorage.setItem('name', name);
     localStorage.setItem('seat', JSON.stringify({ code: c, token: r.token }));
     enter(c, String(r.token));
@@ -549,7 +549,7 @@ async function flush() {
   sending = true;
   while (outbox.length) {
     try {
-      await post(`/api/rooms/${code}/do`, { token, command: outbox[0] });
+      await post(`/api/rooms/${code}/do`, { token, command: outbox[0], via: 'phone' });
       outbox.shift();
     } catch (e) {
       // What was tapped after it was tapped expecting it to work: drop it too.
@@ -1521,7 +1521,7 @@ talk.form.onsubmit = (e) => {
   const text = talk.input.value.trim();
   if (!text) return;
   const to = Number(talk.to.value);
-  post(`/api/rooms/${code}/do`, { token, command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
+  post(`/api/rooms/${code}/do`, { token, via: 'phone', command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
     .then(() => (talk.input.value = ''))
     .catch(toast);
 };

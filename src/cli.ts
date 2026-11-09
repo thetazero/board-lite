@@ -75,7 +75,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'join': {
-      const r = await call(`${roomApi(room)}/join`, { name: args.slice(1).join(' ') });
+      const r = await call(`${roomApi(room)}/join`, { name: args.slice(1).join(' '), via: 'cli' });
       console.log(`You are seat ${r.seat}. Your token: ${r.token}\nUse it after the room's address, e.g. board-lite view ${room} ${r.token}`);
       return 0;
     }
@@ -98,7 +98,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     case 'do': {
       const since = nextIndex(await state());
-      const r = await call(`${roomApi(room)}/do`, { token, command: args.slice(2).join(' ') });
+      const r = await call(`${roomApi(room)}/do`, { token, command: args.slice(2).join(' '), via: 'cli' });
       console.log(afterMove(r.state as Snapshot, since));
       return 0;
     }

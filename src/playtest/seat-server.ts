@@ -55,7 +55,7 @@ function record(command: string, why: string | undefined, outcome: string) {
 }
 
 async function act(command: string, why?: string): Promise<string> {
-  const r = await call('/do', { token, command });
+  const r = await call('/do', { token, command, via: 'claude' });
   if (r.error) {
     record(command, why, `not allowed: ${r.error}`);
     return `Not allowed: ${r.error}`;
