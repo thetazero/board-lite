@@ -491,7 +491,7 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     const [x, y] = hexCenter(h.q, h.r, size);
     const b = h.building;
     const dim = sel.size && !sel.has(h.k);
-    const owner = b ? PLAYER_COLORS[b.owner] : null;
+    const owner = b && !h.suppressed ? PLAYER_COLORS[b.owner] : null; // a suppressed building counts as if it weren't there: no rim in its owner's color (#437)
     cells.push(`<g class="hex${sel.has(h.k) ? ' selectable' : ''}" ${sel.has(h.k) ? `data-hex="${h.k}"` : ''} opacity="${dim ? 0.45 : 1}">`);
     const sea = h.terrain === 'ocean';
     cells.push(`<polygon points="${hexPoints(x, y, size * (sea ? 1.01 : 0.97))}" fill="${TERRAIN_COLORS[h.terrain]}" stroke="${owner ?? (sea ? TERRAIN_COLORS.ocean : '#1b1d24')}" stroke-width="${owner ? size * 0.12 : size * 0.04}"/>`);
@@ -503,7 +503,7 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey (the hex's rim keeps its owner).
+      // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey, and the hex loses its owner's rim.
       cells.push(`<g transform="translate(${x} ${y})"${h.suppressed ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
       // One badge per upgrade, overlapping toward the middle (Workshops stack, #400).
       b.upgrades.forEach((u, i) => cells.push(`<g transform="translate(${x + r * 0.85 - i * size * 0.3} ${y - r * 0.85})">${upgradeBadge(u, size * 0.3)}</g>`));
