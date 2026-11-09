@@ -774,6 +774,9 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 .handfan .card .cname { font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .handfan .card.longname .cname { font-size: .8em; letter-spacing: -.02em; padding-top: .42em; padding-bottom: .48em; }
 .handfan .card .ccost { flex-wrap: nowrap; white-space: nowrap; }
+/* A cost of four kinds or more (the Market's) is set tighter and a little smaller, to stay on the card. */
+.card .ccost.long { gap: 0; font-size: .82em; letter-spacing: -.03em; }
+.card .ccost.long .chip { margin: 0 .06em; }
 .handfan .card .ckind { width: calc(18px * var(--hs, 1)); height: calc(18px * var(--hs, 1)); }
 .handfan .card .ckind svg { width: calc(11px * var(--hs, 1)); height: calc(11px * var(--hs, 1)); }
 .handfan .card.ready { box-shadow: 0 0 0 2px #7dff9b, 0 0 14px 2px #4cc26e, 0 6px 14px #0007; }
