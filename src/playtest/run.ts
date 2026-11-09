@@ -348,7 +348,7 @@ async function main() {
       note(`${name} (${model}) takes seat ${r.seat}.`);
     }
     if (hosted) hosted.start(hosted.hostToken, seed);
-    else note('Waiting for the game to start (press Start game on the TV, or the first player does on their phone).');
+    else note('Waiting for the game to start (press Start game on the TV, or the first to join does on their phone).');
     while (!(await lobby()).started && !interrupted) await new Promise((r) => setTimeout(r, 2000));
     if (interrupted) status = 'interrupted';
     table = (await lobby()).seats;

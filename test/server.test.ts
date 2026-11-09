@@ -324,7 +324,7 @@ test('a game every player quits ends: the bots stop, nothing is saved again, and
 });
 
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
-  const { server, rooms } = startServer(0, { dir });
+  const { server, rooms } = startServer(0, { dir, firstSeat: 0 });
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => {
@@ -459,7 +459,7 @@ test('a TV opened on a room with no TV watching becomes its TV, with its buttons
 });
 
 test('one game, any client: a CLI player and a bot at a server-hosted table', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 });
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0, firstSeat: 0 });
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
@@ -497,7 +497,7 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
 
 test('a saved game with no seats file can be hosted; players claim its open seats', () => {
   const file = join(dir, 'hosted.json');
-  const g = newGame(3, 4);
+  const g = newGame(3, 4, 0);
   for (const p of [0, 1, 2]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
   save(file, g);
   const room = new Room('HOST', { file, botDelayMs: 60000 });
@@ -524,7 +524,7 @@ test('a saved game with no seats file can be hosted; players claim its open seat
 test('a server restart: the room comes back under its own code, and every client to its own seat', async () => {
   const roomsDir = mkdtempSync(join(dir, 'restart-'));
   const serve = async (hostFiles: string[] = []) => {
-    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000 }, hostFiles, '127.0.0.1', true);
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000, firstSeat: 0 }, hostFiles, '127.0.0.1', true);
     await new Promise((r) => s.server.once('listening', r));
     const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
     const stop = () => {
@@ -570,7 +570,7 @@ test('a server restart: the room comes back under its own code, and every client
 });
 
 test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0, firstSeat: 0 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, any>;
@@ -655,7 +655,7 @@ test("the phone's rulebook holds every building, card, beast and kingdom", async
 test('saving a game: it stops for everyone, survives a restart however old, and anyone at the table continues it', async () => {
   const roomsDir = mkdtempSync(join(dir, 'saved-'));
   const serve = async () => {
-    const s = startServer(0, { dir: roomsDir, botDelayMs: 20 }, [], '127.0.0.1', true);
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 20, firstSeat: 0 }, [], '127.0.0.1', true);
     await new Promise((r) => s.server.once('listening', r));
     const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
     const stop = () => {

@@ -208,7 +208,7 @@ test('everyone starts with an egg, and a raid nobody can fight is skipped', () =
 });
 
 test('illegal moves are refused without changing the game', () => {
-  const g = newGame(3, 9);
+  const g = newGame(3, 9, 0);
   keepAll(g);
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
@@ -240,7 +240,7 @@ test('an offer must trade something real', () => {
 });
 
 test('trades are binding and move resources and cards', () => {
-  const g = newGame(2, 11);
+  const g = newGame(2, 11, 0);
   keepAll(g);
   const card = g.players[1].hand[0];
   apply(g, 1, `offer P1 give ${card.id} get 1 stone`);
@@ -267,7 +267,7 @@ test('trades are binding and move resources and cards', () => {
 });
 
 test('an offer to anyone goes to the first to accept it, and the others may decline it', () => {
-  const g = newGame(3, 11);
+  const g = newGame(3, 11, 0);
   keepAll(g);
   // Only the acting player offers to anyone; out of turn, offers go to them.
   assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /you can only offer to P/);
@@ -559,7 +559,7 @@ test('each round you draw two building cards and keep one; the other is discarde
 });
 
 test('building cards count their neighbours; point buildings must go beside what they need', () => {
-  const g = newGame(2, 8);
+  const g = newGame(2, 8, 0);
   keepAll(g);
   rich(g, 0);
   const tower = g.towers[0];
@@ -938,7 +938,7 @@ test('the great beasts: the Thunderbird on the centre peak, the Leviathan off a 
 
 // A game with an adult of the beast's weakness or not, and P1's land next to the peak.
 function beastGame() {
-  const g = newGame(2, 5);
+  const g = newGame(2, 5, 0);
   keepAll(g);
   rich(g, 0);
   const [ring] = neighbors(PEAK);
@@ -1015,7 +1015,7 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
 // A game where P1's own land is set: a meadow pasture next to the tower, and
 // fauna on the hex beyond it.
 function faunaGame() {
-  const g = newGame(2, 5);
+  const g = newGame(2, 5, 0);
   hatchAll(g);
   keepAll(g);
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
@@ -1317,4 +1317,26 @@ test('Workshops stack on one building: +2, then +1 each, and a point each', () =
   const cap = dragonCapacity(g, p);
   g.buildings[g.towers[p]].upgrades.push('nesting_grounds', 'nesting_grounds');
   assert.equal(dragonCapacity(g, p), cap + 2 * (UPGRADES.nesting_grounds.dragonCapacity ?? 0));
+});
+
+test('round 1\'s first player is random, then moves 1 seat left each round (#416)', () => {
+  const firsts = new Set<number>();
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(4, seed);
+    const f = turnOrder(g)[0];
+    firsts.add(f);
+    assert.match(g.log[0].text, new RegExp(`P${f + 1} goes first`));
+    keepAll(g);
+    assert.equal(g.turn, f, 'round 1 actions start with the first player');
+    g.round++;
+    assert.equal(turnOrder(g)[0], (f + 1) % 4);
+  }
+  assert.equal(firsts.size, 4, 'every seat goes first in some game');
+});
+
+test('a game saved before round 1\'s first player was random keeps its turn order', () => {
+  const g = newGame(3, 7);
+  delete g.firstSeat;
+  g.round = 2;
+  assert.deepEqual(turnOrder(g), [1, 2, 0]);
 });

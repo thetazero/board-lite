@@ -251,7 +251,7 @@ The doc left these open; the engine had to pick something. Each is provisional, 
 - Card picking: 1 action card is dealt; 2 building cards are drawn and one is kept (the owner's "draw two keep 1"), all at once in the cards phase.
 - Basic buildings: the four production buildings and the roost are built without a card at the price they had as cards. The tower floor is basic too, paid mostly in gold (since #98, floors are worth points only through the tower title; since #323 each houses 1 dragon). Building cards' effects count their six neighbouring hexes (a terrain, or a class of building, anyone's), multiplying a flat effect; that one rule covers every neighbour card.
 - Winning: checked at the end of each round, not mid-turn; highest total wins; ties go to most gold, then turn order.
-- The first player rotates each round.
+- The first player rotates each round; round 1's is random, so joining the lobby first gives no edge (#416).
 - The tower produces 1 of each non-gold resource and houses 1 dragon, plus 1 per floor (#323).
 - Only production buildings are tied to terrain; other buildings go on any free hex.
 - A building takes any number of upgrades; the tower counts as a monument and a dragon building. Since #400 Workshops stack: the first on a building adds 2, each after it adds 1, and each is worth its 1 point. The owner: "you should be able to apply [Workshops] multiple times to the same hex", "+2, +1,+1,+1". (Until then, one upgrade per building.)

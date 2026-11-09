@@ -171,7 +171,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         return json(res, 200, { token: seat.token, seat: room.seats.indexOf(seat) + 1 });
       }
       case 'bot':
-        if (!room.canStart(tok)) throw new RoomError('Only the TV or the first player can add bots.');
+        if (!room.canStart(tok)) throw new RoomError('Only the TV or the first to join can add bots.');
         room.addBot();
         return json(res, 200, {});
       case 'leave': {

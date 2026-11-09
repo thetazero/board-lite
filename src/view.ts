@@ -211,7 +211,7 @@ const SAVED = 'The game is saved: someone at the table continues it on the TV or
 export function statusText(s: Snapshot): string {
   const names = tableText(s);
   const g = s.game;
-  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'no one yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first player starts' : 'the TV or the first player starts'}.`;
+  if (!g) return `Room ${s.lobby.code}, in the lobby: ${names || 'no one yet'}. ${s.lobby.minPlayers} to ${s.lobby.maxPlayers} players; ${s.lobby.remote ? 'the first to join starts' : 'the TV or the first to join starts'}.`;
   const out = [`Room ${s.lobby.code}: ${names}.`, phaseText(g)];
   if (s.lobby.seating) out.push('The game goes on once every seat is taken.');
   else if (s.lobby.saved) out.push(SAVED);

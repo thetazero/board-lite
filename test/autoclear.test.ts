@@ -19,7 +19,7 @@ function addDragon(g: Game, owner: number, stage: number, key = 'fire_whelp'): D
 // buildings on the land hexes around their tower (`mine`); `empty` is a land
 // hex with nothing on it beside one of them.
 function setup(seed = 5) {
-  const g = newGame(2, seed);
+  const g = newGame(2, seed, 0);
   while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
   g.dragons = [];

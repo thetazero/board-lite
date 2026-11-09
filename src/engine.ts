@@ -136,7 +136,7 @@ export type GameEvent =
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'held' } // unable: no dragon was raid-ready; held: everyone held back; nobody: old saves (no one committed)
   | { k: 'again' }
-  | { k: 'begin'; players: number }
+  | { k: 'begin'; players: number; first?: number }
   | { k: 'final'; totals: number[]; winner: number }
   | { k: 'talk' }
   | { k: 'mine' }; // a private line for the player it went to
@@ -169,6 +169,9 @@ export interface Game {
   slain: Record<string, number>; // great beasts slain, and by whom
   raidPoints: number[]; // each player's points from kingdoms that score (#321)
   beastTried: number[]; // the last round each player fought a great beast
+  // Who goes first in round 1, picked at random so joining the lobby first
+  // gives no edge (#416). Absent in old saves: the first seat.
+  firstSeat?: number;
   winner: number | null;
   nextId: number;
   log: LogEntry[];
@@ -516,7 +519,9 @@ function buildDeck(g: Game, deck: 'building' | 'action'): Card[] {
   return cards;
 }
 
-export function newGame(players: number, seed: number): Game {
+// `first` pins who goes first in round 1 (tests, staged scenes); by default
+// it's random.
+export function newGame(players: number, seed: number, first?: number): Game {
   if (!Number.isInteger(players) || players < 2 || players > 6) fail('A game needs 2 to 6 players.');
   const rng: Rng = { state: seed | 0 };
   const g: Game = {
@@ -544,6 +549,9 @@ export function newGame(players: number, seed: number): Game {
     log: [],
     rng,
   };
+  // Drawn from its own stream off the seed, so the map, decks and dice of a
+  // seed stay what they were before round 1's first player was random.
+  g.firstSeat = first ?? roll({ state: seed ^ 0x51a7 }, players) - 1;
   g.decks.building = buildDeck(g, 'building');
   g.decks.action = buildDeck(g, 'action');
   for (let p = 0; p < players; p++) {
@@ -552,7 +560,7 @@ export function newGame(players: number, seed: number): Game {
     g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrades: [], floors: 0 };
     g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0 });
   }
-  log(g, `A ${players}-player game begins. First to ${TUNING.pointsToWin} points wins.`, { k: 'begin', players });
+  log(g, `A ${players}-player game begins. ${pname(g.firstSeat)} goes first. First to ${TUNING.pointsToWin} points wins.`, { k: 'begin', players, first: g.firstSeat });
   startRound(g);
   return g;
 }
@@ -668,9 +676,10 @@ function startActions(g: Game) {
   log(g, `Actions: ${pname(g.turn)}'s turn.`, { k: 'turn', p: g.turn });
 }
 
-// The first player moves one seat to the left each round.
+// Round 1's first player is random; from then on the first player moves one
+// seat to the left each round.
 export function firstPlayer(g: Game): number {
-  return (g.round - 1) % g.players.length;
+  return ((g.firstSeat ?? 0) + g.round - 1) % g.players.length;
 }
 
 export function turnOrder(g: Game): number[] {

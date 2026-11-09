@@ -20,7 +20,7 @@ function addDragon(g: Game, owner: number, stage: number, key = 'fire_whelp'): D
 // on a meadow beside their tower. The starting eggs are gone: each test adds
 // the dragons it needs.
 function perchGame(players = 2) {
-  const g = newGame(players, 5);
+  const g = newGame(players, 5, 0);
   while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
   g.dragons = [];
