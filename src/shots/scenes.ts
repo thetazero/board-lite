@@ -1256,8 +1256,8 @@ export const SCENES: Scene[] = [
       }
       arm(g, t, []);
       arm(g, t, Array(dragonCapacity(g, t)).fill(3));
-      const terrain = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].terrain && BUILDINGS[k].terrain !== 'plains').sort((a, b) => buildableHexes(g, t, a).length - buildableHexes(g, t, b).length)[0];
-      for (const k of buildableHexes(g, t, terrain)) g.map[k].terrain = 'plains';
+      const terrain = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].terrain && BUILDINGS[k].terrain !== 'desert').sort((a, b) => buildableHexes(g, t, a).length - buildableHexes(g, t, b).length)[0];
+      for (const k of buildableHexes(g, t, terrain)) g.map[k].terrain = 'desert';
       drain(g, t);
       giveHand(g, t, ALL_CARDS);
       if (blockedReasons(g, t).length < 6) throw new Error(`blocked-3p: only ${blockedReasons(g, t).length} reasons`);
@@ -1697,7 +1697,7 @@ export const SCENES: Scene[] = [
       for (const h of Object.values(g.map)) if (h.fauna && !BEASTS[h.fauna]) delete h.fauna;
       const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
-      for (const t of ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor']) {
+      for (const t of ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor']) {
         const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k] && !g.map[k].fauna);
         open.slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       }

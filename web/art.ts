@@ -344,14 +344,14 @@ const BUILDINGS: Record<string, () => string> = {
     + lift(sheep(42, 70, 1.3) + sheep(82, 72, 1.35, true), true),
   roost: () => sky('#f2c79a', { x: 30, y: 20, r: 10, c: '#fff1c4' })
     + lift(ridges([[90, 30, 22], [118, 22, 16]], '#c08a63'))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + lift(f([[50, 76], [54, 34], [62, 28], [66, 76]], '#a58a6a', 0.1) + f([[62, 28], [72, 36], [74, 76], [66, 76]], '#a58a6a', -0.22), true)
     + lift(f([[44, 30], [52, 36], [76, 36], [84, 30], [76, 26], [52, 26]], '#8a5a32', -0.05) + f([[44, 30], [52, 26], [76, 26], [84, 30], [64, 32]], '#a8743e', 0.15)
       + egg(58, 24, 0.9, '#ff7a59') + egg(70, 23, 0.8, '#8fd8ff'), true),
   // The clay brooding dome, its mouth aglow, and the nest of eggs it keeps warm.
   hatchery: () => sky('#f2c79a', { x: 98, y: 18, r: 9, c: '#fff1c4' })
     + lift(ridges([[16, 24, 20], [40, 16, 16]], '#c08a63'))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + shadowUnder(44, 78, 28)
     + lift(f([[18, 76], [18, 52], [24, 38], [36, 30], [44, 29], [44, 76]], CLAY, 0.15) + f([[44, 29], [52, 30], [64, 38], [70, 52], [70, 76], [44, 76]], CLAY, -0.2)
       + f([[48, 30], [48, 18], [54, 18], [54, 32]], CLAY, -0.35)
@@ -361,7 +361,7 @@ const BUILDINGS: Record<string, () => string> = {
       + f([[70, 70], [78, 80], [102, 80], [110, 70], [90, 74]], '#8a5a32', -0.05) + f([[70, 70], [90, 74], [110, 70], [100, 67], [80, 67]], '#a8743e', 0.15), true),
   market: () => sky('#bfe0f0', { x: 18, y: 16, r: 7, c: '#fff1c4' })
     + lift(f([[86, 64], [86, 40], [100, 30], [114, 40], [114, 64]], '#d6c3a0', 0) + f([[96, 64], [96, 52], [104, 52], [104, 64]], '#6b4527', 0))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + shadowUnder(56, 78, 34)
     + lift(
       f([[28, 40], [32, 40], [32, 74], [28, 74]], '#8a5a32', 0) + f([[80, 40], [84, 40], [84, 74], [80, 74]], '#8a5a32', -0.1)
@@ -371,7 +371,7 @@ const BUILDINGS: Record<string, () => string> = {
       + cube(46, 54, 4, '#9aa0a6') + crystal(56, 58, 8, 2.4, '#b07cff') + coin(65, 54, 3.2), true),
   caravan_post: () => sky('#f3d6a4', { x: 96, y: 18, r: 9, c: '#fff1c4' })
     + lift(ridges([[20, 20, 22], [50, 14, 18]], '#d0a874'))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + lift(f([[100, 34], [102, 34], [102, 74], [100, 74]], '#8a5a32', 0) + f([[102, 34], [116, 39], [102, 44]], '#3e7bfa', 0.1) + f([[102, 44], [116, 39], [114, 44]], '#3e7bfa', -0.2))
     + shadowUnder(54, 78, 30)
     + lift(
@@ -379,7 +379,7 @@ const BUILDINGS: Record<string, () => string> = {
       + f([[30, 56], [32, 42], [42, 34], [54, 32]], '#f3ead7', 0.2) + f([[30, 56], [54, 32], [66, 34], [78, 56]], '#f3ead7', 0.05) + f([[66, 34], [76, 42], [78, 56]], '#f3ead7', -0.18)
       + f(poly(38, 70, 7, 8), '#6b4527', -0.05) + f(poly(38, 70, 2, 8), '#d9a066', 0) + f(poly(72, 70, 7, 8), '#6b4527', -0.05) + f(poly(72, 70, 2, 8), '#d9a066', 0), true),
   tower_floor: () => sky('#b7c6e6', { x: 22, y: 16, r: 7, c: '#fff1c4' })
-    + groundLayers('plains', [64, 62, 65, 61, 64, 63, 65])
+    + groundLayers('desert', [64, 62, 65, 61, 64, 63, 65])
     + shadowUnder(60, 78, 22)
     + lift(
       f([[44, 76], [44, 54], [60, 58], [60, 80]], '#c7c1d6', 0.1) + f([[60, 58], [76, 54], [76, 76], [60, 80]], '#c7c1d6', -0.22)
@@ -432,7 +432,7 @@ const BUILDINGS: Record<string, () => string> = {
   // A columned guildhall, banners in the goods' colours between the columns, a gold finial.
   guildhall: () => sky('#bfd4e6', { x: 100, y: 16, r: 7, c: '#fff1c4' })
     + lift(f([[2, 64], [2, 44], [14, 34], [26, 44], [26, 64]], '#d6c3a0', 0) + f([[94, 64], [94, 48], [118, 48], [118, 64]], '#d6c3a0', -0.1))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + shadowUnder(60, 78, 40)
     + lift(f([[18, 80], [20, 74], [100, 74], [102, 80]], MON, -0.1) + f([[22, 74], [22, 42], [98, 42], [98, 74]], MON, 0.05)
       + f([[54, 74], [54, 56], [66, 56], [66, 74]], '#3a2a20', 0)
@@ -455,7 +455,7 @@ const BUILDINGS: Record<string, () => string> = {
   stonemason: () => sky('#bcd2e6', { x: 100, y: 16, r: 7, c: '#fff1c4' })
     + lift(ridges([[14, 18, 18], [104, 22, 20]], '#8d8f96'))
     + lift(box(92, 38, 26, 14, 16, '#e8dfcc') + f([[78, 38], [92, 26], [106, 38]], '#7d828b', 0.1))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + shadowUnder(52, 78, 30)
     + lift(f([[30, 34], [36, 30], [78, 30], [72, 34]], '#d3d5da', 0.35) + f([[72, 34], [78, 30], [78, 72], [72, 76]], '#d3d5da', -0.3)
       + f([[30, 76], [30, 34], [72, 34], [72, 76], [62, 76], [62, 48], [56, 42], [46, 42], [40, 48], [40, 76]], '#d3d5da', 0.05)
@@ -556,7 +556,7 @@ const BUILDINGS: Record<string, () => string> = {
     + lift(sheep(100, 72, 0.9, true), true),
   monument: () => sky('#c9b6d6', { x: 92, y: 20, r: 10, c: '#ffe2a8' })
     + lift(ridges([[14, 18, 18], [106, 22, 20]], '#c08a63'))
-    + groundLayers('plains')
+    + groundLayers('desert')
     + shadowUnder(60, 78, 26)
     + lift(
       f([[40, 78], [44, 70], [76, 70], [80, 78]], '#d6cbb5', 0) + f([[46, 70], [50, 64], [70, 64], [74, 70]], '#e3d9c4', 0.1)

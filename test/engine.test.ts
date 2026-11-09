@@ -331,7 +331,7 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   const [sea, harbor, land] = neighbors(tower);
   g.map[sea].terrain = 'ocean';
   g.map[harbor].terrain = 'harbor';
-  g.map[land].terrain = 'plains';
+  g.map[land].terrain = 'desert';
   assert.throws(() => apply(g, 0, `build roost ${sea}`), RuleError); // nothing on the ocean
   g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
   assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
@@ -564,8 +564,8 @@ test('building cards count their neighbours; point buildings must go beside what
   rich(g, 0);
   const tower = g.towers[0];
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
-  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
-  g.map[spot].terrain = 'plains';
+  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'desert';
+  g.map[spot].terrain = 'desert';
   // Cliff Works makes 1 stone each round for each adjacent mountain hex.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);

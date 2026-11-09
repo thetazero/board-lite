@@ -705,7 +705,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     const d = u.d ? g.dragons.find((x) => x.id === u.d) : undefined;
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
-  const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'plains';
+  const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'desert';
   const first = ev.first !== 'defenders' ? 'Dragons' : units.length > 1 ? 'Defenders' : units[0].name;
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);
 }

@@ -572,7 +572,7 @@ export function rulebook(): Rulebook {
       units: t.units.map((u) => unitView(u)),
     })),
     tower: { makes: res(TUNING.towerProduction), houses: TUNING.towerDragonCapacity },
-    terrains: ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'],
+    terrains: ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor', 'ocean'],
     peakBonus: TUNING.peakBonus,
     faunaWanderOdds: TUNING.faunaWanderOdds,
     elementBeats: ELEMENT_BEATS,
