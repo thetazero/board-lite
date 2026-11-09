@@ -47,16 +47,6 @@ export function towerSpots(players: number): string[] {
   return CORNERS[players].map((i) => key(DIRECTIONS[i][0] * d, DIRECTIONS[i][1] * d));
 }
 
-function randomTerrain(rng: Rng): Terrain {
-  const land = Object.entries(TERRAIN_WEIGHTS) as [Terrain, number][];
-  let x = next(rng) * land.reduce((s, [, w]) => s + w, 0);
-  for (const [t, w] of land) {
-    x -= w;
-    if (x < 0) return t;
-  }
-  return 'plains';
-}
-
 export const distance = (q: number, r: number) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
 
 // The hexes of ring d, starting at corner 0 and walking each side in turn:
@@ -69,6 +59,20 @@ export function ring(d: number): [number, number][] {
     for (let j = 0; j < d; j++) out.push([cq * d + sq * j, cr * d + sr * j]);
   }
   return out;
+}
+
+// The fixed deck of terrains dealt onto the open land (#434): every hex but the
+// towers, the peak and the harbors. Each terrain gets its share of
+// TERRAIN_WEIGHTS, rounded down; the remainder is plains (the desert).
+export function terrainCounts(players: number): Partial<Record<Terrain, number>> {
+  const radius = mapRadius(players);
+  const open = 3 * radius * (radius + 1) + 1 - towerSpots(players).length - 1 - 6;
+  const weights = Object.entries(TERRAIN_WEIGHTS) as [Terrain, number][];
+  const total = weights.reduce((s, [, w]) => s + w, 0);
+  const counts: Partial<Record<Terrain, number>> = {};
+  for (const [t, w] of weights) if (t !== 'plains') counts[t] = Math.floor((open * w) / total);
+  counts.plains = open - Object.values(counts).reduce((a, b) => a + b!, 0)!;
+  return counts;
 }
 
 // Fair starts (#424): roll maps until every start has about as much basic
@@ -134,22 +138,26 @@ function rollMap(rng: Rng, players: number): Record<string, Hex> {
   const hexes: Record<string, Hex> = {};
   for (let q = -radius - 1; q <= radius + 1; q++) {
     for (let r = Math.max(-radius - 1, -q - radius - 1); r <= Math.min(radius + 1, -q + radius + 1); r++) {
-      hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : randomTerrain(rng) };
+      hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : 'plains' };
     }
   }
   // Towers sit on plains; the land around them is as random as the rest, so
   // players start with different terrain and different things to sell.
-  for (const spot of towerSpots(players)) hexes[spot].terrain = 'plains';
+  const towers = new Set(towerSpots(players));
   // One natural harbor on each of the six coasts, somewhere between its
   // corners but not touching a tower: a port is something you build towards.
   const coast = ring(radius);
-  const towers = new Set(towerSpots(players));
   for (let side = 0; side < 6; side++) {
     const between = coast.slice(side * radius + 1, (side + 1) * radius);
     const open = between.filter(([q, r]) => !neighbors(key(q, r)).some((n) => towers.has(n)));
     const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
     hexes[key(q, r)].terrain = 'harbor';
   }
+  // The rest of the land gets a fixed deck of terrains, shuffled (#434), so
+  // every map for a player count has the same mix.
+  const deck = (Object.entries(terrainCounts(players)) as [Terrain, number][]).flatMap(([t, n]) => Array<Terrain>(n).fill(t));
+  const open = Object.keys(hexes).filter((k) => hexes[k].terrain === 'plains' && !towers.has(k) && k !== PEAK);
+  shuffle(rng, deck).forEach((t, i) => (hexes[open[i]].terrain = t));
   placeBeasts(rng, hexes, players);
   placeFauna(rng, hexes, players);
   return hexes;

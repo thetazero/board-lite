@@ -7,11 +7,11 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
 import { besideText, bundleText, specialProjectCost } from './engine.ts';
-import { distance, mapRadius, parseKey, towerSpots } from './map.ts';
+import { distance, mapRadius, parseKey, terrainCounts, towerSpots } from './map.ts';
 
 
 // ---------- plain numbers ----------
@@ -99,21 +99,21 @@ ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 
 function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
-  const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
   const counts = [2, 3, 4, 5, 6];
+  const deal = counts.map(terrainCounts);
+  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', ...deal.map((d, i) => t === 'harbor' ? '6' : t === 'mountain' ? `${d[t]} + peak` : t === 'plains' ? `${d[t]} + ${counts[i]} towers` : `${d[t]}`)]);
   const size = counts.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. The rest of the land is dealt a fixed number of each terrain, shuffled: each terrain gets an equal share, rounded down, and the remainder is plains. So every map for a player count has the same mix; only where each hex lies is random.
 
 Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
 
-The terrain is random, but the map is rolled again until every start has about as much room for basic buildings as the others: in each ring from 1 to ${TUNING.fairStart.rings} steps out from its tower, and in those rings together, a start's opportunity is within ${pct(TUNING.fairStart.tolerance)} of the average across starts. Opportunity is the hexes a basic building can go on, plus ${n1(1 - TUNING.fairStart.oceanCost)} for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+Where the terrain lies is random, but the map is shuffled again until every start has about as much room for basic buildings as the others: in each ring from 1 to ${TUNING.fairStart.rings} steps out from its tower, and in those rings together, a start's opportunity is within ${pct(TUNING.fairStart.tolerance)} of the average across starts. Opportunity is the hexes a basic building can go on, plus ${n1(1 - TUNING.fairStart.oceanCost)} for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
 
 ${table(['Players', 'Towers', 'From the centre', 'Land within 3 steps', 'Land nearest each tower'], counts.map(towerRow))}
 
-${table(['Terrain', 'For', 'Share of land'], rows)}`;
+${table(['Terrain', 'For', ...counts.map((p) => `${p}p`)], rows)}`;
 }
 
 // Each seat's land at the start: within 3 steps of its tower, and nearest its

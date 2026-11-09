@@ -151,11 +151,11 @@ Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round, and each more Wor
 
 ## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes), 5p radius 6 (127 land hexes), 6p radius 6 (127 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes), 5p radius 6 (127 land hexes), 6p radius 6 (127 land hexes). The rest of the land is dealt a fixed number of each terrain, shuffled: each terrain gets an equal share, rounded down, and the remainder is plains. So every map for a player count has the same mix; only where each hex lies is random.
 
 Towers sit on plains at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
 
-The terrain is random, but the map is rolled again until every start has about as much room for basic buildings as the others: in each ring from 1 to 4 steps out from its tower, and in those rings together, a start's opportunity is within 20% of the average across starts. Opportunity is the hexes a basic building can go on, plus 0.3 for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+Where the terrain lies is random, but the map is shuffled again until every start has about as much room for basic buildings as the others: in each ring from 1 to 4 steps out from its tower, and in those rings together, a start's opportunity is within 20% of the average across starts. Opportunity is the hexes a basic building can go on, plus 0.3 for each ocean hex (plains and harbors count nothing). The average can differ from game to game, and which resources lie near each start is still random.
 
 | Players | Towers | From the centre | Land within 3 steps | Land nearest each tower |
 |---|---|---|---|---|
@@ -165,14 +165,14 @@ The terrain is random, but the map is rolled again until every start has about a
 | 5 | 4,-1 3,-4 -2,-2 -4,2 -1,4 | 4 | 33 | 24–28 |
 | 6 | 5,0 5,-5 0,-5 -5,0 -5,5 0,5 | 5 | 23 | 21 |
 
-| Terrain | For | Share of land |
-|---|---|---|
-| mountain | Quarry | 20% |
-| forest | Lumber Camp | 20% |
-| crystal field | Crystal Mine | 20% |
-| meadow | Pasture | 20% |
-| plains | — | 20% |
-| harbor | Stone Port, Timber Port, Crystal Port, Livestock Port | coast |
+| Terrain | For | 2p | 3p | 4p | 5p | 6p |
+|---|---|---|---|---|---|---|
+| mountain | Quarry | 10 + peak | 10 + peak | 16 + peak | 23 + peak | 22 + peak |
+| forest | Lumber Camp | 10 | 10 | 16 | 23 | 22 |
+| crystal field | Crystal Mine | 10 | 10 | 16 | 23 | 22 |
+| meadow | Pasture | 10 | 10 | 16 | 23 | 22 |
+| plains | — | 12 + 2 towers | 11 + 3 towers | 16 + 4 towers | 23 + 5 towers | 26 + 6 towers |
+| harbor | Stone Port, Timber Port, Crystal Port, Livestock Port | 6 | 6 | 6 | 6 | 6 |
 
 ## Building cards that count their neighbours
 

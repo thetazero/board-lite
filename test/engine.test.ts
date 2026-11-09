@@ -5,7 +5,7 @@ import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingC
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
-import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, startOpportunity, towerSpots } from '../src/map.ts';
+import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, startOpportunity, terrainCounts, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
 function playerView(g: Game, p: number, logLines = 25): string {
@@ -922,6 +922,21 @@ test('fair starts: each start has about the average room for basic buildings, ri
     assert.ok(totals.size > 1, `${players}p: the average never drifts`);
     assert.ok(stoneNearFirst.size > 2, `${players}p: the mountains near a start never vary`);
     assert.deepEqual(generateMap({ state: 9 }, players), generateMap({ state: 9 }, players), `${players}p: one seed, one map`);
+  }
+});
+
+test('every map for a player count has the same terrain mix: equal counts, the remainder plains', () => {
+  for (let players = 2; players <= 6; players++) {
+    const counts = terrainCounts(players);
+    const basics = (['mountain', 'forest', 'ley', 'meadow'] as const).map((t) => counts[t]!);
+    assert.ok(basics.every((n) => n === basics[0]) && counts.plains! - basics[0] >= 0 && counts.plains! - basics[0] < 5, `${players}p: ${JSON.stringify(counts)}`);
+    const expect = { ...counts, mountain: counts.mountain! + 1, plains: counts.plains! + players, harbor: 6 };
+    for (let seed = 0; seed < 20; seed++) {
+      const g = startingMap(players, seed);
+      const got: Record<string, number> = {};
+      for (const h of Object.values(g.map)) if (h.terrain !== 'ocean') got[h.terrain] = (got[h.terrain] ?? 0) + 1;
+      assert.deepEqual(got, expect, `${players}p seed ${seed}`);
+    }
   }
 });
 
