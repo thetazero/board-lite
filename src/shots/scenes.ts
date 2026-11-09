@@ -734,7 +734,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-points-fight-3p', caption: "TV: a fight on Cinderkeep mid-replay, on its own stage: the Fire Giant looms, a hit bolts across in its attacker's colour", client: 'tv', live: true, waitMs: 2500 }],
+    shots: () => [{ file: 'tv-points-fight-3p', caption: "TV: a fight on Cinderkeep mid-replay, on its own stage: the Fire Giant looms, a hit bolts across in its attacker's colour", client: 'tv', live: true, waitMs: 3300 }],
   },
   {
     // Titan's Throne, mid-replay: the Titan, the biggest figure in the game, over its Griffins and Knights.
@@ -752,7 +752,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-titan-fight-3p', caption: "TV: a fight on Titan's Throne mid-replay: the Titan looms over everything", client: 'tv', live: true, waitMs: 2900 }],
+    shots: () => [{ file: 'tv-titan-fight-3p', caption: "TV: a fight on Titan's Throne mid-replay: the Titan looms over everything", client: 'tv', live: true, waitMs: 3700 }],
   },
   {
     // The same fight with no TV, on a phone held upright: each side stands
@@ -772,7 +772,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'phone-remote-titan-fight-3p', caption: "No TV: Titan's Throne on a phone: each side in columns of up to four", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2900 }],
+    shots: () => [{ file: 'phone-remote-titan-fight-3p', caption: "No TV: Titan's Throne on a phone: each side in columns of up to four", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 3700 }],
   },
   {
     name: 'choose-3p',
@@ -869,7 +869,18 @@ export const SCENES: Scene[] = [
     setup: wonRaid,
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
-    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, on the kingdom's own stage: a hit lands, a Militia falls", client: 'tv', live: true, waitMs: 2150 }],
+    shots: () => [{ file: 'tv-raid-fight-3p', caption: "TV: a raid's fight mid-replay, on the kingdom's own stage: a hit lands, a Militia falls", client: 'tv', live: true, waitMs: 2950 }],
+  },
+  {
+    // The same raid as it starts: the coin flip for who strikes first (#439).
+    name: 'raid-coin-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: wonRaid,
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'tv-raid-coin-3p', caption: "TV: a raid's fight starts with a coin flip: it lands, and who strikes first shows under it", client: 'tv', live: true, waitFor: '#overlay .fightscene', waitMs: 300 }],
   },
   {
     // The same raid, on a raider's phone while the TV replays it.
@@ -901,7 +912,7 @@ export const SCENES: Scene[] = [
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
-    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the dragons held back beside it', client: 'tv', live: true, waitMs: 3300 }],
+    shots: () => [{ file: 'tv-raid-held-4p', caption: 'TV: a fight mid-replay, with the dragons held back beside it', client: 'tv', live: true, waitMs: 4100 }],
   },
   {
     name: 'discard-4p',
@@ -1544,7 +1555,7 @@ export const SCENES: Scene[] = [
         frames: [0, 0.6, 1.2, 2.5, 4.2, 4.7, 5.6],
       },
       // Last: the fight changes the game.
-      { file: 'tv-beast-fight-3p', caption: 'TV: a fight against the Thunderbird mid-replay', client: 'tv', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
+      { file: 'tv-beast-fight-3p', caption: 'TV: a fight against the Thunderbird mid-replay', client: 'tv', waitMs: 3200, then: (room) => room.mutate((g2) => huntPeak(g2)) },
     ],
   },
   {
@@ -1650,7 +1661,16 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => bearHunters(g),
-    shots: () => [{ file: 'tv-fauna-fight-3p', caption: 'TV: two hatchlings against a Cave Bear, mid-replay', client: 'tv', waitMs: 1400, then: (room) => room.mutate((g2) => huntBear(g2)) }],
+    shots: () => [{ file: 'tv-fauna-fight-3p', caption: 'TV: two hatchlings against a Cave Bear, mid-replay', client: 'tv', waitMs: 2200, then: (room) => room.mutate((g2) => huntBear(g2)) }],
+  },
+  {
+    // The same fight as it starts: the coin flip for who strikes first (#439).
+    name: 'fauna-coin-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => bearHunters(g),
+    shots: () => [{ file: 'tv-fauna-coin-3p', caption: 'TV: clearing a Cave Bear starts with a coin flip: it lands, and who strikes first shows under it', client: 'tv', waitFor: '#overlay .fightscene', waitMs: 300, then: (room) => room.mutate((g2) => huntBear(g2)) }],
   },
   {
     // The same fight, at its end: what the player got for it.
@@ -1679,7 +1699,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-perch-clear-3p', caption: 'Phone: sending dragons against the dragons perched on your Pasture', client: 'phone', seat: g!.turn, clicks: ['#hunt', `[data-hex="${perchedPasture(g!)}"]`, '[data-hunter]'] },
       { file: 'phone-perch-other-3p', caption: "Phone: a rival's view, their dragon perched on someone else's Pasture", client: 'phone', seat: (g!.turn + 1) % 3 },
       // Last: the fight changes the game.
-      { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2000, then: (room) => room.mutate((g2) => apply(g2, g2.turn, `clear ${perchedPasture(g2)} ${g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id).join(' ')}`)) },
+      { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2800, then: (room) => room.mutate((g2) => apply(g2, g2.turn, `clear ${perchedPasture(g2)} ${g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id).join(' ')}`)) },
     ],
   },
   {
@@ -1845,7 +1865,7 @@ export const SCENES: Scene[] = [
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
     shots: () => [
-      { file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 2200 },
+      { file: 'phone-remote-fight-3p', caption: "No TV: a raid's fight cuts in on the phone, mid-replay", client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 3000 },
       // You, tapped while the fight plays: the phone stays on the table, never "Watch the table" (#294).
       { file: 'phone-remote-fight-you-3p', caption: 'No TV: You tapped mid-fight: the table stays, You is off till the fight ends', client: 'phone', seat: 1, live: true, run: `setTimeout(() => document.querySelector('[data-view="you"]').click(), 1000)`, waitFor: '.viewswitch', waitMs: 1800 },
     ],
@@ -1869,7 +1889,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => beastHunters(g),
     shots: (g) => [
-      { file: 'phone-remote-beast-3p', caption: 'No TV: a fight against the Thunderbird cuts in on another player\'s phone', client: 'phone', seat: (g!.turn + 1) % 3, waitFor: '.table-on', waitMs: 2400, then: (room) => room.mutate((g2) => huntPeak(g2)) },
+      { file: 'phone-remote-beast-3p', caption: 'No TV: a fight against the Thunderbird cuts in on another player\'s phone', client: 'phone', seat: (g!.turn + 1) % 3, waitFor: '.table-on', waitMs: 3200, then: (room) => room.mutate((g2) => huntPeak(g2)) },
     ],
   },
   {

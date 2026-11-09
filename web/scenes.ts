@@ -49,11 +49,12 @@ export const madeOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? RESO
 export const eatOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? (ev.eat ?? 0) : 0);
 export const prodRowsOf = (ev: GameEvent | undefined) => madeOf(ev).length + (eatOf(ev) && !madeOf(ev).includes('livestock') ? 1 : 0);
 
-// A fight: a beat to look up and see who's there, the hits (at most 6 s of
-// them), then the outcome long enough to read. A kingdom that scores (#326)
-// adds a beat of its own after the loot: the crown comes down on the player
-// with the most power standing, then their points, held to be read.
-export const FIGHT_LEAD_MS = 1600;
+// A fight: a beat to look up and see who's there while a coin is tossed for
+// who strikes first (#439), the hits (at most 6 s of them), then the outcome
+// long enough to read. A kingdom that scores (#326) adds a beat of its own
+// after the loot: the crown comes down on the player with the most power
+// standing, then their points, held to be read.
+export const FIGHT_LEAD_MS = 2400; // the coin flip's timing is in style.css (.coinflip)
 export const HIT_MS = 400;
 export const OUTCOME_MS = 4500;
 export const CROWN_AT_MS = 2400; // after the outcome: the loot read, the crown comes down

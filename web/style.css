@@ -598,6 +598,31 @@ body.recap-page { font-size: 16px; }
 .bvs small { font-size: .9em; text-transform: uppercase; letter-spacing: .1em; }
 .bvs b { font-size: 2.2em; line-height: 1; color: var(--ink); min-height: 1em; }
 .bvs.bfirst b { font-size: 1.3em; line-height: 1.4; font-family: var(--serif); white-space: nowrap; } /* who won the coin flip, a word not a number */
+/* The coin flip before the hits (#439, tv.ts coinFlip), timed to fit the
+   fight's lead (scenes.ts FIGHT_LEAD_MS, 2.4 s): tossed at .3 s, it spins up
+   and down for 1 s and lands on the winner's face (the dragon, or the
+   defenders' turned a half turn more), who strikes first shows under it, and
+   at 2 s it shrinks away up toward the header, whose "Strikes first" glows
+   as it goes and keeps it for the fight. */
+.coinflip { position: absolute; left: 50%; top: 24vh; translate: -50% -50%; z-index: 6; display: flex; flex-direction: column; align-items: center; gap: .5em; pointer-events: none; perspective: 40em; }
+.coinflip.go { animation: coinin .2s .3s both, coinaway .4s 2s ease-in forwards; }
+/* At rest it's landed and read (as a still, with animations off, shows it); the animations lead up to that. */
+.coin { position: relative; width: 7em; height: 7em; transform-style: preserve-3d; --land: 1800deg; transform: rotateY(var(--land)); }
+.coinflip.them .coin { --land: 1980deg; }
+.coinflip.go .coin { animation: coinspin 1s .3s cubic-bezier(.2, .6, .35, 1) both, cointoss 1s .3s both; }
+.cface { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; backface-visibility: hidden;
+  background: radial-gradient(circle at 35% 30%, #fff3b8, #f5c542 45%, #c79314); box-shadow: inset 0 0 0 .35em #c79314, inset 0 0 0 .5em #fff0bd, 0 .3em .8em #0008; }
+.cface .ricon { width: 4.2em !important; height: 4.2em !important; filter: drop-shadow(0 .05em 0 #7a5a0a); }
+.cface.tails { transform: rotateY(180deg); }
+.coinflip > b { font-family: var(--serif); font-size: 2em; max-width: 86vw; text-align: center; text-wrap: balance; background: var(--sheet); color: var(--ink); padding: .1em .8em; border-radius: 2px; box-shadow: var(--lift); }
+.coinflip.go > b { animation: coinin .3s 1.3s both; }
+.fightscene:has(.coinflip.go) .bfirst b { animation: firstglow .45s 1.95s ease-out both; }
+@keyframes coinspin { from { transform: rotateY(0); } to { transform: rotateY(var(--land)); } }
+@keyframes cointoss { 0%, 100% { translate: 0 0; scale: 1; } 45% { translate: 0 -6vh; scale: 1.2; } }
+@keyframes coinin { from { opacity: 0; } }
+@keyframes coinaway { to { opacity: 0; translate: -50% -50%; top: 4vh; scale: .25; } }
+@keyframes firstglow { 0% { color: var(--ink); } 40% { color: #b8860b; text-shadow: 0 0 .4em #f5c542; } 100% { color: var(--ink); } }
+@media (prefers-reduced-motion: reduce) { .coinflip.go .coin { animation: none; } }
 .battle { position: absolute; left: 3vw; right: 3vw; bottom: 9vh; top: 30vh; display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; align-items: end;
   --k: clamp(.45em, min(calc(34vw / var(--sl)), calc(34vw / var(--sr)), calc(46vh / var(--mx))), 3em); }
 /* wrap-reverse: a second row stands behind the first, and flex-start is the ground. */
