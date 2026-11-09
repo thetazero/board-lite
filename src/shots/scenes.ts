@@ -105,7 +105,8 @@ export function stage(scene: Scene): Staged {
     throw new Error(`Scene ${scene.name}: ${why}.`);
   };
   if (scene.lobby) return { scene, game: null, rng: { state: scene.seed } };
-  const g = newGame(scene.players, scene.seed);
+  // Staged scenes keep the first seat first in round 1, so each shot stays as it was.
+  const g = newGame(scene.players, scene.seed, 0);
   const rng = { state: scene.seed * 7919 };
   if (!drive(g, rng, scene.until ?? (() => true))) fail('the game ended before its opening did');
   scene.setup?.(g);
@@ -211,7 +212,7 @@ function late(players: number, seed: number) {
   let round = 0; // found the first time it's asked
   return (x: Game) => {
     if (!round) {
-      const g = newGame(players, seed);
+      const g = newGame(players, seed, 0);
       drive(g, { state: seed * 7919 }, (y) => y.phase === 'over');
       round = g.round - 1;
     }

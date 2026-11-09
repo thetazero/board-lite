@@ -22,7 +22,7 @@ board-lite is running on port 8080.
 
 1. **TV:** open the TV address and press **Full screen** in the top corner (or F11). The button is always there in the lobby; in a game it shows while the mouse moves. It shows the room's QR code, address and 4-letter code. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
 2. **Phones:** scan the QR code (or type the address), type a name, tap **Join**. The name is remembered.
-3. **Start:** with 2 to 6 players, press **Start game** on the TV or the first player's phone. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
+3. **Start:** with 2 to 6 players, press **Start game** on the TV or the phone of the first to join. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 

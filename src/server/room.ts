@@ -82,6 +82,7 @@ export interface RoomOptions {
   recaps?: string; // where finished games' recaps go (recapsDir)
   now?: () => number; // the clock a recap is dated by (the screenshots fix it)
   recapId?: string; // and its id (the screenshots fix it too, so the QR code is the same each run)
+  firstSeat?: number; // who goes first in round 1; random by default (tests fix it)
 }
 
 // What the seats file keeps: enough for every client to reconnect as before.
@@ -422,11 +423,11 @@ export class Room {
   }
 
   start(tok: string, seed = Date.now()) {
-    if (!this.canStart(tok)) throw new RoomError('Only the TV or the first player can start the game.');
+    if (!this.canStart(tok)) throw new RoomError('Only the TV or the first to join can start the game.');
     if (this.game) throw new RoomError('The game has already started.');
     if (this.seats.length < MIN_PLAYERS) throw new RoomError(`The game needs at least ${MIN_PLAYERS} players.`);
     if (existsSync(this.file)) throw new RoomError(`A game already exists at ${this.file}.`);
-    this.cached = newGame(this.seats.length, seed);
+    this.cached = newGame(this.seats.length, seed, this.opts.firstSeat);
     withLock(this.file, () => save(this.file, this.cached!));
     this.changed();
   }

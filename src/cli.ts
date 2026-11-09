@@ -19,8 +19,8 @@ Every game is hosted by a board-lite server (npm run serve; the TV shows its roo
 
   board-lite new [server-url]                             open a room with no TV; prints its address
   board-lite join <room-url> <name>                       take a seat; prints your token
-  board-lite bot <room-url> <token>                       add a bot to the room (first player only)
-  board-lite start <room-url> <token>                     start the game (first player only)
+  board-lite bot <room-url> <token>                       add a bot to the room (first to join only)
+  board-lite start <room-url> <token>                     start the game (first to join only)
   board-lite view <room-url> <token> [--log N]            what your seat sees, and its options
   board-lite do <room-url> <token> <command...>           make a decision
   board-lite wait <room-url> <token> [--timeout SECS]     block until you have a decision to make
