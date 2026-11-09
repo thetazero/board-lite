@@ -365,3 +365,42 @@ test('a building the Leviathan holds from an adjacent hex is suppressed, and wor
   assert.equal(score(g, 0).buildings, before);
   assert.equal(publicState(g).map.find((h) => h.k === harbor)!.suppressed, undefined);
 });
+
+// The phone's count is the TV's plus the Secret Hoards in hand, whatever
+// suppresses a building and whatever lifts it again (#443).
+test("a phone's points are always the TV's public points plus its hidden ones, through perching, recalls, clears and beasts", () => {
+  const { g, pasture } = perchGame(3);
+  rich(g, 2);
+  g.players[0].hand.push({ id: 'hoard-443', deck: 'action', key: 'secret_hoard' });
+  // pub: P1's points from buildings, as the TV's points track shows them.
+  const check = (why: string, pub: number) => {
+    for (let p = 0; p < 3; p++) {
+      const tv = publicState(g).players[p].publicPoints;
+      const phone = seatState(g, p);
+      assert.equal(phone.totalPoints, tv + phone.hiddenPoints, `${why}: P${p + 1}'s phone`);
+    }
+    assert.equal(publicState(g).players[0].buildings, pub, `${why}: P1's points from buildings`);
+  };
+  const full = score(g, 0).buildings;
+  check('before', full);
+  assert.equal(seatState(g, 0).hiddenPoints, 2);
+  const a = addDragon(g, 1, 1);
+  const b = addDragon(g, 2, 1);
+  apply(g, 0, 'end');
+  apply(g, 1, `perch ${pasture} ${a.id}`);
+  check('perched', full - 1);
+  apply(g, 1, `recall ${a.id}`);
+  check('recalled', full);
+  apply(g, 1, `perch ${pasture} ${a.id}`);
+  apply(g, 1, 'end');
+  apply(g, 2, `perch ${pasture} ${b.id}`);
+  check('two perched', full - 1);
+  apply(g, 2, 'end');
+  toTurnOf(g, 0);
+  check('next round', full - 1);
+  const hunters = [addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3)];
+  apply(g, 0, `clear ${pasture} ${hunters.map((d) => d.id).join(' ')}`);
+  check('cleared', full);
+  g.map[pasture].fauna = 'wolf_pack';
+  check('a beast on it', full - 1);
+});
