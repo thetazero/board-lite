@@ -219,11 +219,65 @@ function seaGeometry(half: number): THREE.BufferGeometry {
   return g;
 }
 
+// The water moves gently, all on the graphics card: the board clock (seconds)
+// is WATER_T, set each frame. Each wave crest rolls slowly to and fro, sinking
+// low into the water and rising again, in long swells across the sea;
+// a faint ripple of light drifts over the sea's paper. Slow and small, so it
+// reads as water without drawing the eye from the game.
+const WATER_T = { value: 0 };
+// A crest's move at a point of the sea: 0.04 to and fro, and from a little
+// above its height on the paper to most of the way under it. Swells about 4
+// hexes apart pass every 7 seconds.
+const CREST_MOVE = `
+  vec3 wp_ = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  float ph_ = wTime * 0.9 + wp_.x * 0.55 + wp_.z * 0.75;
+  transformed += vec3(0.04 * sin(ph_), -0.017 + 0.021 * sin(ph_ + 1.2), 0.015 * cos(ph_ * 0.7));
+`;
+
+function waterShader(s: THREE.WebGLProgramParametersWithUniforms, crest: boolean) {
+  s.uniforms.wTime = WATER_T;
+  s.vertexShader = 'uniform float wTime;\nvarying vec2 vWater;\n' + s.vertexShader.replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>\n${crest ? CREST_MOVE : ''}\nvWater = (modelMatrix * vec4(transformed, 1.0)).xz;`,
+  );
+  if (crest) return;
+  // Broad soft bands of light crossing each other, a few percent either way.
+  s.fragmentShader = 'uniform float wTime;\nvarying vec2 vWater;\n' + s.fragmentShader.replace(
+    '#include <map_fragment>',
+    `#include <map_fragment>
+    float rip_ = sin(vWater.x * 0.9 + vWater.y * 0.4 + wTime * 0.35) * sin(vWater.y * 1.1 - vWater.x * 0.3 - wTime * 0.28)
+      + 0.5 * sin((vWater.x - vWater.y) * 1.7 + wTime * 0.5);
+    diffuseColor.rgb *= 1.0 + 0.05 * rip_;`,
+  );
+}
+
+// The sea's paper (`crest` false) or a wave crest's, moving with the board clock.
+// A crest's shadow moves with it.
+function waterPaper(color: string, crest: boolean): THREE.MeshLambertMaterial {
+  GRAIN ??= paperTexture();
+  const m = new THREE.MeshLambertMaterial({ color, map: GRAIN, flatShading: true });
+  m.onBeforeCompile = (s) => waterShader(s, crest);
+  m.customProgramCacheKey = () => (crest ? 'crest' : 'sea');
+  if (crest) {
+    const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    d.onBeforeCompile = (s) => {
+      s.uniforms.wTime = WATER_T;
+      s.vertexShader = 'uniform float wTime;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${CREST_MOVE}`);
+    };
+    d.customProgramCacheKey = () => 'crest-depth';
+    m.userData.depth = d;
+  }
+  return m;
+}
+let CREST: THREE.MeshLambertMaterial | null = null;
+let SEA_MAT: THREE.MeshLambertMaterial | null = null;
+
 // Folded wave crests on a hex of sea, laid on the sea's paper.
 function waveCrests(r: () => number): THREE.Group {
   const g = new THREE.Group();
   for (let i = 0; i < 3; i++) {
     const crest = part(cyl(0.05, 0.05, 0.3 + r() * 0.15, 3), '#eaf4fb', { rot: [0, 0, Math.PI / 2], crease: false });
+    crest.material = CREST ??= waterPaper('#eaf4fb', true);
     const a = r() * Math.PI * 2, d = 0.1 + r() * 0.5;
     const holder = group(crest);
     holder.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
@@ -280,6 +334,7 @@ function bake(root: THREE.Group, joints = false): THREE.Group {
     geos.forEach((g) => g.dispose());
     const mesh = new THREE.Mesh(merged, mat);
     mesh.castShadow = mesh.receiveShadow = true;
+    if (mat.userData.depth) mesh.customDepthMaterial = mat.userData.depth;
     out.add(mesh);
   }
   if (lines.length) {
@@ -2275,6 +2330,7 @@ export class Board3D {
     // map without an ocean gets plain paper. It catches the shadows too.
     const sea = map.some((h) => h.terrain === 'ocean');
     const floor = part(seaGeometry(150), sea ? mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2) : '#efe5cf', { at: [center.x, -0.01, center.z], crease: false });
+    if (sea) floor.material = SEA_MAT ??= waterPaper(mix(TERRAIN_COLORS.ocean, '#e6eef2', 0.2), false);
     floor.castShadow = false;
     this.world.add(floor);
     // Wave crests on the open sea round the map, out past any screen's corners.
@@ -2462,6 +2518,7 @@ export class Board3D {
   private frame() {
     if (document.hidden) return;
     const t = clock();
+    WATER_T.value = t;
     for (const b of [...this.built.values(), ...this.beasts.values()]) {
       const pop = b.obj.userData.pop as THREE.Group;
       const age = t - b.born;

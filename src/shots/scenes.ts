@@ -435,6 +435,8 @@ export const SCENES: Scene[] = [
     shots: (g) => {
       return [
         { file: 'tv-port-4p', caption: 'TV: the four ports on the coast, facing the sea, each with a pile of what it trades', client: 'tv' },
+        // The water moving: frames half a second apart, through one slow swell.
+        { file: 'tv-sea-4p', caption: 'TV: the sea moving gently, half a second apart', client: 'tv', frames: Array.from({ length: 16 }, (_, i) => i * 0.5) },
         { file: 'phone-bank-port', caption: 'Phone: the merchants with a Timber Port: timber at 2:1', client: 'phone', seat: g!.turn, clicks: ['[data-tab=trade]', '[data-bank="give timber"]', '[data-bank="get crystal"]'] },
       ];
     },
