@@ -18,7 +18,7 @@ import { qrSvg } from './qr.ts';
 import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
-import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, type Scene } from './scenes.ts';
+import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -586,6 +586,7 @@ function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
   if (sc.kind === 'roll') return rollBanner(fresh[sc.at].round, sc.rolls.map((j) => fresh[j]), sc.ms);
   if (sc.kind === 'fight') return fightBanner(g, sc, fresh);
   if (sc.kind === 'hunt') return huntBanner(g, sc, fresh);
+  if (sc.kind === 'tend') return tendBanner(g, fresh[sc.at], sc.ms);
   return { html: `<div class="result"><h1>${eventHtml(fresh[sc.at], g, names)}</h1></div>`, ms: sc.ms, top: { round: fresh[sc.at].round, phase: 'Raid' } };
 }
 
@@ -657,6 +658,62 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   };
   const body = made.length ? `<h2>Production</h2><div class="pstage">${cards}<ul class="psum">${sum}</ul></div>` : '';
   return { html: `<div class="production"><h1>Round ${round}</h1>${body}</div>`, ms, play, top: { round, phase: 'Production' } };
+}
+
+// Production's dragon step (#442): every player's dragons that heal, grow or
+// go hungry, on one sheet, each as its row on the player panels (name, stage,
+// growth, power, health), not the full figure. They start as they were; then
+// health bars fill and growth fills in, a dragon whose growth fills moves up a
+// stage (its picture, stage and power change with a pop), and one that went
+// hungry is stamped "Hungry", changing nothing else. The timings are
+// scenes.ts's.
+type DragonNow = Extract<EventView['ev'], { k: 'tend' }>['ds'][number]['from'];
+function tendBanner(g: PublicState, e: EventView, ms: number): Banner {
+  const ev = e.ev as Extract<EventView['ev'], { k: 'tend' }>;
+  const as = (d: DragonView, x: DragonNow): DragonView => ({ ...d, ...x, status: d.perch ? 'perched' : x.stage === 0 ? 'egg' : x.hp > 0 ? 'ready' : 'out' });
+  const pips = (d: DragonView, lit = 0) => (d.stage < 3 ? `<span class="grow">${Array.from({ length: d.growthTime }, (_, i) => `<i class="${i < d.growth ? 'on' : ''}${i >= d.growth - lit && i < d.growth ? ' new' : ''}">${i < d.growth ? '●' : '○'}</i>`).join('')}</span>` : '');
+  const look = (d: DragonView) => `<span class="tline"><span class="tstage">${STAGE_LABEL[d.stage]}</span>${pips(d)}${d.stage ? powerTag(d.power) : ''}<span class="tstate">${dragonState(d)}</span></span>`;
+  const players = names.flatMap((_, p) => {
+    const rows = ev.ds.filter((x) => x.p === p).flatMap((x) => {
+      const d = g.dragons.find((y) => y.id === x.d);
+      return d ? [{ x, was: as(d, x.from), now: as(d, x.to), name: dragonLabel(d, g.dragons) }] : [];
+    });
+    return rows.length ? [{ p, rows }] : [];
+  });
+  const all = players.flatMap((x) => x.rows);
+  const cols = players.length <= 2 ? players.length : players.length <= 4 ? 2 : 3;
+  const tall = Math.max(...Array.from({ length: cols }, (_, c) => players.filter((_, i) => i % cols === c).reduce((n, x) => n + x.rows.length + 1, 0)));
+  const row = (r: (typeof all)[number], i: number) => `<li class="trow${r.x.hungry ? ' hungry' : ''}" data-t="${i}"><span class="tbadge">${dragonBadge(r.was, 44)}</span><div><b class="tname">${esc(r.name)}${r.x.hungry ? ` ${hungerTags({ ...r.now, hungry: true })}` : ''}</b><span class="tlook">${look(r.was)}</span></div></li>`;
+  let i = 0;
+  const cards = players.map(({ p, rows }) => `<section class="tplayer" style="--pc:${PLAYER_COLORS[p]}"><div class="who">${playerTag(p, names)}</div><ul>${rows.map((r) => row(r, i++)).join('')}</ul></section>`).join('');
+  const play = (el: HTMLElement) => {
+    const at = (t: number, f: () => void) => setTimeout(f, t);
+    const rowEl = (k: number) => el.querySelector<HTMLElement>(`.trow[data-t="${k}"]`);
+    at(TEND_LEAD_MS, () => all.forEach((r, k) => {
+      const li = rowEl(k);
+      if (!li) return;
+      if (r.x.hungry) return li.classList.add('stamped');
+      const up = r.now.stage > r.was.stage;
+      // Growth fills in: up to the new count, or the whole track for a dragon about to move up.
+      const grow = li.querySelector('.grow');
+      const filled = up ? r.was.growthTime : r.now.growth;
+      if (grow) grow.outerHTML = pips({ ...r.was, growth: filled }, filled - r.was.growth);
+      // Health fills, as the panels' bars drain: in place.
+      const fill = li.querySelector<HTMLElement>('.tstate .hpbar > span');
+      if (fill && r.now.stage === r.was.stage && r.now.hp > 0) Object.assign(fill.style, { width: hpFill(r.now.hp, r.now.maxHp).width, background: hpFill(r.now.hp, r.now.maxHp).color });
+      else if (!up) li.querySelector('.tstate')!.innerHTML = dragonState(r.now);
+      li.classList.add('changed');
+    }));
+    at(TEND_LEAD_MS + TEND_STAGE_AT_MS, () => all.forEach((r, k) => {
+      const li = rowEl(k);
+      if (!li || r.now.stage <= r.was.stage) return;
+      li.querySelector('.tlook')!.innerHTML = look(r.now);
+      li.querySelector('.tbadge')!.innerHTML = dragonBadge(r.now, 44);
+      li.classList.add('staged');
+    }));
+  };
+  const body = `<h2>Dragons</h2><div class="tend" style="--cols:${cols};--tsize:${tall <= 4 ? 1.9 : tall <= 6 ? 1.6 : tall <= 9 ? 1.3 : 1.05}em">${cards}</div>`;
+  return { html: `<div class="production tending"><h1>Round ${e.round}</h1>${body}</div>`, ms, play, top: { round: e.round, phase: 'Production' } };
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow on its

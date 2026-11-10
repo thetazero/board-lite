@@ -42,7 +42,7 @@ export const gameLogFile = (gameFile: string) => `${gameFile.replace(/\.json$/, 
 
 // What the game does on its own, rather than the player whose command it
 // followed: the dice, a new round, a raid's steps and fights, titles.
-const AUTO = new Set<GameEvent['k']>(['round', 'produce', 'rest', 'grow', 'draw', 'pick', 'turn', 'wander', 'expire', 'title', 'raid', 'votes', 'target', 'locked', 'fight', 'combat', 'raidEnd', 'noRaid', 'again', 'begin', 'final']);
+const AUTO = new Set<GameEvent['k']>(['round', 'produce', 'rest', 'grow', 'tend', 'draw', 'pick', 'turn', 'wander', 'expire', 'title', 'raid', 'votes', 'target', 'locked', 'fight', 'combat', 'raidEnd', 'noRaid', 'again', 'begin', 'final']);
 
 export class GameLog {
   readonly file: string;

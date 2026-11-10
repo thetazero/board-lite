@@ -85,6 +85,11 @@ export interface LogEntry {
 // target's units); `by` says which of them struck, `down` that the one hit fell.
 export interface Hit { d: string; u: number; by: 'dragon' | 'unit'; dmg: number; down: boolean; beats?: true } // beats: the attacker's element beats the target's (double damage)
 
+// A dragon at production's dragon step (#442): how it was before it healed
+// or grew and how it is after, so the TV can show the change.
+export interface DragonNow { stage: number; growth: number; hp: number; maxHp: number; power: number }
+export interface Tended { d: string; p: number; from: DragonNow; to: DragonNow; hungry?: true }
+
 // The log's events as data. The text is for the CLI and Claude players; the
 // TV and phones draw these instead.
 export type GameEvent =
@@ -92,6 +97,7 @@ export type GameEvent =
   | { k: 'produce'; p: number; got: Bundle; eat?: number } // eat: livestock their dragons eat right after (absent in old saves)
   | { k: 'rest'; d: string; why: 'hungry' | 'hurt' }
   | { k: 'grow'; d: string; stage: number }
+  | { k: 'tend'; ds: Tended[] } // production's dragon step, once a round: each dragon that healed, grew or went hungry (#442)
   | { k: 'draw'; p: number; n: number }
   | { k: 'pick' } // everyone keeps one of the building cards they drew
   | { k: 'keep'; p: number }
@@ -614,18 +620,30 @@ function startRound(g: Game) {
   roam(g);
   // A fed dragon heals some if it's hurt, and grows if it isn't; a hungry one
   // does neither.
+  const tended: Tended[] = [];
+  const now = (d: Dragon): DragonNow => {
+    const st = stageStats(d);
+    return { stage: d.stage, growth: d.growth, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0, power: dragonPower(d) };
+  };
   for (const d of g.dragons) {
+    const from = now(d);
+    tend(d);
+    const to = now(d);
+    if (d.hungry || JSON.stringify(from) !== JSON.stringify(to)) tended.push({ d: d.id, p: d.owner, from, to, ...(d.hungry ? { hungry: true as const } : {}) });
+  }
+  if (tended.length) log(g, tended.some((x) => !x.hungry) ? 'Dragons heal and grow.' : 'No dragon heals or grows.', { k: 'tend', ds: tended });
+  function tend(d: Dragon) {
     const hurt = d.damage > 0;
     const fed = fedIds.has(d.id);
     if (fed) delete d.hungry;
     else d.hungry = true;
     if (!fed || hurt) log(g, `${pname(d.owner)}'s ${dragonName(d)} (${d.id}) ${fed ? 'heals instead of growing' : 'goes hungry: it doesn\'t heal or grow'}.`, { k: 'rest', d: d.id, why: fed ? 'hurt' : 'hungry' });
-    if (!fed) continue;
+    if (!fed) return;
     if (hurt) {
       d.damage = Math.max(0, d.damage - TUNING.healPerRound);
-      continue;
+      return;
     }
-    if (d.stage === 3) continue;
+    if (d.stage === 3) return;
     d.growth += growthPerRound(g, d.owner);
     const need = DRAGONS[d.key].growthTime;
     while (d.stage < 3 && d.growth >= need) {

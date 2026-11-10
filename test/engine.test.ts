@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
-import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingYield, dragonCapacity, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
+import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingYield, dragonCapacity, newGame, production, score, standings, turnOrder, waitingOn, type Game, type GameEvent } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
 import { seatView } from '../src/view.ts';
@@ -480,6 +480,31 @@ test('everyone sees which dragons went hungry at production (#362)', () => {
   const seen = publicState(g, 1000).dragons.filter((d) => d.owner === p).map((d) => d.hungry);
   assert.deepEqual(seen, mine.map((_, i) => i >= tower), 'the first is fed, the rest went hungry');
   assert.match(playerView(g, 1 - p), /went hungry this round/);
+});
+
+test("production's dragon step logs each dragon as it was and is, for the TV (#442)", () => {
+  const g = newGame(2, 7);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  const a = g.dragons[0];
+  const p = a.owner;
+  // A hurt dragon first (it eats the tower's livestock), then a hungry one; the other seat's grow.
+  a.damage = 3;
+  g.dragons.push({ ...a, id: 'd99', damage: 0 });
+  g.players[p].resources.livestock = 0;
+  const from = g.log.length;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const tends = g.log.slice(from).filter((e) => e.ev?.k === 'tend');
+  assert.equal(tends.length, 1, 'once a round');
+  const ds = (tends[0].ev as Extract<GameEvent, { k: 'tend' }>).ds;
+  const healed = ds.find((x) => x.d === a.id)!;
+  assert.equal(healed.to.hp - healed.from.hp, Math.min(3, TUNING.healPerRound), 'the hurt one heals');
+  assert.ok(!healed.hungry);
+  const hungry = ds.find((x) => x.d === 'd99')!;
+  assert.ok(hungry.hungry, 'the unfed one is hungry');
+  assert.deepEqual(hungry.to, hungry.from, 'and nothing changes');
+  for (const x of ds.filter((y) => y.p !== p && !y.hungry && y.from.hp === y.from.maxHp && y.from.stage < 3)) assert.ok(x.to.stage > x.from.stage || x.to.growth > x.from.growth, 'the rest grow');
 });
 
 test('production says what the dragons eat apart from what is made, and so does the income', () => {
