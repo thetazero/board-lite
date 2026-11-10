@@ -14,7 +14,7 @@ import { startServer } from '../src/server/server.ts';
 import type { Rulebook, Snapshot } from '../src/state.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, TARGETS, TUNING, UPGRADES } from '../src/data.ts';
 import { POINTS_TO_WIN } from '../web/common.ts';
-import { scenesOf } from '../web/scenes.ts';
+import { scenesMs, scenesOf } from '../web/scenes.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-test-')); // a few small game files
@@ -98,6 +98,24 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   assert.equal(room.snapshot(seats[p].token).scene, 0);
   tvGone();
   room.close();
+});
+
+test("with no TV, the opening round's production is held for a phone's table view (#449)", () => {
+  const room = new Room('OPEN', { dir, remote: true });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  const phoneGone = room.connect(seats[0].token); // the phone; its table view opens only once the game starts
+  room.start(seats[0].token, 7);
+  const left = room.snapshot(seats[0].token).scene;
+  const opening = scenesMs(scenesOf(room.game!.log.filter((e) => !e.to)));
+  assert.ok(left > 0 && Math.abs(left - opening) < 1000, `the server holds the table for the opening scenes: ${left} of ${opening} ms`);
+  phoneGone();
+  room.close();
+  // With nobody's phone there (a CLI or Claude table), nothing waits.
+  const cli = new Room('NOPH', { dir, remote: true });
+  const s2 = ['Ada', 'Bram'].map((n) => cli.join(n));
+  cli.start(s2[0].token, 7);
+  assert.equal(cli.snapshot(s2[0].token).scene, 0);
+  cli.close();
 });
 
 // No clock here: the test follows the room move by move, so a slow machine only

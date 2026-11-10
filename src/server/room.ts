@@ -267,7 +267,7 @@ export class Room {
   }
 
   private holdForScenes(events: Game['log']) {
-    const ms = this.screens > 0 ? scenesMs(scenesOf(events)) : 0;
+    const ms = this.watched ? scenesMs(scenesOf(events)) : 0;
     if (!ms) return;
     this.sceneUntil = Math.max(Date.now(), this.sceneUntil) + ms;
     this.wakeAfterScene();
@@ -285,6 +285,13 @@ export class Room {
       if (this.sceneLeft()) this.wakeAfterScene();
       else this.changed();
     }, this.sceneLeft() + 1);
+  }
+
+  // Someone sees the scenes: a TV or a phone's table view is open, or, with
+  // no TV, a phone is, whose table view opens with the game (the first scene,
+  // the opening round, comes before it can) (#449).
+  private get watched(): boolean {
+    return this.screens > 0 || (!this.hasTv && this.seats.some((s) => s.via === 'phone' && s.connected > 0));
   }
 
   // How much longer the TV's scene runs (ms); 0 when there's none.
@@ -472,6 +479,11 @@ export class Room {
     this.gameLog.write('start', this.senderOf(tok), { code: this.code, seed, seats: this.seats.map((s, i) => ({ name: s.name, kind: s.kind === 'bot' ? 'bot' : this.sender(i).kind })) });
     this.gameLog.events(this.cached.log, 0, GAME);
     withLock(this.file, () => save(this.file, this.cached!));
+    // With no TV, each phone's table view plays the opening round's production
+    // (web/tv.ts), and it's held for like any other round's, so the table
+    // view is never behind the server (#449). With a TV, the TV shows it while
+    // the first turn goes on.
+    if (!this.hasTv) this.holdForScenes(this.cached.log.filter((e) => !e.to));
     this.changed();
   }
 
