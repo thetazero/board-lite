@@ -18,6 +18,7 @@ import { qrSvg } from './qr.ts';
 import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
+import type { Side } from '../src/engine.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
@@ -753,7 +754,7 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
     : `<h1>${esc(end.name)} <span class="no">holds</span></h1>`;
   const head = `${ev.ps.map((p) => playerTag(p, names)).join(' ')} ${icon('raid', 1.2)} ${esc(ev.name)}`;
   const units = ev.units.map((u) => ({ ...u, max: u.hp }));
-  const first = ev.first === 'defenders' ? 'Defenders' : 'Dragons';
+  const first = flip(ev.first, 'The defenders', true, 'shield');
   return battle(g, ev.t, head, dragons, startHp(ev.ds, ev.hps), back, units, rounds, outcome, scored?.p ?? null, { round: e.round, phase: 'Raid' }, sc.ms, first);
 }
 
@@ -781,7 +782,9 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'desert';
-  const first = ev.first !== 'defenders' ? 'Dragons' : units.length > 1 ? 'Defenders' : units[0].name;
+  // One beast or perched dragon is named: "The Wolf Pack strikes first".
+  const one = ev.fauna ? `The ${units[0].name}` : units[0].name;
+  const first = units.length > 1 ? flip(ev.first, 'The defenders', true, 'shield') : flip(ev.first, one, false, ev.fauna ?? 'shield');
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);
 }
 
@@ -806,8 +809,30 @@ const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
 const STEEL = '#c9ced6';
 
 type Foe = { name: string; hp: number; max: number; d?: DragonView; el?: string };
-// `first`: who won the fight's coin flip and strikes first each round (#380).
-function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, held: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number, first: string): Banner {
+// Who won the fight's coin flip and strikes first each round (#380): the
+// dragons or the defenders, the header's word for them, the line the coin
+// lands on, and the defenders' face of the coin (#439). `them` names the
+// defenders, `many` if more than one; `foe` is the icon on their face (a
+// beast's own, if it has one).
+type Flip = { dragons: boolean; word: string; line: string; foe: string };
+function flip(first: Side | undefined, them: string, many: boolean, foe: string): Flip {
+  const dragons = first !== 'defenders'; // absent in old saves: the dragons
+  return {
+    dragons,
+    word: dragons ? 'Dragons' : many ? 'Defenders' : them.replace(/^The /, ''),
+    line: dragons ? 'The dragons strike first' : `${them} ${many ? 'strike' : 'strikes'} first`,
+    foe: icon(foe, 1) || icon('shield', 1),
+  };
+}
+// The coin flip before the hits (#439): the coin is tossed in the middle of
+// the stage, spins, and lands on the dragons' face (a dragon) or the
+// defenders' (a shield, or the beast), with who strikes first under it; then
+// it shrinks away toward the header, whose "Strikes first" keeps it.
+// Its timing is in style.css (.coinflip); the hits wait for it (FIGHT_LEAD_MS).
+function coinFlip(first: Flip): string {
+  return `<div class="coinflip${first.dragons ? '' : ' them'}"><div class="coin"><span class="cface heads">${icon('dragon', 1)}</span><span class="cface tails">${first.foe}</span></div><b>${esc(first.line)}</b></div>`;
+}
+function battle(g: PublicState, place: string, head: string, dragons: DragonView[], start: Map<string, number>, held: string, units: Foe[], rounds: Combat[], outcome: string, scorer: number | null, top: Banner['top'], ms: number, first: Flip): Banner {
   const hp0 = (d: DragonView) => Math.min(start.get(d.id) ?? d.maxHp, d.maxHp);
   // A figure: its health over its head, the figure standing on its shadow
   // (in its owner's colour, for a dragon), and its name at its feet.
@@ -870,13 +895,16 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
-      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first)}</b></div></header>
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first.word)}</b></div></header>
+      ${coinFlip(first)}
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
       ${held ? `<div class="backrow">${held}</div>` : ''}</div>`;
   const hits = rounds.flatMap((r) => r.hits.map((h) => ({ ...h, round: r.round })));
   const step = hitStep(hits.length);
   const play = (el: HTMLElement) => {
+    el.querySelector('.coinflip')?.classList.add('go');
+    setTimeout(() => el.querySelector('.coinflip')?.remove(), FIGHT_LEAD_MS);
     const hp = new Map<string, [number, number]>();
     dragons.forEach((d) => hp.set(`d${d.id}`, [hp0(d), d.maxHp]));
     units.forEach((u, i) => hp.set(`u${i}`, [u.hp, u.max]));
