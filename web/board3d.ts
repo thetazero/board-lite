@@ -2147,8 +2147,11 @@ export class Board3D {
   }
 
   // Each player's territory border, redrawn when whose buildings are where changes.
+  // A suppressed building counts as if it weren't there, so its hex is left out
+  // until it works again (#437): the border shows the land you build out from.
   private drawTerritory(map: HexView[]) {
-    const sig = map.filter((h) => h.building).map((h) => `${h.k}:${h.building!.owner}`).join();
+    const held = map.filter((h) => h.building && !h.suppressed);
+    const sig = held.map((h) => `${h.k}:${h.building!.owner}`).join();
     if (sig === this.territorySig) return;
     this.territorySig = sig;
     for (const c of [...this.territory.children]) {
@@ -2156,7 +2159,7 @@ export class Board3D {
       dispose(c);
     }
     const byOwner = new Map<number, HexView[]>();
-    for (const h of map) if (h.building) byOwner.set(h.building.owner, [...(byOwner.get(h.building.owner) ?? []), h]);
+    for (const h of held) byOwner.set(h.building!.owner, [...(byOwner.get(h.building!.owner) ?? []), h]);
     for (const [owner, hexes] of byOwner) {
       const geo = territoryGeometry(hexes);
       if (!geo) continue;

@@ -386,6 +386,26 @@ q::after { content: close-quote; }
 .production .psum { align-self: center; }
 .production .psum li { display: flex; align-items: center; gap: .6em; margin: .3em 0; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production .psum li > .ptag { min-width: 4.5em; }
+/* Production's dragon step (#442): every player's changing dragons at once,
+   each as its panel row; the changes play in place. */
+.tending .tend { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, auto)); justify-content: center; align-items: start; gap: .5em .8em; font-size: var(--tsize); }
+.tending .tplayer { padding: .2em .6em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
+.tending .who { font-size: 1em; margin-bottom: .1em; }
+.tending .trow { display: flex; align-items: center; gap: .35em; margin: .2em 0; line-height: 1.15; }
+.tending .tbadge svg { width: 1.9em; height: 1.9em; display: block; }
+.tending .trow > div { display: flex; flex-direction: column; min-width: 0; }
+.tending .tname { display: flex; align-items: baseline; gap: .4em; white-space: nowrap; }
+.tending .tline { display: flex; align-items: center; gap: .35em; color: var(--muted); white-space: nowrap; }
+.tending .tstate:empty { display: none; }
+.tending .hpbar { width: 3.5em; height: .5em; }
+.tending .grow i { font-style: normal; }
+.tending .grow i.new { color: var(--good); animation: tend-pop .5s ease-out both; }
+.tending .trow.staged .tbadge, .tending .trow.staged .tstage, .tending .trow.staged .power { animation: tend-pop .6s ease-out both; }
+.tending .trow.staged .tstage { color: var(--good); font-weight: 800; }
+.tending .trow .st-hungry { font-size: .85em; opacity: 0; scale: 1.8; transition: opacity .25s ease-out, scale .3s cubic-bezier(.3, 1.6, .6, 1); display: inline-block; }
+.tending .trow.stamped .st-hungry { opacity: 1; scale: 1; }
+.tending .trow.hungry.stamped .tlook, .tending .trow.hungry.stamped .tbadge { opacity: .55; transition: opacity .4s; }
+@keyframes tend-pop { 0% { scale: 1; } 40% { scale: 1.35; } 100% { scale: 1; } }
 .endbox { padding: 0 0 1.2em; overflow: hidden; min-width: 44em; }
 .endbox svg.scene { display: block; width: 100%; height: 13em; }
 .endbox h1 { margin: .4em 0 .1em; font-size: 2.8em; }

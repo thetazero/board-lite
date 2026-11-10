@@ -940,6 +940,27 @@ export const SCENES: Scene[] = [
     shots: () => [{ file: 'tv-production-4p', caption: "TV: a new round's production, one player at a time: the second player's resources, dice landed, and their total", client: 'tv', live: true, waitFor: '#overlay .production .pturn.on:nth-child(2) .ptotal.up', hold: true, waitMs: 500 }],
   },
   {
+    // Production's dragon step (#442): right after the resources, everyone's
+    // dragons heal, grow, move up a stage, or go hungry, on one sheet.
+    name: 'production-dragons-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+      tendable(g);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: (g) => {
+      const t = g.log.findLast((e) => e.ev?.k === 'tend')?.ev;
+      return t?.k === 'tend' && t.ds.some((x) => x.hungry) && t.ds.some((x) => x.to.stage > x.from.stage) && t.ds.some((x) => x.to.hp > x.from.hp && x.to.stage === x.from.stage);
+    },
+    shots: () => [
+      { file: 'tv-production-dragons-4p', caption: "TV: production's dragon step: health fills, growth fills in, a dragon moves up a stage, and a hungry one is marked", client: 'tv', live: true, waitFor: '#overlay .tending .trow.staged', hold: true, waitMs: 700 },
+    ],
+  },
+  {
     name: 'production-done-6p',
     players: 6,
     seed: 1,
@@ -1929,6 +1950,21 @@ function wonRaid(g: Game) {
   // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
   g.dragons.find((d) => d.id === g.raid!.sent[a][0])!.damage = 8;
   apply(g, b, 'fight');
+}
+
+// Dragons for production's dragon step (#442), set up just before it: each
+// seat has a hurt dragon, one a step from moving up a stage and an egg a step
+// from hatching; the last seat has more dragons than its livestock can feed.
+function tendable(g: Game) {
+  const n = g.players.length;
+  for (const p of g.players.keys()) {
+    arm(g, p, p === n - 1 ? [1, 2, 2, 3, 3] : [3, 1, 0]);
+    const [a, b, c] = g.dragons.filter((d) => d.owner === p);
+    a.damage = Math.min(9, DRAGONS[a.key].stages[a.stage - 1].hp - 1);
+    b.growth = DRAGONS[b.key].growthTime - 1;
+    if (c.stage === 0) c.growth = DRAGONS[c.key].growthTime - 1;
+  }
+  g.players[n - 1].resources.livestock = 0;
 }
 
 // The acting player gets three ready adult ice dragons (the Thunderbird's weakness).
