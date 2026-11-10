@@ -1863,6 +1863,27 @@ export const SCENES: Scene[] = [
     shots: (g) => [{ file: 'phone-remote-production-4p', caption: "No TV: the round's production rolls cut in on the phone", client: 'phone', seat: 0, live: true, waitFor: '.table-on', waitMs: 1800 }],
   },
   {
+    // Production's dragon step (#442) on a phone's table view (#447).
+    name: 'remote-production-dragons-4p',
+    players: 4,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+      tendable(g);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: (g) => {
+      const t = g.log.findLast((e) => e.ev?.k === 'tend')?.ev;
+      return t?.k === 'tend' && t.ds.some((x) => x.hungry) && t.ds.some((x) => x.to.stage > x.from.stage) && t.ds.some((x) => x.to.hp > x.from.hp && x.to.stage === x.from.stage);
+    },
+    shots: () => [
+      { file: 'tv-remote-production-dragons-4p', caption: "No TV: production's dragon step on a phone's table view", client: 'tv', table: true, live: true, waitFor: '#overlay .tending .trow.staged', hold: true, waitMs: 700 },
+    ],
+  },
+  {
     name: 'remote-production-done-6p',
     players: 6,
     seed: 1,
