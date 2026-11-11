@@ -8,8 +8,23 @@
 // as it was before #469. To add an option: name it in OPTIONS, then read it
 // where it applies (run.ts for the prompt, seat-server.ts for the view).
 
+import { readFileSync } from 'node:fs';
+
+/** The fixed advice +fable51 gives a seat, exactly as the user wrote it (#479). */
+export const FABLE_5_1_ADVICE = readFileSync(new URL('./advice/fable-5-1.txt', import.meta.url), 'utf8').trimEnd();
+
+/** The advice appended to a seat's prompt: --advice for +advice, the fixed text for +fable51, each in its own block. */
+export function seatAdvice(options: readonly PlayerOption[], advice: string | undefined): string {
+  const parts = [
+    ...(advice && options.includes('advice') ? [`Advice: ${advice}`] : []),
+    ...(options.includes('fable51') ? [`Advice:\n\n${FABLE_5_1_ADVICE}`] : []),
+  ];
+  return parts.map((x) => `\n\n${x}`).join('');
+}
+
 export const OPTIONS = {
   advice: 'the --advice text is appended to its prompt',
+  fable51: 'the "advice from Fable 5.1" (src/playtest/advice/fable-5-1.txt) is appended to its prompt, word for word',
   expected: "its view shows each player's expected production each round and what they made at the latest roll (#469)",
 } as const;
 

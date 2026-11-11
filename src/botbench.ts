@@ -30,7 +30,7 @@ function tuneFor(seat: string) {
   }
 }
 
-export interface BenchGame { seats: BenchSeat[]; winner: number | null; points: number[]; rounds: number; ms: number; moves: number }
+export interface BenchGame { seats: BenchSeat[]; winner: number | null; points: number[]; rounds: number; ms: number; moves: number; talk: number }
 
 // Plays one game to its end (or `maxRounds`): returns who won and the strong bot's time.
 export function benchGame(seats: BenchSeat[], seed: number, maxRounds = 60): BenchGame {
@@ -63,7 +63,7 @@ export function benchGame(seats: BenchSeat[], seed: number, maxRounds = 60): Ben
     clock.t += 1000; // a second a move, so a strong bot's offer is withdrawn if no one answers
     if (!moved) clock.t += 60_000;
   }
-  return { seats, winner: g.winner, points: g.players.map((_, p) => score(g, p).total), rounds: g.round, ms, moves };
+  return { seats, winner: g.winner, points: g.players.map((_, p) => score(g, p).total), rounds: g.round, ms, moves, talk: g.log.filter((e) => e.ev?.k === 'talk').length };
 }
 
 function main() {

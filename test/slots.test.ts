@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { RESERVE_MB, SEAT_MB, holders, release, tryAcquire, type Pool } from '../src/playtest/slots.ts';
+import { RESERVE_MB, SEAT_MB, holders, release, seatsThatFit, tryAcquire, type Pool } from '../src/playtest/slots.ts';
 
 function pool(maxSeats: number, freeMb = 100000): Pool {
   const base = join(homedir(), '.cache', 'board-lite');
@@ -52,6 +52,34 @@ test('a game waits while free memory is short, and too-big games are refused', (
     assert.equal(tryAcquire(p, 2, 'mine').ok, true);
     release(p);
     assert.throws(() => tryAcquire(p, 7, 'mine'), /at most 6/);
+  } finally {
+    rmSync(p.dir, { recursive: true, force: true });
+  }
+});
+
+test('with no cap, as many seats start as free memory allows, keeping the reserve', () => {
+  const p = pool(Infinity, RESERVE_MB + 10 * SEAT_MB);
+  try {
+    holder(p, process.ppid, 4); // started long ago: its memory already shows in MemAvailable
+    assert.equal(seatsThatFit(p), 10);
+    assert.equal(tryAcquire(p, 10, 'mine').ok, true);
+    release(p);
+    const r = tryAcquire(p, 11, 'mine');
+    assert.equal(r.ok, false);
+    assert.match(!r.ok ? r.why : '', /MB free/);
+  } finally {
+    rmSync(p.dir, { recursive: true, force: true });
+  }
+});
+
+test('a game that just took its slots counts against free memory while its seats start', () => {
+  const p = pool(Infinity, RESERVE_MB + 10 * SEAT_MB);
+  try {
+    writeFileSync(join(p.dir, `${process.ppid}.json`), JSON.stringify({ pid: process.ppid, seats: 4, out: 'new', since: new Date().toISOString() }));
+    assert.equal(seatsThatFit(p), 6);
+    assert.equal(tryAcquire(p, 7, 'mine').ok, false);
+    assert.equal(tryAcquire(p, 6, 'mine').ok, true);
+    release(p);
   } finally {
     rmSync(p.dir, { recursive: true, force: true });
   }

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Seats Claude players at a board-lite table. Each Claude seat is its own
-// `claude -p` process whose only tools are the seat server's (view, act, say,
-// wait, rules) for that one seat. No built-in tools (no shell, files, web), no
-// other MCP servers, no user or project settings.
+// Seats Claude players (and Codex players) at a board-lite table. Each Claude
+// seat is its own `claude -p` process, each Codex seat its own `codex exec`,
+// whose only tools are the seat server's (view, act, say, wait, rules) for that
+// one seat. No built-in tools (no shell, files, web), no other MCP servers, no
+// user or project settings.
 //
 // Claude players are clients like any other: they join a room on a board-lite
 // server and play through the same interface as the phones and the CLI. Either
@@ -30,19 +31,21 @@ import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
 import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
-import { OPTIONS, isBot, parseSeats, type PlayerOption, type PlayerSpec } from './players.ts';
+import { OPTIONS, isBot, parseSeats, seatAdvice, type PlayerOption, type PlayerSpec } from './players.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
 
-  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, "bot" (random) or "strongbot"; a Claude
-                                    seat can add options, like opus+advice+expected (see below)
+  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, "codex:<model>" for a
+                                    Codex seat (e.g. codex:gpt-5.6-sol; plain "codex" is Codex's default model),
+                                    "bot" (random) or "strongbot"; a Claude or Codex seat can add options, like opus+advice+expected
+                                    (see below)
   --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
                                     e.g. http://localhost:8080/ABCD; without it, this runner hosts the game
   --seed N                          game seed when hosting (default random)
   --out DIR                         where everything goes (default ~/.cache/board-lite/playtests/<time>-<models>)
   --serve PORT                      when hosting, also open the TV and phone pages to the network on PORT
-  --effort low|medium|high|...      effort level for every Claude seat (default: the model's own)
+  --effort low|medium|high|...      effort level for every Claude and Codex seat (default: the model's own)
   --budget-usd N                    spending cap per Claude seat, over the whole game (default 30 with --room,
                                     5 for a playtest this runner hosts); --resume keeps the one it had
   --max-minutes N                   stop after this long (default 240)
@@ -56,8 +59,8 @@ node src/playtest/run.ts --resume DIR [options]
 Claude player options, each switched on per seat with +name (none: the plain Claude player):
 ${Object.entries(OPTIONS).map(([k, v]) => `  +${k.padEnd(10)} ${v}`).join('\n')}
 
-Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
-wait their turn when the pool is full or memory is short. See docs/playtest.md.`;
+Claude seats take slots from a machine-wide pool and wait their turn while starting them
+would leave under 3 GB free (BOARD_LITE_MAX_SEATS=N also caps the pool). See docs/playtest.md.`;
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -97,6 +100,9 @@ const seatServer = fileURLToPath(new URL('./seat-server.ts', import.meta.url));
 const tmp = join(out, 'tmp');
 mkdirSync(tmp, { recursive: true });
 const TOOL_NAMES = ['view', 'act', 'say', 'wait', 'rules'].map((t) => `mcp__game__${t}`);
+
+// A Codex seat: "codex" (Codex's own default model) or "codex:<model>".
+const isCodex = (model: string) => model === 'codex' || model.startsWith('codex:');
 
 // ---- the room ----
 
@@ -157,7 +163,9 @@ function seatName(taken: string[]): string {
 
 // ---- Claude seats ----
 
-interface Seat { p: number; model: string; options: PlayerOption[]; label: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; exitedAt: number }
+// session: the Claude session id, or for a Codex seat its thread id (Codex picks it, so it's empty until the first start reports it).
+// modelId: the model a Claude seat's process reports it runs (an alias like "opus" resolved). tokens: what a Codex seat used (Codex reports no cost).
+interface Seat { p: number; model: string; options: PlayerOption[]; label: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; tokens: number; modelId?: string; exitedAt: number }
 const seats: Seat[] = [];
 let table: Lobby['seats'] = []; // everyone at the table, once the game starts
 
@@ -165,7 +173,7 @@ let table: Lobby['seats'] = []; // everyone at the table, once the game starts
 function saveState() {
   const state: RunnerState = {
     pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}), budget,
-    seats: seats.map(({ p, model, options, token, session, starts, cost }) => ({ p, model, options, token, session, starts, cost })),
+    seats: seats.map(({ p, model, options, token, session, starts, cost, tokens }) => ({ p, model, options, token, session, starts, cost, ...(tokens ? { tokens } : {}) })),
   };
   writeFileSync(stateFile(out), `${JSON.stringify(state, null, 2)}\n`);
 }
@@ -191,16 +199,20 @@ How to play:
 - Every act takes a "why": a sentence or two on why you chose it. It is private, never shown to anyone at the table, and kept for the people studying the game afterwards, so be honest and specific.
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and a player in a raid can secretly hold back from the fight. Keep messages short, like real table talk, and reply when someone talks to you.
-- Don't stop until the game is over. If you're unsure what to do, call wait.${advice && s.options.includes('advice') ? `\n\nAdvice: ${advice}` : ''}`;
+- Don't stop until the game is over. If you're unsure what to do, call wait.${seatAdvice(s.options, advice)}`;
 }
 
 function startSeat(s: Seat) {
   const dir = join(out, `seat-${s.p + 1}`);
   mkdirSync(dir, { recursive: true });
   const mcp = join(dir, 'mcp.json');
-  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token, join(out, `seat-${s.p + 1}.moves.txt`), ...(s.options.includes('expected') ? ['--expected'] : [])] } } }));
-  const first = s.starts === 0;
-  if (first && !s.session) s.session = randomUUID();
+  const movesFile = join(out, `seat-${s.p + 1}.moves.txt`);
+  const serverArgs = [seatServer, roomUrl, s.token, movesFile, ...(s.options.includes('expected') ? ['--expected'] : [])];
+  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: serverArgs } } }));
+  const codex = isCodex(s.model);
+  // A Codex seat that never reported its thread starts afresh: there is nothing to resume.
+  const first = s.starts === 0 || (codex && !s.session);
+  if (first && !s.session && !codex) s.session = randomUUID();
   const prompt = first
     ? resumed
       ? 'The game is under way: you are taking your seat partway through. Read the rules, call view to see where things stand, then play until the game is over.'
@@ -208,7 +220,7 @@ function startSeat(s: Seat) {
     : resumed && s.startsHere === 0
       ? 'You were away from the table for a while (your connection to the game dropped, or the table took a break), and now you are back in your seat. The game is not over yet and may have moved on: call view to see where things stand, then keep playing: call wait, and act when it is your decision.'
       : 'The game is not over yet. Keep playing: call wait, and act when it is your decision.';
-  const argv = [
+  const [cmd, argv] = codex ? ['codex', codexArgv(s, first, first ? `${systemPrompt(s)}\n\n${prompt}` : prompt, serverArgs)] : ['claude', [
     '-p', prompt,
     '--model', s.model,
     ...(first ? ['--session-id', s.session, '--append-system-prompt', systemPrompt(s)] : ['--resume', s.session]),
@@ -222,13 +234,13 @@ function startSeat(s: Seat) {
     '--max-budget-usd', String(Math.max(0.01, budget - s.cost)),
     '--output-format', 'stream-json', '--verbose',
     ...(effort ? ['--effort', effort] : []),
-  ];
+  ]];
   s.starts++;
   s.startsHere++;
   saveState();
   const transcript = createWriteStream(join(out, `seat-${s.p + 1}.jsonl`), { flags: 'a' });
   const errLog = createWriteStream(join(out, `seat-${s.p + 1}.stderr.log`), { flags: 'a' });
-  const proc = spawn('claude', argv, {
+  const proc = spawn(cmd, argv, {
     cwd: dir,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, TMPDIR: tmp, BOARD_LITE_WAIT_SECS: '120', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
@@ -244,18 +256,62 @@ function startSeat(s: Seat) {
       try {
         const msg = JSON.parse(line);
         if (msg.type === 'result' && typeof msg.total_cost_usd === 'number') s.cost += msg.total_cost_usd;
+        if (msg.type === 'system' && msg.subtype === 'init' && typeof msg.model === 'string') s.modelId = msg.model;
+        // Codex (codex exec --json): its thread, to resume, and the tokens each turn used.
+        if (msg.type === 'thread.started' && typeof msg.thread_id === 'string') { s.session = msg.thread_id; saveState(); }
+        if (msg.type === 'turn.completed' && msg.usage) s.tokens += (msg.usage.input_tokens ?? 0) + (msg.usage.output_tokens ?? 0);
       } catch { /* partial or non-JSON line */ }
     }
   });
   proc.stderr!.pipe(errLog);
   proc.on('exit', (code) => {
-    note(`${pname(s.p)} (${s.label}) process exited with code ${code}; spent $${s.cost.toFixed(2)} so far.`);
+    note(`${pname(s.p)} (${s.label}) process exited with code ${code}; ${isCodex(s.model) ? `used ${s.tokens} tokens` : `spent $${s.cost.toFixed(2)}`} so far.`);
     s.proc = null;
     s.exitedAt = Date.now();
     saveState();
   });
   s.proc = proc;
   note(`${pname(s.p)} (${s.label}) ${first ? 'starts' : 'resumes'}.`);
+}
+
+// A Codex seat's `codex exec` command line, sandboxed like a Claude seat: the
+// game's MCP server is its only way to act. Codex's shell, web, image, browser,
+// plugin and sub-agent tools are switched off; none of the owner's Codex config,
+// rules, hooks or project docs load (--ignore-user-config; auth still comes from
+// ~/.codex). Codex 0.154 keeps two things on: apply_patch, which the read-only
+// sandbox rejects, and "code mode", a JavaScript runner it calls tools through,
+// which has no require, fetch or files. Checked by hand on 0.154: see "Codex
+// seats" in docs/eval.md. Codex takes no separate system prompt here, so the
+// first prompt carries it.
+const CODEX_OFF = [
+  'shell_tool', 'unified_exec', 'apps', 'browser_use', 'browser_use_external', 'computer_use', 'in_app_browser', 'image_generation',
+  'view_image', 'multi_agent', 'plugins', 'remote_plugin', 'hooks', 'goals', 'skill_search', 'skill_mcp_dependency_install', 'tool_suggest',
+];
+function codexArgv(s: Seat, first: boolean, prompt: string, serverArgs: string[]): string[] {
+  const str = (v: string) => JSON.stringify(v); // a TOML basic string
+  const config = [
+    `mcp_servers.game.command=${str(process.execPath)}`,
+    `mcp_servers.game.args=[${serverArgs.map(str).join(', ')}]`,
+    'mcp_servers.game.env={ BOARD_LITE_WAIT_SECS = "120" }',
+    'mcp_servers.game.tool_timeout_sec=300', // wait blocks up to 120 s; Codex's default timeout is 60
+    'mcp_servers.game.default_tools_approval_mode="approve"',
+    'approval_policy="never"',
+    'sandbox_mode="read-only"',
+    'web_search="disabled"',
+    'agents.max_depth=0', // no sub-agents (--disable multi_agent leaves them on)
+    'project_doc_max_bytes=0',
+    'history.persistence="none"',
+    ...(effort ? [`model_reasoning_effort=${str(effort)}`] : []),
+  ];
+  const model = s.model.slice('codex:'.length);
+  return [
+    'exec', ...(first ? [] : ['resume', s.session]),
+    '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules',
+    ...(model ? ['--model', model] : []),
+    ...CODEX_OFF.flatMap((f) => ['--disable', f]),
+    ...config.flatMap((c) => ['-c', c]),
+    prompt,
+  ];
 }
 
 function note(text: string) {
@@ -279,10 +335,15 @@ const commit = (() => {
   try { return execFileSync('git', ['describe', '--always', '--dirty'], { cwd: fileURLToPath(new URL('.', import.meta.url)), encoding: 'utf8' }).trim(); } catch { return undefined; }
 })();
 
+// What a Claude or Codex seat ran on and spent, for results.json.
+function spent(s: Seat) {
+  return { ...(s.modelId && s.modelId !== s.model ? { modelId: s.modelId } : {}), costUsd: Math.round(s.cost * 100) / 100, ...(s.tokens ? { tokens: s.tokens } : {}), starts: s.starts };
+}
+
 function writeResults(g: Game | null, status: string, started: number) {
-  const base = { status, ...(commit ? { commit } : {}), ...(hosted ? { seed } : { room: roomUrl }), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
+  const base = { status, ...(commit ? { commit } : {}), ...(hosted ? { seed } : { room: roomUrl }), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
   if (!g) {
-    writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.label, options: s.options, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })) }, null, 2)}\n`);
+    writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.label, options: s.options, ...spent(s) })) }, null, 2)}\n`);
     return { ...base, rounds: 0, winner: null };
   }
   const log = g.log.map((e) => `[r${e.round}]${e.to ? ` (only ${e.to.map(pname).join(', ')})` : ''} ${e.text}`);
@@ -294,7 +355,7 @@ function writeResults(g: Game | null, status: string, started: number) {
     winner: g.winner === null ? null : { seat: pname(g.winner), model: seatLabel(g.winner) },
     seats: g.players.map((_, q) => {
       const s = seats.find((x) => x.p === q);
-      return { seat: pname(q), name: table[q]?.name, model: seatLabel(q), ...(s ? { options: s.options } : {}), points: score(g, q).total, ...(s ? { costUsd: Math.round(s.cost * 100) / 100, starts: s.starts } : {}) };
+      return { seat: pname(q), name: table[q]?.name, model: seatLabel(q), ...(s ? { options: s.options } : {}), points: score(g, q).total, ...(s ? spent(s) : {}) };
     }),
     talk: { public: g.log.filter((e) => / says: "/.test(e.text)).length, private: g.log.filter((e) => / \(private\): "/.test(e.text)).length },
   };
@@ -352,7 +413,7 @@ async function main() {
       if (isBot(model)) { await call('/bot', { token: hosted!.hostToken, ...(model === 'strongbot' ? { strong: true } : {}) }); continue; }
       const name = seatName((await lobby()).seats.map((t) => t.name));
       const r = await call('/join', { name, via: 'claude' });
-      seats.push({ p: r.seat - 1, model, options, label, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });
+      seats.push({ p: r.seat - 1, model, options, label, token: r.token, session: isCodex(model) ? '' : randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, tokens: 0, exitedAt: 0 });
       saveState();
       note(`${name} (${label}) takes seat ${r.seat}.`);
     }
@@ -432,7 +493,7 @@ async function reclaim(state: RunnerState) {
   for (const [i, saved] of state.seats.entries()) {
     const name = table[saved.p]?.name;
     if (!name) throw new Error(`Seat ${saved.p + 1} isn't in the game in ${roomUrl}; is this the right room?`);
-    const s: Seat = { ...saved, options: specs[i].options, label: specs[i].label, proc: null, startsHere: 0, exitedAt: 0 };
+    const s: Seat = { ...saved, tokens: saved.tokens ?? 0, options: specs[i].options, label: specs[i].label, proc: null, startsHere: 0, exitedAt: 0 };
     if (!(await call(`?token=${s.token}`)).seated) {
       const r = await call('/join', { name, via: 'claude' }).catch((e: Error) => { throw new Error(`Can't take seat ${saved.p + 1} (${name}) back: ${e.message}`); });
       s.token = r.token;
