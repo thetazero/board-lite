@@ -93,3 +93,11 @@ test('a seat with player options is its own player, under the model it reported 
   assert.equal(playerOf({ seat: 'P1', model: 'opus+expected', options: ['expected'] }), 'opus+expected');
   assert.equal(playerOf({ seat: 'P1', model: 'codex:gpt-5.6-sol' }), 'codex:gpt-5.6-sol');
 });
+
+test('a seat with +advice is named by its advice text, so two texts are two players', () => {
+  const seat = { seat: 'P1', model: 'opus+advice+expected', options: ['advice', 'expected'], modelId: 'claude-opus-5-5' };
+  const a = playerOf(seat, undefined, 'Build early.');
+  assert.match(a!, /^claude-opus-5-5\+advice:[0-9a-f]{4}\+expected$/);
+  assert.equal(playerOf(seat, undefined, 'Build early.'), a);
+  assert.notEqual(playerOf(seat, undefined, 'Hoard gold.'), a);
+});

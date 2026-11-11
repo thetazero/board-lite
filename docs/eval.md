@@ -1,6 +1,6 @@
 # Model eval and leaderboard
 
-How well does each AI model play board-lite? The eval plays games among a roster of Claude and Codex models, and the leaderboard gives every model a rating from the games it finished. The leaderboard also rates you, and anyone else, from games played on `npm run serve` against bots or AI players.
+How well does each AI model play board-lite? The eval plays games among a roster of Claude and Codex models (or a [contest](#run-a-contest): a bucket of players drawn into games of 2 to 6), and the leaderboard gives every model a rating from the games it finished. The leaderboard also rates you, and anyone else, from games played on `npm run serve` against bots or AI players.
 
 Nothing here runs by itself: the eval costs real money and hours, so you start it.
 
@@ -18,11 +18,30 @@ Then run it, in the background:
 npm run eval -- --models opus,sonnet,haiku,codex:gpt-5.6-sol
 ```
 
-- `--models` is the roster: Claude models (`opus`, `sonnet`, `haiku`, or a full name like `claude-haiku-5-5`), Codex models as `codex:<model>`, and `bot` (the random bot). List a model twice to give it two entries.
+- `--models` is the roster: Claude models (`opus`, `sonnet`, `haiku`, or a full name like `claude-haiku-5-5`), Codex models as `codex:<model>`, and `bot` (the random bot), each Claude or Codex model with any [player options](playtest.md#claude-player-options) (`opus+expected`). List a model twice to give it two entries.
 - Each game has `--seats` players (default 3). The eval plays every lineup of 3 from the roster, and each lineup in every seat order (seat order matters: see [`playtest.md`](playtest.md#depth-batches)). That's one **round**: with 4 models, 4 lineups × 3 seat orders = 12 games, each model in 9. `--games N` plays N games instead: every lineup comes up once before any comes up twice, so a short eval is still fair.
 - Games go in `~/.cache/board-lite/playtests/<time>-eval-<models>/g<i>`, each one a normal playtest directory ([`playtest.md`](playtest.md#results)). At the end it writes `leaderboard.md` there, for those games alone.
 - **Stopped, or want more?** Run the same command with `--out <that directory>` and a bigger `--games`. Finished games are kept; unfinished ones are played again; new ones are added. Two rounds of 4 models is `--games 24`.
 - Other options: `--parallel N` (games at once, default 1), `--budget-usd N` (cap per Claude seat a game, default 25), `--seed N`, `--effort`, `--max-minutes`, `--stall-minutes`. `node src/playtest/eval.ts --help` lists them.
+
+## Run a contest
+
+A contest ranks a bucket of players: models, [Claude player configurations](playtest.md#claude-player-options) and the bot. Each game draws 2 to 6 players from the bucket, so no one board size decides the ranking, and the leaderboard scores them all by their finishing places. Check the draw first (this plays nothing):
+
+```
+node src/playtest/eval.ts --models haiku,sonnet,opus,opus+advice+expected,opus+advice+expected+fable51,bot \
+  --advice "$(cat advice.txt)" --seats 2-6 --games 40 --seed 1 --dry-run
+```
+
+Then run it, in the background: the same with `npm run eval --` and without `--dry-run`. It needs `--games`.
+
+- `--seats 2-6` is the range of game sizes; `--seats 3-4` works too. It can't go above the bucket's size.
+- **The draw is random but balanced**, game by game: each size comes up once, in random order, before any comes up again; each game takes the players with the fewest games so far, and among those the group that has met least; each player gets the seat they've had less of than their share. `--dry-run` prints the games, then each player's games, seats against their fair share, and how often they met each other player. In the draw above, every player has 26 or 27 games, meets each other player 18 to 20 times, and sits in each seat within one game of its share.
+- `--advice` goes to the entries with `+advice`, and only to games that have one.
+- The draw is kept in `draw.json` in the contest's directory. Rerun with `--out <that directory>` and a bigger `--games` to add games to it: the games already drawn stay, and the new ones keep the balance. `--seed` seeds the draw (and the games, as in an eval).
+- At the end, `leaderboard.md` in that directory ranks the bucket, with how sure each rating is (the 95% range, [below](#the-leaderboard)), and the draw's balance under it. `npm run leaderboard -- <that directory>` shows it at any time, for the games finished so far.
+- **How many games:** from simulated contests of the bucket above, each rating's 95% range is about ±125 points after 40 games and ±90 after 80. That tells the bot, Haiku and Opus apart after 40, but two Opus configurations close to each other (under 100 points apart) need 100 games or more.
+- **Cost:** a game averages 4 players, so each Opus entry plays two games in three. At $2 to $11 an Opus seat a game, the bucket above is roughly $10 to $20 a game, $400 to $800 for 40. One game runs at a time by default (`--parallel 1`, for the reason below), so 40 games are 40 game-lengths or more (6-player games run longer).
 
 ### Cost and time
 
@@ -68,7 +87,9 @@ Options: `--since 2026-11-01` counts only games that ended on or after a date. U
 
 ### What counts
 
-Only games that ended (`over`). Left out, and counted at the bottom of the table: unfinished games, games played with `--advice` (an experiment on how players play), and games with fewer than two different players (all the same model, or bots only).
+Only games that ended (`over`). Left out, and counted at the bottom of the table: unfinished games, games played with `--advice` from before seats were named by their options (#476), and games with fewer than two different players (all the same model, or bots only).
+
+A seat with `+advice` is named by its advice too, as `claude-opus-5-5+advice:3f2a+expected`: the 4 characters are from the advice text (the start of its SHA-1), so two different texts are two different players.
 
 ### How the rating works
 
