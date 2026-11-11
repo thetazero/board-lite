@@ -960,6 +960,25 @@ export const SCENES: Scene[] = [
       { file: 'tv-production-dragons-4p', caption: "TV: production's dragon step: health fills, growth fills in, a dragon moves up a stage, and a hungry one is marked", client: 'tv', live: true, waitFor: '#overlay .tending .trow.staged', hold: true, waitMs: 700 },
     ],
   },
+  // Production's dragon step with one hatchling each, as in a game's early
+  // rounds (#466): every row shows its health bar, which has to stay inside
+  // its player's box at 3, 4 and 5 players.
+  ...([3, 4, 5] as const).map((n) => ({
+    name: `production-hatchlings-${n}p`,
+    players: n,
+    seed: 1,
+    until: (g: Game) => g.round === 2 && g.phase === 'action',
+    setup: (g: Game) => {
+      everyoneRolls(g);
+      toDiscard(g, [0]);
+      for (const p of g.players.keys()) arm(g, p, [1]);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: (g: Game) => g.log.some((e) => e.ev?.k === 'tend'),
+    shots: () => [
+      { file: `tv-production-hatchlings-${n}p`, caption: `TV: production's dragon step, one hatchling each (${n} players): every health bar inside its player's box`, client: 'tv' as const, live: true, waitFor: '#overlay .tending .trow.changed', hold: true, waitMs: 900 },
+    ],
+  })),
   {
     name: 'production-done-6p',
     players: 6,
