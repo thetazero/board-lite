@@ -59,6 +59,10 @@ export interface LiveState {
   replayed: number;
   /** Average minutes a finished game took. */
   minutesPerGame: number | null;
+  /** Games being played at once now: those with a live runner. */
+  atOnce: number;
+  /** About how long until every game in the plan is finished, at today's games at once; null without a plan or a finished game. */
+  minutesLeft: number | null;
   pointsToWin: number;
   playing: LiveGame[];
   recent: LiveGame[];
@@ -109,6 +113,21 @@ const started = (dir: string) => {
   const s = statSync(dir);
   return s.birthtimeMs || s.ctimeMs;
 };
+
+/**
+ * About how long the games left take, played `atOnce` at a time: what the
+ * games being played still need (the average game, less what each has had
+ * already) plus the average game for each not yet started, shared out among
+ * the games at once, and never less than the longest of the ones being played.
+ * The games at once are the ones playing now, not a setting kept on disk, so a
+ * contest restarted with another --parallel is timed by how it plays now.
+ */
+export function timeLeft(left: number, minutesPerGame: number, playingMinutes: number[]): number {
+  const now = playingMinutes.slice(0, left).map((m) => Math.max(0, minutesPerGame - m));
+  const lanes = Math.max(1, now.length);
+  const work = now.reduce((a, b) => a + b, 0) + Math.max(0, left - now.length) * minutesPerGame;
+  return Math.max(work / lanes, ...now);
+}
 
 /** Everything the page shows, read from the contest's directory now. */
 export function liveState(dir: string, now = Date.now()): LiveState {
@@ -169,13 +188,19 @@ export function liveState(dir: string, now = Date.now()): LiveState {
     return { player: r.player, rating: Math.round(r.rating), range: Math.round(r.range), games: r.games, wins: r.wins, place: Math.round(r.place * 100) / 100, ...(costPerGame ? { costPerGame } : {}) };
   });
   const minutes = done.map((g) => g.minutes).filter((m) => m > 0);
+  const minutesPerGame = minutes.length ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : null;
+  const total = draw ? draw.games.length : null;
+  const live = playing.filter((g) => g.status === 'playing');
+  const left = total === null ? null : Math.max(0, total - done.length);
   return {
     name: basename(dir),
     dir,
-    total: draw ? draw.games.length : null,
+    total,
     finished: done.length,
     replayed: names.filter((n) => /^g\d+\.failed\d+$/.test(n)).length,
-    minutesPerGame: minutes.length ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : null,
+    minutesPerGame,
+    atOnce: live.length,
+    minutesLeft: left && minutesPerGame ? Math.round(timeLeft(left, minutesPerGame, live.map((g) => g.minutes))) : null,
     pointsToWin: TUNING.pointsToWin,
     playing: playing.reverse(),
     recent: done.reverse().slice(0, 12),

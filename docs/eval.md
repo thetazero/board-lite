@@ -49,7 +49,7 @@ Then run it, in the background: the same with `npm run eval --` and without `--d
 npm run live -- ~/.cache/board-lite/playtests/<the contest's directory>
 ```
 
-serves a page for a contest (or an eval) while it runs: the ratings so far, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take; the game being played now, its round, phase and each seat's points, and a button to watch its board; and the last games' results. It updates by itself every 10 seconds, and it's laid out for a phone.
+serves a page for a contest (or an eval) while it runs: the ratings so far, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take at the number of games being played at once now (so a contest restarted with another `--parallel` is timed by how it plays now); the game being played now, its round, phase and each seat's points, and a button to watch its board; and the last games' results. It updates by itself every 10 seconds, and it's laid out for a phone.
 
 It prints a link for this machine and, when Tailscale is running, a link on the tailnet (`http://<machine>.<tailnet>.ts.net:8790/`) with a QR code of it in the terminal: open it on a phone on the same tailnet. It listens only on this machine and its Tailscale address, not the rest of the network (`--host ADDR` to pick one, `--port N` for another port).
 

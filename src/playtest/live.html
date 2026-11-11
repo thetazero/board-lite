@@ -82,13 +82,14 @@ const usd = (x) => (x ? `$${x.toFixed(2)}` : '');
 
 function progress(s) {
   const left = s.total === null ? null : Math.max(0, s.total - s.finished);
-  const eta = left && s.minutesPerGame ? duration(left * s.minutesPerGame) : null;
+  const eta = s.minutesLeft != null && left ? duration(s.minutesLeft) : null;
   return `<div class="card">
     ${s.total ? `<div class="progress"><div style="width:${pct((100 * s.finished) / s.total)}"></div></div>` : ''}
     <div class="stats">
       <span><b>${s.finished}</b>${s.total ? ` of ${s.total}` : ''} games finished</span>
       ${left !== null ? `<span><b>${left}</b> left</span>` : ''}
       ${s.minutesPerGame ? `<span><b>${duration(s.minutesPerGame)}</b> a game</span>` : ''}
+      ${s.atOnce > 1 ? `<span><b>${s.atOnce}</b> at a time</span>` : ''}
       ${eta ? `<span>about <b>${eta}</b> to go</span>` : ''}
     </div>
     ${s.replayed ? `<div class="note">${s.replayed} game${s.replayed > 1 ? 's' : ''} didn't finish and ${s.replayed > 1 ? 'were' : 'was'} played again.</div>` : ''}

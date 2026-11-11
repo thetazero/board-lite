@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import { newGame } from '../src/engine.ts';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { liveState, terminalQr, watchProxy } from '../src/playtest/live.ts';
+import { liveState, terminalQr, timeLeft, watchProxy } from '../src/playtest/live.ts';
 
 const base = join(homedir(), '.cache', 'board-lite'); // not /tmp, which is RAM on the dev machine
 
@@ -51,6 +51,8 @@ test('a running contest: games finished and left, the game being played, and rat
     assert.equal(s.finished, 2);
     assert.equal(s.replayed, 1);
     assert.equal(s.minutesPerGame, 35);
+    assert.equal(s.atOnce, 1);
+    assert.equal(s.minutesLeft, 35 * 3, 'game 3 just started, and 2 more after it, 1 at a time');
     assert.deepEqual(s.recent.map((g) => g.game), [2, 1], 'newest first');
     assert.equal(s.playing.length, 1);
     const now = s.playing[0];
@@ -80,6 +82,15 @@ test('a game whose runner is gone shows as stopped', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('time left shares the games left among the games played at once', () => {
+  assert.equal(timeLeft(10, 60, []), 600, 'none playing: 1 at a time');
+  assert.equal(timeLeft(10, 60, [0]), 600);
+  assert.equal(timeLeft(10, 60, [0, 0]), 300, '2 at a time: half as long');
+  assert.equal(timeLeft(10, 60, [30, 30]), 270, 'less what the games being played have had');
+  assert.equal(timeLeft(2, 60, [10, 50]), 50, 'the last games: as long as the longest left of them');
+  assert.equal(timeLeft(3, 60, [80, 0]), 60, 'a game past the average counts as nearly done');
 });
 
 test('the terminal QR code is square, two modules a line', () => {
