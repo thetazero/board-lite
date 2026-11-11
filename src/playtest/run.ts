@@ -30,7 +30,7 @@ import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
 import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
-import { OPTIONS, parseSeats, type PlayerOption, type PlayerSpec } from './players.ts';
+import { OPTIONS, parseSeats, seatAdvice, type PlayerOption, type PlayerSpec } from './players.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
@@ -191,7 +191,7 @@ How to play:
 - Every act takes a "why": a sentence or two on why you chose it. It is private, never shown to anyone at the table, and kept for the people studying the game afterwards, so be honest and specific.
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and a player in a raid can secretly hold back from the fight. Keep messages short, like real table talk, and reply when someone talks to you.
-- Don't stop until the game is over. If you're unsure what to do, call wait.${advice && s.options.includes('advice') ? `\n\nAdvice: ${advice}` : ''}`;
+- Don't stop until the game is over. If you're unsure what to do, call wait.${seatAdvice(s.options, advice)}`;
 }
 
 function startSeat(s: Seat) {

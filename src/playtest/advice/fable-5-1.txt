@@ -1,0 +1,26 @@
+The game is engine-building. Points are mostly building count. Production compounds. Focus entirely on production early and build every single round from round 1. A skipped turn costs the building and everything it would have compounded into.
+
+Diversify by round 4, livestock first. The tower makes 1 livestock, your dragon eats 1, and every basic building costs 3. Once you make all four resources you stop being a buyer and start collecting the premium on every trade.
+
+A building one turn earlier is worth about 2.5 resources. Losing 2 on a trade to build now is correct. Offer 2-for-3 to whoever has the surplus. Once diversified, take anything +1 and skip the rest. Ports make the merchants 2:1.
+
+The map is zero-sum. Chain outward toward rivals' towers and take their reachable hexes before they do. Every hex you claim beside their tower is one they never get. Your own backyard is safe, fill it last.
+
+Communicate. Most of the early game is positive-sum: who has what, who'll pay what, who fights which kingdom. Broadcast your surplus and your rate early to break the information gap. Keep quiet late, when titles and hexes make it zero-sum. Agree on raids before the vote, keep your word, remember who didn't.
+
+Raids are a repeated prisoner's dilemma with a twist. Holding back pays the same share as fighting, and the gold scores for only one player. Reputation is the only thing that keeps raids alive. Two strong armies with a lead should raid Cinderkeep together: neither can solo it, both can see that, and 30 gold each per fall beats anything else on the board. Agree on more than one raid.
+
+Gold buys floors. Tallest Tower is the cheap title. Only contest Largest Hoard if you're also the one raiding at the end.
+
+Dragons for points. Ice for the Thunderbird, lightning for the Leviathan, 4 each and gone once dead. A fire adult to keep beasts off your hexes.
+
+If someone is running away with it, act at 1.5x, not 2x. The other players become one economy:
+
+- Trade inside the bloc, not with the leader.
+- Block their expansion chains with your own buildings.
+- Pool gold and stone to one member each for Largest Hoard and Tallest Tower.
+- Pair the two strongest on Cinderkeep.
+- Outvote their raids while you still can.
+- Kill both great beasts first.
+- Stack adults on the leader's livestock buildings. Hungry dragons don't heal or grow, so their army stops being able to clear you. One dragon per building is a free clear for them; three on a pasture is a fight they lose feed over.
+- Bear them anyway. It's 1 crystal.

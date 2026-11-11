@@ -32,6 +32,7 @@ Each Claude seat can play with its own options, written after its model with `+`
 | Option | The seat |
 |---|---|
 | `+advice` | gets the `--advice` text appended to its prompt |
+| `+fable51` | gets the "advice from Fable 5.1" appended to its prompt, word for word: a fixed text in [`src/playtest/advice/fable-5-1.txt`](../src/playtest/advice/fable-5-1.txt), so no `--advice` is needed. It can go with `+advice`; the seat then gets both |
 | `+expected` | sees each player's expected production each round (per resource and in all) and what they made at the latest roll (#469) |
 
 `run.ts --help` lists them. The order doesn't matter: `opus+expected+advice` is the same player as `opus+advice+expected`, and both are labeled `opus+advice+expected`. In `results.json` that label is the seat's `model` (and the winner's), with its `options` beside it, so a batch tallies wins per configuration exactly as it tallies them per model.
@@ -45,6 +46,13 @@ A contest is a [batch](#depth-batches) whose seats are configurations instead of
 ```
 node src/playtest/batch.ts --games 30 --models opus+advice+expected,opus+advice+expected,opus,opus \
   --advice "$(cat advice.txt)" --out ~/.cache/board-lite/playtests/contest-advice-expected
+```
+
+The Fable 5.1 advice against none, with no text on the command line:
+
+```
+node src/playtest/batch.ts --games 30 --models opus+fable51,opus+fable51,opus,opus \
+  --out ~/.cache/board-lite/playtests/contest-fable51
 ```
 
 - Rotating the seats each game puts each configuration in each seat equally often, so seat order doesn't decide it.

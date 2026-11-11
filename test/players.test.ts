@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseSeats, parseSpec } from '../src/playtest/players.ts';
+import { FABLE_5_1_ADVICE, parseSeats, parseSpec, seatAdvice } from '../src/playtest/players.ts';
 import { tally, type GameResult } from '../src/playtest/tally.ts';
 
 test('a seat is a model and its options, labeled the same whatever order the options come in', () => {
@@ -29,4 +29,15 @@ test('a batch tallies wins per configuration, so two configurations of one model
   assert.equal(a.wins, 3);
   assert.equal(a.share, 0.5);
   assert.equal(t.models.find((m) => m.model === B)!.wins, 1);
+});
+
+test('+fable51 gives a seat the Fable 5.1 advice word for word, with no --advice needed', () => {
+  assert.deepEqual(parseSeats(['opus+fable51', 'opus'], undefined).map((s) => s.label), ['opus+fable51', 'opus']);
+  assert.ok(FABLE_5_1_ADVICE.startsWith('The game is engine-building. Points are mostly building count.'));
+  assert.ok(FABLE_5_1_ADVICE.endsWith("- Bear them anyway. It's 1 crystal."));
+  assert.equal(seatAdvice(['fable51'], undefined), `\n\nAdvice:\n\n${FABLE_5_1_ADVICE}`);
+  assert.equal(seatAdvice([], 'raid early'), '');
+  assert.equal(seatAdvice(['advice', 'fable51'], 'raid early'), `\n\nAdvice: raid early\n\nAdvice:\n\n${FABLE_5_1_ADVICE}`);
+  // --advice with no +advice seat still goes to every Claude seat, the +fable51 ones too.
+  assert.deepEqual(parseSeats(['opus+fable51', 'opus'], 'raid early').map((s) => s.label), ['opus+advice+fable51', 'opus+advice']);
 });
