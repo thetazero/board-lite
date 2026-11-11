@@ -17,7 +17,8 @@
     "ci": "npm run typecheck && npm test",
     "shots": "node src/shots/shots.ts",
     "eval": "node src/playtest/eval.ts",
-    "leaderboard": "node src/playtest/leaderboard.ts"
+    "leaderboard": "node src/playtest/leaderboard.ts",
+    "live": "node src/playtest/live.ts"
   },
   "engines": {
     "node": ">=22.18"

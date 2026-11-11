@@ -39,9 +39,21 @@ Then run it, in the background: the same with `npm run eval --` and without `--d
 - **The draw is random but balanced**, game by game: each size comes up once, in random order, before any comes up again; each game takes the players with the fewest games so far, and among those the group that has met least; each player gets the seat they've had less of than their share. `--dry-run` prints the games, then each player's games, seats against their fair share, and how often they met each other player. In the draw above, every player has 26 or 27 games, meets each other player 18 to 20 times, and sits in each seat within one game of its share.
 - `--advice` goes to the entries with `+advice`, and only to games that have one.
 - The draw is kept in `draw.json` in the contest's directory. Rerun with `--out <that directory>` and a bigger `--games` to add games to it: the games already drawn stay, and the new ones keep the balance. `--seed` seeds the draw (and the games, as in an eval).
-- At the end, `leaderboard.md` in that directory ranks the bucket, with how sure each rating is (the 95% range, [below](#the-leaderboard)), and the draw's balance under it. `npm run leaderboard -- <that directory>` shows it at any time, for the games finished so far.
+- At the end, `leaderboard.md` in that directory ranks the bucket, with how sure each rating is (the 95% range, [below](#the-leaderboard)), and the draw's balance under it. `npm run leaderboard -- <that directory>` shows it at any time, for the games finished so far, and `npm run live -- <that directory>` serves a page that follows it as games finish, for a phone too ([below](#watch-a-contest-live)).
 - **How many games:** from simulated contests of the bucket above, each rating's 95% range is about ±125 points after 40 games and ±90 after 80. That tells the bot, Haiku and Opus apart after 40, but two Opus configurations close to each other (under 100 points apart) need 100 games or more.
 - **Cost:** a game averages 4 players, so each Opus entry plays two games in three. At $2 to $11 an Opus seat a game, the bucket above is roughly $10 to $20 a game, $400 to $800 for 40. One game runs at a time by default (`--parallel 1`, for the reason below), so 40 games are 40 game-lengths or more (6-player games run longer).
+
+### Watch a contest live
+
+```
+npm run live -- ~/.cache/board-lite/playtests/<the contest's directory>
+```
+
+serves a page for a contest (or an eval) while it runs: the ratings so far, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take; the game being played now, its round, phase and each seat's points; and the last games' results. It updates by itself every 10 seconds, and it's laid out for a phone.
+
+It prints a link for this machine and, when Tailscale is running, a link on the tailnet (`http://<machine>.<tailnet>.ts.net:8790/`) with a QR code of it in the terminal: open it on a phone on the same tailnet. It listens only on this machine and its Tailscale address, not the rest of the network (`--host ADDR` to pick one, `--port N` for another port).
+
+It only reads the contest's directory, on every refresh, so it works for a contest that's already running, and stopping it does nothing to the contest. A game whose runner has gone shows as stopped; one that didn't finish and was played again is counted under the progress bar.
 
 ### Cost and time
 

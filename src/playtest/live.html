@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Contest live</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #fcfcfb; --line: #e4e2dc;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #77756f;
+    --accent: #2a78d6; --accent-soft: #2a78d633; --good: #2f8a4c; --warn: #b5651d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121211; --surface: #1a1a19; --line: #2e2e2b; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #959389; --accent: #3987e5; --accent-soft: #3987e540; --good: #4caf6a; --warn: #e08a3c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 20px; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
+  .sub { color: var(--ink-2); }
+  .muted { color: var(--muted); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .card + .card { margin-top: 8px; }
+  .progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 10px 0 4px; }
+  .progress > div { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s; }
+  .stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; }
+  .stats b { font-size: 18px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; }
+  .seat { padding: 6px 0; border-top: 1px solid var(--line); }
+  .seat:first-of-type { border-top: 0; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s; }
+  .rank { color: var(--muted); display: inline-block; min-width: 1.6em; }
+  .rating { font-size: 18px; font-weight: 700; }
+  .range { grid-column: 1 / -1; position: relative; height: 14px; margin: 4px 0 2px; }
+  .range .axis { position: absolute; left: 0; right: 0; top: 6px; height: 2px; background: var(--line); }
+  .range .mid { position: absolute; top: 6px; width: 1px; height: 2px; }
+  .range .span { position: absolute; top: 3px; height: 8px; border-radius: 4px; background: var(--accent-soft); }
+  .range .dot { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+  .range .avg { position: absolute; top: 0; width: 1px; height: 14px; background: var(--muted); opacity: .6; }
+  .detail { grid-column: 1 / -1; color: var(--ink-2); font-size: 13px; }
+  .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  ol.places { margin: 6px 0 0; padding-left: 1.4em; }
+  ol.places li { padding: 1px 0; }
+  .won { color: var(--good); font-weight: 600; }
+  .tag { font-size: 12px; padding: 1px 7px; border-radius: 9px; border: 1px solid currentColor; color: var(--muted); white-space: nowrap; }
+  .tag.live { color: var(--good); }
+  .tag.stopped { color: var(--warn); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  footer { margin-top: 28px; font-size: 13px; color: var(--muted); }
+  #offline { display: none; color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+  <div class="muted">Contest live</div>
+  <h1 id="title">Loading…</h1>
+  <div id="progress"></div>
+  <h2>Playing now</h2>
+  <div id="now"></div>
+  <h2>Ratings</h2>
+  <div id="ratings"></div>
+  <h2>Finished games</h2>
+  <div id="recent"></div>
+  <footer><span id="updated"></span> <span id="offline">· Can't reach the server: retrying.</span><br>Updates by itself every 10 seconds.</footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pct = (x) => `${Math.max(0, Math.min(100, x)).toFixed(1)}%`;
+const duration = (min) => {
+  if (min < 1) return 'under 1 min';
+  if (min < 90) return `${Math.round(min)} min`;
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return m ? `${h} h ${m} min` : `${h} h`;
+};
+const usd = (x) => (x ? `$${x.toFixed(2)}` : '');
+
+function progress(s) {
+  const left = s.total === null ? null : Math.max(0, s.total - s.finished);
+  const eta = left && s.minutesPerGame ? duration(left * s.minutesPerGame) : null;
+  return `<div class="card">
+    ${s.total ? `<div class="progress"><div style="width:${pct((100 * s.finished) / s.total)}"></div></div>` : ''}
+    <div class="stats">
+      <span><b>${s.finished}</b>${s.total ? ` of ${s.total}` : ''} games finished</span>
+      ${left !== null ? `<span><b>${left}</b> left</span>` : ''}
+      ${s.minutesPerGame ? `<span><b>${duration(s.minutesPerGame)}</b> a game</span>` : ''}
+      ${eta ? `<span>about <b>${eta}</b> to go</span>` : ''}
+    </div>
+    ${s.replayed ? `<div class="note">${s.replayed} game${s.replayed > 1 ? 's' : ''} didn't finish and ${s.replayed > 1 ? 'were' : 'was'} played again.</div>` : ''}
+  </div>`;
+}
+
+function playing(s) {
+  if (!s.playing.length) return `<div class="card muted">${s.total !== null && s.finished >= s.total ? 'The contest is over.' : 'No game is being played.'}</div>`;
+  return s.playing.map((g) => {
+    const tag = g.status === 'playing' ? '<span class="tag live">Playing</span>' : `<span class="tag stopped">${esc(g.status === 'stopped' ? 'Stopped' : g.status)}</span>`;
+    const order = [...g.seats].sort((a, b) => b.points - a.points);
+    const spent = g.seats.reduce((t, x) => t + (x.costUsd ?? 0), 0);
+    return `<div class="card">
+      <div class="row"><span class="name">Game ${g.game} · ${g.seats.length} players</span>${tag}</div>
+      <div class="sub">${g.round ? `Round ${g.round} · ${esc(g.phase)} · ` : ''}${duration(g.minutes)}${spent ? ` · ${usd(spent)} so far` : ''}</div>
+      ${order.map((x) => `<div class="row seat">
+        <span><span class="muted">${x.seat}</span> <span class="name">${esc(x.player)}</span></span>
+        <span><b>${x.points}</b> <span class="muted">points</span></span>
+        <div class="bar"><div style="width:${pct((100 * x.points) / s.pointsToWin)}"></div></div>
+      </div>`).join('')}
+      <div class="note">First to ${s.pointsToWin} points wins.</div>
+    </div>`;
+  }).join('');
+}
+
+function ratings(s) {
+  if (!s.ratings.length) return `<div class="card muted">No ratings yet: they start when the first game finishes.</div>`;
+  const lo = Math.min(...s.ratings.map((r) => r.rating - r.range)), hi = Math.max(...s.ratings.map((r) => r.rating + r.range));
+  const pad = (hi - lo) * 0.04 || 50, a = Math.floor((lo - pad) / 50) * 50, b = Math.ceil((hi + pad) / 50) * 50;
+  const x = (v) => pct((100 * (v - a)) / (b - a));
+  return `<div class="card">
+    <div class="scale"><span>${a}</span><span>1500 is the average seat</span><span>${b}</span></div>
+    ${s.ratings.map((r, i) => `<div class="row seat" title="${r.rating - r.range} to ${r.rating + r.range}, 95% sure">
+      <span><span class="rank">${i + 1}</span><span class="name">${esc(r.player)}</span></span>
+      <span><span class="rating">${r.rating}</span> <span class="muted">±${r.range}</span></span>
+      <div class="range" aria-hidden="true">
+        <div class="axis"></div>
+        <div class="avg" style="left:${x(1500)}"></div>
+        <div class="span" style="left:${x(r.rating - r.range)};width:${pct((100 * 2 * r.range) / (b - a))}"></div>
+        <div class="dot" style="left:${x(r.rating)}"></div>
+      </div>
+      <div class="detail">${r.games} game${r.games === 1 ? '' : 's'} · ${r.wins} win${r.wins === 1 ? '' : 's'} · average place ${r.place.toFixed(2)}${r.costPerGame ? ` · ${r.costPerGame} a game` : ''}</div>
+    </div>`).join('')}
+    <div class="note">The bar is where each rating is, 95% sure, from the games so far. A player 400 points above another is expected to finish ahead of it 10 times in 11.${s.unrated.length ? ` No finished game yet: ${s.unrated.map(esc).join(', ')}.` : ''}</div>
+  </div>`;
+}
+
+function recent(s) {
+  if (!s.recent.length) return `<div class="card muted">None yet.</div>`;
+  return s.recent.map((g) => {
+    const order = [...g.seats].sort((a, b) => (a.seat === g.winner ? -1 : b.seat === g.winner ? 1 : b.points - a.points));
+    const spent = g.seats.reduce((t, x) => t + (x.costUsd ?? 0), 0);
+    return `<div class="card">
+      <div class="row"><span class="name">Game ${g.game} · ${g.seats.length} players</span><span class="muted">${g.round} rounds · ${duration(g.minutes)}</span></div>
+      <ol class="places">${order.map((x) => `<li${x.seat === g.winner ? ' class="won"' : ''}>${esc(x.player)} <span class="muted">${x.points} points${x.seat === g.winner ? ' · wins' : ''}</span></li>`).join('')}</ol>
+      ${spent ? `<div class="note">${usd(spent)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('state.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error(String(r.status));
+    const s = await r.json();
+    document.title = `${s.finished}${s.total ? `/${s.total}` : ''} · Contest live`;
+    $('title').textContent = s.name;
+    $('progress').innerHTML = progress(s);
+    $('now').innerHTML = playing(s);
+    $('ratings').innerHTML = ratings(s);
+    $('recent').innerHTML = recent(s);
+    $('updated').textContent = `Updated ${new Date(s.updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    $('offline').style.display = 'none';
+  } catch {
+    $('offline').style.display = 'inline';
+  }
+}
+refresh();
+setInterval(refresh, 10000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
