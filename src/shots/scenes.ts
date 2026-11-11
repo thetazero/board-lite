@@ -42,6 +42,7 @@ export interface Shot {
   frames?: number[]; // TV: one shot per time on the 3D board's clock (seconds; the page opens at 0)
   flight?: boolean; // and the frames are fractions (0 to 1) of the way through the first dragon flight instead
   table?: boolean; // TV: the table view a phone shows in a game with no TV (/tv?remote), on a phone's screen
+  window?: [number, number]; // TV: shot in a window this wide and tall instead of 1920×1080 (a browser's bars eat some of a screen)
 }
 
 export interface Scene {
@@ -959,6 +960,28 @@ export const SCENES: Scene[] = [
     shots: () => [
       { file: 'tv-production-dragons-4p', caption: "TV: production's dragon step: health fills, growth fills in, a dragon moves up a stage, and a hungry one is marked", client: 'tv', live: true, waitFor: '#overlay .tending .trow.staged', hold: true, waitMs: 700 },
     ],
+  },
+  {
+    // A short window (#471): a 2000×1125 screen less a browser's tabs and
+    // bookmarks bar. The TV's text follows the width, so the sheet must shrink
+    // to the height, with every seat making all four resources from dice.
+    name: 'production-short-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    setup: (g) => {
+      g.players.forEach((_, p) => producers(g, p, 6));
+      // And a Market by their dice buildings: a fifth row, of gold, as a late game has.
+      g.players.forEach((_, p) => {
+        const mine = (k: string) => g.buildings[k]?.owner === p && BUILDINGS[g.buildings[k].type]?.produces;
+        const k = buildableHexes(g, p, 'market').find((h) => neighbors(h).some(mine));
+        if (k) g.buildings[k] = { type: 'market', owner: p, upgrades: [], floors: 0 };
+      });
+      toDiscard(g, [0]);
+    },
+    live: bots((g) => g.phase === 'action'),
+    liveEnd: allRolled,
+    shots: () => [{ file: 'tv-production-short-5p', caption: "TV in a short window: a player's production, dice landed, their total, and the round's total over all resources", client: 'tv', window: [2000, 965], live: true, waitFor: '#overlay .production .pturn.on:nth-child(2) .ptotal.up', hold: true, waitMs: 500 }],
   },
   {
     name: 'production-done-6p',

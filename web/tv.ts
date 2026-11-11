@@ -631,10 +631,19 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
     const total = x.total < 0 ? `−${-x.total}` : x.total;
     return `<li class="prow">${resIcon(x.r, 1.5)}<span class="parts">${base}${dice}${eat}</span>${x.dice.length || x.eats ? `<span class="eq"><i>=</i><b>${total}</b></span>` : ''}</li>`;
   };
-  const net = (m: (typeof made)[number]) => netChips({ ...m.got, livestock: (m.got.livestock ?? 0) - m.eat }, 1.4);
-  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${net(m)}</div></section>`).join('');
-  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${net(m)}</span></li>`).join('');
+  // Each resource's net amount, then (#471) the round's total over all of
+  // them, as the rows' own "= 39", when there's more than one to add up.
+  const netOf = (m: (typeof made)[number]) => ({ ...m.got, livestock: (m.got.livestock ?? 0) - m.eat });
+  const net = (m: (typeof made)[number]) => netChips(netOf(m), 1.4);
+  const allOf = (m: (typeof made)[number]) => {
+    const vals = Object.values(netOf(m)).filter((v) => v);
+    const n = vals.reduce((s, v) => s + v!, 0);
+    return vals.length > 1 ? `<span class="pall"><i>=</i><b>${n < 0 ? `−${-n}` : n}</b></span>` : '';
+  };
+  const cards = made.map((m) => `<section class="pturn" style="--pc:${PLAYER_COLORS[m.p]}"><div class="who">${playerTag(m.p, names)}</div><ul>${m.rows.map(row).join('')}</ul><div class="ptotal">${net(m)}${allOf(m)}</div></section>`).join('');
+  const sum = made.map((m) => `<li style="--pc:${PLAYER_COLORS[m.p]}">${playerTag(m.p, names)}<span class="gains">${net(m)}</span>${allOf(m)}</li>`).join('');
   const play = (el: HTMLElement) => {
+    fitHeight(el);
     const at = (t: number, f: () => void) => setTimeout(f, t);
     const cardEls = el.querySelectorAll<HTMLElement>('.production .pturn');
     let t = PROD_LEAD_MS;
@@ -666,6 +675,20 @@ function rollBanner(round: number, rolls: EventView[], ms: number): Banner {
   return { html: `<div class="production"><h1>Round ${round}</h1>${body}</div>`, ms, play, top: { round, phase: 'Production' } };
 }
 
+// A sheet taller than the window (a short one: a browser's tabs and bars
+// over a wide screen, #471) shrinks, everything on it together, until it fits
+// with a margin. The TV's text follows the window's width, so a wide, short
+// window would otherwise cut its top and bottom off. A phone's table view
+// scrolls instead.
+function fitHeight(sheet: HTMLElement) {
+  if (remote) return;
+  for (let k = 0; k < 3; k++) {
+    const room = innerHeight * 0.96, tall = sheet.offsetHeight;
+    if (tall <= room) return;
+    sheet.style.fontSize = `${(parseFloat(getComputedStyle(sheet).fontSize) * room) / tall}px`;
+  }
+}
+
 // Production's dragon step (#442): every player's dragons that heal, grow or
 // go hungry, on one sheet, each as its row on the player panels (name, stage,
 // growth, power, health), not the full figure. They start as they were; then
@@ -693,6 +716,7 @@ function tendBanner(g: PublicState, e: EventView, ms: number): Banner {
   let i = 0;
   const cards = players.map(({ p, rows }) => `<section class="tplayer" style="--pc:${PLAYER_COLORS[p]}"><div class="who">${playerTag(p, names)}</div><ul>${rows.map((r) => row(r, i++)).join('')}</ul></section>`).join('');
   const play = (el: HTMLElement) => {
+    fitHeight(el);
     const at = (t: number, f: () => void) => setTimeout(f, t);
     const rowEl = (k: number) => el.querySelector<HTMLElement>(`.trow[data-t="${k}"]`);
     at(TEND_LEAD_MS, () => all.forEach((r, k) => {
