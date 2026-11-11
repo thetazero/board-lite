@@ -492,6 +492,11 @@ export interface Snapshot {
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
   scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
+  // How many times the room has changed when this was taken: a later snapshot
+  // has a higher one, so a phone can tell the answer to its own tap from an
+  // older push arriving after it (#456). Counted from the server's start, so
+  // only snapshots on the same stream compare. Absent where no room made it.
+  v?: number;
   recap?: string | null; // once the game is over: its recap's id (/recap/<id>, src/recap.ts)
   you: (SeatState & { name: string }) | null;
 }

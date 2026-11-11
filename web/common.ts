@@ -33,12 +33,17 @@ export function savedWhen(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// An error with no answer from the server: the request may or may not have
+// been carried out (web/taps.ts sends it again under the same id, #456).
+const unanswered = (msg: string) => Object.assign(new Error(msg), { unanswered: true });
+
 export async function post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   // A request that never comes back (the server restarted under it, the
   // network dropped it) gives up, rather than holding up every tap after it.
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(POST_MS) })
-    .catch(() => { throw new Error("The server didn't answer: try again."); });
-  const data = await res.json().catch(() => ({ error: 'The server sent a bad reply.' }));
+    .catch(() => { throw unanswered("The server didn't answer: try again."); });
+  const data = await res.json().catch(() => null);
+  if (data === null) throw unanswered('The server sent a bad reply.');
   if (!res.ok) throw new Error(String(data.error ?? 'Something went wrong.'));
   return data;
 }
@@ -50,7 +55,7 @@ export async function post(path: string, body: Record<string, unknown>): Promise
 // under the same code); `onGone` is called if the server is up and the room
 // isn't there any more, and it stops trying.
 // `tv`: the watcher is a TV page (not a phone's table view), so the table plays with a TV while it watches.
-export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void, onGone?: () => void, tv = false): () => void {
+export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot, first: boolean) => void, onStatus: (ok: boolean) => void, onGone?: () => void, tv = false): () => void {
   let es: EventSource | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -60,10 +65,12 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     es?.close();
     heard = Date.now();
     const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : tv ? '?tv' : ''}`));
+    let first = true; // a new stream starts over: its first snapshot may come from a restarted server
     mine.onmessage = (e) => {
       heard = Date.now();
       onStatus(true);
-      onSnapshot(JSON.parse(e.data));
+      onSnapshot(JSON.parse(e.data), first);
+      first = false;
     };
     mine.addEventListener('ping', () => void (heard = Date.now()));
     mine.onerror = async () => {
@@ -129,6 +136,11 @@ export function named(text: string, names: string[], dragons: DragonView[] = [])
   return html
     .replace(/ \((?:c|o|d)\d+\)/g, '')
     .replace(/\boffer o\d+/g, 'the offer')
+    // Errors a tap can still meet when the table moved on under it (#456): an
+    // offer someone else took, a card already played. Said without the ids.
+    .replace(/ &quot;o\d+&quot;/g, '')
+    .replace(/^You have no card &quot;c\d+&quot; in hand\./, "That card isn't in your hand any more.")
+    .replace(/^Unknown player &quot;.*?&quot;\. Players are .*$/, "That player isn't at the table.")
     .replace(/^Offer o\d+ expires\./, 'An open offer expires.')
     .replace(/\bd(\d+)\b/g, (m) => {
       const d = dragons.find((x) => x.id === m);
