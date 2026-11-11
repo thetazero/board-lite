@@ -695,6 +695,7 @@ function tendBanner(g: PublicState, e: EventView, ms: number): Banner {
   const play = (el: HTMLElement) => {
     const at = (t: number, f: () => void) => setTimeout(f, t);
     const rowEl = (k: number) => el.querySelector<HTMLElement>(`.trow[data-t="${k}"]`);
+    fitTend(el);
     at(TEND_LEAD_MS, () => all.forEach((r, k) => {
       const li = rowEl(k);
       if (!li) return;
@@ -717,9 +718,29 @@ function tendBanner(g: PublicState, e: EventView, ms: number): Banner {
       li.querySelector('.tbadge')!.innerHTML = dragonBadge(r.now, 44);
       li.classList.add('staged');
     }));
+    at(TEND_LEAD_MS + TEND_STAGE_AT_MS, () => fitTend(el));
   };
   const body = `<h2>Dragons</h2><div class="tend" style="--cols:${cols};--tsize:${tall <= 4 ? 1.9 : tall <= 6 ? 1.6 : tall <= 9 ? 1.3 : 1.05}em">${cards}</div>`;
   return { html: `<div class="production tending"><h1>Round ${e.round}</h1>${body}</div>`, ms, play, top: { round: e.round, phase: 'Production' } };
+}
+// The sheet's size is picked from its tallest column, but three columns of
+// rows can be wider than the screen holds, and the grid then squeezes each
+// player's box narrower than its rows, so a row's health bar runs out of its
+// box into the next (#466). Shrink the sheet until every row fits its box,
+// as the side cards do (fitSide). Only ever shrinks, so a dragon moving up a
+// stage can be fitted again without the sheet jumping back and forth.
+function fitTend(el: HTMLElement) {
+  if (remote) return; // a phone's table view wraps its rows instead
+  const tend = el.querySelector<HTMLElement>('.tending .tend');
+  if (!tend) return;
+  const boxes = [...tend.querySelectorAll<HTMLElement>('.tplayer')];
+  const over = () => boxes.some((b) => b.scrollWidth > b.clientWidth + 1);
+  let px = parseFloat(getComputedStyle(tend).fontSize);
+  const floor = parseFloat(getComputedStyle(document.body).fontSize);
+  while (over() && px > floor) {
+    px = Math.max(floor, px * 0.95);
+    tend.style.fontSize = `${px}px`;
+  }
 }
 
 // The whole fight at once (there is no retreat), replayed blow by blow on its
