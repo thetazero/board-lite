@@ -23,7 +23,7 @@ const BUILDING_CODE: Record<string, string> = {
   shepherds_fold: 'sf', drovers_barn: 'db', fishery: 'fi', hatchery: 'ha', stone_port: 'sp', timber_port: 'tp', crystal_port: 'cp', livestock_port: 'lp', market: 'mk',
   monument: 'mo', standing_stones: 'ss', lighthouse: 'lh', guildhall: 'gh',
 };
-const FAUNA_CODE: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
+const FAUNA_CODE: Record<string, string> = { wolf: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const code = (type: string) => BUILDING_CODE[type] ?? type.slice(0, 2);
 const faunaCode = (key: string) => FAUNA_CODE[key] ?? key[0].toUpperCase();
 const STAGES = ['hatchling', 'young', 'adult'];

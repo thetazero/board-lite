@@ -24,3 +24,22 @@ test('a game saved when the desert was called plains loads with desert', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// The Wolf was the Wolf Pack, keyed wolf_pack: a game saved then still loads, with wolves in it.
+test('a game saved when the Wolf was the Wolf Pack loads with wolves', () => {
+  const base = join(homedir(), '.cache', 'board-lite');
+  mkdirSync(base, { recursive: true });
+  const dir = mkdtempSync(join(base, 'test-store-'));
+  try {
+    const g = newGame(3, 7);
+    const wolves = Object.keys(g.map).filter((k) => g.map[k].fauna === 'wolf');
+    assert.ok(wolves.length > 0);
+    const old = JSON.parse(JSON.stringify(g));
+    for (const k of wolves) old.map[k].fauna = 'wolf_pack';
+    const file = join(dir, 'old.json');
+    save(file, old);
+    assert.deepEqual(load(file), g);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

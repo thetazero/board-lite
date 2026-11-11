@@ -1109,7 +1109,7 @@ function faunaGame() {
 
 test('fauna blocks building on its hex, and a building under it produces nothing', () => {
   const { g, near, beyond } = faunaGame();
-  g.map[beyond].fauna = 'wolf_pack';
+  g.map[beyond].fauna = 'wolf';
   assert.throws(() => apply(g, 0, `build pasture ${beyond}`), RuleError);
   apply(g, 0, `build pasture ${near}`);
   assert.equal(production(g, 0).livestock.dice.length, 1);
@@ -1121,7 +1121,7 @@ test('fauna blocks building on its hex, and a building under it produces nothing
 test('clearing fauna: any player may, the loot is theirs, and those dragons can still raid', () => {
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
-  g.map[near].fauna = 'wolf_pack'; // on P1's pasture
+  g.map[near].fauna = 'wolf'; // on P1's pasture
   apply(g, 0, 'end');
   assert.throws(() => apply(g, 1, `clear ${g.towers[0]} d2`), RuleError); // no fauna there
   assert.throws(() => apply(g, 1, `clear ${near}`), RuleError); // no dragons sent
@@ -1133,7 +1133,7 @@ test('clearing fauna: any player may, the loot is theirs, and those dragons can 
   const before = g.players[1].resources.livestock;
   apply(g, 1, `clear ${near} ${d.id}`);
   assert.equal(g.map[near].fauna, undefined);
-  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf_pack.loot.livestock!);
+  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf.loot.livestock!);
   assert.ok(canRaid(d), 'a dragon that cleared a hex, with health left, can still raid this round');
   assert.throws(() => apply(g, 1, `clear ${near} ${d.id}`), RuleError); // one fight a round
   const ev = g.log.map((e) => e.ev).filter((e) => e?.k === 'cleared');
@@ -1173,7 +1173,7 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
 
 test('a beast a card sent gives no loot when it falls', () => {
   const { g, near } = faunaGame();
-  g.map[near].fauna = 'wolf_pack';
+  g.map[near].fauna = 'wolf';
   g.map[near].sent = true; // as a card leaves it
   const d = g.dragons.find((x) => x.owner === 0)!;
   d.stage = 3;
@@ -1194,7 +1194,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
   g.dragons.forEach((d) => (d.growth = -1000));
   let at = Object.keys(g.map).find((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && !g.buildings[k] && neighbors(k).every((n) => g.map[n]))!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   g.map[at].sent = true;
   const peak = Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird');
   let moves = 0;
@@ -1206,7 +1206,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (now === at) stays++;
     else {
       moves++;
@@ -1269,7 +1269,7 @@ test('a wandering beast still moves at random, but more often to a hex beside no
   // Only great beasts are left, and they never move. Count, over many moves of
   // a wolf, how often it picks a lonely hex against how often it could.
   let at = Object.keys(g.map).sort().find(openHex)!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   let crowdedMoves = 0, lonelyMoves = 0, crowdedShare = 0;
   for (let i = 0; i < 400 && g.phase !== 'over'; i++) {
     const to = neighbors(at).filter(openHex);
@@ -1281,7 +1281,7 @@ test('a wandering beast still moves at random, but more often to a hex beside no
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (at === was || nLonely === 0 || nLonely === to.length) continue;
     if (lonely(at, at)) lonelyMoves++; else crowdedMoves++;
     crowdedShare += (to.length - nLonely) / to.length;

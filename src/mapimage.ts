@@ -102,7 +102,7 @@ class Canvas {
   }
 }
 
-const FAUNA_LETTER: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
+const FAUNA_LETTER: Record<string, string> = { wolf: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const SQ3 = Math.sqrt(3);
 const S = 30; // hex size: centre to corner, in pixels
 

@@ -331,7 +331,7 @@ const ICONS: Record<string, Facet[]> = {
 
   // ---- the fauna: wild beasts holding hexes of the map ----
   // A grey wolf's head, ears up.
-  wolf_pack: [
+  wolf: [
     ['#5d626c', P([[-7.5, -9.5], [-2.5, -5], [-7.8, -2.5]])],
     ['#4a4e57', P([[7.5, -9.5], [7.8, -2.5], [2.5, -5]])],
     ['#c4c8cf', P([[-7.8, -4], [0, -6.5], [0, 9.5], [-3.2, 6.5], [-9, 0.5]])],
@@ -405,7 +405,7 @@ export const ICON_NAMES = Object.keys(ICONS);
 const LABEL: Record<string, string> = { points: 'points', dragon: 'dragons', cards: 'cards', raid: 'raid', shield: 'combat power', talk: 'table talk', secret: 'secret', public: 'everyone sees it', tower: 'Tallest Tower', hoard: 'Largest Hoard', d4: '4-sided die', d6: '6-sided die', d8: '8-sided die', d4face: '4-sided die', d6face: '6-sided die', d8face: '8-sided die',
   workshop: 'Workshop', nesting_grounds: 'Nesting Grounds',
   militia: 'Militia', archers: 'Archers', knights: 'Knights', frost_golem: 'Frost Golem', storm_griffin: 'Storm Griffin', sea_serpent: 'Sea Serpent', fire_giant: 'Fire Giant', titan: 'Titan',
-  wolf_pack: 'Wolf', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
+  wolf: 'Wolf', cave_bear: 'Cave Bear', basilisk: 'Basilisk', thunderbird: 'Thunderbird', leviathan: 'Leviathan' };
 
 // Just the shapes, to draw an icon inside another SVG (on the -10..10 box).
 export function iconShapes(name: string): string {
