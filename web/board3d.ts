@@ -763,7 +763,7 @@ function wolf(phase: number): BeastRig {
   return { kind: 'wolf', body, head, tail, legs, phase };
 }
 
-// The Wolf Pack: one wolf, big enough to read from the TV.
+// The Wolf: one wolf, big enough to read from the TV.
 function wolfPack(): THREE.Group {
   const w = wolf(0);
   const big = group(w.body);

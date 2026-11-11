@@ -289,7 +289,7 @@ Beasts on the map. Nothing is built on a hex with fauna, and a building under fa
 
 | Beast | Health | Attack (avg) | Element | Loot | Starts |
 |---|---|---|---|---|---|
-| Wolf Pack | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
+| Wolf | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
 | Basilisk | 26 | 2×1d8 (9) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 

@@ -337,7 +337,7 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
     case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'held' ? 'Everyone holds back' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
-    // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
+    // The beast is the subject ("The Wolf falls"), as on the fight's banner.
     case 'cleared': {
       const home = (ev.home ?? []).map((id) => dragon(id)).join('');
       if (!ev.fauna) return ev.won ? `The perched dragons <span class="ok">fall</span> to ${who(ev.p)}${home ? `; ${home} go home` : ''}` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;

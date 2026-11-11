@@ -1267,7 +1267,7 @@ test('a wandering beast still moves at random, but more often to a hex beside no
   const openHex = (k: string) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower';
   const lonely = (n: string, self: string) => !neighbors(n).some((m) => m !== self && g.map[m]?.fauna);
   // Only great beasts are left, and they never move. Count, over many moves of
-  // a wolf pack, how often it picks a lonely hex against how often it could.
+  // a wolf, how often it picks a lonely hex against how often it could.
   let at = Object.keys(g.map).sort().find(openHex)!;
   g.map[at].fauna = 'wolf_pack';
   let crowdedMoves = 0, lonelyMoves = 0, crowdedShare = 0;

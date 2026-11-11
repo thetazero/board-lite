@@ -1479,7 +1479,7 @@ export const SCENES: Scene[] = [
   },
   {
     // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
-    // another player's building, a wolf pack beside the acting player's tower.
+    // another player's building, a wolf beside the acting player's tower.
     // The acting player holds both fauna cards and has a young dragon to send.
     name: 'fauna-3p',
     players: 3,
@@ -1499,8 +1499,8 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-fauna-3p', caption: 'TV: fauna on the board: wolves by a tower, a bear on a building, beasts out in the wilds', client: 'tv', waitMs: 4800 },
       {
-        // The wolf pack wanders to the next open hex: it turns, trots over, and turns back.
-        file: 'tv-fauna-wander-3p', caption: 'TV: the wolf pack wanders to the next hex, walking over', client: 'tv',
+        // The wolf wanders to the next open hex: it turns, trots over, and turns back.
+        file: 'tv-fauna-wander-3p', caption: 'TV: the wolf wanders to the next hex, walking over', client: 'tv',
         then: (room) => room.mutate((g2) => {
           const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!;
           const n = neighbors(k).find((x) => g2.map[x] && g2.map[x].terrain !== 'ocean' && !g2.map[x].fauna && !g2.buildings[x])!;
@@ -1511,8 +1511,8 @@ export const SCENES: Scene[] = [
         frames: [0, 0.4, 0.9, 1.5, 2.1, 2.9, 4],
       },
       {
-        // The wolf pack is cleared: it folds down flat, and the hex's scenery grows back round where it stood.
-        file: 'tv-fauna-leave-3p', caption: 'TV: the wolf pack is cleared, folding down, and the hex grows back', client: 'tv',
+        // The wolf is cleared: it folds down flat, and the hex's scenery grows back round where it stood.
+        file: 'tv-fauna-leave-3p', caption: 'TV: the wolf is cleared, folding down, and the hex grows back', client: 'tv',
         then: (room) => room.mutate((g2) => {
           delete g2.map[Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!].fauna;
         }),
@@ -1737,7 +1737,7 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    // Fauna on every terrain and on buildings (#72): a wolf pack, a cave bear
+    // Fauna on every terrain and on buildings (#72): a wolf, a cave bear
     // and a basilisk on open hexes of each land terrain, and one of each on a
     // building it shuts down. The acting player has dragons to send.
     name: 'fauna-terrain-3p',
