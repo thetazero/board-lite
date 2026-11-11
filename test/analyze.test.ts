@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { analyze, findGame } from '../src/analyze.ts';
@@ -8,7 +8,7 @@ import { botStep, playToEnd } from '../src/bot.ts';
 import { newGame } from '../src/engine.ts';
 
 test('analyze finds a room by code, a game file or a playtest game, and names its seats (#475)', () => {
-  const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'board-lite-analyze-'));
   try {
     const g = newGame(3, 7);
     const rng = { state: 7 };
