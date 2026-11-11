@@ -4,7 +4,7 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 ## Economy baseline
 
-- Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
+- Start: 6 stone, 6 timber, 6 crystal, 6 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 50 points. Titles are 7 points each, from a minimum (see Points).
 - Each hatched dragon eats 1 livestock a round; eggs don't eat. The tower makes 1.
