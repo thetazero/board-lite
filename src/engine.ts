@@ -1327,8 +1327,8 @@ function placeUpgrade(g: Game, p: number, up: string, k: string, project = false
 // The upgrades a player may add without the card, as a special project.
 export const PROJECT_UPGRADES = Object.keys(UPGRADES).filter((k) => UPGRADES[k].base);
 
-export function specialProjectCost(cost: Bundle): Bundle {
-  return scale(cost, TUNING.specialProjectMultiplier);
+export function specialProjectCost(kind: 'egg' | 'upgrade', cost: Bundle): Bundle {
+  return scale(cost, TUNING.specialProjectMultiplier[kind]);
 }
 
 export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object.keys(DRAGONS).find((k) => DRAGONS[k].base && DRAGONS[k].element === e)!])) as Record<Element, string>;
@@ -1475,12 +1475,12 @@ function actionCommand(g: Game, p: number, verb: string, args: string[]) {
       if (el) {
         const dk = PROJECT_DRAGONS[el];
         if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`No room for another dragon: build a roost first.`);
-        pay(pl, specialProjectCost(DRAGONS[dk].cost));
+        pay(pl, specialProjectCost('egg', DRAGONS[dk].cost));
         return hatch(g, p, dk, true);
       }
       if (UPGRADES[what]?.base) {
         const k = upgradeCheck(g, p, what, args[1]);
-        pay(pl, specialProjectCost(UPGRADES[what].cost));
+        pay(pl, specialProjectCost('upgrade', UPGRADES[what].cost));
         return placeUpgrade(g, p, what, k, true);
       }
       return fail(`Use: project <${ELEMENTS.join('|')}>, or ${orList(PROJECT_UPGRADES.map((u) => `project ${u} <hex>`))}.`);
