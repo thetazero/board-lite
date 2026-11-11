@@ -9,7 +9,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { newGame } from '../src/engine.ts';
-import { liveState, terminalQr } from '../src/playtest/live.ts';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { liveState, terminalQr, watchProxy } from '../src/playtest/live.ts';
 
 const base = join(homedir(), '.cache', 'board-lite'); // not /tmp, which is RAM on the dev machine
 
@@ -32,8 +34,12 @@ function stageContest(dir: string, alivePid = process.pid) {
   g.round = 5;
   g.phase = 'action';
   writeFileSync(join(dir, 'g3', 'game.json'), JSON.stringify(g));
-  writeFileSync(join(dir, 'g3', 'runner.json'), JSON.stringify({ pid: alivePid, seats: [{ p: 1, model: 'haiku', options: [], cost: 1.25 }] }));
+  writeFileSync(join(dir, 'g3', 'game.seats.json'), JSON.stringify({ seats: [{ name: 'Rowan' }, { name: 'Tick' }, { name: 'Quinn' }, { name: 'Ellis' }] }));
+  writeFileSync(join(dir, 'g3', 'runner.json'), JSON.stringify({ pid: alivePid, room: `http://127.0.0.1:${roomPort}/FJKK`, hosted: true, seats: [{ p: 1, model: 'haiku', options: [], cost: 1.25 }] }));
 }
+let roomPort = 1;
+
+const listen = (s: Server) => new Promise<number>((ok) => s.listen(0, '127.0.0.1', () => ok((s.address() as AddressInfo).port)));
 
 test('a running contest: games finished and left, the game being played, and ratings from the finished ones', () => {
   mkdirSync(base, { recursive: true });
@@ -53,6 +59,8 @@ test('a running contest: games finished and left, the game being played, and rat
     assert.equal(now.phase, 'Actions');
     assert.deepEqual(now.seats.map((x) => x.player), ['bot', 'haiku', 'opus+expected', 'opus'], 'named from the draw, in seat order');
     assert.equal(now.seats[1].costUsd, 1.25);
+    assert.equal(now.seats[1].name, 'Tick', 'its name at the table, as the table view shows it');
+    assert.equal(now.watch, 'tv?room=FJKK&remote', 'its board can be watched');
     assert.deepEqual(s.ratings.map((r) => r.player).sort(), ['bot', 'haiku', 'opus', 'opus+expected']);
     assert.equal(s.ratings[0].player, 'opus+expected');
     assert.ok(s.ratings.every((r) => r.range > 0));
@@ -68,6 +76,7 @@ test('a game whose runner is gone shows as stopped', () => {
   try {
     stageContest(dir, 2 ** 22 + 12345); // above Linux's default pid_max, so no process has it
     assert.equal(liveState(dir).playing[0].status, 'stopped');
+    assert.equal(liveState(dir).playing[0].watch, undefined, 'nothing to watch');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -77,4 +86,40 @@ test('the terminal QR code is square, two modules a line', () => {
   const lines = terminalQr('http://example.ts.net:8790/').split('\n');
   assert.ok(lines.length > 10);
   assert.ok(lines.every((l) => l.length === lines[0].length));
+});
+
+test("a game's table view is passed through from its room, read-only", async () => {
+  mkdirSync(base, { recursive: true });
+  const dir = mkdtempSync(join(base, 'test-live-'));
+  const seen: string[] = [];
+  const room = createServer((req, res) => {
+    seen.push(`${req.method} ${req.url}`);
+    res.writeHead(200, { 'content-type': 'text/plain', 'x-secret': '1' });
+    res.end(`room ${req.url}`);
+  });
+  const live = createServer((req, res) => watchProxy(dir, req, res));
+  try {
+    roomPort = await listen(room);
+    stageContest(dir);
+    const at = `http://127.0.0.1:${await listen(live)}`;
+    const get = (path: string, init?: RequestInit) => fetch(at + path, init).then(async (r) => ({ status: r.status, text: await r.text(), headers: r.headers }));
+
+    const page = await get('/tv?room=FJKK&remote');
+    assert.equal(page.status, 200);
+    assert.equal(page.text, 'room /tv?room=FJKK&remote');
+    assert.equal(page.headers.get('x-secret'), null, 'only the headers a page needs');
+    assert.equal((await get('/api/rooms/FJKK/events')).text, 'room /api/rooms/FJKK/events');
+    assert.equal((await get('/style.css')).text, 'room /style.css', "the page's files, from a room being played");
+
+    assert.equal((await get('/api/rooms/FJKK/save', { method: 'POST' })).status, 405, 'watching changes nothing');
+    assert.equal((await get('/api/rooms/FJKK?token=abc')).status, 403, 'no seat');
+    assert.equal((await get('/api/saved')).status, 404);
+    assert.equal((await get('/api/rooms/ABCD')).status, 400, 'a room not being played here');
+    assert.deepEqual(seen, ['GET /tv?room=FJKK&remote', 'GET /api/rooms/FJKK/events', 'GET /style.css']);
+  } finally {
+    room.close();
+    live.close();
+    roomPort = 1;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

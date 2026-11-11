@@ -49,9 +49,11 @@ Then run it, in the background: the same with `npm run eval --` and without `--d
 npm run live -- ~/.cache/board-lite/playtests/<the contest's directory>
 ```
 
-serves a page for a contest (or an eval) while it runs: the ratings so far, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take; the game being played now, its round, phase and each seat's points; and the last games' results. It updates by itself every 10 seconds, and it's laid out for a phone.
+serves a page for a contest (or an eval) while it runs: the ratings so far, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take; the game being played now, its round, phase and each seat's points, and a button to watch its board; and the last games' results. It updates by itself every 10 seconds, and it's laid out for a phone.
 
 It prints a link for this machine and, when Tailscale is running, a link on the tailnet (`http://<machine>.<tailnet>.ts.net:8790/`) with a QR code of it in the terminal: open it on a phone on the same tailnet. It listens only on this machine and its Tailscale address, not the rest of the network (`--host ADDR` to pick one, `--port N` for another port).
+
+**Watch the table** under the game being played opens its board live: the same table view a phone's **Table** shows in a game with no TV (the map, each player's dragons and points, what just happened), updating as the players move. The game's runner hosts its room on this machine only, so the page passes that room's table view through its own port, read-only: it lets through nothing that acts in the game, and nothing with a seat's token. The players are named there as at the table (Rowan, Tick, …); the live page shows each seat's table name beside its model. When the game ends its runner closes the room, and the next game's button appears on the live page.
 
 It only reads the contest's directory, on every refresh, so it works for a contest that's already running, and stopping it does nothing to the contest. A game whose runner has gone shows as stopped; one that didn't finish and was played again is counted under the progress bar.
 
