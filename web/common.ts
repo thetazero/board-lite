@@ -33,12 +33,17 @@ export function savedWhen(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// An error with no answer from the server: the request may or may not have
+// been carried out (web/taps.ts sends it again under the same id, #456).
+const unanswered = (msg: string) => Object.assign(new Error(msg), { unanswered: true });
+
 export async function post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   // A request that never comes back (the server restarted under it, the
   // network dropped it) gives up, rather than holding up every tap after it.
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(POST_MS) })
-    .catch(() => { throw new Error("The server didn't answer: try again."); });
-  const data = await res.json().catch(() => ({ error: 'The server sent a bad reply.' }));
+    .catch(() => { throw unanswered("The server didn't answer: try again."); });
+  const data = await res.json().catch(() => null);
+  if (data === null) throw unanswered('The server sent a bad reply.');
   if (!res.ok) throw new Error(String(data.error ?? 'Something went wrong.'));
   return data;
 }

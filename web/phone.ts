@@ -544,7 +544,7 @@ const table = (() => {
 // still does what one tap does (#456). The server answers a command with the
 // table as it is after it, drawn at once rather than waiting for the push.
 const tapper = taps({
-  post: (command) => post(`/api/rooms/${code}/do`, { token, command, via: 'phone' }),
+  post: (command, id) => post(`/api/rooms/${code}/do`, { token, command, id, via: 'phone' }),
   answer: (reply) => {
     const s = (reply as { state?: Snapshot }).state;
     if (!s || s.v === undefined || s.v <= shownV) return false;
@@ -554,7 +554,7 @@ const tapper = taps({
   fail: toast,
 });
 
-function send(command: string): Promise<void> {
+function send(command: string): Promise<boolean> {
   endAsk = null; // doing anything else on your turn takes back an End turn waiting for its confirm
   return tapper.send(command);
 }
@@ -1527,9 +1527,10 @@ talk.form.onsubmit = (e) => {
   const text = talk.input.value.trim();
   if (!text) return;
   const to = Number(talk.to.value);
-  // Sent once, however often Send is tapped before it's gone.
-  tapper.tap('talk', () => call(`/api/rooms/${code}/do`, { token, via: 'phone', command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
-    .then(() => (talk.input.value = '')));
+  // Said once, however often Send is tapped, and when sent again after the
+  // server didn't answer (it may have heard it): the same id, said at most once.
+  tapper.tap('talk', () => tapper.send(to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}`)
+    .then((ok) => ok && (talk.input.value = '')));
 };
 
 function talkHtml(text: string, g: PublicState): string {

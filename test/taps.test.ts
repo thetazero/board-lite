@@ -20,19 +20,21 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // the answer's snapshot if it's newer than the one on screen, as web/phone.ts does.
 function slowPhone(room: Room, tok: string, lagMs: number) {
   const errors: string[] = [];
+  let dropAnswers = 0; // the next answers lost on the way back (the server did the command)
   let shownV = -1;
   let screen: Snapshot = room.snapshot(tok);
   const phone = taps({
-    post: async (command) => {
+    post: async (command, id) => {
       await sleep(lagMs);
       try {
-        room.command(tok, command, 'phone');
+        room.command(tok, command, 'phone', id);
       } catch (e) {
         await sleep(lagMs);
         throw e;
       }
       const state = room.snapshot(tok);
       await sleep(lagMs);
+      if (dropAnswers > 0 && dropAnswers--) throw Object.assign(new Error("The server didn't answer: try again."), { unanswered: true });
       return { state };
     },
     answer: (reply) => {
@@ -45,7 +47,7 @@ function slowPhone(room: Room, tok: string, lagMs: number) {
     },
     fail: (e) => errors.push((e as Error).message),
   });
-  return { phone, errors, screen: () => screen };
+  return { phone, errors, screen: () => screen, loseAnswer: () => void dropAnswers++ };
 }
 
 // Taps `times` times, `gapMs` apart: quicker than the answer comes back.
@@ -67,7 +69,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
     assert.equal(g.phase, 'action');
     const me = g.turn;
     const tok = [ada, bram][me].token;
-    const { phone, errors, screen } = slowPhone(room, tok, 40);
+    const { phone, errors, screen, loseAnswer } = slowPhone(room, tok, 40);
     const v0 = room.snapshot(tok).v!;
 
     // The trade form, as the phone has it: Send offer builds the command from
@@ -104,6 +106,27 @@ test('on a slow connection, tapping a button again and again does what one tap d
     await sleep(200);
     assert.deepEqual(errors, []);
     assert.equal(ends(), before + 1, 'the turn ends once');
+
+    // Table talk: Send tapped again and again says it once. And when the
+    // answer is lost (the server heard it, the phone never heard back), the
+    // phone says to try again; sent again, it's still said once.
+    const said = () => g.log.filter((e) => / says: "/.test(e.text)).length;
+    const talked = said();
+    await tapping(4, 15, () => phone.tap('talk', () => phone.send('say good luck')));
+    await sleep(200);
+    assert.deepEqual(errors, []);
+    assert.equal(said(), talked + 1, 'said once, however many taps');
+    loseAnswer();
+    phone.tap('talk', () => phone.send('say well played'));
+    await sleep(200);
+    assert.deepEqual(errors, ["The server didn't answer: try again."]);
+    assert.equal(said(), talked + 2, 'the server heard it');
+    phone.tap('talk', () => phone.send('say well played'));
+    await sleep(200);
+    assert.equal(said(), talked + 2, 'sent again after "try again": not said twice');
+    phone.tap('talk', () => phone.send('say well played'));
+    await sleep(200);
+    assert.equal(said(), talked + 3, 'and once that went through, saying it again is a new message');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -175,6 +198,31 @@ test('a refused command drops what was tapped after it, and says so once', async
   // The button is free again at once: nothing changed to wait for.
   s.phone.tap('a', () => s.phone.send('build c1 0,1'));
   assert.deepEqual(s.sent, ['build c1 0,1', 'build c1 0,1']);
+});
+
+test('a command whose answer was lost goes again under the same id; anything else gets a new one', async () => {
+  const ids: string[] = [];
+  let lose = true;
+  const phone = taps({
+    post: async (_command, id) => {
+      ids.push(id);
+      if (lose) throw Object.assign(new Error('no answer'), { unanswered: true });
+      return {};
+    },
+    answer: () => true,
+    fail: () => {},
+  });
+  await phone.send('say hi');
+  lose = false;
+  await phone.send('say hi');
+  assert.equal(ids[1], ids[0], 'the retry is the same sending');
+  await phone.send('say hi');
+  assert.notEqual(ids[2], ids[1], 'once it went through, the same words again are new');
+  lose = true;
+  await phone.send('say hi');
+  lose = false;
+  await phone.send('end');
+  assert.notEqual(ids[4], ids[3], 'another command after a lost one is its own');
 });
 
 test('taps that only change the phone (a stepper, a pick) count every time', async () => {

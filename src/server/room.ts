@@ -145,6 +145,7 @@ export class Room {
   private awayTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
   private version = 0; // how many times the room has changed (Snapshot.v)
+  private doneIds = new Set<string>(); // the latest commands carried out, by seat and the client's id for them
   private botRng = { state: Date.now() | 0 };
   private savedSeats = '';
   // While a TV is watching, a change that gives it a scene to play (a fight,
@@ -497,10 +498,19 @@ export class Room {
   // ---- play ----
 
   // A player's command, through the engine.
-  command(tok: string, cmd: string, via?: Via) {
+  // `id`, when the client gives one, names this one sending of the command: the
+  // same id again is the same tap retried (an answer lost on slow Wi-Fi, a
+  // browser resending), and it's done only once: no repeated action, no
+  // message said twice (#456).
+  command(tok: string, cmd: string, via?: Via, id?: string) {
     const p = this.playerSeat(tok);
     this.heard(p, via);
+    const key = id ? `${p} ${id}` : null;
+    if (key && this.doneIds.has(key)) return;
     this.act(p, cmd);
+    if (!key) return;
+    this.doneIds.add(key);
+    if (this.doneIds.size > 500) this.doneIds.delete(this.doneIds.values().next().value!);
   }
 
   private playerSeat(tok: string): number {
