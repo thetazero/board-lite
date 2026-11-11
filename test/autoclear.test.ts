@@ -33,12 +33,12 @@ function setup(seed = 5) {
 test('auto clear targets your own held buildings, weakest first, and skips great beasts and fauna beside them', () => {
   const { g, mine: [a, b, c, d], empty } = setup();
   g.map[a].fauna = 'basilisk';
-  g.map[b].fauna = 'wolf_pack';
+  g.map[b].fauna = 'wolf';
   g.map[c].fauna = 'thunderbird';
-  g.map[empty].fauna = 'wolf_pack';
+  g.map[empty].fauna = 'wolf';
   const rival = addDragon(g, 1, 1);
   rival.perch = d;
-  const power = { [a]: combatPower(FAUNA.basilisk), [b]: combatPower(FAUNA.wolf_pack), [d]: dragonPower(rival) };
+  const power = { [a]: combatPower(FAUNA.basilisk), [b]: combatPower(FAUNA.wolf), [d]: dragonPower(rival) };
   assert.deepEqual(autoClearTargets(g, 0), [a, b, d].sort((x, y) => power[x] - power[y] || (x < y ? -1 : 1)));
   // A rival's dragon perched there is fought too: the hex is held by both.
   rival.perch = a;
@@ -50,7 +50,7 @@ test('auto clear targets your own held buildings, weakest first, and skips great
 test('auto clear fights each target in turn with every raid-ready dragon, as clear does', () => {
   const { g, mine: [a, b] } = setup();
   g.map[a].fauna = 'cave_bear';
-  g.map[b].fauna = 'wolf_pack';
+  g.map[b].fauna = 'wolf';
   const ds = [0, 1, 2, 3, 4].map(() => addDragon(g, 0, 3));
   const egg = addDragon(g, 0, 0);
   const before = g.log.length;
@@ -92,19 +92,19 @@ test("auto clear is refused with nothing to clear, no raid-ready dragon, or off 
   const { g, mine: [a] } = setup();
   addDragon(g, 0, 3);
   assert.throws(() => apply(g, 0, 'autoclear'), /nothing to auto clear/);
-  g.map[a].fauna = 'wolf_pack';
+  g.map[a].fauna = 'wolf';
   g.dragons[0].damage = 999;
   assert.throws(() => apply(g, 0, 'autoclear'), /no raid-ready dragon/);
   g.dragons[0].damage = 0;
   assert.throws(() => apply(g, 1, 'autoclear'), RuleError);
-  assert.equal(g.map[a].fauna, 'wolf_pack');
+  assert.equal(g.map[a].fauna, 'wolf');
 });
 
 test('the phone and the CLI offer auto clear only with something to clear and a dragon to send', () => {
   const { g, mine: [a] } = setup();
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = () => seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...seatState(g, 0), name: 'P1' } }, 10);
-  g.map[a].fauna = 'wolf_pack';
+  g.map[a].fauna = 'wolf';
   assert.deepEqual(seatState(g, 0).autoClear, [a]);
   assert.doesNotMatch(view(), /^\s*autoclear /m); // no dragon
   addDragon(g, 0, 3);

@@ -1479,7 +1479,7 @@ export const SCENES: Scene[] = [
   },
   {
     // Aggressive fauna (#66): beasts on the starting map, a cave bear sent onto
-    // another player's building, a wolf pack beside the acting player's tower.
+    // another player's building, a wolf beside the acting player's tower.
     // The acting player holds both fauna cards and has a young dragon to send.
     name: 'fauna-3p',
     players: 3,
@@ -1491,7 +1491,7 @@ export const SCENES: Scene[] = [
       const theirs = Object.keys(g.buildings).find((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower')!;
       g.map[theirs].fauna = 'cave_bear';
       const open = neighbors(g.towers[p]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
-      g.map[open].fauna = 'wolf_pack';
+      g.map[open].fauna = 'wolf';
       readyDragons(g, p);
       giveHand(g, p, ['rouse_bear', 'wake_basilisk', 'windfall']);
       Object.keys(g.players[p].resources).forEach((r) => (g.players[p].resources[r as 'gold'] = 6));
@@ -1499,22 +1499,22 @@ export const SCENES: Scene[] = [
     shots: (g) => [
       { file: 'tv-fauna-3p', caption: 'TV: fauna on the board: wolves by a tower, a bear on a building, beasts out in the wilds', client: 'tv', waitMs: 4800 },
       {
-        // The wolf pack wanders to the next open hex: it turns, trots over, and turns back.
-        file: 'tv-fauna-wander-3p', caption: 'TV: the wolf pack wanders to the next hex, walking over', client: 'tv',
+        // The wolf wanders to the next open hex: it turns, trots over, and turns back.
+        file: 'tv-fauna-wander-3p', caption: 'TV: the wolf wanders to the next hex, walking over', client: 'tv',
         then: (room) => room.mutate((g2) => {
-          const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!;
+          const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf')!;
           const n = neighbors(k).find((x) => g2.map[x] && g2.map[x].terrain !== 'ocean' && !g2.map[x].fauna && !g2.buildings[x])!;
-          g2.map[n].fauna = 'wolf_pack';
+          g2.map[n].fauna = 'wolf';
           delete g2.map[k].fauna;
         }),
         waitMs: 1500, // the board has the move before its clock starts
         frames: [0, 0.4, 0.9, 1.5, 2.1, 2.9, 4],
       },
       {
-        // The wolf pack is cleared: it folds down flat, and the hex's scenery grows back round where it stood.
-        file: 'tv-fauna-leave-3p', caption: 'TV: the wolf pack is cleared, folding down, and the hex grows back', client: 'tv',
+        // The wolf is cleared: it folds down flat, and the hex's scenery grows back round where it stood.
+        file: 'tv-fauna-leave-3p', caption: 'TV: the wolf is cleared, folding down, and the hex grows back', client: 'tv',
         then: (room) => room.mutate((g2) => {
-          delete g2.map[Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf_pack')!].fauna;
+          delete g2.map[Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf')!].fauna;
         }),
         waitMs: 1500,
         frames: [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.1],
@@ -1737,7 +1737,7 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    // Fauna on every terrain and on buildings (#72): a wolf pack, a cave bear
+    // Fauna on every terrain and on buildings (#72): a wolf, a cave bear
     // and a basilisk on open hexes of each land terrain, and one of each on a
     // building it shuts down. The acting player has dragons to send.
     name: 'fauna-terrain-3p',
@@ -1749,7 +1749,7 @@ export const SCENES: Scene[] = [
       buildingsAtLeast(g, 3);
       // The great beasts stay where they are: the TV lists them as alive.
       for (const h of Object.values(g.map)) if (h.fauna && !BEASTS[h.fauna]) delete h.fauna;
-      const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
+      const kinds = ['wolf', 'cave_bear', 'basilisk'];
       Object.keys(g.buildings).filter((k) => g.buildings[k].type !== 'tower').slice(0, 3).forEach((k, i) => (g.map[k].fauna = kinds[i]));
       for (const t of ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor']) {
         const open = Object.keys(g.map).filter((k) => g.map[k].terrain === t && !g.buildings[k] && !g.map[k].fauna);
@@ -1758,7 +1758,7 @@ export const SCENES: Scene[] = [
       readyDragons(g, p);
     },
     shots: (g) => {
-      const kinds = ['wolf_pack', 'cave_bear', 'basilisk'];
+      const kinds = ['wolf', 'cave_bear', 'basilisk'];
       const hexOf = (kind: string, built: boolean) => Object.keys(g!.map).find((k) => g!.map[k].fauna === kind && !!g!.buildings[k] === built)!;
       const send = (kind: string, built: boolean) => ({
         file: `phone-fauna-send-${kind.replace('_', '-')}${built ? '-built' : ''}-3p`,

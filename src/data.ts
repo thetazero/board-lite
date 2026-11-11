@@ -361,7 +361,7 @@ export interface FaunaDef extends UnitDef {
 }
 
 export const FAUNA: Record<string, FaunaDef> = {
-  wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
+  wolf: { name: 'Wolf', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4 } },
   basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'neutral', loot: { livestock: 4, gold: 2 } },
 };
@@ -388,7 +388,7 @@ export function faunaDef(k: string): FaunaDef {
 
 // On the starting map, a beast's kind goes by its distance to the nearest
 // tower: wolves close in, the basilisk furthest out.
-export const FAUNA_BY_DISTANCE = ['wolf_pack', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
+export const FAUNA_BY_DISTANCE = ['wolf', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
 
 export interface TargetDef {
   name: string;

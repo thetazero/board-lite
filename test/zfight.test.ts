@@ -120,7 +120,7 @@ function hexes(): Portrait[] {
   for (const t of terrains) out.push({ terrain: t }, { terrain: t, held: 'thunderbird' }, { terrain: t, peakZone: 2 });
   const buildings = [...Object.entries(BUILDINGS).filter(([k]) => k !== 'tower_floor').map(([k, b]) => [k, b.terrain ?? 'desert'] as const), ['tower', 'desert'] as const];
   for (const [b, t] of buildings) {
-    out.push({ terrain: t, building: b, border: true }, { terrain: t, building: b, beast: 'wolf_pack' }, { terrain: t, building: b, peakZone: 2 });
+    out.push({ terrain: t, building: b, border: true }, { terrain: t, building: b, beast: 'wolf' }, { terrain: t, building: b, peakZone: 2 });
     for (const u of Object.keys(UPGRADES)) out.push({ terrain: t, building: b, upgrade: u });
   }
   for (const floors of [1, 2, 3]) out.push({ terrain: 'desert', building: 'tower', floors, dragon: { element: 'fire', stage: 2 } });
