@@ -19,14 +19,15 @@
 // PNG's size, and one the same as the previous run's is a link to that file,
 // not a copy. Finished work is cleared away (tidy.ts). Only one run goes at a
 // time on the machine (turn.ts): one started meanwhile waits for it, and says so.
+// Chrome goes with the run however it ends, and a run first closes any stray
+// headless Chrome some other run left behind (browser.ts).
 
-import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { Readable, Writable } from 'node:stream';
+import { launchChrome, sweepBrowsers, type Cdp } from '../browser.ts';
 import { Room, seatsFile } from '../server/room.ts';
 import { gameLogFile } from '../server/gamelog.ts';
 import { startServer } from '../server/server.ts';
@@ -91,112 +92,6 @@ const TAILSCALE = ['100.86.12.40']; // and its Tailscale address, for shots with
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : undefined;
-}
-
-// ---------- a minimal DevTools protocol client ----------
-
-class Cdp {
-  private id = 0;
-  private pending = new Map<number, { ok: (v: any) => void; fail: (e: Error) => void }>();
-  private handlers: ((method: string, params: any, session?: string) => void)[] = [];
-  private buf = '';
-  private out: Writable;
-  // Chrome's --remote-debugging-pipe: it reads commands on its fd 3 and writes on its fd 4, each message ended by a NUL.
-  constructor(out: Writable, input: Readable) {
-    this.out = out;
-    input.setEncoding('utf8');
-    input.on('data', (d: string) => {
-      const parts = (this.buf + d).split('\0');
-      this.buf = parts.pop()!;
-      for (const p of parts) this.receive(JSON.parse(p));
-    });
-    // Chrome gone: nothing pending will ever be answered.
-    input.on('close', () => {
-      for (const p of this.pending.values()) p.fail(new Error('Chrome closed its DevTools pipe'));
-      this.pending.clear();
-    });
-  }
-
-  private receive(m: any) {
-    if (m.id !== undefined) {
-      const p = this.pending.get(m.id);
-      if (!p) return;
-      this.pending.delete(m.id);
-      if (m.error) p.fail(new Error(`${m.error.message} ${m.error.data ?? ''}`));
-      else p.ok(m.result);
-    } else for (const h of this.handlers) h(m.method, m.params, m.sessionId);
-  }
-
-  send(method: string, params: object = {}, sessionId?: string): Promise<any> {
-    const id = ++this.id;
-    if (process.env.CDP_DEBUG) console.error('>', id, method, JSON.stringify(params).slice(0, 120));
-    this.out.write(JSON.stringify({ id, method, params, sessionId }) + '\0');
-    return new Promise((ok, fail) => this.pending.set(id, { ok, fail }));
-  }
-
-  on(fn: (method: string, params: any, session?: string) => void) {
-    this.handlers.push(fn);
-  }
-}
-
-function findChrome(): string {
-  const candidates = [process.env.CHROME, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
-  const found = candidates.find((c) => c && existsSync(c));
-  if (!found) throw new Error('No Chrome or Chromium found. Set CHROME=/path/to/chrome.');
-  return found;
-}
-
-// Chrome is driven over a pipe, not a port: when this process ends, however it
-// ends (Ctrl-C, kill -9, its tab closing), the kernel closes our end and
-// Chrome quits on its own. A port would leave it running, holding a gigabyte.
-async function launchChrome(): Promise<{ proc: ChildProcess; cdp: Cdp; gone: Promise<void> }> {
-  // A profile of its own, so runs from several worktrees at once don't collide.
-  // The next run clears away the profile of a run that was killed outright (tidy.ts).
-  const profile = mkdtempSync(join(CACHE, `chrome-profile-${process.pid}-`));
-  const proc = spawn(findChrome(), [
-    '--headless=new', '--remote-debugging-pipe', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
-    '--disable-extensions', '--disable-background-networking', '--disable-sync', '--mute-audio', '--hide-scrollbars',
-    '--force-color-profile=srgb', '--font-render-hinting=none',
-    '--use-angle=swiftshader', '--enable-unsafe-swiftshader', // WebGL for the TV's 3D board, on the CPU
-    '--disable-gpu-rasterization', // the rest of the page rasterized in software, the same every run
-    '--disable-features=BackForwardCache', // a cached page would keep its event stream open, and the browser allows only 6 per host
-    'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
-  // Chrome's helper processes can still be writing the profile for a moment after it exits.
-  const gone = new Promise<void>((ok) => {
-    const removeProfile = (tries: number) => {
-      try {
-        rmSync(profile, { recursive: true, force: true });
-        ok();
-      } catch (e) {
-        if (tries > 0) setTimeout(() => removeProfile(tries - 1), 300);
-        else {
-          console.error(`Couldn't remove Chrome's profile ${profile}: ${(e as Error).message}`);
-          ok();
-        }
-      }
-    };
-    proc.on('exit', () => removeProfile(10));
-  });
-  let err = '';
-  proc.stderr!.on('data', (d) => (err += d));
-  const cdp = new Cdp(proc.stdio[3] as Writable, proc.stdio[4] as Readable);
-  await new Promise<void>((ok, fail) => {
-    const timer = setTimeout(() => fail(new Error(`Chrome didn't start:\n${err}`)), 20000);
-    cdp.send('Browser.getVersion').then(() => {
-      clearTimeout(timer);
-      ok();
-    }, () => {});
-    proc.on('exit', () => {
-      clearTimeout(timer);
-      fail(new Error(`Chrome exited:\n${err}`));
-    });
-  }).catch((e) => {
-    proc.kill();
-    throw e;
-  });
-  return { proc, cdp, gone };
 }
 
 // ---------- a browser tab ----------
@@ -480,6 +375,7 @@ async function main() {
   const prev = `${out}.previous`;
   const cleared = tidy(CACHE, [out, prev]);
   if (cleared.length) console.log(`Cleared away ${cleared.length} old run(s) and profile(s) (their checkout is gone, or untouched for ${KEEP_DAYS} days): ${cleared.join(', ')}`);
+  await sweepBrowsers(); // a headless Chrome some other run left behind, holding memory this one needs
   rmSync(prev, { recursive: true, force: true });
   if (existsSync(out)) renameSync(out, prev);
   mkdirSync(out, { recursive: true });
@@ -497,16 +393,8 @@ async function main() {
   const { server, rooms } = startServer(0, { dir: join(CACHE, 'rooms'), recaps: join(CACHE, 'recaps') });
   await new Promise<void>((ok) => (server.listening ? ok() : server.on('listening', () => ok())));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const chrome = await launchChrome();
-  // Ctrl-C and friends: take Chrome down now, so its profile goes too. (A kill -9 can't be caught; the pipe covers that.)
-  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
-    process.on(sig, () => {
-      chrome.proc.kill();
-      console.error(`\nStopped (${sig}).`);
-      chrome.gone.then(() => process.exit(130));
-      setTimeout(() => process.exit(130), 5000).unref();
-    });
-  }
+  // Chrome goes when this run ends, however it ends (browser.ts).
+  const chrome = await launchChrome(CACHE);
   const done: Done[] = [];
   const covered: string[] = []; // phone screens where the hand sits over the page
   const spills: string[] = []; // screens where a card's cost spills past its edge
@@ -616,7 +504,7 @@ async function main() {
       rooms.delete(code);
     }
   } finally {
-    chrome.proc.kill();
+    void chrome.close();
     server.close();
     server.closeAllConnections();
   }

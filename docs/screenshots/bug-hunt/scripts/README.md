@@ -10,6 +10,8 @@ npm init -y && npm install playwright-core@1
 cp <repo>/docs/screenshots/bug-hunt/scripts/* .
 ```
 
+They start Chrome with `chromium.launch()`, which drives it over a pipe, so it closes when the script ends. Keep it that way: never a Chrome started by hand on a `--remote-debugging-port` (see "Browsers in scripts" in `docs/clients.md`).
+
 Then fix the import paths in `mkgame.ts` and `REPO` in `s8-restart.cjs` so they point at your checkout.
 
 - `drive.cjs <base> <players> <outdir> [seed]`: a TV and one phone per seat play a whole game through the phones' buttons, with a loose random policy. It logs toasts, page errors, failed requests, stalls, and buttons something covers.

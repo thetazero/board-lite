@@ -116,3 +116,12 @@ npm run shots -- --out NAME                  # its own folder: ~/.cache/board-li
 - **A phone shot is one screen.** A longer page is shot a screen at a time, scrolling down (`name.webp`, `name.2.webp`, …).
 - **Same code, same images:** games are seeded and the clock is frozen. `npm test` checks every scene still stages.
 - **Adding a scene:** add an entry in `src/shots/scenes.ts`.
+
+## Browsers in scripts
+
+A script that drives the real TV and phone pages (a fuzz, a real-client test, a check of a fix) starts its headless Chrome so that the browser goes when the script does, however it ends: finished, failed, Ctrl-C, killed, or its tab closed with its worktree. A headless Chrome left running holds a gigabyte or more for as long as the machine is up; one held 7.5 GB for 42 hours and stopped a live game's Claude players for lack of memory (#451).
+
+- **Start it with `launchChrome()` from `src/browser.ts`** (what `npm run shots` uses), or playwright's `chromium.launch()`. Both drive Chrome over a pipe, which closes when the script's process ends, so Chrome quits on its own.
+- **Never start Chrome yourself with `--remote-debugging-port`** (in the background, then connecting to the port). Nothing ties that Chrome to anyone: it outlives the script, the shell and the tab.
+- Keep its profile (`--user-data-dir`) on disk under `~/.cache/board-lite/`, not in `/tmp` (RAM on the dev machine).
+- **`npm run browsers`** lists every headless Chrome running, with its memory and folder, and closes the stray ones. A Chrome is stray when whatever started it has exited and no one can still be using it: the folder it ran in or its profile is gone (its tab closed), or it has run for 6 hours. Screenshot runs close stray Chromes before they start, and playtests do when memory is short.

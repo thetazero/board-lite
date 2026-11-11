@@ -24,6 +24,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import { pname, score, type Game } from '../engine.ts';
+import { sweepBrowsers } from '../browser.ts';
 import { load } from '../store.ts';
 import { Room, addClaudeRunner } from '../server/room.ts';
 import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.ts';
@@ -301,9 +302,15 @@ let interrupted = false;
 async function admit(): Promise<boolean> {
   const claudeSeats = models.filter((m) => m !== 'bot').length;
   let said = '';
+  let swept = false;
   for (;;) {
     const r = tryAcquire(pool, claudeSeats, out);
     if (r.ok) return true;
+    // Short of memory: first close any headless Chrome a test run left behind (#451), and look again.
+    if (!swept && / MB free/.test(r.why)) {
+      swept = true;
+      if ((await sweepBrowsers(note)).length) continue;
+    }
     const kind = r.why.replace(/[\d.]+/g, '#'); // don't log every change in a number
     if (kind !== said) { note(`Waiting to start: ${r.why}.`); said = kind; }
     await new Promise((res) => setTimeout(res, 5000));
@@ -384,7 +391,10 @@ async function main() {
     if (saved) { status = 'saved'; break; }
     // Free memory under the floor for 10 s: stop this game before the machine OOMs.
     if (pool.memAvailableMb() >= FLOOR_MB) lowSince = 0;
-    else if (!lowSince) lowSince = Date.now();
+    else if (!lowSince) {
+      lowSince = Date.now();
+      void sweepBrowsers(note); // a headless Chrome a test run left behind may be what's holding it (#451)
+    }
     else if (Date.now() - lowSince > 10000) { status = 'low memory'; break; }
     if (over) {
       // Give the players a moment to see the end and sign off.
