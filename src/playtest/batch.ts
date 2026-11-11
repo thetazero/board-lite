@@ -9,7 +9,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { defaultPool } from './slots.ts';
 import { runGames } from './games.ts';
 import { batchMarkdown, loadBatch } from './stats.ts';
 import { summary } from './tally.ts';
@@ -50,13 +49,11 @@ if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is R
 mkdirSync(out, { recursive: true });
 const passed = ['--effort', '--budget-usd', '--max-minutes', '--stall-minutes', '--advice'].flatMap((o) => (opt(o) === undefined ? [] : [o, opt(o)!]));
 
-// Run only as many games at once as the machine-wide pool can seat: the rest
-// would just sit waiting for slots (run.ts waits for them anyway).
-const claudeSeats = models.filter((m) => m !== 'bot').length;
+// As many games at once as free memory can seat (runGames checks before each).
 await runGames({
   out,
   games,
-  atOnce: Math.max(1, Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))),
+  atOnce: Infinity,
   // Game i rotates the seats i-1 places, so each model sits in each seat equally often.
   seats: (i) => { const r = (i - 1) % models.length; return [...models.slice(r), ...models.slice(0, r)]; },
   args: (i) => [...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...passed],

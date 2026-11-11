@@ -62,7 +62,7 @@ const claudeSeats = Math.max(...Array.from({ length: Math.min(games, round) }, (
 const atOnce = Math.max(1, Math.min(Number(opt('--parallel') ?? 1), Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))));
 
 if (args.includes('--dry-run')) {
-  console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), ${atOnce} at a time:`);
+  console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), up to ${atOnce} at a time:`);
   for (let i = 1; i <= games; i++) console.log(`g${i}: ${seats(i).join(', ')}`);
   process.exit(0);
 }
@@ -73,7 +73,7 @@ if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is R
 mkdirSync(out, { recursive: true });
 const seed = opt('--seed');
 const passed = ['--effort', '--max-minutes', '--stall-minutes'].flatMap((o) => (opt(o) === undefined ? [] : [o, opt(o)!]));
-console.log(`Eval in ${out}: ${games} games, ${atOnce} at a time.`);
+console.log(`Eval in ${out}: ${games} games, up to ${atOnce} at a time.`);
 await runGames({
   out,
   games,

@@ -1,8 +1,9 @@
 // Machine-wide seat slots for playtests. Every Claude seat is a `claude -p`
 // process of a few hundred MB, and several tabs may run batches at once, so a
 // game takes one slot per Claude seat from a pool shared by every playtest on
-// the machine before it starts any of them, and waits while the pool is full or
-// free memory is short. See "How many games run at once" in docs/playtest.md.
+// the machine before it starts any of them, and waits while its seats would
+// leave too little memory free (or, if BOARD_LITE_MAX_SEATS is set, while the
+// pool is full). See "How many games run at once" in docs/playtest.md.
 
 import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -10,7 +11,8 @@ import { join } from 'node:path';
 import { withLock } from '../store.ts';
 
 export const SEAT_MB = 450; // one claude -p process plus its seat server, measured at 300-400 MB
-export const RESERVE_MB = 2048; // free memory a new game must leave for everything else
+export const RESERVE_MB = 3072; // free memory a new game must leave for everything else
+export const WARMUP_MS = 120000; // a game this new may not show in MemAvailable yet
 export const FLOOR_MB = 1024; // below this, running games stop rather than risk an OOM
 
 export interface Pool { dir: string; maxSeats: number; memAvailableMb: () => number }
@@ -18,7 +20,7 @@ export interface Pool { dir: string; maxSeats: number; memAvailableMb: () => num
 export function defaultPool(): Pool {
   return {
     dir: process.env.BOARD_LITE_SLOTS_DIR ?? join(homedir(), '.cache', 'board-lite', 'seat-slots'),
-    maxSeats: Number(process.env.BOARD_LITE_MAX_SEATS ?? 6),
+    maxSeats: process.env.BOARD_LITE_MAX_SEATS ? Number(process.env.BOARD_LITE_MAX_SEATS) : Infinity,
     memAvailableMb,
   };
 }
@@ -58,6 +60,22 @@ export function holders(pool: Pool): Holder[] {
 }
 
 /**
+ * Free memory once the seats of games that took their slots in the last
+ * WARMUP_MS are counted as used: their processes are still starting, so
+ * MemAvailable doesn't show them yet.
+ */
+export function freeMb(pool: Pool, held: Holder[], now = Date.now()): number {
+  const warming = held.filter((h) => now - Date.parse(h.since) < WARMUP_MS).reduce((n, h) => n + h.seats, 0);
+  return pool.memAvailableMb() - warming * SEAT_MB;
+}
+
+/** How many more Claude seats could start right now. */
+export function seatsThatFit(pool: Pool, held = holders(pool)): number {
+  const used = held.reduce((n, h) => n + h.seats, 0);
+  return Math.max(0, Math.min(pool.maxSeats - used, Math.floor((freeMb(pool, held) - RESERVE_MB) / SEAT_MB)));
+}
+
+/**
  * Takes `seats` slots for this process if they fit right now, and says why not
  * otherwise. Check and take happen under one lock, so two games can't both
  * squeeze into the last slots.
@@ -72,9 +90,9 @@ export function tryAcquire(pool: Pool, seats: number, out: string): { ok: true }
     if (used + seats > pool.maxSeats) {
       return { ok: false as const, why: `${used} of ${pool.maxSeats} seat slots in use (${held.map((h) => h.out).join(', ')})` };
     }
-    const free = pool.memAvailableMb();
+    const free = freeMb(pool, held);
     if (free - seats * SEAT_MB < RESERVE_MB) {
-      return { ok: false as const, why: `${Math.round(free)} MB free; ${seats} seats need ${seats * SEAT_MB} MB plus ${RESERVE_MB} MB to spare` };
+      return { ok: false as const, why: `${Math.round(free)} MB free counting games still starting; ${seats} seats need ${seats * SEAT_MB} MB plus ${RESERVE_MB} MB to spare` };
     }
     const h: Holder = { pid: process.pid, seats, out, since: new Date().toISOString() };
     writeFileSync(join(pool.dir, `${process.pid}.json`), JSON.stringify(h));
