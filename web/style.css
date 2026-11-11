@@ -1287,7 +1287,11 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .spoils { font-size: 1.15em; flex-wrap: wrap; gap: .5em 1em; }
 .remote .outcome .boon { font-size: 1em; }
 .remote .outcome .score { font-size: 1.1em; flex-wrap: wrap; }
-.remote .heldback { font-size: .9em; padding: .2em .3em; flex-wrap: wrap; }
+/* On a phone, whoever held back share lines, and stay on the screen; the
+   fighters stand above them (tv.ts). */
+.remote .backrow { right: 1.5vw; flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
+.remote .heldback { font-size: .9em; padding: .2em .4em; gap: .3em; flex-wrap: wrap; }
+.remote .heldback svg { width: 1.9em; height: 1.9em; }
 /* A dragon in the roost is a button: tap it for its card. */
 .dtap { background: none; box-shadow: none; padding: .15em .2em; text-align: left; color: inherit; font-weight: inherit; }
 .dtap:active:not(:disabled) { transform: translateY(.08em); box-shadow: none; }

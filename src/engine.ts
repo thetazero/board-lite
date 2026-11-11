@@ -137,7 +137,8 @@ export type GameEvent =
   // `hps`: each of `ds`'s health as the fight starts, lined up with `ds`, so a
   // replay drawn after it starts a hurt dragon hurt. Saves from before it lack it.
   // `first`: who won the coin flip and strikes first each combat round (absent in old saves: the dragons).
-  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[]; first?: Side } // el: each defender's element (absent in old saves)
+  // `held`: who held back which dragons, so a replay needn't find the hold events in the log (absent in old saves).
+  | { k: 'fight'; ps: number[]; t: string; name: string; ds: string[]; hps?: number[]; units: { name: string; hp: number; el?: string }[]; first?: Side; held?: { p: number; ds: string[] }[] } // el: each defender's element (absent in old saves)
   | { k: 'combat'; round: number; hits: Hit[] }
   | { k: 'raidEnd'; t: string; name: string; won: boolean; winners: number[]; shares: Bundle[]; power: number[]; points?: number; scorer?: number } // shares and power line up with winners; scorer took the kingdom's points
   | { k: 'noRaid'; why: 'unable' | 'nobody' | 'held' } // unable: no dragon was raid-ready; held: everyone held back; nobody: old saves (no one committed)
@@ -842,12 +843,14 @@ function resolveVote(g: Game) {
 function resolveChoices(g: Game) {
   const raid = g.raid!;
   const fighters: number[] = [];
+  const heldBack: { p: number; ds: string[] }[] = [];
   for (let p = 0; p < g.players.length; p++) {
     const fight = raid.choices[p];
     if (!fight) continue;
     if (fight.length) fighters.push(p);
     const held = raid.sent[p].filter((id) => !fight.includes(id));
     if (!held.length) continue;
+    heldBack.push({ p, ds: held });
     if (!fight.length) log(g, `${pname(p)} holds back.`, { k: 'hold', p, ds: held });
     else log(g, `${pname(p)} holds back ${held.join(' ')}.`, { k: 'hold', p, ds: held });
   }
@@ -858,7 +861,7 @@ function resolveChoices(g: Game) {
   raid.fighters = fighters.flatMap((p) => raid.choices[p]!);
   raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
   const first = coinFlip(g);
-  log(g, `${andList(fighters.map(pname))} ${fighters.length === 1 ? 'attacks' : 'attack'} ${TARGETS[raid.target!].name}. ${firstText(first, 'the defenders')}`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })), first });
+  log(g, `${andList(fighters.map(pname))} ${fighters.length === 1 ? 'attacks' : 'attack'} ${TARGETS[raid.target!].name}. ${firstText(first, 'the defenders')}`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })), first, held: heldBack });
   // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
   for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round, first);
 }

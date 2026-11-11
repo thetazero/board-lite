@@ -1892,6 +1892,31 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // A fight on the phone with several held back, some with many dragons
+    // (#453): they share lines at the foot, and the fighters stand above them.
+    name: 'remote-fight-held-4p',
+    players: 4,
+    seed: 1,
+    remote: true,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const [a, b, c, d] = turnOrder(g);
+      arm(g, a, [3, 3, 2, 2, 3]);
+      arm(g, b, [3, 3]);
+      arm(g, c, [3, 2, 3, 2]);
+      arm(g, d, [3, 2]);
+      toVote(g);
+      vote(g, byPower(g)[0]);
+      toChoice(g);
+      apply(g, a, 'hold');
+      apply(g, b, `fight ${g.raid!.sent[b][0]}`);
+      apply(g, c, 'hold');
+    },
+    live: bots(raidOver),
+    liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
+    shots: () => [{ file: 'phone-remote-fight-held-4p', caption: 'No TV: a fight on the phone, mid-replay, with three players holding back dragons', client: 'phone', seat: 1, live: true, waitFor: '.table-on', waitMs: 3000 }],
+  },
+  {
     name: 'remote-fight-end-3p',
     players: 3,
     seed: 1,

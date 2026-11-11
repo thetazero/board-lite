@@ -732,10 +732,15 @@ function fightBanner(g: PublicState, sc: Extract<Scene, { kind: 'fight' }>, fres
   const ev = e.ev as Extract<EventView['ev'], { k: 'fight' }>;
   const rounds = sc.combat.map((j) => fresh[j].ev as Combat);
   const end = sc.end === null ? null : (fresh[sc.end].ev as Extract<EventView['ev'], { k: 'raidEnd' }>);
-  // Who held back in this raid, and which dragons: the ones logged since the vote put everyone in
-  // (maybe in an earlier update than the fight's, so from the whole log).
+  // Who held back in this raid, and which dragons: the fight's own list. Saves
+  // from before it have only the hold events logged since the vote put
+  // everyone in (maybe in an earlier update than the fight's, so from the
+  // whole log). The client has only the log's last lines: if this raid's
+  // lock has scrolled out of them, an older raid's would answer instead
+  // (#453), so no one is shown rather than the wrong players.
   const lockAt = g.log.findLastIndex((x) => x.i < e.i && x.ev?.k === 'locked');
-  const held = g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [{ p: x.ev.p, ds: x.ev.ds }] : []));
+  const ownLock = lockAt >= 0 && !g.log.slice(lockAt + 1).some((x) => x.i < e.i && (x.ev?.k === 'fight' || x.ev?.k === 'raidEnd' || x.ev?.k === 'noRaid'));
+  const held = ev.held ?? (!ownLock ? [] : g.log.slice(lockAt + 1).filter((x) => x.i < e.i).flatMap((x) => (x.ev?.k === 'hold' ? [{ p: x.ev.p, ds: x.ev.ds }] : [])));
   const dragons = ev.ds.map((id) => g.dragons.find((d) => d.id === id)!).filter(Boolean);
   // Their dragons: the ones the lock lists (in an old save, the ones they last committed).
   const lock = g.log[lockAt]?.ev as Extract<EventView['ev'], { k: 'locked' }> | undefined;
@@ -895,7 +900,7 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
-      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first.word)}</b></div></header>
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Combat round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first.word)}</b></div></header>
       ${coinFlip(first)}
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
@@ -927,6 +932,14 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     const below = (sheet.getBoundingClientRect().bottom + gap) / innerHeight;
     const safe = remote ? { top: 0.2, bottom: 0.17 } : { top: 0.26, bottom: 0.09 };
     safe.top = Math.max(safe.top, Math.min(below, 0.6));
+    // The fighters stand above whoever held back, never behind them (#453).
+    const backrow = el.querySelector<HTMLElement>('.backrow');
+    if (backrow) {
+      const under = innerHeight - backrow.getBoundingClientRect().top + gap;
+      safe.bottom = Math.max(safe.bottom, Math.min(under / innerHeight, 0.4));
+      const flat = el.querySelector<HTMLElement>('.battle:not(.live)');
+      if (flat) flat.style.bottom = `${Math.max(parseFloat(getComputedStyle(flat).bottom) || 0, under)}px`;
+    }
     const stage = live ? new live.FightStage(place,
       dragons.map((d) => ({ key: `d${d.id}`, fighter: { dragon: { element: d.element, stage: d.stage } }, maxHp: d.maxHp, label: label(`d${d.id}`) })),
       units.map((u, i) => ({ key: `u${i}`, fighter: u.d ? { dragon: { element: u.d.element, stage: u.d.stage } } : { foe: unitKey(u.name) }, maxHp: u.max, label: label(`u${i}`) })),
