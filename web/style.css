@@ -1216,6 +1216,10 @@ body.tv.remote { font-size: 15px; overflow: auto; }
 .remote .production .die { width: 1.9em; height: 1.9em; margin: 0; }
 .remote .production .parts i, .remote .production .eq > i { margin: 0 .1em; }
 .remote .production .ptotal { font-size: .85em; }
+/* Production's dragon step (#447): one player under another, at the phone's
+   own size; a row's lines wrap rather than run into the next card. */
+.remote .tending .tend { grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: .45em; font-size: 1em; }
+.remote .tending :is(.tname, .tline) { white-space: normal; flex-wrap: wrap; row-gap: .1em; }
 .remote .endbox svg.scene { height: 8em; }
 .remote .endbox .standings { font-size: 1.1em; margin: .5em .6em; }
 .remote .endbox .endbody { margin: 0; }
