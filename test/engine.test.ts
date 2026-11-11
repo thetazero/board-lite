@@ -663,6 +663,23 @@ test('a hurt dragon starts its fight hurt: the fight event carries its health', 
   assert.deepEqual(fight.hps, [full - 9, DRAGONS.ice_whelp.stages[2].hp]);
 });
 
+test('the fight event lists who held back which dragons, so a replay needs no older log lines (#453)', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd3', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, 'fight d1'); apply(g, 1, 'hold');
+  const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+  assert.ok(fight.k === 'fight');
+  assert.deepEqual(fight.held, [{ p: 0, ds: ['d2'] }, { p: 1, ds: ['d3'] }]);
+});
+
 test('a knocked-out dragon cannot fight until a fed production heals it, then fights hurt', () => {
   const g = newGame(2, 7);
   const a = g.dragons[0];
