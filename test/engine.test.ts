@@ -1420,3 +1420,22 @@ test('a game saved before round 1\'s first player was random keeps its turn orde
   g.round = 2;
   assert.deepEqual(turnOrder(g), [1, 2, 0]);
 });
+
+test("a view shows each player's expected production each round, and what they made at the latest roll", () => {
+  const g = newGame(3, 7);
+  // P1 has 2 Quarries: their stone is dice.
+  for (const k of neighbors(g.towers[0]).filter((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna).slice(0, 2)) g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
+  const rng = { state: 99 };
+  while (g.round < 3) botStep(g, rng); // a bot step plays its move
+  assert.match(playerView(g, 1), /^P1: .*makes stone \d+\+1d4\+1d4 \(expected \d+\)/m);
+  const view = playerView(g, 1);
+  for (let p = 0; p < 3; p++) {
+    const line = view.split('\n').find((l) => l.startsWith(`P${p + 1}${p === 1 ? ' (you)' : ''}: `))!;
+    const pr = production(g, p);
+    const want = Object.values(pr).reduce((a, v) => a + v.base + v.dice.reduce((s, d) => s + (d + 1) / 2, 0), 0);
+    assert.ok(line.includes(`; expected ${Math.round(want * 10) / 10} in all each round`), line);
+    const made = g.log.findLast((e) => e.ev?.k === 'produce' && e.ev.p === p)!;
+    const total = made.ev?.k === 'produce' ? Object.values(made.ev.got).reduce((a, b) => a + (b ?? 0), 0) : -1;
+    assert.ok(line.endsWith(`; made ${total} in round ${g.round}`), line);
+  }
+});

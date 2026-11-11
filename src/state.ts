@@ -120,7 +120,7 @@ export interface PublicState {
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
-  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; raids: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRates: Record<BasicResource, number> }[];
+  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; raids: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; lastMade: { round: number; total: number } | null; bankRates: Record<BasicResource, number> }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -268,6 +268,14 @@ export function visibleEvents(g: Game, p: number, since = 0): EventView[] {
   return events(g, (e) => !e.to || e.to.includes(p), Infinity, since);
 }
 
+// What a player's production made at its latest roll, every resource added up
+// (before their dragons eat), and the round it was: null before the first.
+function lastMade(g: Game, p: number): { round: number; total: number } | null {
+  const e = g.log.findLast((x) => x.ev?.k === 'produce' && x.ev.p === p);
+  if (e?.ev?.k !== 'produce') return null;
+  return { round: e.round, total: Object.values(e.ev.got).reduce((a: number, b) => a + (b ?? 0), 0) };
+}
+
 export function publicState(g: Game, logLines = 60): PublicState {
   const n = g.players.length;
   const raid = g.raid;
@@ -284,7 +292,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, raids: s.raids, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRates: bankRates(g, p) };
+      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, raids: s.raids, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), lastMade: lastMade(g, p), bankRates: bankRates(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
