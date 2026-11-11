@@ -6,12 +6,11 @@
 //   node src/playtest/batch.ts --games 30 --models opus,haiku,haiku [--out DIR] [run.ts options]
 //   node src/playtest/batch.ts --summary DIR
 
-import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { defaultPool } from './slots.ts';
+import { runGames } from './games.ts';
 import { batchMarkdown, loadBatch } from './stats.ts';
 import { summary } from './tally.ts';
 
@@ -54,44 +53,12 @@ const passed = ['--effort', '--budget-usd', '--max-minutes', '--stall-minutes', 
 // Run only as many games at once as the machine-wide pool can seat: the rest
 // would just sit waiting for slots (run.ts waits for them anyway).
 const claudeSeats = models.filter((m) => m !== 'bot').length;
-const atOnce = Math.max(1, Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats)));
-const runner = fileURLToPath(new URL('./run.ts', import.meta.url));
-
-function done(dir: string): boolean {
-  const f = join(dir, 'results.json');
-  return existsSync(f) && JSON.parse(readFileSync(f, 'utf8')).status === 'over';
-}
-
-function runGame(i: number): Promise<void> {
-  const dir = join(out, `g${i}`);
-  if (done(dir)) return Promise.resolve();
-  // A game that didn't finish starts over in a fresh directory; keep the old one beside it.
-  if (existsSync(dir)) {
-    let n = 1;
-    while (existsSync(`${dir}.failed${n}`)) n++;
-    renameSync(dir, `${dir}.failed${n}`);
-  }
-  const r = (i - 1) % models.length;
-  const seats = [...models.slice(r), ...models.slice(0, r)];
-  const argv = [runner, '--models', seats.join(','), '--out', dir, ...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...passed];
-  console.log(`g${i}: ${seats.join(', ')}`);
-  return new Promise((res) => {
-    const log = createWriteStream(`${dir}.out`);
-    const p = spawn(process.execPath, argv, { stdio: ['ignore', 'pipe', 'pipe'] });
-    p.stdout.pipe(log);
-    p.stderr.pipe(log);
-    p.on('exit', () => {
-      const f = join(dir, 'results.json');
-      console.log(`g${i}: ${existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')).status : 'no results'}`);
-      res();
-    });
-  });
-}
-
-let stopping = false;
-process.on('SIGINT', () => { stopping = true; });
-let next = 1;
-await Promise.all(Array.from({ length: Math.min(atOnce, games) }, async () => {
-  while (next <= games && !stopping) await runGame(next++);
-}));
+await runGames({
+  out,
+  games,
+  atOnce: Math.max(1, Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))),
+  // Game i rotates the seats i-1 places, so each model sits in each seat equally often.
+  seats: (i) => { const r = (i - 1) % models.length; return [...models.slice(r), ...models.slice(0, r)]; },
+  args: (i) => [...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...passed],
+});
 writeSummary(out);

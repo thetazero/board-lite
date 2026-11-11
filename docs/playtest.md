@@ -8,14 +8,14 @@ Claude players are clients like phones: the runner hosts the game in a room on a
 node src/playtest/run.ts --models opus,haiku,haiku
 ```
 
-One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...) or `bot`, and for a Claude seat the [options](#claude-player-options) it plays with, like `opus+advice+expected`. Other options:
+One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...), a Codex model as `codex:<model>` (`codex:gpt-5.6-sol`; sandboxed the same way, see [`eval.md`](eval.md#codex-seats)), or `bot`, and for a Claude or Codex seat the [options](#claude-player-options) it plays with, like `opus+advice+expected`. To rank models against each other, see the eval and leaderboard in [`eval.md`](eval.md). Other options:
 
 | Option | Default | |
 |---|---|---|
 | `--seed N` | random | game seed; same seed, same deal |
 | `--out DIR` | `~/.cache/board-lite/playtests/<time>-<models>` | where everything goes (refuses `/tmp`, which is RAM on the dev machine) |
-| `--effort LEVEL` | the model's own | effort for every Claude seat |
-| `--budget-usd N` | 5 (30 with `--room`) | spending cap per Claude seat for the whole game |
+| `--effort LEVEL` | the model's own | effort for every Claude and Codex seat |
+| `--budget-usd N` | 5 (30 with `--room`) | spending cap per Claude seat for the whole game (Codex reports no cost, so it has none) |
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
 | `--advice TEXT` | none | strategy advice appended to the prompt of each seat with `+advice` (to every Claude seat if no seat says `+advice`), recorded in `results.json` |
@@ -75,7 +75,7 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 
 In the `--out` directory:
 
-- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, the advice if any seat had it, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, `player: <name>` for someone else's seat in a `--room` game, or a Claude seat's configuration like `opus+expected`), a Claude seat's `options`, final points (hidden ones included), and for Claude seats cost and how many times its process was (re)started; plus counts of public and private messages.
+- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, effort, the advice if any seat had it, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, `player: <name>` for someone else's seat in a `--room` game, or a Claude seat's configuration like `opus+expected`), a Claude seat's `options`, final points (hidden ones included), and for Claude and Codex seats the model it reported running (`modelId`, when the alias differs), cost (Codex: `tokens`) and how many times its process was (re)started; plus counts of public and private messages.
 - `log.txt`: the whole game log as the engine recorded it, talk included. Lines only some players saw are marked `(only P1, P3)`: private messages, card draws, secret votes and fight-or-hold-back choices.
 - `talk.txt`: just the talk.
 - `seat-N.moves.txt`: why seat N made each move. Every `act` (and `say`) carries a private `why` that no other player sees, and this file pairs each one with what really happened (`-> done` or `-> not allowed: can't afford ...`). It's the record of reasoning to audit: read it, not the narration.

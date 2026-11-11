@@ -12,12 +12,13 @@ import { parseSpec, type PlayerOption } from './players.ts';
 
 export interface SavedSeat {
   p: number;
-  model: string; // the claude --model
+  model: string; // the claude --model, or codex:<model> for a Codex seat
   options?: PlayerOption[]; // the seat's Claude player options (src/playtest/players.ts); runners before them had none
   token: string;
   session: string;
   starts: number;
   cost: number;
+  tokens?: number; // what a Codex seat used (Codex reports no cost)
 }
 
 export interface RunnerState {
@@ -68,7 +69,7 @@ function fromLeftovers(out: string): RunnerState {
     if (!existsSync(mcp)) continue;
     const [, url, token] = JSON.parse(readFileSync(mcp, 'utf8')).mcpServers.game.args as string[];
     room ||= url;
-    const session = /"session_id":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1];
+    const session = /"(?:session_id|thread_id)":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1]; // Claude's session, or Codex's thread
     const fromResults = (results.seats as { seat: string; model: string; costUsd?: number; starts?: number }[] | undefined)?.find((s) => s.seat === `P${n}`);
     const label = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
     if (!label) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
