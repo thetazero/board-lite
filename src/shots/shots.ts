@@ -520,7 +520,7 @@ async function main() {
       const room = makeRoom(st, code);
       rooms.set(code, room);
       for (const shot of shots) {
-        const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? TV : PHONE];
+        const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? (shot.window ? { ...TV, width: shot.window[0], height: shot.window[1] } : TV) : PHONE];
         const sizes = [own, ...otherSizes(shot, everySize)];
         // Its taps can still change the room (Leave takes the seat away): each size starts from the room as it was.
         const before = sizes.length > 1 ? keep(room) : null;

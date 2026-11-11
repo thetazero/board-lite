@@ -383,6 +383,10 @@ q::after { content: close-quote; }
 .production .parts .eat { display: inline-flex; align-items: center; gap: .1em; color: var(--bad); }
 .production .ptotal { margin-top: .3em; padding-top: .3em; border-top: 2px solid color-mix(in srgb, var(--pc) 45%, transparent); opacity: 0; transition: opacity .3s ease-out; }
 .production .ptotal.up { opacity: 1; }
+/* the round's total over all resources (#471), after the chips */
+.production .pall { display: inline-flex; align-items: center; margin-left: .3em; font-weight: 800; }
+.production .psum .pall { margin-left: auto; padding-left: .6em; }
+.production .pall > i { font-style: normal; color: var(--muted); margin-right: .3em; font-weight: 400; }
 .production .psum { align-self: center; }
 .production .psum li { display: flex; align-items: center; gap: .6em; margin: .3em 0; padding: .1em .4em; border-radius: 12px; border-left: .3em solid var(--pc); background: color-mix(in srgb, var(--pc) 20%, transparent); }
 .production .psum li > .ptag { min-width: 4.5em; }
