@@ -3,7 +3,7 @@
 // from. The TV plays it at the end of a game (tv.ts); the recap page shows
 // it whole (recap.ts). Ink on paper, like the end screen's sheet.
 
-import type { Moment, Recap } from '../src/state.ts';
+import type { Moment, Recap, RecapStanding } from '../src/state.ts';
 import { PLAYER_COLORS, esc, icon, playerTag } from './common.ts';
 
 const ink = (p: number) => `color-mix(in oklab, ${PLAYER_COLORS[p]} 78%, #1a1218)`;
@@ -141,20 +141,23 @@ export function madeSvg(r: Recap, opts: RaceOptions = {}): string {
   return r.made?.length ? linesSvg(r, { rows: r.made, from: 1, last: r.race.length - 1, label: 'Resources made by round' }, opts) : '';
 }
 
-const PARTS = [
-  { key: 'buildings', cls: 'buildings', label: 'Buildings' },
-  { key: 'titles', cls: 'titles', label: 'Titles' },
-  { key: 'beasts', cls: 'beasts', label: 'Great beasts' },
-  { key: 'raids', cls: 'kingdoms', label: 'Kingdoms' },
-  { key: 'hidden', cls: 'hand', label: 'In hand' },
-] as const;
+// The parts of a player's final score, in the order the game's points track
+// has them: buildings without monuments, then monuments on their own.
+const PARTS: { cls: string; label: string; n: (s: RecapStanding) => number }[] = [
+  { cls: 'buildings', label: 'Buildings', n: (s) => s.buildings - (s.monuments ?? 0) },
+  { cls: 'monuments', label: 'Monuments', n: (s) => s.monuments ?? 0 },
+  { cls: 'titles', label: 'Titles', n: (s) => s.titles },
+  { cls: 'beasts', label: 'Great beasts', n: (s) => s.beasts },
+  { cls: 'kingdoms', label: 'Kingdoms', n: (s) => s.raids },
+  { cls: 'hand', label: 'In hand', n: (s) => s.hidden },
+];
 
 /** Where each player's points came from: a bar per player, in final order, split by source. */
 export function breakdownHtml(r: Recap): string {
   const most = Math.max(1, ...r.standings.map((s) => s.total));
-  const used = PARTS.filter((part) => r.standings.some((s) => s[part.key] > 0));
+  const used = PARTS.filter((part) => r.standings.some((s) => part.n(s) > 0));
   const rows = r.standings.map((s) => {
-    const bits = used.filter((part) => s[part.key] > 0).map((part) => `<span class="part ${part.cls}" style="flex-grow:${s[part.key]}">${s[part.key]}</span>`).join('');
+    const bits = used.filter((part) => part.n(s) > 0).map((part) => `<span class="part ${part.cls}" style="flex-grow:${part.n(s)}">${part.n(s)}</span>`).join('');
     return `<li><span class="who">${playerTag(s.p, r.names)}</span>
       <span class="bar"><span class="fill" style="width:${(100 * s.total) / most}%">${bits}</span></span>
       <b class="total">${s.total}${icon('points', 1.1)}</b></li>`;

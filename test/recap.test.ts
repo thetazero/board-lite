@@ -39,6 +39,7 @@ test("a recap tells the race round by round, ends on the final scores, and lists
   assert.equal(r.made!.length, g.round);
   assert.ok(r.made!.every((row) => row.every((v) => v >= 0)) && r.made!.flat().some((v) => v > 0));
   for (const s of r.standings) assert.equal(s.buildings + s.titles + s.beasts + s.raids + s.hidden, s.total);
+  for (const s of r.standings) assert.equal(s.monuments, score(g, s.p).monuments, 'monuments, their share of the buildings');
   assert.ok(r.moments.length > 0);
   assert.ok(r.moments.every((m, i) => m.round >= 1 && m.round <= g.round && (i === 0 || r.moments[i - 1].round <= m.round)), 'in round order');
   // A title's holder at each round's end is told once, when it changes.

@@ -76,7 +76,7 @@ export function buildRecap(g: Game, names: string[], id: string, ended: Date): R
     made,
     standings: order.map((s) => {
       const sc = score(g, s.p);
-      return { p: s.p, place: s.place, tied: s.tied, tiebreak: s.tiebreak, total: s.total, buildings: sc.buildings, titles: sc.titles, beasts: sc.beasts, raids: sc.raids, hidden: sc.hidden };
+      return { p: s.p, place: s.place, tied: s.tied, tiebreak: s.tiebreak, total: s.total, buildings: sc.buildings, monuments: sc.monuments, titles: sc.titles, beasts: sc.beasts, raids: sc.raids, hidden: sc.hidden };
     }),
     moments,
   };

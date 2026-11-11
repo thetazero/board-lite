@@ -504,7 +504,8 @@ export interface RecapStanding {
   tied: boolean;
   tiebreak: 'gold' | 'turn order' | null;
   total: number;
-  buildings: number;
+  buildings: number; // every building's points, monuments included
+  monuments?: number; // the monument cards' share of those (absent in recaps from before #461)
   titles: number;
   beasts: number; // great beasts slain
   raids: number; // kingdoms that score, taken
