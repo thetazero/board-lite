@@ -1029,7 +1029,10 @@ body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100
 /* Anything chosen (a tab, a player, a resource, a dragon, a vote) is lit the
    same way, gold on gold, and stays lit once made. */
 button.on { --edge: #a8801c; background: var(--grain), var(--mottle), linear-gradient(180deg, #fcd660, #f0bb34); color: var(--ink); }
-.who button.on { --edge: color-mix(in srgb, var(--pc) 60%, #000); background: var(--grain), var(--mottle), linear-gradient(180deg, color-mix(in srgb, var(--pc) 88%, #fff), var(--pc)); }
+/* The player's colour lit from above: a white wash over the plain colour, not a
+   gradient between color-mix() stops. Some phones (Android Chrome) draw a gradient
+   with color-mix() stops in pale horizontal stripes. */
+.who button.on { --edge: color-mix(in srgb, var(--pc) 60%, #000); background: var(--grain), var(--mottle), linear-gradient(180deg, #ffffff1f, #ffffff00), var(--pc); }
 .who button.on .ptag, .who button.on { color: var(--ink); }
 button.on:disabled { opacity: 1; }
 .row.big2 > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15em; }
