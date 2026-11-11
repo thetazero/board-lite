@@ -12,6 +12,7 @@ import {
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
+import { taps } from './taps.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -45,11 +46,7 @@ let openDragon: string | null = null; // one of your dragons tapped open: its ca
 let selected = new Set<string>(); // discard picks
 let trade = fresh();
 let bank = { give: 'stone', get: 'timber', times: 1 };
-// Commands go to the server one at a time, in the order they were tapped:
-// quick taps queue up instead of being lost. A tap that repeats the last
-// command still waiting (the same button twice) is a double tap, and is dropped.
-const outbox: string[] = [];
-let sending = false;
+let shownV = -1; // the version (Snapshot.v) of the snapshot on screen
 let menu = false; // the menu under your name (Save game, Quit game) is open
 let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
@@ -134,7 +131,8 @@ function wireJoin() {
   if (!form) return;
   // A game with no TV: this phone makes the room and is its first player.
   const host = document.getElementById('host');
-  if (host) host.onclick = async () => {
+  // One room, one seat, however often New game or Join is tapped while it's on its way.
+  if (host) host.onclick = () => tapper.tap('join', async () => {
     const name = document.getElementById('name') as HTMLInputElement;
     if (!name.reportValidity()) return;
     try {
@@ -143,12 +141,12 @@ function wireJoin() {
     } catch (er) {
       renderJoin(er instanceof Error ? er.message : String(er), { code: '', name: name.value });
     }
-  };
-  form.onsubmit = async (e) => {
+  });
+  form.onsubmit = (e) => {
     e.preventDefault();
     const c = (document.getElementById('code') as HTMLInputElement).value.trim().toUpperCase();
     const n = (document.getElementById('name') as HTMLInputElement).value.trim();
-    await join(c, n, n);
+    tapper.tap('join', () => join(c, n, n));
   };
 }
 
@@ -186,7 +184,7 @@ function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '')
         <p class="error">${esc(err)}</p>
       </div>
     </div>`;
-  app.querySelectorAll<HTMLElement>('[data-seat]').forEach((b) => (b.onclick = () => join(l.code, b.dataset.seat!, name)));
+  app.querySelectorAll<HTMLElement>('[data-seat]').forEach((b) => (b.onclick = () => tapper.tap('join', () => join(l.code, b.dataset.seat!, name))));
   wireJoin();
 }
 
@@ -194,10 +192,13 @@ function enter(c: string, t: string) {
   code = c;
   token = t;
   offerSeen = null;
+  shownV = -1;
   stop?.();
   // Offline, nothing on the page can be tapped (a tap couldn't reach the
   // table): it greys out under the Reconnecting banner until the phone is back.
-  stop = watch(code, token, onSnapshot, (ok) => {
+  // A push older than what's on screen (the answer to a tap can overtake it) is
+  // already out of date: drawing it would put back buttons just tapped.
+  stop = watch(code, token, (s, first) => (first || (s.v ?? 0) >= shownV) && onSnapshot(s), (ok) => {
     document.body.classList.toggle('offline', !ok);
     app.inert = !ok;
   }, () => {
@@ -210,6 +211,8 @@ function enter(c: string, t: string) {
 function onSnapshot(s: Snapshot) {
   const prev = snap;
   snap = s;
+  shownV = s.v ?? shownV;
+  tapper.seen();
   names = s.lobby.seats.map((x) => x.name);
   // Before the game, and while a saved game hosted again takes its seats, the phone shows the lobby.
   if (!s.game || s.lobby.seating) {
@@ -362,12 +365,12 @@ function renderLobby() {
       </div>
     </div>`));
   if (host) {
-    on('bot', () => post(`/api/rooms/${code}/bot`, { token }));
-    if (!l.seating) on('start', () => post(`/api/rooms/${code}/start`, { token }));
-    app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token, seat: Number(b.dataset.remove) }).catch(toast)));
+    on('bot', () => call(`/api/rooms/${code}/bot`, { token }));
+    if (!l.seating) on('start', () => call(`/api/rooms/${code}/start`, { token }));
+    bind('[data-remove]', (b) => call(`/api/rooms/${code}/leave`, { token, seat: Number(b.dataset.remove) }));
   }
   on('leave', async () => {
-    await post(`/api/rooms/${code}/leave`, { token });
+    await call(`/api/rooms/${code}/leave`, { token });
     leaveToJoin('');
   });
 }
@@ -398,7 +401,7 @@ function renderSaved() {
         <button id="leave" class="ghost">Leave</button>
       </div>
     </div>`));
-  on('continue', () => post(`/api/rooms/${code}/continue`, { token }));
+  on('continue', () => call(`/api/rooms/${code}/continue`, { token }));
   on('leave', () => leaveToJoin('The game is saved. To continue it, open it under Saved games and tap your name.'));
 }
 
@@ -536,39 +539,39 @@ const table = (() => {
 
 // ---------- the game ----------
 
-// A second tap on a button whose command is still on its way is a double tap,
-// and dropped, except the merchants' Trade: each tap trades again (#331).
-function send(command: string) {
+// Every tap goes through here (web/taps.ts): a second tap on a button before
+// the screen has caught up with its first is dropped, so on slow Wi-Fi a button
+// still does what one tap does (#456). The server answers a command with the
+// table as it is after it, drawn at once rather than waiting for the push.
+const tapper = taps({
+  post: (command) => post(`/api/rooms/${code}/do`, { token, command, via: 'phone' }),
+  answer: (reply) => {
+    const s = (reply as { state?: Snapshot }).state;
+    if (!s || s.v === undefined || s.v <= shownV) return false;
+    onSnapshot(s);
+    return true;
+  },
+  fail: toast,
+});
+
+function send(command: string): Promise<void> {
   endAsk = null; // doing anything else on your turn takes back an End turn waiting for its confirm
-  if (outbox[outbox.length - 1] === command && !command.startsWith('merchants ')) return;
-  outbox.push(command);
-  if (!sending) void flush();
+  return tapper.send(command);
 }
 
-async function flush() {
-  sending = true;
-  while (outbox.length) {
-    try {
-      await post(`/api/rooms/${code}/do`, { token, command: outbox[0], via: 'phone' });
-      outbox.shift();
-    } catch (e) {
-      // What was tapped after it was tapped expecting it to work: drop it too.
-      outbox.length = 0;
-      toast(e);
-    }
-  }
-  sending = false;
-}
+// A request other than a command, made by a tap: the button waits for its answer.
+const call = (path: string, body: Record<string, unknown>) => tapper.call(post(path, body));
 
 function on(id: string, fn: () => unknown) {
   const el = document.getElementById(id);
-  if (el) el.onclick = () => Promise.resolve(fn()).catch(toast);
+  if (el) el.onclick = () => tapper.tap(`#${id}`, fn);
 }
 
+// A button picked out by `sel` and its data-* attributes (which one of them it is).
 function bind(sel: string, fn: (el: HTMLElement) => unknown) {
   app.querySelectorAll<HTMLElement>(sel).forEach((el) => (el.onclick = (e) => {
     e.stopPropagation();
-    Promise.resolve(fn(el)).catch(toast);
+    tapper.tap(`${sel} ${JSON.stringify(el.dataset)}`, () => fn(el));
   }));
 }
 
@@ -1524,9 +1527,9 @@ talk.form.onsubmit = (e) => {
   const text = talk.input.value.trim();
   if (!text) return;
   const to = Number(talk.to.value);
-  post(`/api/rooms/${code}/do`, { token, via: 'phone', command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
-    .then(() => (talk.input.value = ''))
-    .catch(toast);
+  // Sent once, however often Send is tapped before it's gone.
+  tapper.tap('talk', () => call(`/api/rooms/${code}/do`, { token, via: 'phone', command: to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}` })
+    .then(() => (talk.input.value = '')));
 };
 
 function talkHtml(text: string, g: PublicState): string {
@@ -1621,9 +1624,10 @@ function wire(g: PublicState, me: Me) {
     eggOpen = false;
     send(`project ${el.dataset.egg}`);
   });
-  app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => {
-    if (picking!.confirm) {
-      picking!.picked = el.dataset.hex!;
+  app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => tapper.tap(`hex ${el.dataset.hex}`, () => {
+    if (!picking) return; // a second tap, after the first sent its command
+    if (picking.confirm) {
+      picking.picked = el.dataset.hex!;
       return render();
     }
     const cmd = picking!.command(el.dataset.hex!);
@@ -1632,9 +1636,10 @@ function wire(g: PublicState, me: Me) {
     const send2 = /^(hunt|perch) /.exec(cmd);
     if (send2) hunting = { hex: el.dataset.hex!, chosen: new Set(), perch: send2[1] === 'perch' };
     render();
-    if (!send2) send(cmd);
-  }));
+    if (!send2) return send(cmd);
+  })));
   on('confirmpick', () => {
+    if (!picking?.picked) return;
     const cmd = picking!.command(picking!.picked!);
     picking = null;
     render();
@@ -1665,6 +1670,7 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   on('huntgo', () => {
+    if (!hunting) return;
     const cmd = `${hunting!.perch ? 'perch' : 'clear'} ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
     hunting = null;
     render();
@@ -1750,7 +1756,8 @@ function wire(g: PublicState, me: Me) {
     const cmd = `offer ${trade.to === null ? 'anyone' : `P${trade.to + 1}`} give ${side(trade.give, [...trade.cards].filter((id) => me.hand.some((c) => c.id === id)))} get ${side(trade.get)}`;
     trade = fresh();
     tab = 'none';
-    send(cmd);
+    render();
+    return send(cmd);
   });
   // raid
   bind('[data-vote]', (el) => send(`vote ${el.dataset.vote}`));
@@ -1810,7 +1817,7 @@ function wire(g: PublicState, me: Me) {
     stop?.(); // the seat stops being this phone's: don't hear that as someone taking it
     stop = null;
     try {
-      await post(`/api/rooms/${code}/quit`, { token });
+      await call(`/api/rooms/${code}/quit`, { token });
     } catch (e) {
       enter(code, token);
       throw e;
@@ -1820,9 +1827,9 @@ function wire(g: PublicState, me: Me) {
   });
   on('save', async () => {
     menu = false;
-    await post(`/api/rooms/${code}/save`, { token });
+    await call(`/api/rooms/${code}/save`, { token });
   });
-  bind('[data-standin]', (el) => post(`/api/rooms/${code}/standin`, { token, seat: Number(el.dataset.standin) }));
+  bind('[data-standin]', (el) => call(`/api/rooms/${code}/standin`, { token, seat: Number(el.dataset.standin) }));
 }
 
 function toast(e: unknown) {

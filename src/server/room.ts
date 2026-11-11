@@ -144,6 +144,7 @@ export class Room {
   private botTimer: NodeJS.Timeout | null = null;
   private awayTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
+  private version = 0; // how many times the room has changed (Snapshot.v)
   private botRng = { state: Date.now() | 0 };
   private savedSeats = '';
   // While a TV is watching, a change that gives it a scene to play (a fight,
@@ -689,6 +690,7 @@ export class Room {
       seat: p,
       game: g ? publicState(g) : null,
       scene: this.sceneLeft(),
+      v: this.version,
       recap: g?.phase === 'over' && existsSync(this.recapFile) ? this.recapId : null,
       you: g && p >= 0 && this.seats[p].kind === 'player' ? { ...seatState(g, p), name: this.seats[p].name } : null,
     };
@@ -755,6 +757,7 @@ export class Room {
   }
 
   changed() {
+    this.version++;
     this.lastActive = Date.now();
     this.saveSeats();
     this.saveRecap(); // once the game is over (also one that ended before recaps were kept)
