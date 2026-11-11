@@ -100,8 +100,8 @@ const claudeSeats = Math.max(...Array.from({ length: mixed ? games : Math.min(ga
 const atOnce = Math.max(1, Math.min(Number(opt('--parallel') ?? 1), Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))));
 
 if (args.includes('--dry-run')) {
-  if (mixed) console.log(`${games} games of ${lo} to ${hi} players, drawn from ${roster.length}, ${atOnce} at a time:`);
-  else console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), ${atOnce} at a time:`);
+  if (mixed) console.log(`${games} games of ${lo} to ${hi} players, drawn from ${roster.length}, up to ${atOnce} at a time:`);
+  else console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), up to ${atOnce} at a time:`);
   for (let i = 1; i <= games; i++) console.log(`g${i}: ${seats(i).join(', ')}`);
   if (draw) console.log(`\n${balance(roster, draw.games.slice(0, games))}`);
   process.exit(0);
@@ -114,7 +114,7 @@ const seed = opt('--seed');
 const passed = ['--effort', '--max-minutes', '--stall-minutes'].flatMap((o) => (opt(o) === undefined ? [] : [o, opt(o)!]));
 // Only a game with a +advice seat gets the advice: given to a game with none, run.ts would hand it to every seat.
 const adviceFor = (i: number) => (advice !== undefined && seats(i).some(advised) ? ['--advice', advice] : []);
-console.log(`${mixed ? 'Contest' : 'Eval'} in ${out}: ${games} games, ${atOnce} at a time.`);
+console.log(`${mixed ? 'Contest' : 'Eval'} in ${out}: ${games} games, up to ${atOnce} at a time.`);
 await runGames({
   out,
   games,

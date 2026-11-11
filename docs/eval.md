@@ -41,7 +41,7 @@ Then run it, in the background: the same with `npm run eval --` and without `--d
 - The draw is kept in `draw.json` in the contest's directory. Rerun with `--out <that directory>` and a bigger `--games` to add games to it: the games already drawn stay, and the new ones keep the balance. `--seed` seeds the draw (and the games, as in an eval).
 - At the end, `leaderboard.md` in that directory ranks the bucket, with how sure each rating is (the 95% range, [below](#the-leaderboard)), and the draw's balance under it. `npm run leaderboard -- <that directory>` shows it at any time, for the games finished so far.
 - **How many games:** from simulated contests of the bucket above, each rating's 95% range is about ±125 points after 40 games and ±90 after 80. That tells the bot, Haiku and Opus apart after 40, but two Opus configurations close to each other (under 100 points apart) need 100 games or more.
-- **Cost:** a game averages 4 players, so each Opus entry plays two games in three. At $2 to $11 an Opus seat a game, the bucket above is roughly $10 to $20 a game, $400 to $800 for 40, and since a 6-player game fills the machine's seats one game runs at a time: 40 games are 40 game-lengths or more (6-player games run longer).
+- **Cost:** a game averages 4 players, so each Opus entry plays two games in three. At $2 to $11 an Opus seat a game, the bucket above is roughly $10 to $20 a game, $400 to $800 for 40. One game runs at a time by default (`--parallel 1`, for the reason below), so 40 games are 40 game-lengths or more (6-player games run longer).
 
 ### Cost and time
 
