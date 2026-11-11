@@ -4,7 +4,7 @@ You are a wizard who raises dragons. Build out from your tower, hatch and feed d
 
 **Hidden** (your phone): your hand, and your resources other than gold. **Public** (the TV): the map, buildings, dragons, titles, everyone's gold, hand sizes, trade offers.
 
-**Setup.** The land is ringed by ocean, with one natural harbor on each coast. Its terrain is shuffled, but every map for a player count has the same mix: as many mountain, forest, crystal field and meadow hexes as each other, and desert hexes for the rest. Wild **fauna** holds some hexes: Wolves 2 steps from the nearest tower, Cave Bears 3, Basilisks farther out. Two **great beasts**: the Thunderbird on the mountain peak at the center, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 3 stone, timber, crystal and livestock, and a Fire Dragon egg. A random player goes first in round 1, and the first player moves 1 seat left each round after that.
+**Setup.** The land is ringed by ocean, with one natural harbor on each coast. Its terrain is shuffled, but every map for a player count has the same mix: as many mountain, forest, crystal field and meadow hexes as each other, and desert hexes for the rest. Wild **fauna** holds some hexes: Wolves 2 steps from the nearest tower, Cave Bears 3, Basilisks farther out. Two **great beasts**: the Thunderbird on the mountain peak at the center, and the Leviathan in the ocean beside one harbor. Each player has a tower (fixed spot by player count), 6 stone, timber, crystal and livestock, and a Fire Dragon egg. A random player goes first in round 1, and the first player moves 1 seat left each round after that.
 
 ## A round: four phases
 

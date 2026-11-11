@@ -47,7 +47,7 @@ export const TUNING = {
   // Each round a player draws this many building cards and keeps one.
   buildingCardsDrawn: 2,
   actionCardsPerRound: 1,
-  startingResources: { stone: 3, timber: 3, crystal: 3, livestock: 3 } as Bundle,
+  startingResources: { stone: 6, timber: 6, crystal: 6, livestock: 6 } as Bundle,
   // The tower produces this every round, no dice.
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
