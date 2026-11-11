@@ -30,12 +30,12 @@ import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
 import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
-import { OPTIONS, parseSeats, type PlayerOption, type PlayerSpec } from './players.ts';
+import { OPTIONS, isBot, parseSeats, type PlayerOption, type PlayerSpec } from './players.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
 
-  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, or "bot"; a Claude
+  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, "bot" (random) or "strongbot"; a Claude
                                     seat can add options, like opus+advice+expected (see below)
   --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
                                     e.g. http://localhost:8080/ABCD; without it, this runner hosts the game
@@ -79,7 +79,7 @@ if (resumed) {
   if (resumed.pid && resumed.pid !== process.pid && alive(resumed.pid)) throw new Error(`The runner for ${resumeDir} is still running (process ${resumed.pid}).`);
 } else if (joinUrl) {
   if (!models.length || models.length > 5) throw new Error('Give 1 to 5 Claude seats in --models.');
-  if (models.includes('bot')) throw new Error('With --room, add bots from the TV ("Add a bot"); --models is only for Claude seats.');
+  if (models.some((m) => isBot(m))) throw new Error('With --room, add bots from the TV ("Add a bot"); --models is only for Claude seats.');
 } else if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
 const seed = Number(opt(args, '--seed') ?? resumed?.seed ?? Math.floor(Math.random() * 2 ** 31));
 const effort = opt(args, '--effort') ?? resumed?.effort;
@@ -174,7 +174,7 @@ function systemPrompt(s: Seat): string {
   const who = (q: number) => {
     const t = table[q];
     const mine = seats.find((x) => x.p === q);
-    const kind = mine ? 'another AI player' : t.kind === 'bot' ? 'a random bot that never talks' : t.kind === 'open' ? 'an empty seat' : 'a person, playing on their phone or at a terminal';
+    const kind = mine ? 'another AI player' : t.kind === 'bot' ? (t.strong ? 'a bot played by code, no AI model, that plays to win and talks' : 'a random bot that never talks') : t.kind === 'open' ? 'an empty seat' : 'a person, playing on their phone or at a terminal';
     return `${pname(q)} ${t.name} (${kind})`;
   };
   const others = table.map((_, q) => q).filter((q) => q !== s.p).map(who).join('; ');
@@ -270,7 +270,7 @@ function seatLabel(q: number): string {
   const mine = seats.find((s) => s.p === q);
   if (mine) return mine.label;
   const t = table[q];
-  return t?.kind === 'bot' ? 'bot' : `${t?.kind === 'open' ? 'open' : 'player'}: ${t?.name ?? '?'}`;
+  return t?.kind === 'bot' ? (t.strong ? 'strongbot' : 'bot') : `${t?.kind === 'open' ? 'open' : 'player'}: ${t?.name ?? '?'}`;
 }
 
 // The code the game ran on, so its stats can be counted under the same rules
@@ -307,7 +307,7 @@ let interrupted = false;
 
 /** Blocks until this game's Claude seats fit in the machine-wide pool. */
 async function admit(): Promise<boolean> {
-  const claudeSeats = specs.filter((m) => m.model !== 'bot').length;
+  const claudeSeats = specs.filter((m) => !isBot(m.model)).length;
   let said = '';
   for (;;) {
     const r = tryAcquire(pool, claudeSeats, out);
@@ -349,7 +349,7 @@ async function main() {
   if (status === 'running' && resumed) await reclaim(resumed);
   else if (status === 'running') {
     for (const { model, options, label } of specs) {
-      if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
+      if (isBot(model)) { await call('/bot', { token: hosted!.hostToken, ...(model === 'strongbot' ? { strong: true } : {}) }); continue; }
       const name = seatName((await lobby()).seats.map((t) => t.name));
       const r = await call('/join', { name, via: 'claude' });
       seats.push({ p: r.seat - 1, model, options, label, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });

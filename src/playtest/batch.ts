@@ -11,6 +11,7 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, wri
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isBot } from './players.ts';
 import { defaultPool } from './slots.ts';
 import { batchMarkdown, loadBatch } from './stats.ts';
 import { summary } from './tally.ts';
@@ -53,7 +54,7 @@ const passed = ['--effort', '--budget-usd', '--max-minutes', '--stall-minutes', 
 
 // Run only as many games at once as the machine-wide pool can seat: the rest
 // would just sit waiting for slots (run.ts waits for them anyway).
-const claudeSeats = models.filter((m) => m !== 'bot').length;
+const claudeSeats = models.filter((m) => !isBot(m.split('+')[0])).length;
 const atOnce = Math.max(1, Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats)));
 const runner = fileURLToPath(new URL('./run.ts', import.meta.url));
 

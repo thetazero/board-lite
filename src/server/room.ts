@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
+import { strongMove, strongWaits } from '../strongbot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { buildRecap } from '../recap.ts';
 import { GAME, GameLog, type Sender, type Via } from './gamelog.ts';
@@ -55,6 +56,7 @@ export interface Seat {
   // back by joining with its name.
   standIn: boolean;
   left: boolean; // quit: no phone holds the seat any more
+  strong?: boolean; // a bot seat played by the strong bot (src/strongbot.ts), not the random one
   via?: Via; // what the player last sent from (phone, CLI or a Claude player), for the game log; not saved
 }
 
@@ -95,7 +97,7 @@ interface SavedRoom {
   hostToken: string;
   remote: boolean; // no TV, when last saved
   savedAt?: number; // the game was saved partway through then (ms epoch), to continue later
-  seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
+  seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left' | 'strong'>[];
 }
 
 /** Where a game file's seats are saved. */
@@ -215,7 +217,7 @@ export class Room {
   }
 
   private saveSeats() {
-    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, ...(this.savedAt ? { savedAt: this.savedAt } : {}), seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, ...(this.savedAt ? { savedAt: this.savedAt } : {}), seats: this.seats.map(({ name, token, kind, standIn, left, strong }) => ({ name, token, kind, standIn, left, ...(strong ? { strong } : {}) })) };
     const text = JSON.stringify(saved);
     if (text === this.savedSeats) return;
     this.savedSeats = text;
@@ -390,11 +392,16 @@ export class Room {
     return seat;
   }
 
-  addBot(): Seat {
+  addBot(strong = false): Seat {
     // Clockwork names, so a bot never shares a name with a person at the table.
     const names = ['Tick', 'Gizmo', 'Widget', 'Pinion', 'Cog', 'Ratchet', 'Bolt'];
     const taken = (n: string) => this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === n.toLowerCase());
-    return this.join(names.find((n) => !taken(n)) ?? `Cog ${this.seats.length + 1}`, 'bot');
+    const seat = this.join(names.find((n) => !taken(n)) ?? `Cog ${this.seats.length + 1}`, 'bot');
+    if (strong) {
+      seat.strong = true;
+      this.changed();
+    }
+    return seat;
   }
 
   // In the lobby a player (or bot) can be removed: before the game starts,
@@ -664,11 +671,22 @@ export class Room {
         // A scene began while this bot was waiting to move: it moves once the
         // scene is over, when the scene's timer wakes the room.
         if (this.sceneLeft()) return this.scheduleBot();
-        const p = waitingOn(this.game!).find(botPlays);
-        if (p === undefined) return;
-        const bot = this.seats[p].kind === 'bot';
-        const by: Sender = { kind: bot ? 'bot' : 'standIn', seat: p, name: this.seats[p].name };
-        this.mutate((g2) => (bot ? botMove(g2, p, this.botRng) : standInMove(g2, p)), by);
+        // The first bot waited on that moves: a strong bot waiting on answers
+        // to its own offer passes, and is woken again in a few seconds.
+        for (const p of waitingOn(this.game!).filter(botPlays)) {
+          const s = this.seats[p];
+          const bot = s.kind === 'bot';
+          const by: Sender = { kind: bot ? 'bot' : 'standIn', seat: p, name: s.name };
+          if (bot && s.strong) {
+            if (strongWaits(this.game!, p, { name: s.name })) continue;
+            this.mutate((g2) => strongMove(g2, p, this.botRng, { name: s.name }), by);
+            return;
+          }
+          this.mutate((g2) => (bot ? botMove(g2, p, this.botRng) : standInMove(g2, p)), by);
+          return;
+        }
+        this.botTimer = setTimeout(() => { this.botTimer = null; this.scheduleBot(); }, 3000);
+        this.botTimer.unref();
       } catch (e) {
         console.error(`Room ${this.code}: a bot is stuck:`, e);
       }
@@ -684,7 +702,7 @@ export class Room {
       seating: this.seating,
       saved: this.savedAt,
       // Phones hold a stream open; a CLI player counts as here if it asked anything in the last minute.
-      seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left })),
+      seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left, ...(s.strong ? { strong: true } : {}) })),
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       file: this.file,
