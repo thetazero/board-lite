@@ -1,30 +1,40 @@
 #!/usr/bin/env node
-// The model eval: games among a roster of models (Claude, Codex, the bot),
-// every lineup of --seats of them in turn, each lineup rotated through every
-// seat order, then the leaderboard of those games (src/playtest/leaderboard.ts).
-// See docs/eval.md.
+// The model eval: games among a roster of models (Claude, Codex, the bot) or
+// Claude player configurations, then the leaderboard of those games
+// (src/playtest/leaderboard.ts). With a fixed --seats, every lineup of that
+// many in turn, each lineup rotated through every seat order; with a range
+// like --seats 2-6 (a contest), each game draws its size and its players at
+// random but balanced (draw.ts). See docs/eval.md.
 //
 //   node src/playtest/eval.ts --models opus,sonnet,haiku,codex:gpt-5.6-sol [--seats 3] [--games N] [--dry-run]
+//   node src/playtest/eval.ts --models haiku,sonnet,opus,opus+fable51,bot --seats 2-6 --games 40 [--dry-run]
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runGames } from './games.ts';
 import { collect, leaderboard } from './leaderboard.ts';
+import { balance, extend, parseSizes, rng, type DrawState } from './draw.ts';
+import { parseSeats, parseSpec } from './players.ts';
 import { defaultPool } from './slots.ts';
 
 const USAGE = `node src/playtest/eval.ts --models <m1,m2,...> [options]
 
   --models ...       the roster, 2 or more: claude models (opus, sonnet, haiku, claude-...),
-                     Codex models (codex:<model>, e.g. codex:gpt-5.6-sol), or bot
-  --seats K          players a game (default 3, at most the roster's size)
-  --games N          how many games (default: one round, every lineup of K in every seat order)
+                     Codex models (codex:<model>, e.g. codex:gpt-5.6-sol), or bot; a Claude
+                     or Codex entry can add player options, like opus+advice+expected
+  --seats K          players a game (default 3, at most the roster's size), or a range like
+                     2-6: each game then draws its size and players at random, balanced
+  --games N          how many games (default: one round, every lineup of K in every seat order;
+                     with a range of sizes, --games is needed)
+  --advice TEXT      the advice for entries with +advice, passed to every game
   --parallel N       games at once (default 1; see docs/eval.md for why)
   --out DIR          the eval directory (default ~/.cache/board-lite/playtests/<time>-eval-<models>);
                      game i goes in DIR/gi. Rerunning into the same DIR keeps the finished
                      games and plays the rest.
   --budget-usd N     spending cap per Claude seat a game (default 25)
-  --seed N           seed of game 1; game i gets N+i-1 (default random per game)
+  --seed N           seed of game 1; game i gets N+i-1 (default random per game). With a
+                     range of sizes it also seeds the draw
   --effort, --max-minutes, --stall-minutes   passed to every game
   --dry-run          print the games it would play, and play none`;
 
@@ -34,9 +44,15 @@ if (args.includes('--help')) { console.log(USAGE); process.exit(0); }
 
 const roster = (opt('--models') ?? '').split(',').map((m) => m.trim()).filter(Boolean);
 if (roster.length < 2) { console.log(USAGE); process.exit(1); }
-const k = Number(opt('--seats') ?? Math.min(3, roster.length));
-if (!Number.isInteger(k) || k < 2 || k > 6) throw new Error('--seats takes 2 to 6.');
-if (k > roster.length) throw new Error(`--seats ${k} needs at least ${k} models in --models (a model can be listed twice).`);
+const advice = opt('--advice');
+// Every entry a model or configuration run.ts can seat, checked before anything is played.
+const advised = (m: string) => parseSpec(m).options.includes('advice');
+parseSeats(roster, advice);
+if (advice !== undefined && !roster.some(advised)) throw new Error('--advice goes to the entries with +advice, and no entry in --models has it.');
+const [lo, hi] = parseSizes(opt('--seats') ?? String(Math.min(3, roster.length)));
+if (hi > roster.length) throw new Error(`--seats ${hi} needs at least ${hi} models in --models (a model can be listed twice).`);
+const mixed = lo < hi;
+const k = hi;
 
 // Every lineup of k roster entries, in roster order.
 function lineups(n: number, size: number): number[][] {
@@ -47,40 +63,65 @@ function lineups(n: number, size: number): number[][] {
 }
 const all = lineups(roster.length, k);
 const round = all.length * k;
+if (mixed && opt('--games') === undefined) throw new Error('With a range of --seats, say how many games with --games N.');
 const games = Number(opt('--games') ?? round);
+if (!Number.isInteger(games) || games < 1) throw new Error(`--games takes a number of games, not ${opt('--games')}.`);
 
-// Game i: lineup (i-1) mod L, rotated floor((i-1)/L) seats. Every lineup comes
-// up once before any comes up again, so a stopped eval is still balanced, and
-// each full round seats every lineup in every seat order.
+const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const out = resolve(opt('--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${mixed ? 'contest' : 'eval'}-${roster.join('-').replace(/[:/+]/g, '_')}`));
+
+// A contest's draw is kept in <out>/draw.json, so a rerun with more games extends it
+// rather than drawing again.
+const drawFile = join(out, 'draw.json');
+let draw: (DrawState & { seed: number }) | null = null;
+if (mixed) {
+  const kept = existsSync(drawFile) ? JSON.parse(readFileSync(drawFile, 'utf8')) : null;
+  if (kept && (kept.roster.join(',') !== roster.join(',') || kept.sizes.join('-') !== `${lo}-${hi}`)) {
+    throw new Error(`${out} holds a contest of ${kept.roster.join(',')} with --seats ${kept.sizes.join('-')}; run it with those, or pick another --out.`);
+  }
+  const seed = kept?.seed ?? Number(opt('--seed') ?? Math.floor(Math.random() * 2 ** 31));
+  const state: DrawState = kept ? { roster, sizes: [lo, hi], games: kept.games } : { roster, sizes: [lo, hi], games: [] };
+  const more = Math.max(0, games - state.games.length);
+  draw = { ...extend(state, more, rng(seed + state.games.length)), seed };
+}
+
+// Game i: with a range of sizes, the draw's game i. Otherwise lineup (i-1) mod L,
+// rotated floor((i-1)/L) seats: every lineup comes up once before any comes up
+// again, so a stopped eval is still balanced, and each full round seats every
+// lineup in every seat order.
 function seats(i: number): string[] {
+  if (draw) return draw.games[i - 1].map((r) => roster[r]);
   const line = all[(i - 1) % all.length].map((r) => roster[r]);
   const turn = Math.floor((i - 1) / all.length) % k;
   return [...line.slice(turn), ...line.slice(0, turn)];
 }
 
-const claudeSeats = Math.max(...Array.from({ length: Math.min(games, round) }, (_, i) => seats(i + 1).filter((m) => m !== 'bot').length));
+const claudeSeats = Math.max(...Array.from({ length: mixed ? games : Math.min(games, round) }, (_, i) => seats(i + 1).filter((m) => m !== 'bot').length));
 const atOnce = Math.max(1, Math.min(Number(opt('--parallel') ?? 1), Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))));
 
 if (args.includes('--dry-run')) {
-  console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), ${atOnce} at a time:`);
+  if (mixed) console.log(`${games} games of ${lo} to ${hi} players, drawn from ${roster.length}, ${atOnce} at a time:`);
+  else console.log(`${games} games of ${k} (one round is ${round}: ${all.length} lineups x ${k} seat orders), ${atOnce} at a time:`);
   for (let i = 1; i <= games; i++) console.log(`g${i}: ${seats(i).join(', ')}`);
+  if (draw) console.log(`\n${balance(roster, draw.games.slice(0, games))}`);
   process.exit(0);
 }
 
-const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-const out = resolve(opt('--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-eval-${roster.join('-').replace(/[:/]/g, '_')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
 mkdirSync(out, { recursive: true });
+if (draw) writeFileSync(drawFile, `${JSON.stringify({ roster, sizes: [lo, hi], seed: draw.seed, games: draw.games }, null, 1)}\n`);
 const seed = opt('--seed');
 const passed = ['--effort', '--max-minutes', '--stall-minutes'].flatMap((o) => (opt(o) === undefined ? [] : [o, opt(o)!]));
-console.log(`Eval in ${out}: ${games} games, ${atOnce} at a time.`);
+// Only a game with a +advice seat gets the advice: given to a game with none, run.ts would hand it to every seat.
+const adviceFor = (i: number) => (advice !== undefined && seats(i).some(advised) ? ['--advice', advice] : []);
+console.log(`${mixed ? 'Contest' : 'Eval'} in ${out}: ${games} games, ${atOnce} at a time.`);
 await runGames({
   out,
   games,
   atOnce,
   seats,
-  args: (i) => ['--budget-usd', opt('--budget-usd') ?? '25', ...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...passed],
+  args: (i) => ['--budget-usd', opt('--budget-usd') ?? '25', ...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...adviceFor(i), ...passed],
 });
 const text = leaderboard(collect({ dirs: [out], rooms: null }));
-writeFileSync(join(out, 'leaderboard.md'), text);
+writeFileSync(join(out, 'leaderboard.md'), draw ? `${text}\n## The draw\n\n\`\`\`\n${balance(roster, draw.games.slice(0, games))}\n\`\`\`\n` : text);
 console.log(text);

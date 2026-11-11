@@ -12,6 +12,7 @@
 //
 // See docs/eval.md for how the rating works and how to read it.
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -36,14 +37,21 @@ export interface Collected { games: Played[]; skipped: Record<string, number> }
  * options (and effort, if set), a person, or the bot. A seat's model is its
  * label, like "opus+expected"; when the runner saw the model the alias ran
  * ("claude-opus-5-5"), that name stands in for the alias, options kept.
+ * A seat with +advice is named by its advice too ("+advice:3f2a", from the
+ * text), since two advice texts make two different players.
  */
-export function playerOf(s: ResultSeat, effort?: string): string | null {
+export function playerOf(s: ResultSeat, effort?: string, advice?: string): string | null {
   if (s.model === 'bot') return BOT;
   if (s.model.startsWith('player: ')) return person(s.model.slice('player: '.length));
   if (s.model.startsWith('open')) return null;
-  const name = s.modelId ? [s.modelId, ...(s.options ?? [])].join('+') : s.model;
+  const options = s.options ?? s.model.split('+').slice(1);
+  const named = options.map((o) => (o === 'advice' && advice ? `advice:${adviceTag(advice)}` : o));
+  const name = [s.modelId ?? s.model.split('+')[0], ...named].join('+');
   return `${name}${effort ? ` @${effort}` : ''}`;
 }
+
+/** A short tag that tells advice texts apart: the first 4 hex digits of its SHA-1. */
+export const adviceTag = (advice: string) => createHash('sha1').update(advice).digest('hex').slice(0, 4);
 
 // People are told apart by the name they joined with, whatever its case.
 const people = new Map<string, string>();
@@ -101,11 +109,12 @@ export function collect(opts: { dirs: string[]; rooms: string | null; since?: nu
 
   function fromResults(r: Results, dir: string) {
     if (r.status !== 'over' || !r.winner) return skip('not finished');
-    if (r.advice) return skip('played with --advice (an experiment)');
+    // Before seats had options (#476), --advice went to every seat with nothing in its name to say so.
+    if (r.advice && !r.seats.some((s) => s.options?.includes('advice'))) return skip('played with --advice before seats were named by it');
     const final = dir ? finalScores(readJson(join(dir, 'game.json'))) : null;
     const winner = r.seats.findIndex((s) => s.seat === r.winner!.seat);
     const places = final ? placesFrom(final.totals, final.winner) : placesFrom(r.seats.map((s) => s.points ?? 0), winner);
-    add(dir, r.seats.map((s, p) => ({ player: playerOf(s, r.effort), place: places[p], costUsd: s.costUsd, tokens: s.tokens })));
+    add(dir, r.seats.map((s, p) => ({ player: playerOf(s, r.effort, r.advice), place: places[p], costUsd: s.costUsd, tokens: s.tokens })));
   }
 
   function add(source: string, seats: { player: string | null; place: number; costUsd?: number; tokens?: number }[]) {
@@ -140,7 +149,7 @@ export function collect(opts: { dirs: string[]; rooms: string | null; since?: nu
         if (s.kind !== 'player') return { player: null, place: places[p] };
         for (const r of ran) {
           const mine = r.seats.find((x) => x.name?.toLowerCase() === s.name.toLowerCase() && !x.model.startsWith('player: ') && x.model !== 'bot');
-          if (mine) return { player: playerOf(mine, r.effort), place: places[p], costUsd: mine.costUsd, tokens: mine.tokens };
+          if (mine) return { player: playerOf(mine, r.effort, r.advice), place: places[p], costUsd: mine.costUsd, tokens: mine.tokens };
         }
         return { player: person(s.name), place: places[p] };
       }));

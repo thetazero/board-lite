@@ -41,7 +41,7 @@ To add an option, name it in `OPTIONS` in `src/playtest/players.ts`, then read i
 
 ### Contests between configurations
 
-A contest is a [batch](#depth-batches) whose seats are configurations instead of models. Advice and expected production on two seats, against two plain Opus seats:
+To rank a bucket of configurations, models and the bot against each other in games of 2 to 6, drawn at random but balanced, see [Run a contest](eval.md#run-a-contest). For a head-to-head between two configurations, a [batch](#depth-batches) whose seats are configurations instead of models works too. Advice and expected production on two seats, against two plain Opus seats:
 
 ```
 node src/playtest/batch.ts --games 30 --models opus+advice+expected,opus+advice+expected,opus,opus \
