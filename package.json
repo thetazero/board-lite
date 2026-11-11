@@ -11,6 +11,7 @@
     "game": "node src/cli.ts",
     "serve": "node src/server/server.ts",
     "datasheet": "node src/datasheet.ts",
+    "analyze": "node src/analyze.ts",
     "typecheck": "tsc && tsc -p web",
     "test": "node --test test/*.test.ts test/design/*.test.ts",
     "ci": "npm run typecheck && npm test",
