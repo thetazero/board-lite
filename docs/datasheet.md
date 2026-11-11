@@ -147,7 +147,7 @@ Anyone may build these, no card needed.
 | Crystal Mine | crystal field | 4 stone, 4 timber, 3 livestock | d4 crystal (avg 2.5) |
 | Pasture | meadow | 3 stone, 4 timber, 4 crystal | d4 livestock (avg 2.5) |
 
-Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round, and each more Workshop on the same building 1 more. Also added without the card, as a special project, for 8 stone, 8 timber, 4 crystal.
+Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round, and each more Workshop on the same building 1 more. Also added without the card, as a special project, for 12 stone, 12 timber, 6 crystal.
 
 ## Land
 
@@ -289,7 +289,7 @@ Beasts on the map. Nothing is built on a hex with fauna, and a building under fa
 
 | Beast | Health | Attack (avg) | Element | Loot | Starts |
 |---|---|---|---|---|---|
-| Wolf Pack | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
+| Wolf | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
 | Basilisk | 26 | 2×1d8 (9) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 

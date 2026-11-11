@@ -1109,7 +1109,7 @@ function faunaGame() {
 
 test('fauna blocks building on its hex, and a building under it produces nothing', () => {
   const { g, near, beyond } = faunaGame();
-  g.map[beyond].fauna = 'wolf_pack';
+  g.map[beyond].fauna = 'wolf';
   assert.throws(() => apply(g, 0, `build pasture ${beyond}`), RuleError);
   apply(g, 0, `build pasture ${near}`);
   assert.equal(production(g, 0).livestock.dice.length, 1);
@@ -1121,7 +1121,7 @@ test('fauna blocks building on its hex, and a building under it produces nothing
 test('clearing fauna: any player may, the loot is theirs, and those dragons can still raid', () => {
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
-  g.map[near].fauna = 'wolf_pack'; // on P1's pasture
+  g.map[near].fauna = 'wolf'; // on P1's pasture
   apply(g, 0, 'end');
   assert.throws(() => apply(g, 1, `clear ${g.towers[0]} d2`), RuleError); // no fauna there
   assert.throws(() => apply(g, 1, `clear ${near}`), RuleError); // no dragons sent
@@ -1133,7 +1133,7 @@ test('clearing fauna: any player may, the loot is theirs, and those dragons can 
   const before = g.players[1].resources.livestock;
   apply(g, 1, `clear ${near} ${d.id}`);
   assert.equal(g.map[near].fauna, undefined);
-  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf_pack.loot.livestock!);
+  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf.loot.livestock!);
   assert.ok(canRaid(d), 'a dragon that cleared a hex, with health left, can still raid this round');
   assert.throws(() => apply(g, 1, `clear ${near} ${d.id}`), RuleError); // one fight a round
   const ev = g.log.map((e) => e.ev).filter((e) => e?.k === 'cleared');
@@ -1173,7 +1173,7 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
 
 test('a beast a card sent gives no loot when it falls', () => {
   const { g, near } = faunaGame();
-  g.map[near].fauna = 'wolf_pack';
+  g.map[near].fauna = 'wolf';
   g.map[near].sent = true; // as a card leaves it
   const d = g.dragons.find((x) => x.owner === 0)!;
   d.stage = 3;
@@ -1194,7 +1194,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
   for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
   g.dragons.forEach((d) => (d.growth = -1000));
   let at = Object.keys(g.map).find((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && !g.buildings[k] && neighbors(k).every((n) => g.map[n]))!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   g.map[at].sent = true;
   const peak = Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird');
   let moves = 0;
@@ -1206,7 +1206,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (now === at) stays++;
     else {
       moves++;
@@ -1267,9 +1267,9 @@ test('a wandering beast still moves at random, but more often to a hex beside no
   const openHex = (k: string) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower';
   const lonely = (n: string, self: string) => !neighbors(n).some((m) => m !== self && g.map[m]?.fauna);
   // Only great beasts are left, and they never move. Count, over many moves of
-  // a wolf pack, how often it picks a lonely hex against how often it could.
+  // a wolf, how often it picks a lonely hex against how often it could.
   let at = Object.keys(g.map).sort().find(openHex)!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   let crowdedMoves = 0, lonelyMoves = 0, crowdedShare = 0;
   for (let i = 0; i < 400 && g.phase !== 'over'; i++) {
     const to = neighbors(at).filter(openHex);
@@ -1281,7 +1281,7 @@ test('a wandering beast still moves at random, but more often to a hex beside no
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (at === was || nLonely === 0 || nLonely === to.length) continue;
     if (lonely(at, at)) lonelyMoves++; else crowdedMoves++;
     crowdedShare += (to.length - nLonely) / to.length;
@@ -1336,21 +1336,21 @@ test('a building card shows what it makes now and with the upgrade', () => {
   assert.deepEqual(production(g, 0).stone, { base: (TUNING.towerProduction.stone ?? 0), dice: [4] });
 });
 
-// #350: a Workshop without the card, as a special project, for double the card.
-test('a Workshop is also a special project, at double the card, and works like the card', () => {
+// #350: a Workshop without the card, as a special project; #463: for triple the card.
+test('a Workshop is also a special project, at triple the card, and works like the card', () => {
   const g = newGame(2, 7);
   keepAll(g);
   const p = g.turn;
   const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
   g.buildings[k] = { type: 'quarry', owner: p, upgrades: [], floors: 0 };
   const card = { timber: 4, stone: 4, crystal: 2 };
-  g.players[p].resources = { stone: 8, timber: 8, crystal: 3, livestock: 0, gold: 0 };
-  // Short of the double cost: the phone says so, and the command is refused.
+  g.players[p].resources = { stone: 12, timber: 12, crystal: 5, livestock: 0, gold: 0 };
+  // Short of the triple cost: the phone says so, and the command is refused.
   let u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
   assert.deepEqual(u.hexes, [k]);
   assert.match(u.why!, /^You can't afford .*crystal.*\.$/);
   assert.throws(() => apply(g, p, `project workshop ${k}`), RuleError);
-  g.players[p].resources.crystal = 4;
+  g.players[p].resources.crystal = 6;
   u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
   assert.equal(u.why, null);
   assert.deepEqual(u.after[k].makes, { stone: { base: 2, dice: [4] } });
@@ -1358,7 +1358,7 @@ test('a Workshop is also a special project, at double the card, and works like t
   // Not on a building it can't go on (the tower), nor twice on one building.
   assert.throws(() => apply(g, p, `project workshop ${g.towers[p]}`), /Workshop can go on/);
   apply(g, p, `project workshop ${k}`);
-  assert.deepEqual(g.players[p].resources, { stone: 8 - 2 * card.stone, timber: 8 - 2 * card.timber, crystal: 4 - 2 * card.crystal, livestock: 0, gold: 0 });
+  assert.deepEqual(g.players[p].resources, { stone: 12 - 3 * card.stone, timber: 12 - 3 * card.timber, crystal: 6 - 3 * card.crystal, livestock: 0, gold: 0 });
   assert.deepEqual(g.buildings[k].upgrades, ['workshop']);
   assert.equal(buildingPoints(g, k), 1 + (UPGRADES.workshop.points ?? 0));
   assert.match(g.log.at(-1)!.text, /adds Workshop to their Quarry at .* as a special project\./);

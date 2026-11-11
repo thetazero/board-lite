@@ -118,7 +118,7 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
   assert.equal(score(g, 0).buildings, points);
   assert.equal(gold(), goldBefore);
   // A beast on it does the same, until it's cleared.
-  g.map[pasture].fauna = 'wolf_pack';
+  g.map[pasture].fauna = 'wolf';
   assert.equal(score(g, 0).buildings, points - 1);
   assert.equal(gold(), goldBefore - 1);
   delete g.map[pasture].fauna;
@@ -234,12 +234,12 @@ test('a beast and perched dragons on one building fight together', () => {
   apply(g, 1, 'end');
   toTurnOf(g, 0);
   // Placed after production, so it can't wander off first.
-  g.map[pasture].fauna = 'wolf_pack';
+  g.map[pasture].fauna = 'wolf';
   assert.equal(g.dragons.find((x) => x.id === a.id)!.perch, pasture);
   const hunters = [addDragon(g, 0, 3, 'ember_wyrm'), addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3)];
   apply(g, 0, `clear ${pasture} ${hunters.map((d) => d.id).join(' ')}`);
   const hunt = g.log.findLast((e) => e.ev?.k === 'hunt')!.ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
-  assert.equal(hunt.fauna, 'wolf_pack');
+  assert.equal(hunt.fauna, 'wolf');
   assert.equal(hunt.units.length, 2);
   assert.equal(hunt.units[1].d, a.id);
 });
@@ -279,7 +279,7 @@ test('one element wheel for everything that fights: double damage only; neutral 
 
 test('foe elements', () => {
   const el = (x: { element: string }) => x.element;
-  assert.deepEqual([UNITS.militia, UNITS.archers, UNITS.knights, FAUNA.wolf_pack, FAUNA.cave_bear, FAUNA.basilisk].map(el), Array(6).fill('neutral'));
+  assert.deepEqual([UNITS.militia, UNITS.archers, UNITS.knights, FAUNA.wolf, FAUNA.cave_bear, FAUNA.basilisk].map(el), Array(6).fill('neutral'));
   assert.equal(UNITS.frost_golem.element, 'ice');
   assert.equal(UNITS.storm_griffin.element, 'air');
   assert.equal(BEASTS.thunderbird.element, 'air');

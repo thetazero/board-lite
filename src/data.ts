@@ -66,8 +66,10 @@ export const TUNING = {
   towerDragonCapacity: 1,
   // Each player's starting base dragon begins at this life stage (0 egg).
   startingDragonStage: 0,
-  // A special project (a base egg, or a Workshop) costs this many times its card.
-  specialProjectMultiplier: 2,
+  // A special project costs this many times its card: a base egg, or an
+  // upgrade (the Workshop). The Workshop's went from 2 to 3 (#463): late in a
+  // game it was a points dump, 31 added as projects in one 4-player game.
+  specialProjectMultiplier: { egg: 2, upgrade: 3 },
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
   // Fair starts (#424): a start's opportunity in a ring around its tower is
@@ -359,7 +361,7 @@ export interface FaunaDef extends UnitDef {
 }
 
 export const FAUNA: Record<string, FaunaDef> = {
-  wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
+  wolf: { name: 'Wolf', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4 } },
   basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'neutral', loot: { livestock: 4, gold: 2 } },
 };
@@ -386,7 +388,7 @@ export function faunaDef(k: string): FaunaDef {
 
 // On the starting map, a beast's kind goes by its distance to the nearest
 // tower: wolves close in, the basilisk furthest out.
-export const FAUNA_BY_DISTANCE = ['wolf_pack', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
+export const FAUNA_BY_DISTANCE = ['wolf', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
 
 export interface TargetDef {
   name: string;

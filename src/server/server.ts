@@ -207,7 +207,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
         return json(res, 200, {});
       case 'do':
         if (host) throw new RoomError('The TV has no seat.');
-        room.command(tok, str(b.command), via(b.via));
+        room.command(tok, str(b.command), via(b.via), str(b.id) || undefined);
         return json(res, 200, { state: room.snapshot(tok) });
     }
     return json(res, 404, { error: 'Not found.' });

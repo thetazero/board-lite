@@ -474,7 +474,7 @@ q::after { content: close-quote; }
 @keyframes grow-bar { from { transform: scaleX(0); } }
 .breakdown .part { flex-basis: 0; display: flex; align-items: center; justify-content: center; min-width: 1.4em; font-size: .7em; font-weight: 800; color: #fff; box-shadow: inset -2px 0 0 #fff6; }
 .breakdown .total { text-align: right; white-space: nowrap; }
-.part.buildings { background: #7a5c3e; } .part.titles { background: #c4951c; } .part.beasts { background: #6a4bb0; } .part.kingdoms { background: #b0443a; } .part.hand { background: #8a8296; }
+.part.buildings { background: #7a5c3e; } .part.monuments { background: #4f7d80; } .part.titles { background: #c4951c; } .part.beasts { background: #6a4bb0; } .part.kingdoms { background: #b0443a; } .part.hand { background: #8a8296; }
 .partkey { display: flex; flex-wrap: wrap; gap: .4em 1.2em; justify-content: center; color: var(--ink-soft); font-size: 1.1em; }
 .partkey i { display: inline-block; width: .9em; height: .9em; border-radius: 2px; margin-right: .35em; vertical-align: -.1em; }
 

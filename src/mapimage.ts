@@ -102,7 +102,7 @@ class Canvas {
   }
 }
 
-const FAUNA_LETTER: Record<string, string> = { wolf_pack: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
+const FAUNA_LETTER: Record<string, string> = { wolf: 'W', cave_bear: 'B', basilisk: 'X', thunderbird: 'T', leviathan: 'V' };
 const SQ3 = Math.sqrt(3);
 const S = 30; // hex size: centre to corner, in pixels
 
@@ -221,4 +221,4 @@ export function mapImage(g: PublicState, you: number): Buffer {
 }
 
 // What the picture shows, in words, to go beside it.
-export const MAP_IMAGE_KEY = 'The picture: each hex at its place, with its coordinates. A hex in a player\'s color has their building on it (a white ring: their tower); a dark edge runs around each player\'s land. Colored dots on an empty hex: who can build there. A dark disc: a beast (W Wolf Pack, B Cave Bear, X Basilisk, T Thunderbird, V Leviathan). Dark stripes: suppressed, or held by a great beast. Colors: P1 red, P2 blue, P3 yellow, P4 green, P5 purple, P6 orange.';
+export const MAP_IMAGE_KEY = 'The picture: each hex at its place, with its coordinates. A hex in a player\'s color has their building on it (a white ring: their tower); a dark edge runs around each player\'s land. Colored dots on an empty hex: who can build there. A dark disc: a beast (W Wolf, B Cave Bear, X Basilisk, T Thunderbird, V Leviathan). Dark stripes: suppressed, or held by a great beast. Colors: P1 red, P2 blue, P3 yellow, P4 green, P5 purple, P6 orange.';

@@ -39,7 +39,19 @@ export function load(file: string): Game {
 export function upgrade(g: Game): Game {
   // The desert was called plains before.
   for (const h of Object.values(g.map ?? {})) if ((h.terrain as string) === 'plains') h.terrain = 'desert';
+  // The Wolf was the Wolf Pack, keyed wolf_pack: on the map, in a fight or the log.
+  renameValue(g, 'wolf_pack', 'wolf');
   return g;
+}
+
+// Every string `from` anywhere inside `v` becomes `to`, in place.
+function renameValue(v: unknown, from: string, to: string) {
+  if (!v || typeof v !== 'object') return;
+  const o = v as Record<string, unknown>;
+  for (const k of Object.keys(o)) {
+    if (o[k] === from) o[k] = to;
+    else renameValue(o[k], from, to);
+  }
 }
 
 export function save(file: string, g: unknown) {

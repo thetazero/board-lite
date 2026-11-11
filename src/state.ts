@@ -416,7 +416,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const s = score(g, p);
   const raid = g.raid;
   const housed = g.dragons.filter((d) => d.owner === p).length;
-  const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
+  const eggCost = specialProjectCost('egg', DRAGONS.fire_whelp.cost);
   const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
   const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, eat: 0, blocked: shut.has(r) }])) as SeatState['income'];
   // Eggs don't eat (#415): an egg that hatches at the next production eats from the one after.
@@ -444,7 +444,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
     upgradeProjects: PROJECT_UPGRADES.map((key) => {
       const u = UPGRADES[key];
-      const cost = specialProjectCost(u.cost);
+      const cost = specialProjectCost('upgrade', u.cost);
       const hexes = upgradeTargets(g, p, key);
       const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, key])]));
       return { key, name: u.name, text: u.text, cost: res(cost), affordable: canAfford(pl, cost), hexes, after, why: (hexes.length ? null : noUpgradeHex(u)) ?? afford(pl, cost) };
@@ -492,6 +492,11 @@ export interface Snapshot {
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
   scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
+  // How many times the room has changed when this was taken: a later snapshot
+  // has a higher one, so a phone can tell the answer to its own tap from an
+  // older push arriving after it (#456). Counted from the server's start, so
+  // only snapshots on the same stream compare. Absent where no room made it.
+  v?: number;
   recap?: string | null; // once the game is over: its recap's id (/recap/<id>, src/recap.ts)
   you: (SeatState & { name: string }) | null;
 }
@@ -504,7 +509,8 @@ export interface RecapStanding {
   tied: boolean;
   tiebreak: 'gold' | 'turn order' | null;
   total: number;
-  buildings: number;
+  buildings: number; // every building's points, monuments included
+  monuments?: number; // the monument cards' share of those (absent in recaps from before #461)
   titles: number;
   beasts: number; // great beasts slain
   raids: number; // kingdoms that score, taken

@@ -792,7 +792,7 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
     return { name: d ? dragonLabel(d, g.dragons) : u.name, hp: u.hp, max: d?.maxHp ?? u.hp, d, el: (u as { el?: string }).el ?? d?.element };
   });
   const terrain = g.map.find((h) => h.k === ev.hex)?.terrain ?? 'desert';
-  // One beast or perched dragon is named: "The Wolf Pack strikes first".
+  // One beast or perched dragon is named: "The Wolf strikes first".
   const one = ev.fauna ? `The ${units[0].name}` : units[0].name;
   const first = units.length > 1 ? flip(ev.first, 'The defenders', true, 'shield') : flip(ev.first, one, false, ev.fauna ?? 'shield');
   return battle(g, terrain, head, dragons, startHp(ev.ds, ev.hps), '', units, rounds, outcome, null, undefined, sc.ms, first);

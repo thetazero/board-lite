@@ -763,8 +763,8 @@ function wolf(phase: number): BeastRig {
   return { kind: 'wolf', body, head, tail, legs, phase };
 }
 
-// The Wolf Pack: one wolf, big enough to read from the TV.
-function wolfPack(): THREE.Group {
+// The Wolf: one wolf, big enough to read from the TV.
+function wolfModel(): THREE.Group {
   const w = wolf(0);
   const big = group(w.body);
   big.scale.setScalar(1.25); // the board sets the outer group's scale
@@ -898,7 +898,7 @@ function leviathan(): THREE.Group {
 const PEAK_H = 1.5; // the centre peak's height: the Thunderbird perches on top
 
 function beastModel(key: string): THREE.Group {
-  return key === 'wolf_pack' ? wolfPack() : key === 'cave_bear' ? caveBear() : key === 'thunderbird' ? thunderbird() : key === 'leviathan' ? leviathan() : basilisk();
+  return key === 'wolf' ? wolfModel() : key === 'cave_bear' ? caveBear() : key === 'thunderbird' ? thunderbird() : key === 'leviathan' ? leviathan() : basilisk();
 }
 
 // A beast's joints at time t (seconds). `gait` is how far into walking it is
@@ -3178,7 +3178,7 @@ function pleatWallRing(r: number, h: number, n: number): THREE.BufferGeometry {
 const DEFENDERS: Record<string, () => THREE.Group> = {
   militia, archers, knights, frost_golem: frostGolem, storm_griffin: stormGriffin, sea_serpent: leviathan, fire_giant: fireGiant, titan,
 };
-const BEASTS = new Set(['wolf_pack', 'cave_bear', 'basilisk', 'thunderbird', 'leviathan']);
+const BEASTS = new Set(['wolf', 'cave_bear', 'basilisk', 'thunderbird', 'leviathan']);
 
 export type Fighter = { dragon: { element: string; stage: number } } | { foe: string };
 

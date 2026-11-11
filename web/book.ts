@@ -68,7 +68,7 @@ function portraitList(b: Rulebook, seat: number): { id: string; p: Portrait }[] 
   const add = (id: string, p: Portrait) => out.push({ id, p: { owner: seat, ...p } });
   for (const t of b.terrains) add(`terrain ${t}`, { terrain: t });
   add('border', { terrain: 'meadow', building: 'pasture', border: true });
-  add('shut', { terrain: 'meadow', building: 'pasture', beast: 'wolf_pack' });
+  add('shut', { terrain: 'meadow', building: 'pasture', beast: 'wolf' });
   add('perched', { terrain: 'meadow', building: 'pasture', dragon: { element: 'ice', stage: 3 } });
   add('held thunderbird', { terrain: 'meadow', held: 'thunderbird' });
   add('held leviathan', { terrain: 'harbor', held: 'leviathan' });
