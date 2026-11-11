@@ -47,8 +47,16 @@ function dragonLine(d: DragonView): string {
   return `${d.id} ${P(d.owner)} ${d.name} (${d.element} ${d.stageName}, ${stats}${growth}; ${status}${hungry}) ${d.targeting}`;
 }
 
+// A die's expected roll: 1d4 is 2.5.
+const expected = (v: { base: number; dice: number[] }) => v.base + v.dice.reduce((a, d) => a + (d + 1) / 2, 0);
+const num = (n: number) => String(Math.round(n * 10) / 10);
+
+// Each resource's base and dice, with what it makes on average each round,
+// then the total of those.
 function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
-  return Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat).map(([r, v]) => `${r} ${[...(v.base || !v.dice.length ? [v.base] : []), ...v.dice.map((d) => `1d${d}`)].join('+')}${v.eat ? ` (dragons eat ${v.eat})` : ''}`).join(', ') || 'nothing';
+  const rows = Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat);
+  const each = rows.map(([r, v]) => `${r} ${[...(v.base || !v.dice.length ? [v.base] : []), ...v.dice.map((d) => `1d${d}`)].join('+')}${v.dice.length ? ` (expected ${num(expected(v))})` : ''}${v.eat ? ` (dragons eat ${v.eat})` : ''}`);
+  return each.length ? `${each.join(', ')}; expected ${num(rows.reduce((a, [, v]) => a + expected(v), 0))} in all` : 'nothing';
 }
 
 function mapText(g: PublicState): string[] {
@@ -236,7 +244,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}${pl.titles ? `, titles ${pl.titles}` : ''}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${amounts(pl.production)}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}${pl.titles ? `, titles ${pl.titles}` : ''}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${amounts(pl.production)} each round${pl.lastMade ? `; made ${pl.lastMade.total} in round ${pl.lastMade.round}` : ''}`);
   });
   const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
   if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);
