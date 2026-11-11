@@ -8,8 +8,17 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseSpec, type PlayerOption } from './players.ts';
 
-export interface SavedSeat { p: number; model: string; token: string; session: string; starts: number; cost: number }
+export interface SavedSeat {
+  p: number;
+  model: string; // the claude --model
+  options?: PlayerOption[]; // the seat's Claude player options (src/playtest/players.ts); runners before them had none
+  token: string;
+  session: string;
+  starts: number;
+  cost: number;
+}
 
 export interface RunnerState {
   pid?: number; // the runner running this directory, while it runs
@@ -61,10 +70,11 @@ function fromLeftovers(out: string): RunnerState {
     room ||= url;
     const session = /"session_id":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1];
     const fromResults = (results.seats as { seat: string; model: string; costUsd?: number; starts?: number }[] | undefined)?.find((s) => s.seat === `P${n}`);
-    const model = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
-    if (!model) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
+    const label = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
+    if (!label) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
     // No session id: the player never got going, so it starts afresh.
-    seats.push({ p: n - 1, model, token, session: session ?? '', starts: session ? Math.max(1, fromResults?.starts ?? 1) : 0, cost: fromResults?.costUsd ?? 0 });
+    const { model, options } = parseSpec(label); // results.json and runner.log name the seat's configuration, like opus+expected
+    seats.push({ p: n - 1, model, options, token, session: session ?? '', starts: session ? Math.max(1, fromResults?.starts ?? 1) : 0, cost: fromResults?.costUsd ?? 0 });
   }
   if (!seats.length) throw new Error(`Nothing to resume in ${out}: no Claude player ever took a seat there.`);
   return { room, hosted: existsSync(join(out, 'game.json')), ...(typeof results.seed === 'number' ? { seed: results.seed } : {}), ...(results.advice ? { advice: results.advice } : {}), seats };

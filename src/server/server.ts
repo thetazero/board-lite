@@ -344,7 +344,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const url = `http://localhost:${port}/${room.code}`;
     console.log(`Room ${room.code} is open.`);
     console.log(`  At a terminal:  node src/cli.ts join ${url} <name>`);
-    console.log(`  Claude players: node src/playtest/run.ts --room ${url} --models opus,haiku`);
+    console.log(`  Claude players: node src/playtest/run.ts --room ${url} --models opus+expected,haiku+expected`);
     console.log(`  On a TV, any time: http://localhost:${port}/tv?room=${room.code}`);
   });
   server.on('continue', (room: Room) => bringBackClaude(room, port));

@@ -8,7 +8,7 @@ Claude players are clients like phones: the runner hosts the game in a room on a
 node src/playtest/run.ts --models opus,haiku,haiku
 ```
 
-One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...) or `bot`. Other options:
+One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...) or `bot`, and for a Claude seat the [options](#claude-player-options) it plays with, like `opus+advice+expected`. Other options:
 
 | Option | Default | |
 |---|---|---|
@@ -18,12 +18,39 @@ One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model`
 | `--budget-usd N` | 5 (30 with `--room`) | spending cap per Claude seat for the whole game |
 | `--max-minutes N` | 240 | stop the game after this long |
 | `--stall-minutes N` | 15 | stop if nothing happens in the game for this long |
-| `--advice TEXT` | none | strategy advice appended to every Claude seat's prompt, recorded in `results.json`; for A/B tests of how players play |
+| `--advice TEXT` | none | strategy advice appended to the prompt of each seat with `+advice` (to every Claude seat if no seat says `+advice`), recorded in `results.json` |
 | `--serve PORT` | off | also open the game's TV and phone pages to the network on PORT, to watch a playtest on a TV (the runner prints the TV link) |
 | `--room URL` | none | don't host: join the Claude seats to a room someone else hosts; see [`play-vs-claude.md`](play-vs-claude.md) |
 | `--resume DIR` | none | bring back the Claude seats of a runner that stopped before the game ended; see [Resuming a game](#resuming-a-game) |
 
 It prints progress and blocks until the game ends, so run it in the background. Several games can run at once with different `--out` dirs, within the limits below.
+
+## Claude player options
+
+Each Claude seat can play with its own options, written after its model with `+`: `opus` is the plain Claude player, `opus+advice+expected` the same model with two options on. A seat with no options plays as Claude players did before #469: no advice, production shown as dice only.
+
+| Option | The seat |
+|---|---|
+| `+advice` | gets the `--advice` text appended to its prompt |
+| `+expected` | sees each player's expected production each round (per resource and in all) and what they made at the latest roll (#469) |
+
+`run.ts --help` lists them. The order doesn't matter: `opus+expected+advice` is the same player as `opus+advice+expected`, and both are labeled `opus+advice+expected`. In `results.json` that label is the seat's `model` (and the winner's), with its `options` beside it, so a batch tallies wins per configuration exactly as it tallies them per model.
+
+To add an option, name it in `OPTIONS` in `src/playtest/players.ts`, then read it where it takes effect: `run.ts` for the prompt, `seat-server.ts` for what the seat sees.
+
+### Contests between configurations
+
+A contest is a [batch](#depth-batches) whose seats are configurations instead of models. Advice and expected production on two seats, against two plain Opus seats:
+
+```
+node src/playtest/batch.ts --games 30 --models opus+advice+expected,opus+advice+expected,opus,opus \
+  --advice "$(cat advice.txt)" --out ~/.cache/board-lite/playtests/contest-advice-expected
+```
+
+- Rotating the seats each game puts each configuration in each seat equally often, so seat order doesn't decide it.
+- In `summary.md` each configuration has a fair share of 50%. Each game has one winner, so one configuration's wins are the other's losses: read the table's chance column for the configuration that won more.
+- 4 Claude seats a game, so one game runs at a time (the pool seats 6): 30 games are 30 game-lengths, about 4 hours, and about $220 at Opus's cost of about $1.80 a seat per game.
+- How many games: over 30, 20 or more wins for one side happens by chance under 5% of the time; a side that really wins 65% of games gets there only half the time. 30 games show a big gap, not a small one.
 
 ## How many games run at once
 
@@ -40,7 +67,7 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 
 In the `--out` directory:
 
-- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, or `player: <name>` for someone else's seat in a `--room` game), final points (hidden ones included), and for Claude seats cost and how many times its process was (re)started; plus counts of public and private messages.
+- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, the advice if any seat had it, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, `player: <name>` for someone else's seat in a `--room` game, or a Claude seat's configuration like `opus+expected`), a Claude seat's `options`, final points (hidden ones included), and for Claude seats cost and how many times its process was (re)started; plus counts of public and private messages.
 - `log.txt`: the whole game log as the engine recorded it, talk included. Lines only some players saw are marked `(only P1, P3)`: private messages, card draws, secret votes and fight-or-hold-back choices.
 - `talk.txt`: just the talk.
 - `seat-N.moves.txt`: why seat N made each move. Every `act` (and `say`) carries a private `why` that no other player sees, and this file pairs each one with what really happened (`-> done` or `-> not allowed: can't afford ...`). It's the record of reasoning to audit: read it, not the narration.
@@ -58,7 +85,7 @@ Claude seats are named Rowan, Quinn, Ellis, ... in seat order, never after their
 node src/playtest/batch.ts --games 30 --models opus,haiku,haiku
 ```
 
-- Game *i* goes in `<out>/g<i>` and rotates the seats *i*-1 places, so each model sits in each seat equally often (seat order matters: in batch b13-0921, P2 won all 4 games). It takes `--out`, `--seed` and the run.ts options `--effort`, `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--advice`, passed to every game.
+- Game *i* goes in `<out>/g<i>` and rotates the seats *i*-1 places, so each model sits in each seat equally often (seat order matters: in batch b13-0921, P2 won all 4 games). It takes `--out`, `--seed` and the run.ts options `--effort`, `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--advice`, passed to every game. Its seats can be [configurations](#contests-between-configurations) like `opus+expected`.
 - It runs as many games at once as the seat pool can seat (two 3-seat games) and the rest after them. Run it in the background: about (games × Claude seats ÷ 6) game-lengths, so 30 three-seat games are 15 game-lengths, about 2 hours on an idle machine, and about $55 at today's costs (Opus about $1.80 a game, Haiku under $0.10).
 - A game that doesn't finish (`stalled`, `low memory`, ...) is left in `g<i>.failed<n>`; run the same command with the same `--out` again to rerun just those.
 - At the end it writes `<out>/summary.md`: per model, games, wins, win rate with a 95% range, its fair share of wins (its share of the seats), and the chance of that many wins or more if every seat were equally strong; wins by seat; one line per game; then the batch's [stats](#stats). `node src/playtest/batch.ts --summary <out>` rewrites it at any time, e.g. while the batch runs.

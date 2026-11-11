@@ -22,7 +22,7 @@ test('a stopped runner with no runner.json resumes from what it left behind', ()
     const s = readState(out);
     assert.equal(s.room, 'http://localhost:8080/GZJH');
     assert.equal(s.hosted, false);
-    assert.deepEqual(s.seats, [{ p: 0, model: 'opus', token: 'tok1', session: 'sess-1', starts: 1, cost: 0.5 }]);
+    assert.deepEqual(s.seats, [{ p: 0, model: 'opus', options: [], token: 'tok1', session: 'sess-1', starts: 1, cost: 0.5 }]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -37,7 +37,7 @@ test('a Claude player that never started comes back as a fresh start', () => {
     writeFileSync(join(out, 'game.json'), '{}');
     const s = readState(out);
     assert.equal(s.hosted, true);
-    assert.deepEqual(s.seats, [{ p: 1, model: 'haiku', token: 'tok2', session: '', starts: 0, cost: 0 }]);
+    assert.deepEqual(s.seats, [{ p: 1, model: 'haiku', options: [], token: 'tok2', session: '', starts: 0, cost: 0 }]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

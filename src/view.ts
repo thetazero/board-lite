@@ -51,12 +51,13 @@ function dragonLine(d: DragonView): string {
 const expected = (v: { base: number; dice: number[] }) => v.base + v.dice.reduce((a, d) => a + (d + 1) / 2, 0);
 const num = (n: number) => String(Math.round(n * 10) / 10);
 
-// Each resource's base and dice, with what it makes on average each round,
-// then the total of those.
-function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>): string {
+// Each resource's base and dice; with `withExpected`, what it makes on average
+// each round, then the total of those.
+function amounts(x: Record<string, { base: number; dice: number[]; eat?: number }>, withExpected = true): string {
   const rows = Object.entries(x).filter(([, v]) => v.base || v.dice.length || v.eat);
-  const each = rows.map(([r, v]) => `${r} ${[...(v.base || !v.dice.length ? [v.base] : []), ...v.dice.map((d) => `1d${d}`)].join('+')}${v.dice.length ? ` (expected ${num(expected(v))})` : ''}${v.eat ? ` (dragons eat ${v.eat})` : ''}`);
-  return each.length ? `${each.join(', ')}; expected ${num(rows.reduce((a, [, v]) => a + expected(v), 0))} in all` : 'nothing';
+  const each = rows.map(([r, v]) => `${r} ${[...(v.base || !v.dice.length ? [v.base] : []), ...v.dice.map((d) => `1d${d}`)].join('+')}${withExpected && v.dice.length ? ` (expected ${num(expected(v))})` : ''}${v.eat ? ` (dragons eat ${v.eat})` : ''}`);
+  if (!each.length) return 'nothing';
+  return withExpected ? `${each.join(', ')}; expected ${num(rows.reduce((a, [, v]) => a + expected(v), 0))} in all` : each.join(', ');
 }
 
 function mapText(g: PublicState): string[] {
@@ -228,8 +229,15 @@ export function statusText(s: Snapshot): string {
   return out.join('\n');
 }
 
+/** How a seat's view is shown; a Claude player's options (src/playtest/players.ts) pick these. */
+export interface ViewOptions {
+  /** Each player's expected production each round and what they made at the latest roll (#469). */
+  expected?: boolean;
+}
+
 /** Everything one seat sees, and its options: what its phone shows, as text. */
-export function seatView(s: Snapshot, logLines = 25): string {
+export function seatView(s: Snapshot, logLines = 25, opts: ViewOptions = {}): string {
+  const withExpected = opts.expected ?? true;
   const g = s.game;
   const you = s.you;
   if (!you) return statusText(s);
@@ -244,7 +252,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push(`== Scores (first to ${g.pointsToWin}; hidden points count at the end) ==`);
   g.players.forEach((pl, q) => {
     const extra = q === p ? ` + ${you.hiddenPoints} hidden = ${you.totalPoints}` : '';
-    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}${pl.titles ? `, titles ${pl.titles}` : ''}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${amounts(pl.production)} each round${pl.lastMade ? `; made ${pl.lastMade.total} in round ${pl.lastMade.round}` : ''}`);
+    out.push(`${P(q)}${q === p ? ' (you)' : ''}: ${pl.publicPoints} public (buildings ${pl.buildings - pl.monuments}${pl.monuments ? `, monuments ${pl.monuments}` : ''}${pl.titles ? `, titles ${pl.titles}` : ''}${pl.beasts ? `, great beasts ${pl.beasts}` : ''}${pl.raids ? `, kingdoms ${pl.raids}` : ''})${extra}; ${pl.handSize} cards in hand; makes ${withExpected ? `${amounts(pl.production)} each round${pl.lastMade ? `; made ${pl.lastMade.total} in round ${pl.lastMade.round}` : ''}` : amounts(pl.production, false)}`);
   });
   const last = g.phase === 'over' ? [] : g.players.flatMap((pl, q) => ((q === p ? you.totalPoints : pl.publicPoints) >= g.pointsToWin ? [q === p ? 'you' : P(q)] : []));
   if (last.length) out.push(`${last.join(' and ').replace(/^you/, 'You')} ${last.length > 1 || last[0] === 'you' ? 'have' : 'has'} ${g.pointsToWin} or more points, so this is the last round.`);
@@ -252,7 +260,7 @@ export function seatView(s: Snapshot, logLines = 25): string {
   out.push('');
   out.push('== You (hidden from others) ==');
   out.push(`Resources: ${Object.entries(you.resources).map(([r, n]) => `${n} ${r}`).join(', ')}`);
-  out.push(`Each round you make: ${amounts(you.income)}.`);
+  out.push(`Each round you make: ${amounts(you.income, withExpected)}.`);
   out.push(`Merchants ${rateText(you.bankRates)}. Dragons ${you.dragonsHoused}/${you.dragonCapacity} housed${you.dragonsHoused > you.dragonCapacity ? `: ${you.dragonsHoused - you.dragonCapacity} over, no hatching until there's room` : ''}.`);
   const over = you.hand.length - you.handCap;
   out.push(`Hand (${you.hand.length}/${you.handCap})${over > 0 && g.phase !== 'discard' ? `: ${over} over the limit, discarded at the end of the round` : ''}:`);

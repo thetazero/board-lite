@@ -17,10 +17,10 @@ npm run serve -- --flee-seconds 60
 3. **Claude players:** in the repo on the laptop, with the room code the TV shows (the server's terminal prints this command with the room filled in when the TV opens the room):
 
    ```
-   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
+   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus+expected,haiku+expected
    ```
 
-   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name. They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats; bring them back with `--resume` (below).
+   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, or a full model name, then its options: `+expected` shows it each player's expected production each round and what they made at the latest roll; without it, the player sees production as dice only. See [Claude player options](playtest.md#claude-player-options). They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats; bring them back with `--resume` (below).
 4. **Start:** press **Start game** on the TV (or on the first player's phone). Bots can fill seats too ("Add a bot").
 
 Claude players start the moment the game does. Each is a `claude -p` process of 300 to 400 MB, and they share the machine-wide limit of 6 Claude seats with any playtests running (see [`playtest.md`](playtest.md#how-many-games-run-at-once)). If the slots aren't free, the runner prints `Waiting to start: ...` and only joins the lobby once they are, so wait for the Claude players to show up on the TV before you press Start.

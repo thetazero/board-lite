@@ -5,21 +5,25 @@
 // are fixed by the command line, so the player can't see other hands, act for
 // another seat, or reach files, shell or anything else on the network.
 //
-//   node src/playtest/seat-server.ts <room-url> <token> [moves-file]
+//   node src/playtest/seat-server.ts <room-url> <token> [moves-file] [--expected]
 //
 // The room URL looks like http://localhost:8080/ABCD. With a moves file, every
 // act and say is appended to it with the player's private reason ("why") and
 // what actually happened, so a playtest audit can read why each move was made.
 // Claude Code drops thinking from `claude -p` transcripts, so this is the record.
+// The flags are the seat's Claude player options that change what it sees
+// (src/playtest/players.ts): --expected shows each player's expected production.
 
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import type { EventView, Snapshot } from '../state.ts';
-import { eventLine, seatStatus, seatView } from '../view.ts';
+import { eventLine, seatStatus, seatView, type ViewOptions } from '../view.ts';
 import { MAP_IMAGE_KEY, mapImage } from '../mapimage.ts';
 
-const [roomUrl, token, movesFile] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const [roomUrl, token, movesFile] = argv.filter((a) => !a.startsWith('--'));
+const viewOptions: ViewOptions = { expected: argv.includes('--expected') };
 const m = /^(https?:\/\/[^/]+)\/([A-Za-z]{4})\/?$/.exec(roomUrl ?? '');
 if (!m || !token) {
   console.error('Usage: seat-server.ts <room-url> <token>');
@@ -79,7 +83,7 @@ const TOOLS = [
       if (r.error) return `Error: ${r.error}`;
       await listen(0); // the view shows the recent events: don't repeat them on the next wait
       const s = r as Snapshot;
-      const text = seatView(s, a.log ?? 25);
+      const text = seatView(s, a.log ?? 25, viewOptions);
       // The board as a picture too (#384): the text map's rows don't line up as a hex grid.
       if (!s.game || !s.you) return text;
       return [
