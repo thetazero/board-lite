@@ -19,7 +19,7 @@ import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
 import type { Side } from '../src/engine.ts';
-import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
+import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, behind, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -125,6 +125,9 @@ function onSnapshot(s: Snapshot) {
   const fresh = log.filter((e) => e.i > seenLog);
   if (fresh.length) seenLog = fresh.at(-1)!.i;
   queueBanners(s.game, fresh);
+  // A phone's table view doesn't play scenes the server has stopped holding
+  // the table for: the phone would stay cut away from what's open now (#449).
+  if (remote) catchUp(s.scene);
   // While a scene plays, the board, the panels, the feed and the titles stay
   // as they were when it began, so nothing in the corners gives its ending
   // away; they catch up when it's over.
@@ -1173,10 +1176,13 @@ function updateOverlay(g: PublicState) {
 }
 
 let bannerN = 0;
+let bannerEnds = 0; // when the banner up ends (Date.now())
+let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
   bannerUp = true;
   bannerTop = b.top ?? null;
+  bannerEnds = Date.now() + b.ms;
   cut(true);
   const key = `banner ${++bannerN}`;
   const box = showOverlay('banner', key, b.html);
@@ -1188,22 +1194,32 @@ function showBanner(b: Banner) {
   // rather than all of it landing in the frame the scene ends. The fade starts
   // once the caught-up board is drawn: drawing it takes a while on a slow TV,
   // and would eat the fade.
-  setTimeout(() => {
+  bannerTimers = [window.setTimeout(() => {
     if (!bannerUp || !snap?.game || !boardNext(snap.game)) return;
     bannerTop = null;
     renderGame(snap.game);
     requestAnimationFrame(() => requestAnimationFrame(() => overlayKey === key && hideOverlay()));
-  }, Math.max(0, b.ms - FADE_MS - CATCH_UP_MS));
-  setTimeout(() => {
-    bannerUp = false;
-    bannerTop = null;
-    if (!snap?.game) return;
-    updateOverlay(snap.game);
-    if (!bannerUp) {
-      renderGame(snap.game); // the scenes are over: the board catches up
-      if (!summary) cut(false);
-    }
-  }, b.ms);
+  }, Math.max(0, b.ms - FADE_MS - CATCH_UP_MS)), window.setTimeout(endBanner, b.ms)];
+}
+
+function endBanner() {
+  bannerTimers.forEach(clearTimeout);
+  bannerUp = false;
+  bannerTop = null;
+  if (!snap?.game) return;
+  updateOverlay(snap.game);
+  if (!bannerUp) {
+    renderGame(snap.game); // the scenes are over: the board catches up
+    if (!summary) cut(false);
+  }
+}
+
+// Behind the server (scenes.ts, behind): the scenes still queued are dropped,
+// and the one playing ends now unless it's about to.
+function catchUp(serverLeft: number) {
+  const r = behind(serverLeft, bannerUp ? bannerEnds - Date.now() : null);
+  if (r.skipQueued) banners.length = 0;
+  if (r.endPlaying) endBanner();
 }
 
 // The overlay over the board: a banner, a raid step or the final scores.

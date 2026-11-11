@@ -113,3 +113,19 @@ export function scenesOf(events: SceneEvent[]): Scene[] {
 }
 
 export const scenesMs = (scenes: Scene[]) => scenes.reduce((s, x) => s + x.ms, 0);
+
+// A table view that has fallen behind the server (#449). The server holds the
+// table only while its scenes play (src/server/room.ts), and each snapshot says
+// how much longer (`scene`). A table view can still have scenes to play once
+// the server says none are left: a phone's table view that was away (the phone
+// asleep, its stream gone) gets everything it missed as new, and one made just
+// after the game started has the opening round to show. Played then, they'd
+// keep the phone cut away from the vote or turn that has already opened, until
+// a reload. So once the server holds nothing, the scenes still queued are
+// skipped, and the one playing ends unless it's in its last moment (there,
+// ending a little after the server is only the time a snapshot takes to arrive).
+export const BEHIND_GRACE_MS = 1500;
+export function behind(serverLeft: number, playingLeft: number | null): { skipQueued: boolean; endPlaying: boolean } {
+  if (serverLeft > 0) return { skipQueued: false, endPlaying: false };
+  return { skipQueued: true, endPlaying: playingLeft !== null && playingLeft > BEHIND_GRACE_MS };
+}
