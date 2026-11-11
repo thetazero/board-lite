@@ -4,14 +4,14 @@ import { botStep, playToEnd } from '../src/bot.ts';
 import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingYield, dragonCapacity, newGame, production, score, standings, turnOrder, waitingOn, type Game, type GameEvent } from '../src/engine.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
-import { seatView } from '../src/view.ts';
+import { seatView, type ViewOptions } from '../src/view.ts';
 import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, startOpportunity, terrainCounts, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
-function playerView(g: Game, p: number, logLines = 25): string {
+function playerView(g: Game, p: number, logLines = 25, opts: ViewOptions = {}): string {
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const lobby = { code: 'TEST', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
-  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
+  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines, opts);
 }
 
 // Each round starts with everyone keeping a building card: keep the first.
@@ -1438,4 +1438,18 @@ test("a view shows each player's expected production each round, and what they m
     const total = made.ev?.k === 'produce' ? Object.values(made.ev.got).reduce((a, b) => a + (b ?? 0), 0) : -1;
     assert.ok(line.endsWith(`; made ${total} in round ${g.round}`), line);
   }
+});
+
+test('a Claude player without the expected-production option sees production as it did before it', () => {
+  const g = newGame(3, 7);
+  for (const k of neighbors(g.towers[0]).filter((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna).slice(0, 2)) g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
+  const rng = { state: 99 };
+  while (g.round < 3) botStep(g, rng);
+  const view = playerView(g, 1, 25, { expected: false });
+  assert.match(view, /^P1: .*; makes stone \d+\+1d4\+1d4(, |$)/m);
+  assert.doesNotMatch(view, /expected|each round;|made \d+ in round/);
+  assert.match(view, /^Each round you make: [^\n]*\.$/m);
+  // Every other line is the same as with the option on.
+  const strip = (v: string) => v.split('\n').filter((l) => !/^P\d|^Each round you make/.test(l));
+  assert.deepEqual(strip(view), strip(playerView(g, 1, 25)));
 });

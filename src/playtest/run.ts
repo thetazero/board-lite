@@ -30,11 +30,13 @@ import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
 import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
+import { OPTIONS, parseSeats, type PlayerOption, type PlayerSpec } from './players.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
 
-  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, or "bot"
+  --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, or "bot"; a Claude
+                                    seat can add options, like opus+advice+expected (see below)
   --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
                                     e.g. http://localhost:8080/ABCD; without it, this runner hosts the game
   --seed N                          game seed when hosting (default random)
@@ -45,10 +47,14 @@ node src/playtest/run.ts --resume DIR [options]
                                     5 for a playtest this runner hosts); --resume keeps the one it had
   --max-minutes N                   stop after this long (default 240)
   --stall-minutes N                 stop if nothing happens in the game for this long (default 15; 60 with --room)
-  --advice TEXT                     extra strategy advice appended to every Claude seat's prompt (for A/B tests)
+  --advice TEXT                     extra strategy advice appended to the prompt of each seat with +advice
+                                    (of every Claude seat, if none says +advice)
   --resume DIR                      bring the Claude players of a runner that stopped (low memory, Ctrl-C, a crash,
                                     a restart) back into their own seats, in the same game, with their memory of it;
                                     DIR is that runner's --out. With --room too, the room has moved (a new port).
+
+Claude player options, each switched on per seat with +name (none: the plain Claude player):
+${Object.entries(OPTIONS).map(([k, v]) => `  +${k.padEnd(10)} ${v}`).join('\n')}
 
 Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
 wait their turn when the pool is full or memory is short. See docs/playtest.md.`;
@@ -61,7 +67,7 @@ function opt(args: string[], name: string): string | undefined {
 const args = process.argv.slice(2);
 const resumeDir = opt(args, '--resume');
 const resumed: RunnerState | null = resumeDir ? readState(resolve(resumeDir)) : null;
-const modelsArg = opt(args, '--models') ?? resumed?.seats.map((s) => s.model).join(',');
+const modelsArg = opt(args, '--models') ?? resumed?.seats.map((s) => [s.model, ...(s.options ?? [])].join('+')).join(',');
 if (!modelsArg || args.includes('--help')) {
   console.log(USAGE);
   process.exit(modelsArg ? 0 : 1);
@@ -81,9 +87,10 @@ const budget = budgetUsd(opt(args, '--budget-usd'), resumed, !!joinUrl);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
 const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
 const advice = opt(args, '--advice') ?? resumed?.advice;
+const specs: PlayerSpec[] = parseSeats(models, advice);
 const servePort = opt(args, '--serve');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-const out = resolve(resumeDir ?? opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${models.join('-')}`));
+const out = resolve(resumeDir ?? opt(args, '--out') ?? join(homedir(), '.cache', 'board-lite', 'playtests', `${stamp}-${specs.map((x) => x.label).join('-')}`));
 if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is RAM on the dev machine).');
 
 const seatServer = fileURLToPath(new URL('./seat-server.ts', import.meta.url));
@@ -150,7 +157,7 @@ function seatName(taken: string[]): string {
 
 // ---- Claude seats ----
 
-interface Seat { p: number; model: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; exitedAt: number }
+interface Seat { p: number; model: string; options: PlayerOption[]; label: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; exitedAt: number }
 const seats: Seat[] = [];
 let table: Lobby['seats'] = []; // everyone at the table, once the game starts
 
@@ -158,7 +165,7 @@ let table: Lobby['seats'] = []; // everyone at the table, once the game starts
 function saveState() {
   const state: RunnerState = {
     pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}), budget,
-    seats: seats.map(({ p, model, token, session, starts, cost }) => ({ p, model, token, session, starts, cost })),
+    seats: seats.map(({ p, model, options, token, session, starts, cost }) => ({ p, model, options, token, session, starts, cost })),
   };
   writeFileSync(stateFile(out), `${JSON.stringify(state, null, 2)}\n`);
 }
@@ -184,14 +191,14 @@ How to play:
 - Every act takes a "why": a sentence or two on why you chose it. It is private, never shown to anyone at the table, and kept for the people studying the game afterwards, so be honest and specific.
 - Decide only from what your own view shows you. Other players' hands and resources are hidden from you.
 - This is a social game, and talking is a big part of it. Use say to talk to the table and say with "to" for a private word with one player: propose and haggle over trades, form alliances, ask for help with raids, make promises, bluff, and call others out. Talk is free and binds no one; only accepted offers are binding, and a player in a raid can secretly hold back from the fight. Keep messages short, like real table talk, and reply when someone talks to you.
-- Don't stop until the game is over. If you're unsure what to do, call wait.${advice ? `\n\nAdvice: ${advice}` : ''}`;
+- Don't stop until the game is over. If you're unsure what to do, call wait.${advice && s.options.includes('advice') ? `\n\nAdvice: ${advice}` : ''}`;
 }
 
 function startSeat(s: Seat) {
   const dir = join(out, `seat-${s.p + 1}`);
   mkdirSync(dir, { recursive: true });
   const mcp = join(dir, 'mcp.json');
-  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token, join(out, `seat-${s.p + 1}.moves.txt`)] } } }));
+  writeFileSync(mcp, JSON.stringify({ mcpServers: { game: { type: 'stdio', command: process.execPath, args: [seatServer, roomUrl, s.token, join(out, `seat-${s.p + 1}.moves.txt`), ...(s.options.includes('expected') ? ['--expected'] : [])] } } }));
   const first = s.starts === 0;
   if (first && !s.session) s.session = randomUUID();
   const prompt = first
@@ -242,13 +249,13 @@ function startSeat(s: Seat) {
   });
   proc.stderr!.pipe(errLog);
   proc.on('exit', (code) => {
-    note(`${pname(s.p)} (${s.model}) process exited with code ${code}; spent $${s.cost.toFixed(2)} so far.`);
+    note(`${pname(s.p)} (${s.label}) process exited with code ${code}; spent $${s.cost.toFixed(2)} so far.`);
     s.proc = null;
     s.exitedAt = Date.now();
     saveState();
   });
   s.proc = proc;
-  note(`${pname(s.p)} (${s.model}) ${first ? 'starts' : 'resumes'}.`);
+  note(`${pname(s.p)} (${s.label}) ${first ? 'starts' : 'resumes'}.`);
 }
 
 function note(text: string) {
@@ -257,10 +264,11 @@ function note(text: string) {
   appendFileSync(join(out, 'runner.log'), `${line}\n`);
 }
 
-// What sits in each seat: a model for this runner's Claude seats, else the room's seat.
+// What sits in each seat: a configuration (model and options) for this
+// runner's Claude seats, else the room's seat.
 function seatLabel(q: number): string {
   const mine = seats.find((s) => s.p === q);
-  if (mine) return mine.model;
+  if (mine) return mine.label;
   const t = table[q];
   return t?.kind === 'bot' ? 'bot' : `${t?.kind === 'open' ? 'open' : 'player'}: ${t?.name ?? '?'}`;
 }
@@ -274,7 +282,7 @@ const commit = (() => {
 function writeResults(g: Game | null, status: string, started: number) {
   const base = { status, ...(commit ? { commit } : {}), ...(hosted ? { seed } : { room: roomUrl }), ...(advice ? { advice } : {}), minutes: Math.round((Date.now() - started) / 600) / 100 };
   if (!g) {
-    writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.model, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })) }, null, 2)}\n`);
+    writeFileSync(join(out, 'results.json'), `${JSON.stringify({ ...base, seats: seats.map((s) => ({ seat: pname(s.p), model: s.label, options: s.options, costUsd: Math.round(s.cost * 100) / 100, starts: s.starts })) }, null, 2)}\n`);
     return { ...base, rounds: 0, winner: null };
   }
   const log = g.log.map((e) => `[r${e.round}]${e.to ? ` (only ${e.to.map(pname).join(', ')})` : ''} ${e.text}`);
@@ -286,7 +294,7 @@ function writeResults(g: Game | null, status: string, started: number) {
     winner: g.winner === null ? null : { seat: pname(g.winner), model: seatLabel(g.winner) },
     seats: g.players.map((_, q) => {
       const s = seats.find((x) => x.p === q);
-      return { seat: pname(q), name: table[q]?.name, model: seatLabel(q), points: score(g, q).total, ...(s ? { costUsd: Math.round(s.cost * 100) / 100, starts: s.starts } : {}) };
+      return { seat: pname(q), name: table[q]?.name, model: seatLabel(q), ...(s ? { options: s.options } : {}), points: score(g, q).total, ...(s ? { costUsd: Math.round(s.cost * 100) / 100, starts: s.starts } : {}) };
     }),
     talk: { public: g.log.filter((e) => / says: "/.test(e.text)).length, private: g.log.filter((e) => / \(private\): "/.test(e.text)).length },
   };
@@ -299,7 +307,7 @@ let interrupted = false;
 
 /** Blocks until this game's Claude seats fit in the machine-wide pool. */
 async function admit(): Promise<boolean> {
-  const claudeSeats = models.filter((m) => m !== 'bot').length;
+  const claudeSeats = specs.filter((m) => m.model !== 'bot').length;
   let said = '';
   for (;;) {
     const r = tryAcquire(pool, claudeSeats, out);
@@ -340,13 +348,13 @@ async function main() {
   note(`${resumed ? 'Resuming: ' : ''}${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}; budget $${budget} per Claude player.`);
   if (status === 'running' && resumed) await reclaim(resumed);
   else if (status === 'running') {
-    for (const model of models) {
+    for (const { model, options, label } of specs) {
       if (model === 'bot') { await call('/bot', { token: hosted!.hostToken }); continue; }
       const name = seatName((await lobby()).seats.map((t) => t.name));
       const r = await call('/join', { name, via: 'claude' });
-      seats.push({ p: r.seat - 1, model, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });
+      seats.push({ p: r.seat - 1, model, options, label, token: r.token, session: randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, exitedAt: 0 });
       saveState();
-      note(`${name} (${model}) takes seat ${r.seat}.`);
+      note(`${name} (${label}) takes seat ${r.seat}.`);
     }
     if (hosted) hosted.start(hosted.hostToken, seed);
     else note('Waiting for the game to start (press Start game on the TV, or the first to join does on their phone).');
@@ -421,16 +429,16 @@ async function reclaim(state: RunnerState) {
   gameFile ||= l.file;
   const now = await call(`/listen?token=${state.seats[0].token}&since=0&timeout=0`).catch(() => null);
   if (now && /^The game is over/.test(now.status)) throw new Error(`The game in ${roomUrl} is already over.`);
-  for (const saved of state.seats) {
+  for (const [i, saved] of state.seats.entries()) {
     const name = table[saved.p]?.name;
     if (!name) throw new Error(`Seat ${saved.p + 1} isn't in the game in ${roomUrl}; is this the right room?`);
-    const s: Seat = { ...saved, proc: null, startsHere: 0, exitedAt: 0 };
+    const s: Seat = { ...saved, options: specs[i].options, label: specs[i].label, proc: null, startsHere: 0, exitedAt: 0 };
     if (!(await call(`?token=${s.token}`)).seated) {
       const r = await call('/join', { name, via: 'claude' }).catch((e: Error) => { throw new Error(`Can't take seat ${saved.p + 1} (${name}) back: ${e.message}`); });
       s.token = r.token;
     }
     seats.push(s);
-    note(`${name} (${s.model}) is back in seat ${s.p + 1}${s.starts ? ', with its memory of the game so far' : ''}.`);
+    note(`${name} (${s.label}) is back in seat ${s.p + 1}${s.starts ? ', with its memory of the game so far' : ''}.`);
   }
   saveState();
   listBesideGame();
