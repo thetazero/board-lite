@@ -56,8 +56,8 @@ node src/playtest/run.ts --resume DIR [options]
 Claude player options, each switched on per seat with +name (none: the plain Claude player):
 ${Object.entries(OPTIONS).map(([k, v]) => `  +${k.padEnd(10)} ${v}`).join('\n')}
 
-Claude seats take slots from a machine-wide pool (BOARD_LITE_MAX_SEATS, default 6) and
-wait their turn when the pool is full or memory is short. See docs/playtest.md.`;
+Claude seats take slots from a machine-wide pool and wait their turn while starting them
+would leave under 3 GB free (BOARD_LITE_MAX_SEATS=N also caps the pool). See docs/playtest.md.`;
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);

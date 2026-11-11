@@ -11,7 +11,7 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, wri
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defaultPool } from './slots.ts';
+import { defaultPool, holders, seatsThatFit } from './slots.ts';
 import { batchMarkdown, loadBatch } from './stats.ts';
 import { summary } from './tally.ts';
 
@@ -51,10 +51,12 @@ if (out.startsWith('/tmp')) throw new Error('Keep playtests out of /tmp (it is R
 mkdirSync(out, { recursive: true });
 const passed = ['--effort', '--budget-usd', '--max-minutes', '--stall-minutes', '--advice'].flatMap((o) => (opt(o) === undefined ? [] : [o, opt(o)!]));
 
-// Run only as many games at once as the machine-wide pool can seat: the rest
-// would just sit waiting for slots (run.ts waits for them anyway).
+// Start a game only when free memory can seat it: the rest would just sit
+// waiting (run.ts waits for its slots anyway). Games started but not yet
+// holding their slots count against what's free, so one check can't start many.
 const claudeSeats = models.filter((m) => m !== 'bot').length;
-const atOnce = Math.max(1, Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats)));
+const pool = defaultPool();
+const waiting = new Set<number>(); // pids of our games that haven't taken their slots yet
 const runner = fileURLToPath(new URL('./run.ts', import.meta.url));
 
 function done(dir: string): boolean {
@@ -78,9 +80,11 @@ function runGame(i: number): Promise<void> {
   return new Promise((res) => {
     const log = createWriteStream(`${dir}.out`);
     const p = spawn(process.execPath, argv, { stdio: ['ignore', 'pipe', 'pipe'] });
+    if (p.pid) waiting.add(p.pid);
     p.stdout.pipe(log);
     p.stderr.pipe(log);
     p.on('exit', () => {
+      if (p.pid) waiting.delete(p.pid);
       const f = join(dir, 'results.json');
       console.log(`g${i}: ${existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')).status : 'no results'}`);
       res();
@@ -90,8 +94,22 @@ function runGame(i: number): Promise<void> {
 
 let stopping = false;
 process.on('SIGINT', () => { stopping = true; });
-let next = 1;
-await Promise.all(Array.from({ length: Math.min(atOnce, games) }, async () => {
-  while (next <= games && !stopping) await runGame(next++);
-}));
+const running = new Set<Promise<void>>();
+function roomForAnother(): boolean {
+  if (running.size === 0) return true;
+  const held = holders(pool);
+  for (const pid of waiting) if (held.some((h) => h.pid === pid)) waiting.delete(pid);
+  if (waiting.size > 0) return false; // one of ours is still waiting: let it go first
+  return seatsThatFit(pool, held) >= claudeSeats;
+}
+for (let i = 1; i <= games && !stopping;) {
+  if (roomForAnother()) {
+    const g = runGame(i++);
+    running.add(g);
+    void g.then(() => running.delete(g));
+  } else {
+    await Promise.race([...running, new Promise((r) => setTimeout(r, 15000))]);
+  }
+}
+await Promise.all(running);
 writeSummary(out);

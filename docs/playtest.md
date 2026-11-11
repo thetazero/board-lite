@@ -57,19 +57,19 @@ node src/playtest/batch.ts --games 30 --models opus+fable51,opus+fable51,opus,op
 
 - Rotating the seats each game puts each configuration in each seat equally often, so seat order doesn't decide it.
 - In `summary.md` each configuration has a fair share of 50%. Each game has one winner, so one configuration's wins are the other's losses: read the table's chance column for the configuration that won more.
-- 4 Claude seats a game, so one game runs at a time (the pool seats 6): 30 games are 30 game-lengths, about 4 hours, and about $220 at Opus's cost of about $1.80 a seat per game.
+- 4 Claude seats a game, so on an idle machine with about 10 GB free three games run at a time (see below): 30 games are about 10 game-lengths, about 1.5 hours, and about $220 at Opus's cost of about $1.80 a seat per game.
 - How many games: over 30, 20 or more wins for one side happens by chance under 5% of the time; a side that really wins 65% of games gets there only half the time. 30 games show a big gap, not a small one.
 
 ## How many games run at once
 
 Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine has 14 GB shared with everything else, including every vibrant tab. Several tabs and the orchestrator may each run a batch at the same time, so the limit is machine-wide, not per batch:
 
-- **At most 6 Claude seats run at once on the machine**, across every playtest from every tab: two 3-seat games, three 2-seat games, or one 6-seat game. `bot` seats don't count.
-- A game takes one slot per Claude seat before it starts any of them. If the slots aren't free, or free memory (`MemAvailable`) would drop under 2 GB once its seats start (counting 450 MB a seat), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once the slots free up. `--max-minutes` counts from the start, not from the wait.
+- **Free memory sets the limit: a game's Claude seats start only if at least 3 GB would stay free** once they do, counting 450 MB a seat, across every playtest from every tab. On an idle machine with 10 GB free that's 15 seats: five 3-seat games, or three 4-seat ones; when the tabs are busy it's fewer. `bot` seats don't count.
+- A game takes one slot per Claude seat before it starts any of them. If its seats would leave under 3 GB free (`MemAvailable`, less 450 MB a seat for each game that took its slots in the last 2 minutes, whose processes are still starting), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once there's room. `--max-minutes` counts from the start, not from the wait.
 - A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Resume it later with `--resume` (below), or rerun it.
-- So start a whole batch at once (`batch.ts`, below, or all games in the background): the pool runs them a few at a time. Expect a batch to take about (games × seats ÷ 6) game-lengths.
+- So start a whole batch at once (`batch.ts`, below, or all games in the background): the pool runs them as many at a time as memory allows. Expect a batch to take about (games × seats ÷ seats that fit) game-lengths, where seats that fit is (free GB − 3) × 2.2.
 - Slots live in `~/.cache/board-lite/seat-slots/`, one file per running game naming its `--out`, so `ls` there shows who holds them. A game that dies without cleaning up frees its slots automatically (its process is gone).
-- `BOARD_LITE_MAX_SEATS=N` changes the limit, and every playtest on the machine must use the same N for it to hold; leave it alone unless the owner says so. A game with more Claude seats than the limit is refused.
+- `BOARD_LITE_MAX_SEATS=N` also caps the seats at N, on top of the memory rule (unset: no cap). Every playtest on the machine must use the same N for it to hold; leave it alone unless the owner says so. A game with more Claude seats than the cap is refused.
 
 ## Results
 
@@ -94,7 +94,7 @@ node src/playtest/batch.ts --games 30 --models opus,haiku,haiku
 ```
 
 - Game *i* goes in `<out>/g<i>` and rotates the seats *i*-1 places, so each model sits in each seat equally often (seat order matters: in batch b13-0921, P2 won all 4 games). It takes `--out`, `--seed` and the run.ts options `--effort`, `--budget-usd`, `--max-minutes`, `--stall-minutes`, `--advice`, passed to every game. Its seats can be [configurations](#contests-between-configurations) like `opus+expected`.
-- It runs as many games at once as the seat pool can seat (two 3-seat games) and the rest after them. Run it in the background: about (games × Claude seats ÷ 6) game-lengths, so 30 three-seat games are 15 game-lengths, about 2 hours on an idle machine, and about $55 at today's costs (Opus about $1.80 a game, Haiku under $0.10).
+- It starts another game whenever free memory can seat it (and its last game has taken its slots), so it runs as many at once as fit and the rest after them. Run it in the background: about (games × Claude seats ÷ seats that fit) game-lengths, so 30 three-seat games with 15 seats free are 6 game-lengths, under an hour on an idle machine, and about $55 at today's costs (Opus about $1.80 a game, Haiku under $0.10).
 - A game that doesn't finish (`stalled`, `low memory`, ...) is left in `g<i>.failed<n>`; run the same command with the same `--out` again to rerun just those.
 - At the end it writes `<out>/summary.md`: per model, games, wins, win rate with a 95% range, its fair share of wins (its share of the seats), and the chance of that many wins or more if every seat were equally strong; wins by seat; one line per game; then the batch's [stats](#stats). `node src/playtest/batch.ts --summary <out>` rewrites it at any time, e.g. while the batch runs.
 
