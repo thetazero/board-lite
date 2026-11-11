@@ -68,7 +68,9 @@ The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/rec
 
 On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others, and the address to open on a TV if one turns up later. One phone and a few bots is a whole game.
 
-Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, dragons healing and growing, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet. The table plays a scene only while the server holds the game for it: a phone that was asleep or offline doesn't catch up on the scenes it missed, so it never stays on the table over a vote or a turn that's already open. The opening round's production is held for too, as soon as a phone is in the room.
+Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, dragons healing and growing, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet. Whatever was showing, a decision that opens for you (a vote, your turn, a card to keep) always shows on You.
+
+Only the server says when a scene plays (`web/view.ts`): the phone shows the table while the server holds the game for a scene, and goes back once the server says it's over or the scene's time is up on the phone's own clock, whichever comes first. The table in its frame has no say. So a phone that was asleep or offline doesn't catch up on the scenes it missed, and a scene can't keep a phone on the table after the game has moved on. The opening round's production is held for too, as soon as a phone is in the room.
 
 The switch is on the phone in a game with a TV too, so a player away from the TV can still see the table. There the table loads the first time you tap **Table**, scenes cut to it only from then on, and You stays on.
 

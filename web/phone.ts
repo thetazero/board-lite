@@ -12,6 +12,7 @@ import {
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
+import { askKey, PhoneView, type View } from './view.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -220,8 +221,7 @@ function onSnapshot(s: Snapshot) {
   if (s.seat < 0) return leaveToJoin('Someone else has your seat now.');
   if (!s.you) return leaveToJoin('You are not in this game.');
   if (s.lobby.saved) return renderSaved();
-  table.show(code, s.lobby.remote);
-  table.hold(s.lobby.remote && s.scene > 0);
+  table.snapshot(code, s);
   noteOffers(s.game, s.seat);
   // Reset per-decision UI when the situation changes under us.
   const key = (x: Snapshot | null) => `${x?.game?.phase}|${x?.game?.turn}|${x?.game?.raid?.step}|${x?.game?.round}`;
@@ -235,16 +235,27 @@ function onSnapshot(s: Snapshot) {
     eggOpen = false;
     if (s.game.phase !== 'action') trade = fresh();
   }
-  // The TV (or, with no TV, each phone's table view) is playing a scene (a
-  // fight, the round's roll): the whole table watches it, and the next
-  // decision waits until it's over. Nothing that
-  // changed shows yet, so the phone doesn't give the ending away.
-  if (s.scene > 0) {
+  showGame();
+}
+
+// The game on the phone's own screen. While the server holds the table for a
+// scene (a fight, the round's roll), the whole table watches it and the next
+// decision waits until it's over: nothing that changed shows yet, so the phone
+// doesn't give the ending away. The table module says when it's over, by the
+// server's word or the phone's own clock, and draws the game again then.
+let buzzed = ''; // the decision the phone last buzzed for
+function showGame() {
+  const s = snap;
+  if (!s?.game || !s.you || s.lobby.seating || s.lobby.saved) return;
+  if (table.sceneOn()) {
     renderWatch(s.you);
     renderTalk();
     return;
   }
-  if (navigator.vibrate && s.you.deciding && !(prev?.you?.deciding && !prev.scene)) navigator.vibrate(120);
+  // A new decision, shown: the phone buzzes once for it.
+  const ask = askKey(s.game, s.you.deciding);
+  if (navigator.vibrate && ask && ask !== buzzed) navigator.vibrate(120);
+  buzzed = ask;
   noteDeals(s.you.hand.map((c) => c.id));
   render();
   renderTalk();
@@ -424,111 +435,99 @@ function invite(c: string): string {
 
 // ---------- the table ----------
 
-// The TV's page for the room, in a frame over this page, kept loaded (and
-// hidden) for the rest of the game so its cutscenes are queued as they happen.
-// The switch sits by the talk bar in both views. While a cutscene plays (the
-// round's dice, a raid's or a beast's fight) the frame tells this page, and in a
-// game with no TV so does the server's snapshot (its `scene`); the phone cuts to
-// the table and back after, unless the player switched by hand. While the
-// server's scene plays with no TV, You is off: there's nothing to do there.
-// In a game with a TV the frame is only made when Table is first tapped, so a
-// phone at the TV doesn't load a second board or cut away from the hand; there
-// the server's scene doesn't hold the table, and You says to watch the TV.
-// A TV can come or go at any time (src/server/room.ts, Room.hasTv), and the
-// phone follows.
+// The TV's page for the room, in a frame over this page, behind a You / Table
+// switch by the talk bar. Which of the two shows is view.ts's to say (#455),
+// from the server's snapshots and the player's taps alone: the frame only
+// shows the table, and has no say in when the phone cuts to it or back.
+// With no TV, the frame loads with the game. In a game with a TV it's only made
+// when Table is first tapped, so a phone at the TV doesn't load a second board
+// or cut away from the hand. A TV can come or go at any time
+// (src/server/room.ts, Room.hasTv), and the phone follows: once a TV is back,
+// a table nobody tapped goes.
 const table = (() => {
   let wrap: HTMLElement | null = null;
   let sw: HTMLElement | null = null;
   let room = '';
-  let on = false;
-  let auto = false; // showing the table because a cutscene cut to it
-  let framed = false; // the frame says its cutscene is playing
-  let held = false; // the server says a scene is playing: there's nothing to do on the You side
   let noTv = false; // the table is playing with no TV
   let tapped = false; // the player opened Table by hand
-  const set = (v: boolean) => {
-    on = v;
-    document.body.classList.toggle('table-on', v);
-    sw?.querySelectorAll<HTMLElement>('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === v)));
-    wrap?.setAttribute('aria-hidden', String(!v));
-  };
-  // Cut to the table while either says a scene plays, and back once neither does.
-  const update = () => {
+  let view = new PhoneView();
+  let timer = 0; // the end of the scene playing, on this phone's clock
+  const draw = () => {
     if (!wrap) return;
-    const you = sw?.querySelector<HTMLButtonElement>('[data-view="you"]');
-    if (you) you.disabled = held;
-    if ((framed || held) && !on) {
-      auto = true;
-      set(true);
-    } else if (!framed && !held && auto) {
-      auto = false;
-      set(false);
-    }
+    const now = Date.now();
+    const on = view.view(now) === 'table';
+    document.body.classList.toggle('table-on', on);
+    sw?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+      b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === on));
+      if (b.dataset.view === 'you') b.disabled = view.youOff(now);
+    });
+    wrap.setAttribute('aria-hidden', String(!on));
   };
-  addEventListener('message', (e) => {
-    if (e.origin !== location.origin || e.data?.boardLite !== 'cut' || !wrap) return;
-    framed = !!e.data.on;
-    update();
-  });
   const frame = () => {
-    if (wrap?.firstChild) return;
-    wrap!.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(room)}&remote" title="The table"></iframe>`;
+    if (!wrap || wrap.firstChild) return;
+    wrap.innerHTML = `<iframe src="/tv?room=${encodeURIComponent(room)}&remote" title="The table"></iframe>`;
+  };
+  const make = (c: string, remote: boolean) => {
+    room = c;
+    noTv = remote;
+    tapped = false;
+    view = new PhoneView();
+    wrap = document.createElement('div');
+    wrap.className = 'tableview';
+    sw = document.createElement('div');
+    sw.className = 'viewswitch';
+    sw.setAttribute('role', 'group');
+    sw.setAttribute('aria-label', 'View');
+    sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
+    sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
+      const v = b.dataset.view as View;
+      if (v === 'table') {
+        tapped = true;
+        frame();
+        view.frame(true);
+      }
+      view.tap(Date.now(), v);
+      draw();
+    }));
+    document.body.append(wrap, sw);
+    document.body.classList.add('has-table');
   };
   return {
-    // The server's word on whether a scene plays, in a game with no TV: a phone
-    // joining mid-scene, or one whose frame missed it, still cuts to the table
-    // rather than saying to watch it.
-    hold(v: boolean) {
-      held = v;
-      update();
-    },
-    // `remote`: no TV. The table can get a TV or lose it mid-game: with no TV
-    // the table loads now; once a TV is back, a table nobody tapped goes, so
-    // the phone stops cutting away from the hand.
-    show(c: string, remote: boolean) {
-      if (wrap && room === c) {
-        if (remote === noTv) return;
+    // Every snapshot of the game.
+    snapshot(c: string, s: Snapshot) {
+      const remote = s.lobby.remote;
+      if (!wrap || room !== c) {
+        this.hide();
+        make(c, remote);
+      } else if (remote !== noTv) {
         noTv = remote;
-        document.body.classList.toggle('remote', remote);
-        if (remote) frame();
-        else if (!tapped) {
-          wrap.innerHTML = '';
-          framed = auto = false;
-          if (on) set(false);
-        }
-        return update();
+        // The TV went: the table loads. It came back: a table nobody tapped goes.
+        if (!remote && !tapped) wrap.innerHTML = '';
       }
-      this.hide();
-      noTv = remote;
-      room = c;
-      wrap = document.createElement('div');
-      wrap.className = 'tableview';
       if (remote) frame();
-      sw = document.createElement('div');
-      sw.className = 'viewswitch';
-      sw.setAttribute('role', 'group');
-      sw.setAttribute('aria-label', 'View');
-      sw.innerHTML = `<button type="button" data-view="you">You</button><button type="button" data-view="table">Table</button>`;
-      sw.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => {
-        auto = false;
-        if (b.dataset.view === 'table') {
-          tapped = true;
-          frame();
-        }
-        set(b.dataset.view === 'table');
-      }));
-      document.body.append(wrap, sw);
-      document.body.classList.add('has-table');
       document.body.classList.toggle('remote', remote);
-      set(false);
-      update();
+      const now = Date.now();
+      view.snapshot(now, { remote, scene: s.scene, ask: askKey(s.game, s.you?.deciding), over: s.game?.phase === 'over' }, !!wrap!.firstChild);
+      draw();
+      // The scene ends on this phone's clock if no snapshot says so first.
+      clearTimeout(timer);
+      if (view.scene(now)) timer = window.setTimeout(() => {
+        draw();
+        showGame();
+      }, view.sceneEndsAt() - now + 20);
+    },
+    // The server holds the table for a scene: the phone's own screen waits.
+    sceneOn(): boolean {
+      return view.scene(Date.now());
     },
     hide() {
+      clearTimeout(timer);
       wrap?.remove();
       sw?.remove();
       wrap = sw = null;
       room = '';
-      on = auto = framed = held = tapped = noTv = false;
+      tapped = noTv = false;
+      view = new PhoneView();
       document.body.classList.remove('has-table', 'remote', 'table-on');
     },
   };

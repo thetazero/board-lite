@@ -3,8 +3,9 @@
 // closing it, the table goes on with no TV (src/server/room.ts, Room.hasTv).
 // Lobby -> board, with overlays for production dice, the raid and the end.
 // With ?remote, it's the table view inside a phone of a game with no TV
-// (phone.ts): the flat map, laid out for a phone, and it tells the phone when
-// a cutscene (a banner) starts and ends, so the phone can cut to it.
+// (phone.ts): the flat map, laid out for a phone. There it plays a scene only
+// while the server holds the table for it; the phone, not this page, decides
+// when to show it (view.ts).
 
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
@@ -19,7 +20,7 @@ import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
 import type { Side } from '../src/engine.ts';
-import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, behind, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
+import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -125,9 +126,10 @@ function onSnapshot(s: Snapshot) {
   const fresh = log.filter((e) => e.i > seenLog);
   if (fresh.length) seenLog = fresh.at(-1)!.i;
   queueBanners(s.game, fresh);
-  // A phone's table view doesn't play scenes the server has stopped holding
-  // the table for: the phone would stay cut away from what's open now (#449).
-  if (remote) catchUp(s.scene);
+  // A phone's table view plays scenes only while the server holds the table
+  // for them: one it missed (the phone asleep, or the frame made just now)
+  // isn't played late over what's open now (#449, #455).
+  if (remote && !s.scene) dropScenes();
   // While a scene plays, the board, the panels, the feed and the titles stay
   // as they were when it began, so nothing in the corners gives its ending
   // away; they catch up when it's over.
@@ -1099,7 +1101,6 @@ function playSummary(from = 0) {
   if (summary) clearTimeout(summary.timer);
   summaryPlayed = true;
   summary = { step: from, timer: 0 };
-  cut(true);
   summaryStep();
 }
 // For the screenshots: play it from a step (from the end if negative).
@@ -1109,7 +1110,6 @@ function stopSummary() {
   if (summary) clearTimeout(summary.timer);
   summary = null;
   if (snap?.game) showFinal(snap.game);
-  cut(false);
 }
 
 function summaryStep() {
@@ -1189,14 +1189,11 @@ function updateOverlay(g: PublicState) {
 }
 
 let bannerN = 0;
-let bannerEnds = 0; // when the banner up ends (Date.now())
 let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
   bannerUp = true;
   bannerTop = b.top ?? null;
-  bannerEnds = Date.now() + b.ms;
-  cut(true);
   const key = `banner ${++bannerN}`;
   const box = showOverlay('banner', key, b.html);
   if (box) b.play?.(box);
@@ -1223,16 +1220,13 @@ function endBanner() {
   updateOverlay(snap.game);
   if (!bannerUp) {
     renderGame(snap.game); // the scenes are over: the board catches up
-    if (!summary) cut(false);
   }
 }
 
-// Behind the server (scenes.ts, behind): the scenes still queued are dropped,
-// and the one playing ends now unless it's about to.
-function catchUp(serverLeft: number) {
-  const r = behind(serverLeft, bannerUp ? bannerEnds - Date.now() : null);
-  if (r.skipQueued) banners.length = 0;
-  if (r.endPlaying) endBanner();
+// The server holds nothing: the scenes queued go, and the one playing ends.
+function dropScenes() {
+  banners.length = 0;
+  if (bannerUp) endBanner();
 }
 
 // The overlay over the board: a banner, a raid step or the final scores.
@@ -1292,11 +1286,6 @@ function clearOverlay() {
   overlayKey = '';
   el.className = 'overlay hidden';
   el.innerHTML = '';
-}
-
-// In a phone (remote mode): a cutscene starts or ends.
-function cut(on: boolean) {
-  if (remote && parent !== window) parent.postMessage({ boardLite: 'cut', on }, location.origin);
 }
 
 // News for the table, not an error: shown longer, without the error's red edge.
