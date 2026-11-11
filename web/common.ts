@@ -14,8 +14,8 @@ export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as 
 export const POINTS_TO_WIN = 50;
 
 export const PLAYER_COLORS = ['#e5484d', '#3e7bfa', '#f2b600', '#30a46c', '#a35bd8', '#f76b15'];
-export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', plains: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
-export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Crystal field', meadow: 'Meadow', plains: 'Plains', harbor: 'Harbor (ports)', ocean: 'Ocean' };
+export const TERRAIN_COLORS: Record<string, string> = { mountain: '#8d8f96', forest: '#2f6b3a', ley: '#5d4a9c', meadow: '#8fbf4f', desert: '#d9c68e', harbor: '#4fb0a5', ocean: '#2c5f8f' };
+export const TERRAIN_NAMES: Record<string, string> = { mountain: 'Mountain', forest: 'Forest', ley: 'Crystal field', meadow: 'Meadow', desert: 'Desert', harbor: 'Harbor (ports)', ocean: 'Ocean' };
 export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#8fd8ff', lightning: '#ffd23f', air: '#9fe3c4', water: '#2f8fff' };
 
 // ---------- server ----------
@@ -28,12 +28,22 @@ const POST_MS = 15000;
 // or a turn never shows up until a reload.
 const STALE_MS = 40000;
 
+// When a game was saved, as the TV and the phone say it: "Nov 7, 9:40 PM".
+export function savedWhen(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// An error with no answer from the server: the request may or may not have
+// been carried out (web/taps.ts sends it again under the same id, #456).
+const unanswered = (msg: string) => Object.assign(new Error(msg), { unanswered: true });
+
 export async function post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   // A request that never comes back (the server restarted under it, the
   // network dropped it) gives up, rather than holding up every tap after it.
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(POST_MS) })
-    .catch(() => { throw new Error("The server didn't answer: try again."); });
-  const data = await res.json().catch(() => ({ error: 'The server sent a bad reply.' }));
+    .catch(() => { throw unanswered("The server didn't answer: try again."); });
+  const data = await res.json().catch(() => null);
+  if (data === null) throw unanswered('The server sent a bad reply.');
   if (!res.ok) throw new Error(String(data.error ?? 'Something went wrong.'));
   return data;
 }
@@ -44,7 +54,8 @@ export async function post(path: string, body: Record<string, unknown>): Promise
 // While the server is down it keeps trying (a restart brings the room back
 // under the same code); `onGone` is called if the server is up and the room
 // isn't there any more, and it stops trying.
-export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot) => void, onStatus: (ok: boolean) => void, onGone?: () => void): () => void {
+// `tv`: the watcher is a TV page (not a phone's table view), so the table plays with a TV while it watches.
+export function watch(code: string, token: string | null, onSnapshot: (s: Snapshot, first: boolean) => void, onStatus: (ok: boolean) => void, onGone?: () => void, tv = false): () => void {
   let es: EventSource | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -53,11 +64,13 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     clearTimeout(retry);
     es?.close();
     heard = Date.now();
-    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : ''}`));
+    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : tv ? '?tv' : ''}`));
+    let first = true; // a new stream starts over: its first snapshot may come from a restarted server
     mine.onmessage = (e) => {
       heard = Date.now();
       onStatus(true);
-      onSnapshot(JSON.parse(e.data));
+      onSnapshot(JSON.parse(e.data), first);
+      first = false;
     };
     mine.addEventListener('ping', () => void (heard = Date.now()));
     mine.onerror = async () => {
@@ -123,6 +136,11 @@ export function named(text: string, names: string[], dragons: DragonView[] = [])
   return html
     .replace(/ \((?:c|o|d)\d+\)/g, '')
     .replace(/\boffer o\d+/g, 'the offer')
+    // Errors a tap can still meet when the table moved on under it (#456): an
+    // offer someone else took, a card already played. Said without the ids.
+    .replace(/ &quot;o\d+&quot;/g, '')
+    .replace(/^You have no card &quot;c\d+&quot; in hand\./, "That card isn't in your hand any more.")
+    .replace(/^Unknown player &quot;.*?&quot;\. Players are .*$/, "That player isn't at the table.")
     .replace(/^Offer o\d+ expires\./, 'An open offer expires.')
     .replace(/\bd(\d+)\b/g, (m) => {
       const d = dragons.find((x) => x.id === m);
@@ -179,15 +197,15 @@ export function lastRoundHtml(g: PublicState, names: string[], me?: { seat: numb
   const goal = g.pointsToWin;
   const who = g.players.map((p, i) => ({ i, n: i === me?.seat ? me.total : p.publicPoints })).filter((x) => x.n >= goal);
   if (!who.length) return '';
-  const pts = (n: number) => `${n} points`;
+  const pts = (n: number) => `${n}${icon('points', 1.1)}`;
   if (who.length > 1) {
-    const tags = who.map((x, k) => (x.i === me?.seat ? (k ? 'you' : 'You') : playerTag(x.i, names)));
-    return `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more, so this is the last round.`;
+    const tags = who.map((x) => (x.i === me?.seat ? 'you' : playerTag(x.i, names)));
+    return `Last round: ${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]} have ${pts(goal)} or more`;
   }
   const [x] = who;
-  if (x.i !== me?.seat) return `${playerTag(x.i, names)} has ${pts(x.n)}, so this is the last round.`;
-  const hidden = g.players[x.i].publicPoints < goal ? ' with the cards in your hand' : '';
-  return `You have ${pts(x.n)}${hidden}, so this is the last round.`;
+  if (x.i !== me?.seat) return `Last round: ${playerTag(x.i, names)} has ${pts(x.n)}`;
+  const hidden = g.players[x.i].publicPoints < goal ? ' with your hand' : '';
+  return `Last round: you have ${pts(x.n)}${hidden}`;
 }
 
 // ---------- icons ----------
@@ -300,14 +318,14 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     case 'round': return `<span class="evround">Round ${ev.n}</span>`;
     case 'grow': {
       const d = g.dragons.find((x) => x.id === ev.d);
-      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} grows into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][ev.stage]}` : '';
+      return d ? `${whose(d.owner)} ${dragon(ev.d)} ${dname(ev.d)} ${['', 'hatches', 'is now young', 'is now an adult'][ev.stage]}` : '';
     }
     case 'build': return `${who(ev.p)} builds ${a(ev.name)} ${buildingChip(ev.b, ev.p, null, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'floor': return `${whose(ev.p)} tower ${buildingChip('tower', ev.p)} rises to ${ev.floors} floor${ev.floors === 1 ? '' : 's'}`;
     case 'upgrade': return `${who(ev.p)} adds ${a(ev.name)} ${buildingChip(ev.on, ev.p, ev.u, 26, g.map.find((h) => h.k === ev.hex)?.building?.cls)} ${esc(ev.name)}`;
     case 'perch': {
       const b = g.map.find((h) => h.k === ev.hex)?.building;
-      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrade ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
+      return `${who(ev.p)} perches ${ev.ds.map((id) => dragon(id)).join('')} on ${whose(ev.owner)} ${buildingChip(ev.on, ev.owner, b?.upgrades[0] ?? null, 26, b?.cls)} ${esc(b?.name ?? '')}`;
     }
     case 'recall': return `${who(ev.p)} recalls ${ev.ds.map((id) => dragon(id)).join('')} home`;
     case 'hatch': return `${who(ev.p)} hatches ${dragon(ev.d, 0)} ${dname(ev.d)}`;
@@ -325,16 +343,16 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'discard': return `${who(ev.p)} discards ${ev.n} card${ev.n === 1 ? '' : 's'}`;
     case 'target': return `${icon('raid', 1.3)} The vote picks <b>${esc(ev.name)}</b>${ev.coin ? ' <small>(coin flip)</small>' : ''}`;
-    case 'bail': return `${who(ev.p)} <span class="no">bails</span>`;
+    case 'hold': return `${who(ev.p)} <span class="no">holds back</span>`;
     case 'raidEnd': return ev.won
       ? `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="ok">falls</span>: ${ev.winners.map((p, i) => `${who(p)} ${gainChips(ev.shares[i], 1.2) || 'gains nothing'}${p === ev.scorer ? ` +${ev.points} ${icon('points', 1.2)}` : ''}`).join(', ')}`
       : `${icon('raid', 1.3)} <b>${esc(ev.name)}</b> <span class="no">holds</span>`;
-    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'bailed' ? 'Everyone bails' : 'No one raids'}`;
+    case 'noRaid': return ev.why === 'unable' ? '' : `${icon('raid', 1.3)} ${ev.why === 'held' ? 'Everyone holds back' : 'No one raids'}`;
     case 'again': return `${icon('raid', 1.3)} Another raid follows`;
-    // The beast is the subject ("The Wolf Pack falls"), as on the fight's banner.
+    // The beast is the subject ("The Wolf falls"), as on the fight's banner.
     case 'cleared': {
       const home = (ev.home ?? []).map((id) => dragon(id)).join('');
-      if (!ev.fauna) return ev.won ? `${who(ev.p)} drives off ${home} <span class="ok">home</span>` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
+      if (!ev.fauna) return ev.won ? `The perched dragons <span class="ok">fall</span> to ${who(ev.p)}${home ? `; ${home} go home` : ''}` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
       const it = beast(ev.fauna, ev.name);
       const The = it.replace(/^the/, 'The');
       if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
@@ -342,7 +360,11 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
     }
     case 'wander': {
       const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;
-      return b && b.type !== 'tower' ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrade, 26, b.cls)} ${esc(b.name)}` : '';
+      if (b && b.type !== 'tower') return `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} moves onto ${whose(b.owner)} ${buildingChip(b.type, b.owner, b.upgrades[0] ?? null, 26, b.cls)} ${esc(b.name)}`;
+      // The Leviathan surfacing holds the hexes adjacent to it: each building there is suppressed (#370).
+      const there = g.map.some((h) => h.k === ev.to && h.fauna?.key === ev.fauna);
+      const held = !there ? [] : g.map.filter((h) => h.held === ev.fauna && h.suppressed && h.building).map((h) => h.building!);
+      return held.length ? `${beast(ev.fauna, ev.name).replace(/^the/, 'The')} holds ${held.map((x) => `${whose(x.owner)} ${buildingChip(x.type, x.owner, x.upgrades[0] ?? null, 26, x.cls)} ${esc(x.name)}`).join(', ')}` : '';
     }
     default: return '';
   }
@@ -368,9 +390,16 @@ export function dragonBadge(d: DragonView, size = 30): string {
 // staying home. `all` numbers same-named dragons.
 export function dragonChip(d: DragonView, all: DragonView[], round: number): string {
   const state = dragonState(d, round);
+  const hunger = hungerTags(d);
   const grow = d.stage < 3 ? `<span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
   const name = dragonLabel(d, all);
-  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}</div></div>`;
+  return `<div class="dchip${d.status === 'out' ? ' out' : ''}" title="${esc(name)}">${dragonBadge(d, 34)}<div><b>${esc(name)}</b><span>${STAGE_LABEL[d.stage]} ${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}</span>${state}${hunger ? `<span class="hunger">${hunger}</span>` : ''}</div></div>`;
+}
+
+// "Hungry" (#362): it went hungry at this round's production, so it didn't
+// heal or grow. Anyone can see that. No forecast of the next production.
+export function hungerTags(d: DragonView): string {
+  return d.hungry ? '<em class="st-hungry" title="It went hungry this round, so it didn\'t heal or grow.">Hungry</em>' : '';
 }
 
 // A round's income of one resource the way the table says it: "+2 +3d6",
@@ -474,7 +503,7 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     const [x, y] = hexCenter(h.q, h.r, size);
     const b = h.building;
     const dim = sel.size && !sel.has(h.k);
-    const owner = b ? PLAYER_COLORS[b.owner] : null;
+    const owner = b && !h.suppressed ? PLAYER_COLORS[b.owner] : null; // a suppressed building counts as if it weren't there: no rim in its owner's color (#437)
     cells.push(`<g class="hex${sel.has(h.k) ? ' selectable' : ''}" ${sel.has(h.k) ? `data-hex="${h.k}"` : ''} opacity="${dim ? 0.45 : 1}">`);
     const sea = h.terrain === 'ocean';
     cells.push(`<polygon points="${hexPoints(x, y, size * (sea ? 1.01 : 0.97))}" fill="${TERRAIN_COLORS[h.terrain]}" stroke="${owner ?? (sea ? TERRAIN_COLORS.ocean : '#1b1d24')}" stroke-width="${owner ? size * 0.12 : size * 0.04}"/>`);
@@ -486,9 +515,10 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
     if (h.terrain === 'meadow') for (const [dx, dy] of [[-0.3, 0.2], [0.25, -0.15], [0.2, 0.35]]) cells.push(`<path d="M${x + dx * size} ${y + dy * size} l-3 -6 M${x + dx * size} ${y + dy * size} l0 -7 M${x + dx * size} ${y + dy * size} l3 -6" stroke="#5f8f2c" stroke-width="1.5"/>`);
     if (b) {
       const r = size * 0.62;
-      // Shut down by a beast or a perched dragon on it: the building's mark goes grey (the hex's rim keeps its owner).
-      cells.push(`<g transform="translate(${x} ${y})"${h.fauna || h.perched?.length ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
-      if (b.upgrade) cells.push(`<g transform="translate(${x + r * 0.85} ${y - r * 0.85})">${upgradeBadge(b.upgrade, size * 0.3)}</g>`);
+      // Suppressed (a beast on it or holding it, or a perched dragon): the building's mark goes grey, and the hex loses its owner's rim.
+      cells.push(`<g transform="translate(${x} ${y})"${h.suppressed ? ' style="filter:grayscale(1) brightness(.75)"' : ''}>${ownedMark(b.type, b.owner, r, b.cls)}</g>`);
+      // One badge per upgrade, overlapping toward the middle (Workshops stack, #400).
+      b.upgrades.forEach((u, i) => cells.push(`<g transform="translate(${x + r * 0.85 - i * size * 0.3} ${y - r * 0.85})">${upgradeBadge(u, size * 0.3)}</g>`));
       if (b.type === 'tower' && b.floors > 0) cells.push(`<g transform="translate(${x - r * 0.9} ${y - r * 0.85})"><circle r="${size * 0.24}" fill="#fff" stroke="#0009" stroke-width="1.5"/><text text-anchor="middle" dy="0.35em" font-size="${size * 0.32}" font-weight="800" fill="#111">${b.floors}</text></g>`);
     }
     // A great beast's hold on the hexes round it, and the freed peak's richer ground.
@@ -534,7 +564,7 @@ export function standingsHtml(g: PublicState, names: string[], me = -1): string 
 // How the winner won a tie, if they did.
 export function tiebreakNote(g: PublicState): string {
   const w = g.standings![0];
-  return w.tiebreak === 'gold' ? `Wins the tie with the most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+  return w.tiebreak === 'gold' ? `Tie: most ${resIcon('gold', 1.1)}` : w.tiebreak === 'turn order' ? 'Tie: earliest in turn order' : '';
 }
 
 // A toast or note fades as it goes (style.css, .toast.gone), then leaves; at

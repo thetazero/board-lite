@@ -12,6 +12,7 @@ export type Scene =
   | { kind: 'roll'; at: number; rolls: number[]; ms: number } // at: the round event; rolls: the produce events of players who make or eat anything
   | { kind: 'fight'; at: number; combat: number[]; end: number | null; ms: number } // a raid's fight; end: its raidEnd
   | { kind: 'hunt'; at: number; combat: number[]; end: number | null; ms: number } // a fight against fauna; end: its cleared
+  | { kind: 'tend'; at: number; ms: number } // production's dragon step: at, its tend event
   | { kind: 'noRaid'; at: number; ms: number };
 
 // Every length here allows for a table whose eyes are on their phones: the
@@ -49,13 +50,30 @@ export const madeOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? RESO
 export const eatOf = (ev: GameEvent | undefined) => (ev?.k === 'produce' ? (ev.eat ?? 0) : 0);
 export const prodRowsOf = (ev: GameEvent | undefined) => madeOf(ev).length + (eatOf(ev) && !madeOf(ev).includes('livestock') ? 1 : 0);
 
-// A fight: a beat to look up and see who's there, the hits (at most 6 s of
-// them), then the outcome long enough to read.
-export const FIGHT_LEAD_MS = 1600;
+// Production's dragon step (#442), right after the resources: every player's
+// dragons that heal, grow or go hungry, together on one sheet. A beat with
+// them as they were, then each change plays at once: health bars fill, growth
+// fills in, and a dragon that moves up a stage takes its new one. Held to be
+// read, but quick: the table has just watched production.
+export const TEND_LEAD_MS = 800;
+export const TEND_STAGE_AT_MS = 900; // after the lead: a full growth track turns into the next stage
+export const TEND_MS = 4800;
+
+// A fight: a beat to look up and see who's there while a coin is tossed for
+// who strikes first (#439), the hits (at most 6 s of them), then the outcome
+// long enough to read. A kingdom that scores (#326) adds a beat of its own
+// after the loot: the crown comes down on the player with the most power
+// standing, then their points, held to be read.
+export const FIGHT_LEAD_MS = 2400; // the coin flip's timing is in style.css (.coinflip)
 export const HIT_MS = 400;
 export const OUTCOME_MS = 4500;
+export const CROWN_AT_MS = 2400; // after the outcome: the loot read, the crown comes down
+export const POINTS_AT_MS = 1100; // after the crown: the points
+export const SCORED_MS = 3800; // the points held
 export const hitStep = (hits: number) => Math.min(HIT_MS, 6000 / Math.max(1, hits));
-const fightMs = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400 + OUTCOME_MS;
+// When the outcome shows, from the scene's start.
+export const outcomeAt = (hits: number) => FIGHT_LEAD_MS + hits * hitStep(hits) + 400;
+const fightMs = (hits: number, scored = false) => outcomeAt(hits) + (scored ? CROWN_AT_MS + POINTS_AT_MS + SCORED_MS : OUTCOME_MS);
 
 export const NO_RAID_MS = 4000;
 
@@ -77,9 +95,12 @@ export function scenesOf(events: SceneEvent[]): Scene[] {
     if (ev?.k === 'round') {
       const rolls = events.flatMap((x, j) => (j > at && x.round === e.round && prodRowsOf(x.ev) ? [j] : []));
       out.push({ kind: 'roll', at, rolls, ms: prodMs(rolls.map((j) => prodRowsOf(events[j].ev))) });
+    } else if (ev?.k === 'tend') {
+      out.push({ kind: 'tend', at, ms: TEND_MS });
     } else if (ev?.k === 'fight') {
       const f = fightOf(at, 'raidEnd');
-      out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat)) });
+      const end = f.end === null ? undefined : events[f.end].ev;
+      out.push({ kind: 'fight', at, ...f, ms: fightMs(hits(f.combat), end?.k === 'raidEnd' && end.scorer !== undefined) });
     } else if (ev?.k === 'hunt') {
       const f = fightOf(at, 'cleared');
       out.push({ kind: 'hunt', at, ...f, ms: fightMs(hits(f.combat)) });

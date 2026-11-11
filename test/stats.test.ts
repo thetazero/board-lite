@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { botStep } from '../src/bot.ts';
-import { apply, newGame, score, type Game } from '../src/engine.ts';
+import { botStep, playToEnd } from '../src/bot.ts';
+import { apply, newGame, score, waitingOn, type Game } from '../src/engine.ts';
 import { ACTIONS, BUILDINGS, DRAGONS, UPGRADES } from '../src/data.ts';
 import { batchMarkdown, batchStats, compareMarkdown, gameStats, loadBatch } from '../src/playtest/stats.ts';
 
@@ -47,8 +47,10 @@ test('a batch reads its finished games, flags what is never used, and compares w
   try {
     for (let i = 1; i <= 3; i++) {
       const g = newGame(3, i);
+      const rng = { state: i };
       // The third is stalled, so it never has to finish.
-      for (let n = 0; g.phase !== 'over' && n < (i === 3 ? 50 : 20000); n++) botStep(g, { state: i } as never);
+      if (i === 3) for (let n = 0; n < 50; n++) botStep(g, rng);
+      else playToEnd(g, () => botStep(g, rng));
       mkdirSync(join(dir, `g${i}`));
       writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
       writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status: i === 3 ? 'stalled' : 'over', ...seats(3) }));
@@ -75,7 +77,8 @@ test('every card seen or kept is counted under its own key (#136)', () => {
   const known = new Set([BUILDINGS, UPGRADES, ACTIONS, DRAGONS].flatMap((m) => Object.keys(m)));
   for (let seed = 1; seed <= 4; seed++) {
     const g = newGame(3, seed);
-    for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: seed } as never);
+    const rng = { state: seed };
+    playToEnd(g, () => botStep(g, rng));
     const s = gameStats(g, seats(3));
     assert.ok(Object.keys(s.offered).length > 5);
     for (const k of [...Object.keys(s.offered), ...Object.keys(s.kept)]) assert.ok(known.has(k), `seed ${seed}: ${k}`);
@@ -86,7 +89,8 @@ test('stats.json saved while a batch plays gains the games that finish later, an
   const dir = mkdtempSync(join(homedir(), '.cache', 'board-lite-test-'));
   const game = (i: number, status: string) => {
     const g = newGame(3, i);
-    for (let n = 0; g.phase !== 'over' && n < 20000; n++) botStep(g, { state: i } as never);
+    const rng = { state: i };
+    playToEnd(g, () => botStep(g, rng));
     mkdirSync(join(dir, `g${i}`), { recursive: true });
     writeFileSync(join(dir, `g${i}`, 'game.json'), JSON.stringify(g));
     writeFileSync(join(dir, `g${i}`, 'results.json'), JSON.stringify({ status, ...seats(3) }));
@@ -118,4 +122,36 @@ test('stats.json saved while a batch plays gains the games that finish later, an
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('trade surplus counts basic resources 1 and gold and cards 0, players only, with and without gold trades (#475)', () => {
+  const g = newGame(3, 5);
+  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  const pl = g.players;
+  for (const p of pl) Object.assign(p.resources, { stone: 9, timber: 9, crystal: 9, livestock: 9, gold: 9 });
+  const offer = (p: number, cmd: string) => { apply(g, p, cmd); return g.offers.at(-1)!.id; };
+  const turn = g.turn; // the acting seat: others can only offer to it out of turn
+  const a = turn, b = (turn + 1) % 3, c = (turn + 2) % 3;
+  apply(g, b, `accept ${offer(a, `offer P${b + 1} give 3 stone get 1 timber`)}`); // a −2, b +2
+  apply(g, c, `accept ${offer(a, `offer P${c + 1} give 1 gold get 2 crystal`)}`); // a +2, c −2; gold
+  apply(g, a, `accept ${offer(b, `offer P${a + 1} give 1 livestock get 2 timber`)}`); // b +1, a −1
+  apply(g, a, 'merchants stone timber'); // merchants: not counted
+  const s = gameStats(g, seats(3));
+  const at = (xs: number[]) => [xs[a], xs[b], xs[c]];
+  assert.deepEqual(at(s.surplus!.all), [-1, 3, -2]);
+  assert.deepEqual(at(s.surplus!.n), [3, 2, 1]);
+  assert.deepEqual(at(s.surplus!.noGold), [-3, 3, 0]);
+  assert.deepEqual(at(s.surplus!.nNoGold), [2, 2, 0]);
+});
+
+test('production each round is the basic resources the log says each seat made (#475)', () => {
+  const g = newGame(3, 2);
+  const rng = { state: 2 };
+  playToEnd(g, () => botStep(g, rng));
+  const s = gameStats(g, seats(3));
+  assert.equal(s.made!.length, g.round);
+  const want = [0, 0, 0];
+  for (const e of g.log) if (e.ev?.k === 'produce') want[e.ev.p] += ['stone', 'timber', 'crystal', 'livestock'].reduce((x, r) => x + (e.ev!.k === 'produce' ? e.ev!.got[r as 'stone'] ?? 0 : 0), 0);
+  assert.deepEqual([0, 1, 2].map((p) => s.made!.reduce((x, r) => x + r[p], 0)), want);
+  assert.equal(s.surplus!.all.reduce((x, y) => x + y, 0), 0); // what one gains another gives
 });

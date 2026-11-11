@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,13 +8,13 @@ import { after, test } from 'node:test';
 import { promisify } from 'node:util';
 import { candidateCommands, endingTarget, playToEnd } from '../src/bot.ts';
 import { apply, newGame, waitingOn } from '../src/engine.ts';
-import { Room, RoomError } from '../src/server/room.ts';
+import { Room, RoomError, addClaudeRunner, claudeRunners } from '../src/server/room.ts';
 import { load, save } from '../src/store.ts';
 import { startServer } from '../src/server/server.ts';
 import type { Rulebook, Snapshot } from '../src/state.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, TARGETS, TUNING, UPGRADES } from '../src/data.ts';
 import { POINTS_TO_WIN } from '../web/common.ts';
-import { scenesOf } from '../web/scenes.ts';
+import { scenesMs, scenesOf } from '../web/scenes.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-test-')); // a few small game files
@@ -86,7 +86,7 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   // Round 1's raid: every dragon is an egg, so no one could raid: no scene for it.
   const r1 = g.log.filter((e) => e.round === 1 && !e.to);
   assert.ok(r1.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'unable'));
-  assert.deepEqual(scenesOf(r1).map((s) => s.kind), ['roll'], 'only the opening roll');
+  assert.deepEqual(scenesOf(r1).map((s) => s.kind), ['roll', 'tend'], 'only the opening roll, and the eggs growing');
   // Round 2 has begun, and its production is on the TV: the phones wait for it.
   const left = room.snapshot(seats[0].token).scene;
   assert.ok(left > 0 && left < 20000, `production takes ${left} ms`);
@@ -98,6 +98,24 @@ test('while a TV watches, its scene holds the next decision until it ends', asyn
   assert.equal(room.snapshot(seats[p].token).scene, 0);
   tvGone();
   room.close();
+});
+
+test("with no TV, the opening round's production is held for a phone's table view (#449)", () => {
+  const room = new Room('OPEN', { dir, remote: true });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  const phoneGone = room.connect(seats[0].token); // the phone; its table view opens only once the game starts
+  room.start(seats[0].token, 7);
+  const left = room.snapshot(seats[0].token).scene;
+  const opening = scenesMs(scenesOf(room.game!.log.filter((e) => !e.to)));
+  assert.ok(left > 0 && Math.abs(left - opening) < 1000, `the server holds the table for the opening scenes: ${left} of ${opening} ms`);
+  phoneGone();
+  room.close();
+  // With nobody's phone there (a CLI or Claude table), nothing waits.
+  const cli = new Room('NOPH', { dir, remote: true });
+  const s2 = ['Ada', 'Bram'].map((n) => cli.join(n));
+  cli.start(s2[0].token, 7);
+  assert.equal(cli.snapshot(s2[0].token).scene, 0);
+  cli.close();
 });
 
 // No clock here: the test follows the room move by move, so a slow machine only
@@ -174,9 +192,9 @@ test('lobby rules: names, size, joining late', () => {
   const room = new Room('LOBY', { dir });
   room.join('Ada');
   assert.throws(() => room.join('ada'), /already called/);
-  assert.throws(() => room.join('   '), /Pick a name/);
-  assert.throws(() => room.join('\u200B\u200B\u200B'), /Pick a name/, 'zero-width spaces are no name');
-  assert.throws(() => room.join('\u3164\u2800\u200D'), /Pick a name/, 'nor are blank fillers');
+  assert.throws(() => room.join('   '), /Choose a name/);
+  assert.throws(() => room.join('\u200B\u200B\u200B'), /Choose a name/, 'zero-width spaces are no name');
+  assert.throws(() => room.join('\u3164\u2800\u200D'), /Choose a name/, 'nor are blank fillers');
   assert.equal(room.join('Bo\u200Bb').name, 'Bob', 'an invisible character inside a name is dropped');
   room.leave(1);
   assert.throws(() => room.start(room.hostToken), /at least 2/);
@@ -184,7 +202,7 @@ test('lobby rules: names, size, joining late', () => {
   assert.throws(() => room.join('Late'), /full/);
   room.leave(5);
   room.start(room.hostToken);
-  assert.throws(() => room.join('Late'), /already started/);
+  assert.throws(() => room.join('Late'), /has started/);
   assert.equal(room.game!.players.length, 5);
   room.close();
 });
@@ -324,7 +342,7 @@ test('a game every player quits ends: the bots stop, nothing is saved again, and
 });
 
 test('the HTTP server: rooms, joining, live snapshots, commands and the clients', async () => {
-  const { server, rooms } = startServer(0, { dir });
+  const { server, rooms } = startServer(0, { dir, firstSeat: 0 });
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => {
@@ -355,7 +373,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
 
     const bad = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'build c999 0,0' });
     assert.equal(bad.status, 400);
-    assert.match(bad.body.error, /Keep one of the building cards/); // the round opens with picking a card
+    assert.match(bad.body.error, /Keep 1 of your 2 building cards/); // the round opens with picking a card
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: made.hostToken, command: 'end' })).status, 400, 'the TV has no seat');
     // The round opens with everyone keeping one of two building cards.
     assert.equal(snap.you!.choice.length, 2);
@@ -377,7 +395,8 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${solo}/bot`, { token: me })).status, 200);
     assert.equal((await post(`/api/rooms/${solo}/start`, { token: me })).status, 200);
     assert.ok(rooms.get(solo)!.game, 'one phone and a bot is a game');
-    // The table view a phone shows is the TV page as a watcher: three.js isn't loaded for it.
+    // The table view a phone shows is the TV page as a watcher: three.js is loaded on demand
+    // (behind the table, for the fights' figures), never as part of the page.
     assert.match(await (await fetch(`${base}/tv.ts`)).text(), /await import\('\.\/board3d\.ts'\)/);
 
     // Both pages have an icon, so no browser logs a missing favicon.
@@ -407,8 +426,58 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
   }
 });
 
+test('a TV can come and go at any time: opening one gives the table a TV, and it goes on without one once the TV is gone', async () => {
+  const room = new Room('TVTV', { dir, remote: true, tvGoneMs: 30, botDelayMs: 60000 });
+  const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+  assert.equal(room.lobby().remote, true, 'made with no TV');
+  const table = room.connect(null); // a phone's table view is no TV
+  assert.equal(room.lobby().remote, true);
+  let tv = room.connect(null, true); // in the lobby
+  assert.equal(room.lobby().remote, false);
+  room.start(seats[0].token, 3);
+  tv();
+  tv = room.connect(null, true); // a reload: no switch in between
+  await sleep(60);
+  assert.equal(room.lobby().remote, false);
+  tv();
+  assert.equal(room.lobby().remote, false, 'a TV that just went may be reloading');
+  await sleep(60);
+  assert.equal(room.lobby().remote, true, 'mid-game, the table goes on with no TV');
+  assert.equal(JSON.parse(readFileSync(room.file.replace(/\.json$/, '.seats.json'), 'utf8')).remote, true, 'saved, for a restart');
+  const back = room.connect(null, true); // and back again, mid-game, the same seats
+  assert.equal(room.lobby().remote, false);
+  assert.equal(room.snapshot(seats[1].token).seat, 1);
+  back();
+  table();
+  room.close();
+});
+
+test('a TV opened on a room with no TV watching becomes its TV, with its buttons', async () => {
+  const { server, rooms } = startServer(0, { dir });
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, string>;
+  const ctrl = new AbortController();
+  try {
+    const { code } = await post('/api/rooms', { remote: true });
+    const room = rooms.get(code)!;
+    await post(`/api/rooms/${code}/join`, { name: 'Ada' });
+    const { hostToken } = await post(`/api/rooms/${code}/tv`, {});
+    assert.ok(room.canStart(hostToken), 'it can add bots and start');
+    const es = await fetch(`${base}/api/rooms/${code}/events?tv`, { signal: ctrl.signal });
+    await es.body!.getReader().read();
+    assert.equal(room.lobby().remote, false, 'watching as a TV gives the table a TV');
+    assert.deepEqual(await post(`/api/rooms/${code}/tv`, {}), {}, 'a second TV has no buttons');
+  } finally {
+    ctrl.abort();
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
 test('one game, any client: a CLI player and a bot at a server-hosted table', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 });
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0, firstSeat: 0 });
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
@@ -446,7 +515,7 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
 
 test('a saved game with no seats file can be hosted; players claim its open seats', () => {
   const file = join(dir, 'hosted.json');
-  const g = newGame(3, 4);
+  const g = newGame(3, 4, 0);
   for (const p of [0, 1, 2]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
   save(file, g);
   const room = new Room('HOST', { file, botDelayMs: 60000 });
@@ -473,7 +542,7 @@ test('a saved game with no seats file can be hosted; players claim its open seat
 test('a server restart: the room comes back under its own code, and every client to its own seat', async () => {
   const roomsDir = mkdtempSync(join(dir, 'restart-'));
   const serve = async (hostFiles: string[] = []) => {
-    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000 }, hostFiles, '127.0.0.1', true);
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60000, firstSeat: 0 }, hostFiles, '127.0.0.1', true);
     await new Promise((r) => s.server.once('listening', r));
     const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
     const stop = () => {
@@ -519,7 +588,7 @@ test('a server restart: the room comes back under its own code, and every client
 });
 
 test('a Claude seat server plays one seat of a room over MCP, and wakes when someone talks', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 0 }, [], '127.0.0.1');
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 0, firstSeat: 0 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, any>;
@@ -561,6 +630,11 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     }
     assert.deepEqual((await reply(2)).result.tools.map((t: { name: string }) => t.name), ['view', 'act', 'say', 'wait', 'rules']);
     assert.match((await reply(3)).result.content[0].text, /^Table: P1 Ada, P2 Opus \(you\)\.\nYou are P2\./);
+    // The view carries a picture of the board beside the text map (#384).
+    const picture = (await reply(3)).result.content[1];
+    assert.equal(picture.type, 'image');
+    assert.equal(picture.mimeType, 'image/png');
+    assert.equal(Buffer.from(picture.data, 'base64').subarray(1, 4).toString(), 'PNG');
     assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
     assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
     // The moves file pairs each move's private reason with what really happened.
@@ -571,7 +645,7 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     await sleep(200);
     assert.ok(!lines.some((l) => l.id === 6), 'wait blocks while nothing happens');
     await post(`/api/rooms/${code}/do`, { token: ada.token, command: 'say hi Opus, want to trade?' });
-    assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Not your decision/);
+    assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Waiting for/);
     child.kill();
   } finally {
     server.closeAllConnections();
@@ -593,5 +667,72 @@ test("the phone's rulebook holds every building, card, beast and kingdom", async
     assert.deepEqual(book.kingdoms.map((k) => k.key), Object.keys(TARGETS));
   } finally {
     server.close();
+  }
+});
+
+test('saving a game: it stops for everyone, survives a restart however old, and anyone at the table continues it', async () => {
+  const roomsDir = mkdtempSync(join(dir, 'saved-'));
+  const serve = async () => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 20, firstSeat: 0 }, [], '127.0.0.1', true);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    const post = async (path: string, body: object) => {
+      const r = await fetch(base + path, { method: 'POST', body: JSON.stringify(body) });
+      const v = (await r.json()) as Record<string, string>;
+      if (!r.ok) throw new Error(v.error);
+      return v;
+    };
+    return { ...s, base, stop, post };
+  };
+  const first = await serve();
+  const made = await first.post('/api/rooms', {});
+  const ada = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Ada' })).token;
+  const bram = (await first.post(`/api/rooms/${made.code}/join`, { name: 'Bram' })).token;
+  await first.post(`/api/rooms/${made.code}/bot`, { token: made.hostToken });
+  await assert.rejects(first.post(`/api/rooms/${made.code}/save`, { token: ada }), /isn't under way/);
+  await first.post(`/api/rooms/${made.code}/start`, { token: ada });
+  const room = first.rooms.get(made.code)!;
+  // The bot's opening keep happens; then Ada saves.
+  for (const p of [0, 1]) room.command([ada, bram][p], `keep ${room.game!.players[p].choice[0].id}`);
+  await sleep(100);
+  await assert.rejects(first.post(`/api/rooms/${made.code}/save`, { token: 'nobody' }), /not in this game/);
+  await first.post(`/api/rooms/${made.code}/save`, { token: ada });
+  assert.ok(room.snapshot(bram).lobby.saved, 'every phone hears it');
+  assert.throws(() => room.command(ada, 'end'), /saved: continue it first/);
+  const log = room.game!.log.length;
+  const waited = await room.wait(ada, 100);
+  assert.equal(waited.code, 2, "a CLI or Claude player's wait doesn't wake on a saved game");
+  assert.equal(room.game!.log.length, log, 'and no bot moves');
+  const listed = (await (await fetch(`${first.base}/api/saved`)).json()) as { code: string; round: number; names: string[] }[];
+  assert.deepEqual(listed.map((s) => [s.code, s.round, s.names]), [[made.code, 1, ['Ada', 'Bram', 'Tick']]]);
+  const file = room.file;
+  first.stop();
+
+  // Long after the rooms' 6 hours, the server restarts: the saved game is still there.
+  const long = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  for (const f of [file, file.replace(/\.json$/, '.seats.json')]) utimesSync(f, long, long);
+  // A Claude runner listed itself beside the game: continuing brings it back.
+  addClaudeRunner(file, '/somewhere/claude-run');
+  const again = await serve();
+  try {
+    const back = again.rooms.get(made.code)!;
+    assert.ok(back, 'hosted again after the restart');
+    assert.ok(back.savedAt, 'still saved');
+    const continued: string[] = [];
+    again.server.on('continue', (r: Room) => continued.push(...claudeRunners(r.file)));
+    await again.post(`/api/rooms/${made.code}/continue`, { token: bram });
+    assert.deepEqual(continued, ['/somewhere/claude-run']);
+    assert.equal(back.lobby().saved, null);
+    await again.post(`/api/rooms/${made.code}/continue`, { token: bram }); // a second tap does nothing
+    assert.equal(continued.length, 1);
+    back.command(ada, 'end');
+    assert.deepEqual((await (await fetch(`${again.base}/api/saved`)).json()), []);
+  } finally {
+    again.stop();
   }
 });

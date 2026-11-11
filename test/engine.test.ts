@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botStep, playToEnd } from '../src/bot.ts';
-import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, newGame, production, score, standings, turnOrder, waitingOn, type Game } from '../src/engine.ts';
-import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, combatPower, targetPower } from '../src/data.ts';
+import { RuleError, apply, splitLoot, bankRates, canRaid, dragonPower, buildingClass, lootOf, buildingPoints, buildingYield, dragonCapacity, newGame, production, score, standings, turnOrder, waitingOn, type Game, type GameEvent } from '../src/engine.ts';
+import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, TARGETS, TUNING, UNITS, UPGRADES, combatPower, targetPower } from '../src/data.ts';
 import { publicState, seatState } from '../src/state.ts';
-import { seatView } from '../src/view.ts';
-import { PEAK, distance, generateMap, mapRadius, neighbors, towerSpots } from '../src/map.ts';
+import { seatView, type ViewOptions } from '../src/view.ts';
+import { PEAK, distance, generateMap, leviathanWaters, mapRadius, neighbors, parseKey, startOpportunity, terrainCounts, towerSpots } from '../src/map.ts';
 
 // What seat p's CLI prints: its view, from the same JSON its phone would get.
-function playerView(g: Game, p: number, logLines = 25): string {
+function playerView(g: Game, p: number, logLines = 25, opts: ViewOptions = {}): string {
   const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
-  const lobby = { code: 'TEST', started: true, seating: false, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
-  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines);
+  const lobby = { code: 'TEST', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+  return seatView({ lobby, seat: p, game: publicState(g, 1000), scene: 0, you: { ...seatState(g, p, 1000), name: `P${p + 1}` } }, logLines, opts);
 }
 
 // Each round starts with everyone keeping a building card: keep the first.
@@ -133,7 +133,7 @@ test('a view shows only your own hand and resources', () => {
   }
 });
 
-test('votes are public as cast; fight-or-bail choices stay secret until revealed', () => {
+test('votes are public as cast; fight-or-hold-back choices stay secret until revealed', () => {
   const g = newGame(2, 3);
   hatchAll(g);
   advanceToRaidVote(g);
@@ -142,16 +142,14 @@ test('votes are public as cast; fight-or-bail choices stay secret until revealed
   assert.ok(playerView(g, 1, 1000).includes(`P1 votes for ${name}`));
   assert.deepEqual(publicState(g).raid!.votes, [1, null]);
   apply(g, 1, 'vote 2');
-  apply(g, 0, `commit ${g.dragons[0].id}`);
-  apply(g, 0, 'ready');
-  apply(g, 1, `commit ${g.dragons[1].id}`);
-  apply(g, 1, 'ready');
-  assert.equal(g.raid!.step, 'bail');
-  apply(g, 0, 'bail');
-  assert.ok(!playerView(g, 1, 1000).includes('bail!'));
+  // No commit step: everyone with a raid-ready dragon is in, with all of them.
+  assert.equal(g.raid!.step, 'choose');
+  assert.deepEqual(waitingOn(g), [0, 1]);
+  apply(g, 0, 'hold');
+  assert.ok(!playerView(g, 1, 1000).includes('holds back'));
   assert.ok(!playerView(g, 1, 1000).includes('You choose'));
   apply(g, 1, 'fight');
-  assert.ok(playerView(g, 1, 1000).includes('P1 bails.'));
+  assert.ok(playerView(g, 1, 1000).includes('P1 holds back.'));
   // There is no retreat: the fight plays out to the end with no more choices.
   assert.equal(g.raid, null);
   assert.match(playerView(g, 1, 1000), /falls\.|holds\./);
@@ -172,9 +170,11 @@ test('only a player with a raid-ready dragon votes, and one without is told why'
   assert.equal(seatState(g, 0).whyNoVote, null);
   apply(g, 0, 'vote 1');
   apply(g, 1, 'vote 2');
-  // Both voters voted: the target is picked without waiting on P3.
-  assert.equal(g.raid!.step, 'commit');
+  // Both voters voted: the target is picked without waiting on P3, who isn't in the raid.
+  assert.equal(g.raid!.step, 'choose');
   assert.deepEqual(waitingOn(g), [0, 1]);
+  assert.deepEqual(g.raid!.sent[2], []);
+  assert.throws(() => apply(g, 2, 'fight'), /aren't in this raid/);
 });
 
 test("each vote counts its voter's raid-ready power, and the most power wins", () => {
@@ -208,7 +208,7 @@ test('everyone starts with an egg, and a raid nobody can fight is skipped', () =
 });
 
 test('illegal moves are refused without changing the game', () => {
-  const g = newGame(3, 9);
+  const g = newGame(3, 9, 0);
   keepAll(g);
   const before = JSON.stringify(g);
   assert.throws(() => apply(g, 1, 'end'), RuleError); // not P2's turn
@@ -223,8 +223,8 @@ test('illegal moves are refused without changing the game', () => {
 test('an offer must trade something real', () => {
   const g = newGame(2, 11);
   keepAll(g);
-  assert.throws(() => apply(g, 0, 'offer P2 give 0 stone get 0 gold'), /nothing for nothing/);
-  assert.throws(() => apply(g, 0, 'offer P2 give get'), /nothing for nothing/);
+  assert.throws(() => apply(g, 0, 'offer P2 give 0 stone get 0 gold'), /offer is empty/);
+  assert.throws(() => apply(g, 0, 'offer P2 give get'), /offer is empty/);
   const card = g.players[0].hand[0];
   assert.throws(() => apply(g, 0, `offer P2 give ${card.id} ${card.id} get 1 stone`), /Name each card once/);
   // Gold is public: asking for more than they have is refused at once.
@@ -240,7 +240,7 @@ test('an offer must trade something real', () => {
 });
 
 test('trades are binding and move resources and cards', () => {
-  const g = newGame(2, 11);
+  const g = newGame(2, 11, 0);
   keepAll(g);
   const card = g.players[1].hand[0];
   apply(g, 1, `offer P1 give ${card.id} get 1 stone`);
@@ -267,10 +267,10 @@ test('trades are binding and move resources and cards', () => {
 });
 
 test('an offer to anyone goes to the first to accept it, and the others may decline it', () => {
-  const g = newGame(3, 11);
+  const g = newGame(3, 11, 0);
   keepAll(g);
   // Only the acting player offers to anyone; out of turn, offers go to them.
-  assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /only make offers to the acting player/);
+  assert.throws(() => apply(g, 1, 'offer anyone give 1 stone get'), /you can only offer to P/);
   apply(g, 0, 'offer anyone give 1 stone get 1 timber');
   const o = g.offers[0];
   assert.equal(o.to, null);
@@ -331,7 +331,7 @@ test('the ocean rings the land, with one harbor per coast; ports go only on harb
   const [sea, harbor, land] = neighbors(tower);
   g.map[sea].terrain = 'ocean';
   g.map[harbor].terrain = 'harbor';
-  g.map[land].terrain = 'plains';
+  g.map[land].terrain = 'desert';
   assert.throws(() => apply(g, 0, `build roost ${sea}`), RuleError); // nothing on the ocean
   g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
   assert.throws(() => apply(g, 0, `build cport ${land}`), RuleError); // a port needs a harbor
@@ -421,7 +421,7 @@ test('table talk is allowed any time, private talk reaches only the two players,
   assert.ok(playerView(g, 0).includes('P2 to P1 (private): "I will bail, trust me"'));
   assert.ok(!playerView(g, 2).includes('I will bail'));
   assert.throws(() => apply(g, 0, 'tell P1 talking to myself'), /You can't tell yourself\./);
-  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Tell whom\?/);
+  assert.throws(() => apply(g, 0, 'tell P9 hi'), /Name a player to tell/);
   assert.throws(() => apply(g, 0, 'say'), RuleError);
   advanceToRaidVote(g);
   apply(g, 0, 'say vote 2 with me');
@@ -436,15 +436,14 @@ test('a hurt dragon heals instead of growing, and still fights', () => {
   g.players[a.owner].resources.livestock = 5;
   const ga = a.growth + a.stage * 10;
   advanceToRaidVote(g);
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.equal(g.round, 2);
   assert.equal(a.damage, 3);
   assert.equal(a.growth + a.stage * 10, ga, 'a hurt dragon does not grow while it heals');
   advanceToRaidVote(g);
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  apply(g, a.owner, `commit ${a.id}`); // hurt, it still raids
-  assert.deepEqual(g.raid!.commits[a.owner], [a.id]);
+  assert.ok(g.raid!.sent[a.owner].includes(a.id), 'hurt, it still raids');
 });
 
 test('a hungry dragon neither heals nor grows, but still fights', () => {
@@ -457,11 +456,55 @@ test('a hungry dragon neither heals nor grows, but still fights', () => {
   g.dragons.unshift({ ...a, id: 'd99' });
   g.players[a.owner].resources.livestock = 0;
   a.damage = 3;
-  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   assert.ok(canRaid(a), 'a hungry dragon with health left still fights');
   assert.equal(a.growth + a.stage * 10, ga, 'a hungry dragon does not grow');
   assert.equal(a.damage, 3, 'a hungry dragon does not heal');
+});
+
+test('everyone sees which dragons went hungry at production (#362)', () => {
+  const g = newGame(2, 7);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  const a = g.dragons[0];
+  const p = a.owner;
+  const tower = TUNING.towerProduction.livestock ?? 0;
+  // Four dragons and no livestock in stock: the tower's livestock feeds the first.
+  g.dragons.unshift({ ...a, id: 'd97' });
+  g.dragons.push({ ...a, id: 'd98' }, { ...a, id: 'd99' });
+  const mine = g.dragons.filter((d) => d.owner === p).map((d) => d.id);
+  g.players[p].resources.livestock = 0;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const seen = publicState(g, 1000).dragons.filter((d) => d.owner === p).map((d) => d.hungry);
+  assert.deepEqual(seen, mine.map((_, i) => i >= tower), 'the first is fed, the rest went hungry');
+  assert.match(playerView(g, 1 - p), /went hungry this round/);
+});
+
+test("production's dragon step logs each dragon as it was and is, for the TV (#442)", () => {
+  const g = newGame(2, 7);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  const a = g.dragons[0];
+  const p = a.owner;
+  // A hurt dragon first (it eats the tower's livestock), then a hungry one; the other seat's grow.
+  a.damage = 3;
+  g.dragons.push({ ...a, id: 'd99', damage: 0 });
+  g.players[p].resources.livestock = 0;
+  const from = g.log.length;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const tends = g.log.slice(from).filter((e) => e.ev?.k === 'tend');
+  assert.equal(tends.length, 1, 'once a round');
+  const ds = (tends[0].ev as Extract<GameEvent, { k: 'tend' }>).ds;
+  const healed = ds.find((x) => x.d === a.id)!;
+  assert.equal(healed.to.hp - healed.from.hp, Math.min(3, TUNING.healPerRound), 'the hurt one heals');
+  assert.ok(!healed.hungry);
+  const hungry = ds.find((x) => x.d === 'd99')!;
+  assert.ok(hungry.hungry, 'the unfed one is hungry');
+  assert.deepEqual(hungry.to, hungry.from, 'and nothing changes');
+  for (const x of ds.filter((y) => y.p !== p && !y.hungry && y.from.hp === y.from.maxHp && y.from.stage < 3)) assert.ok(x.to.stage > x.from.stage || x.to.growth > x.from.growth, 'the rest grow');
 });
 
 test('production says what the dragons eat apart from what is made, and so does the income', () => {
@@ -469,19 +512,39 @@ test('production says what the dragons eat apart from what is made, and so does 
   const p = 0;
   // Two dragons and only the tower's livestock left: both eat, from what's in stock too.
   g.dragons.push({ ...g.dragons.find((d) => d.owner === p)!, id: 'd98' });
+  hatchAll(g);
   g.players[p].resources.livestock = 5;
   const inc = seatState(g, p).income.livestock;
   assert.equal(inc.base, TUNING.towerProduction.livestock ?? 0, 'the income is what is made');
   assert.equal(inc.eat, 2 * TUNING.livestockPerDragon, 'and what the dragons eat, apart');
-  hatchAll(g);
   advanceToRaidVote(g);
   g.players[p].resources.livestock = 5;
   const from = g.log.length;
-  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
   while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
   const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { got: Record<string, number>; eat: number };
   assert.equal(ev.eat, 2 * TUNING.livestockPerDragon);
-  assert.match(playerView(g, p), /livestock \d+ \(your dragons eat 2\)/);
+  assert.match(playerView(g, p), /livestock [0-9+d]+ \(dragons eat 2\)/);
+});
+
+test('eggs do not eat livestock, and grow even with none (#415)', () => {
+  const g = newGame(2, 7);
+  const p = 0;
+  const egg = g.dragons.find((d) => d.owner === p)!;
+  assert.equal(egg.stage, 0, 'the starting dragon is an egg');
+  // A hatched dragon beside the egg: only it eats.
+  g.dragons.push({ ...egg, id: 'd98', stage: 1 });
+  assert.equal(seatState(g, p).income.livestock.eat, TUNING.livestockPerDragon, 'the income counts only the hatched dragon');
+  const before = egg.growth + egg.stage * 100;
+  advanceToRaidVote(g);
+  g.players[p].resources.livestock = 0;
+  const from = g.log.length;
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, 'discard');
+  const ev = g.log.slice(from).find((e) => e.ev?.k === 'produce' && e.ev.p === p)!.ev as { eat: number };
+  assert.equal(ev.eat, TUNING.livestockPerDragon, 'only the hatched dragon eats');
+  assert.ok(!egg.hungry, 'the egg never goes hungry');
+  assert.ok(egg.growth + egg.stage * 100 > before, 'the egg grows');
 });
 
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
@@ -521,13 +584,13 @@ test('each round you draw two building cards and keep one; the other is discarde
 });
 
 test('building cards count their neighbours; point buildings must go beside what they need', () => {
-  const g = newGame(2, 8);
+  const g = newGame(2, 8, 0);
   keepAll(g);
   rich(g, 0);
   const tower = g.towers[0];
   const [spot, ...ring] = neighbors(tower).filter((k) => g.map[k]);
-  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'plains';
-  g.map[spot].terrain = 'plains';
+  for (const k of neighbors(spot)) if (g.map[k] && k !== tower) g.map[k].terrain = 'desert';
+  g.map[spot].terrain = 'desert';
   // Cliff Works makes 1 stone each round for each adjacent mountain hex.
   g.players[0].hand.push({ id: 'ccw', deck: 'building', key: 'cliff_works' });
   apply(g, 0, `build ccw ${spot}`);
@@ -593,13 +656,28 @@ test('a hurt dragon starts its fight hurt: the fight event carries its health', 
     { id: 'd2', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
   ];
   apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-  apply(g, 0, 'commit d1'); apply(g, 1, 'commit d2');
-  apply(g, 0, 'ready'); apply(g, 1, 'ready');
   apply(g, 0, 'fight'); apply(g, 1, 'fight');
   const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
   assert.ok(fight.k === 'fight');
   const full = DRAGONS.fire_whelp.stages[2].hp;
   assert.deepEqual(fight.hps, [full - 9, DRAGONS.ice_whelp.stages[2].hp]);
+});
+
+test('the fight event lists who held back which dragons, so a replay needs no older log lines (#453)', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd3', owner: 1, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, 'fight d1'); apply(g, 1, 'hold');
+  const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+  assert.ok(fight.k === 'fight');
+  assert.deepEqual(fight.held, [{ p: 0, ds: ['d2'] }, { p: 1, ds: ['d3'] }]);
 });
 
 test('a knocked-out dragon cannot fight until a fed production heals it, then fights hurt', () => {
@@ -612,7 +690,7 @@ test('a knocked-out dragon cannot fight until a fed production heals it, then fi
   const passRound = () => {
     for (const pl of g.players) pl.hand = []; // nothing to discard
     advanceToRaidVote(g);
-    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : g.raid!.step === 'commit' ? 'ready' : 'bail');
+    while (g.phase === 'raid') for (const p of waitingOn(g)) apply(g, p, g.raid!.step === 'vote' ? 'vote 1' : 'hold');
     while (g.phase === 'discard') for (const p of waitingOn(g)) apply(g, p, 'discard');
   };
   assert.ok(!canRaid(a));
@@ -622,7 +700,7 @@ test('a knocked-out dragon cannot fight until a fed production heals it, then fi
   assert.ok(canRaid(a), `back in round ${g.round}, hurt`);
 });
 
-test('raid loot is split by the combat power still fighting at the end', () => {
+test('raid loot is split by the combat power still fighting at the end, when everyone fights', () => {
   let shared = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
@@ -633,8 +711,6 @@ test('raid loot is split by the combat power still fighting at the end', () => {
       { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
       { id: 'd3', owner: 1, key: 'air_whelp', stage: 1, growth: 0, damage: 0 },
-      // Stays home, so the next raid has a raider and isn't skipped.
-      { id: 'd4', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 },
     ];
     g.raid!.candidates = ['archers_hold'];
     g.raidsLeft = 2; // stop at the next raid's vote, before the next production
@@ -643,8 +719,6 @@ test('raid loot is split by the combat power still fighting at the end', () => {
     const hoard = { ...g.hoard };
     const before = g.players.map((pl) => ({ ...pl.resources }));
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-    apply(g, 0, 'commit d1 d2'); apply(g, 1, 'commit d3');
-    apply(g, 0, 'ready'); apply(g, 1, 'ready');
     apply(g, 0, 'fight'); apply(g, 1, 'fight');
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd' || !end.won) continue;
@@ -664,7 +738,108 @@ test('raid loot is split by the combat power still fighting at the end', () => {
   assert.ok(shared > 0, 'some raids should be shared');
 });
 
-test('a scoring kingdom gives its points to the most power still fighting, ties in turn order', () => {
+test('a dragon held back takes no hits and shares the loot by its power; a knocked-out fighter gets nothing', () => {
+  let held = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    hatchAll(g);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    g.dragons = [
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 3, growth: 0, damage: 0 },
+    ];
+    g.raid!.candidates = ['archers_hold'];
+    g.raidsLeft = 2;
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    apply(g, 0, 'fight'); apply(g, 1, 'hold');
+    const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+    assert.ok(fight.k === 'fight');
+    assert.deepEqual(fight.ps, [0]);
+    assert.deepEqual(fight.ds, ['d1', 'd2']);
+    assert.equal(g.dragons.find((d) => d.id === 'd3')!.damage, 0, 'held back, so never hit');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd' || !end.won) continue;
+    assert.ok(end.winners.includes(1), 'the one who held back shares the loot');
+    assert.equal(end.power[end.winners.indexOf(1)], dragonPower(g.dragons.find((d) => d.id === 'd3')!));
+    held++;
+    // P1's power counts only their dragons not knocked out.
+    const standing = ['d1', 'd2'].map((id) => g.dragons.find((d) => d.id === id)!).filter((d) => d.damage < DRAGONS[d.key].stages[2].hp);
+    assert.equal(end.power[end.winners.indexOf(0)], standing.reduce((s, d) => s + dragonPower(d), 0));
+  }
+  assert.ok(held > 0, 'some raids should fall');
+});
+
+test("after the vote, every raid-ready dragon is in the raid, the ones whose power the vote counted", () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  keepAll(g);
+  while (g.phase === 'action') apply(g, g.turn, 'end');
+  g.dragons = [
+    { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+    { id: 'd2', owner: 0, key: 'ice_whelp', stage: 1, growth: 0, damage: 0 },
+    { id: 'd3', owner: 0, key: 'air_whelp', stage: 3, growth: 0, damage: 999 }, // knocked out
+    { id: 'd4', owner: 1, key: 'water_whelp', stage: 0, growth: 0, damage: 0 }, // an egg
+    { id: 'd5', owner: 1, key: 'fire_whelp', stage: 2, growth: 0, damage: 0 },
+  ];
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  assert.equal(g.raid!.step, 'choose');
+  assert.deepEqual(g.raid!.sent, [['d1', 'd2'], ['d5']]);
+  const lock = g.log.findLast((e) => e.ev?.k === 'locked')!.ev!;
+  assert.deepEqual(lock, { k: 'locked', ps: [0, 1], sent: [['d1', 'd2'], ['d5']] });
+  assert.throws(() => apply(g, 0, 'commit d1'), RuleError);
+});
+
+test('a player picks which of their dragons fight; the rest hold back and still count for the loot', () => {
+  let won = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(2, seed);
+    hatchAll(g);
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    g.dragons = [
+      { id: 'd1', owner: 0, key: 'fire_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd2', owner: 0, key: 'ice_whelp', stage: 3, growth: 0, damage: 0 },
+      { id: 'd3', owner: 1, key: 'air_whelp', stage: 3, growth: 0, damage: 0 },
+    ];
+    g.raid!.candidates = ['archers_hold'];
+    g.raidsLeft = 2;
+    apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+    assert.throws(() => apply(g, 0, 'fight d3'), /isn't one of your dragons/);
+    assert.throws(() => apply(g, 0, 'hold d1'), RuleError);
+    apply(g, 0, 'fight d1');
+    assert.deepEqual(g.raid!.choices[0], ['d1']);
+    assert.throws(() => apply(g, 0, 'fight'), /already chose/);
+    apply(g, 1, 'fight');
+    const hold = g.log.find((e) => e.ev?.k === 'hold')!.ev!;
+    assert.deepEqual(hold, { k: 'hold', p: 0, ds: ['d2'] });
+    const fight = g.log.findLast((e) => e.ev?.k === 'fight')!.ev!;
+    assert.ok(fight.k === 'fight');
+    assert.deepEqual(fight.ps, [0, 1]);
+    assert.deepEqual(fight.ds, ['d1', 'd3']);
+    assert.equal(g.dragons.find((d) => d.id === 'd2')!.damage, 0, 'held back, so never hit');
+    const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
+    if (end.k !== 'raidEnd' || !end.won) continue;
+    won++;
+    // P1's credit is every dragon of theirs in the raid still standing: the one held back too.
+    const standing = ['d1', 'd2'].map((id) => g.dragons.find((d) => d.id === id)!).filter((d) => d.damage < DRAGONS[d.key].stages[2].hp);
+    assert.equal(end.power[end.winners.indexOf(0)], standing.reduce((s, d) => s + dragonPower(d), 0));
+  }
+  assert.ok(won > 0, 'some raids should fall');
+});
+
+test('everyone holding back calls the raid off', () => {
+  const g = newGame(2, 3);
+  hatchAll(g);
+  advanceToRaidVote(g);
+  apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
+  apply(g, 0, 'hold'); apply(g, 1, 'hold');
+  assert.ok(g.log.some((e) => e.ev?.k === 'noRaid' && e.ev.why === 'held'));
+  assert.ok(!g.log.some((e) => e.ev?.k === 'fight' || e.ev?.k === 'raidEnd'), 'no fight, so no loot');
+});
+
+test('a scoring kingdom gives its points to the most power standing, ties in turn order', () => {
   let scored = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const g = newGame(2, seed);
@@ -675,14 +850,11 @@ test('a scoring kingdom gives its points to the most power still fighting, ties 
     g.dragons = [
       ...['d1', 'd2', 'd3', 'd4', 'd5'].map((id) => ({ id, owner: 0, key: 'ember_wyrm', stage: 3, growth: 0, damage: 0 })),
       ...['d6', 'd7', 'd8', 'd9', 'd10'].map((id) => ({ id, owner: 1, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0 })),
-      { id: 'd11', owner: 1, key: 'water_whelp', stage: 1, growth: 0, damage: 0 }, // stays home
     ];
     g.raid!.candidates = ['cinderkeep'];
     g.raidsLeft = 2;
     const before = [score(g, 0).raids, score(g, 1).raids];
     apply(g, 0, 'vote 1'); apply(g, 1, 'vote 1');
-    apply(g, 0, 'commit d1 d2 d3 d4 d5'); apply(g, 1, 'commit d6 d7 d8 d9 d10');
-    apply(g, 0, 'ready'); apply(g, 1, 'ready');
     apply(g, 0, 'fight'); apply(g, 1, 'fight');
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd') continue;
@@ -745,11 +917,70 @@ test('combat power: dragons and kingdoms carry one number, and a side adds up', 
   const st = DRAGONS[a.key].stages[2];
   assert.equal(dragonPower(a), Math.round(Math.sqrt(st.hp * st.targets * st.dice * (st.sides + 1) / 2)));
   assert.equal(targetPower('brindle'), 2 * combatPower(UNITS.militia));
-  assert.match(playerView(g, 0), new RegExp(`power ${dragonPower(a)}`));
+  assert.match(playerView(g, 0), new RegExp(`Power ${dragonPower(a)}`));
 });
 
 // The map as generated, before the first production lets fauna wander.
 const startingMap = (players: number, seed: number) => ({ map: generateMap({ state: seed }, players), towers: towerSpots(players) });
+
+test('every seat starts with as much land as the others', () => {
+  for (let players = 2; players <= 6; players++) {
+    const R = mapRadius(players);
+    const towers = towerSpots(players).map((k) => parseKey(k)!);
+    const land: [number, number][] = [];
+    for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (distance(q, r) <= R) land.push([q, r]);
+    const within3 = towers.map(([a, b]) => land.filter(([q, r]) => distance(q - a, r - b) <= 3).length);
+    assert.equal(new Set(within3).size, 1, `${players}p: land within 3 steps ${within3}`);
+    assert.equal(new Set(towers.map(([q, r]) => distance(q, r))).size, 1, `${players}p: towers at different distances from the centre`);
+    // Land nearest each tower, ties split: within a fifth of each other.
+    const near = towers.map(() => 0);
+    for (const [q, r] of land) {
+      const d = towers.map(([a, b]) => distance(q - a, r - b));
+      const m = Math.min(...d);
+      const ties = d.filter((x) => x === m).length;
+      d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
+    }
+    assert.ok(Math.max(...near) <= 1.2 * Math.min(...near), `${players}p: land nearest each tower ${near.map((x) => x.toFixed(1))}`);
+  }
+});
+
+test('fair starts: each start has about the average room for basic buildings, ring by ring, and the mix still varies', () => {
+  const tol = TUNING.fairStart.tolerance;
+  for (let players = 2; players <= 6; players++) {
+    const totals = new Set<number>();
+    const stoneNearFirst = new Set<number>();
+    for (let seed = 0; seed < 40; seed++) {
+      const g = startingMap(players, seed);
+      const rows = startOpportunity(g.map, players);
+      for (let c = 0; c < rows[0].length; c++) {
+        const col = rows.map((row) => row[c]);
+        const avg = col.reduce((a, b) => a + b, 0) / col.length;
+        for (const x of col) assert.ok(Math.abs(x - avg) <= tol * avg + 1e-9, `${players}p seed ${seed}: ${c < TUNING.fairStart.rings ? `ring ${c + 1}` : 'total'} ${col.map((v) => v.toFixed(1))}`);
+      }
+      totals.add(rows.reduce((s, row) => s + row[row.length - 1], 0));
+      const [a, b] = parseKey(g.towers[0])!;
+      stoneNearFirst.add(Object.values(g.map).filter((h) => h.terrain === 'mountain' && distance(h.q - a, h.r - b) <= 2).length);
+    }
+    assert.ok(totals.size > 1, `${players}p: the average never drifts`);
+    assert.ok(stoneNearFirst.size > 2, `${players}p: the mountains near a start never vary`);
+    assert.deepEqual(generateMap({ state: 9 }, players), generateMap({ state: 9 }, players), `${players}p: one seed, one map`);
+  }
+});
+
+test('every map for a player count has the same terrain mix: equal counts, the remainder desert', () => {
+  for (let players = 2; players <= 6; players++) {
+    const counts = terrainCounts(players);
+    const basics = (['mountain', 'forest', 'ley', 'meadow'] as const).map((t) => counts[t]!);
+    assert.ok(basics.every((n) => n === basics[0]) && counts.desert! - basics[0] >= 0 && counts.desert! - basics[0] < 5, `${players}p: ${JSON.stringify(counts)}`);
+    const expect = { ...counts, mountain: counts.mountain! + 1, desert: counts.desert! + players, harbor: 6 };
+    for (let seed = 0; seed < 20; seed++) {
+      const g = startingMap(players, seed);
+      const got: Record<string, number> = {};
+      for (const h of Object.values(g.map)) if (h.terrain !== 'ocean') got[h.terrain] = (got[h.terrain] ?? 0) + 1;
+      assert.deepEqual(got, expect, `${players}p seed ${seed}`);
+    }
+  }
+});
 
 test('the starting map has fauna, at least 2 steps from every tower, stronger further out', () => {
   for (let players = 2; players <= 6; players++) {
@@ -787,12 +1018,12 @@ test('the great beasts: the Thunderbird on the centre peak, the Leviathan off a 
 
 // A game with an adult of the beast's weakness or not, and P1's land next to the peak.
 function beastGame() {
-  const g = newGame(2, 5);
+  const g = newGame(2, 5, 0);
   keepAll(g);
   rich(g, 0);
   const [ring] = neighbors(PEAK);
   const [beyond] = neighbors(ring).filter((n) => n !== PEAK && !neighbors(PEAK).includes(n));
-  g.buildings[beyond] = { type: 'roost', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[beyond] = { type: 'roost', owner: 0, upgrades: [], floors: 0 };
   g.map[ring].terrain = 'meadow';
   delete g.map[ring].fauna;
   return { g, ring, beyond };
@@ -807,6 +1038,35 @@ test('a great beast holds the hexes around it: nothing is built there until it f
   apply(g, 0, `build pasture ${ring}`);
   // A production building next to the freed peak makes more.
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock! + TUNING.peakBonus);
+});
+
+test('a hex a great beast holds stays held with other fauna on it, on the TV and in the CLI', () => {
+  const { g, ring } = beastGame();
+  g.map[ring].fauna = 'basilisk';
+  const hex = publicState(g).map.find((h) => h.k === ring)!;
+  assert.equal(hex.held, 'thunderbird');
+  assert.equal(publicState(g).map.find((h) => h.k === PEAK)!.held, undefined); // the beast's own hex has no border
+  assert.match(playerView(g, 0), new RegExp(`${ring}:[A-Z.~]\\{[^}]+\\}\\{x\\}`));
+});
+
+// #366: before a building goes on a hex, the phone shows what it would do
+// there, and whether the freed peak's bonus applies to it.
+test('placing a building shows what it would do on each hex, peak bonus or not', () => {
+  const { g, ring } = beastGame();
+  delete g.map[PEAK].fauna;
+  g.slain.thunderbird = 1;
+  g.players[0].hand.push({ id: 'ch', deck: 'building', key: 'hatchery' });
+  const s = seatState(g, 0);
+  const pasture = s.basics.find((b) => b.key === 'pasture')!;
+  assert.ok(pasture.hexes.includes(ring));
+  assert.deepEqual(pasture.after[ring], { makes: { livestock: { base: TUNING.peakBonus, dice: [4] } }, houses: 0, points: 1, peak: 'more' });
+  const hatchery = s.hand.find((c) => c.id === 'ch')!;
+  assert.ok(hatchery.hexes.includes(ring));
+  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, note: BUILDINGS.hatchery.text, peak: 'none' });
+  // Away from the peak, no word of it; and nothing is built by asking.
+  const far = pasture.hexes.find((k) => k !== PEAK && !neighbors(PEAK).includes(k));
+  if (far) assert.equal(pasture.after[far].peak, undefined);
+  assert.equal(g.buildings[ring], undefined);
 });
 
 test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {
@@ -835,7 +1095,7 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
 // A game where P1's own land is set: a meadow pasture next to the tower, and
 // fauna on the hex beyond it.
 function faunaGame() {
-  const g = newGame(2, 5);
+  const g = newGame(2, 5, 0);
   hatchAll(g);
   keepAll(g);
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
@@ -849,7 +1109,7 @@ function faunaGame() {
 
 test('fauna blocks building on its hex, and a building under it produces nothing', () => {
   const { g, near, beyond } = faunaGame();
-  g.map[beyond].fauna = 'wolf_pack';
+  g.map[beyond].fauna = 'wolf';
   assert.throws(() => apply(g, 0, `build pasture ${beyond}`), RuleError);
   apply(g, 0, `build pasture ${near}`);
   assert.equal(production(g, 0).livestock.dice.length, 1);
@@ -861,7 +1121,7 @@ test('fauna blocks building on its hex, and a building under it produces nothing
 test('clearing fauna: any player may, the loot is theirs, and those dragons can still raid', () => {
   const { g, near } = faunaGame();
   apply(g, 0, `build pasture ${near}`);
-  g.map[near].fauna = 'wolf_pack'; // on P1's pasture
+  g.map[near].fauna = 'wolf'; // on P1's pasture
   apply(g, 0, 'end');
   assert.throws(() => apply(g, 1, `clear ${g.towers[0]} d2`), RuleError); // no fauna there
   assert.throws(() => apply(g, 1, `clear ${near}`), RuleError); // no dragons sent
@@ -873,15 +1133,14 @@ test('clearing fauna: any player may, the loot is theirs, and those dragons can 
   const before = g.players[1].resources.livestock;
   apply(g, 1, `clear ${near} ${d.id}`);
   assert.equal(g.map[near].fauna, undefined);
-  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf_pack.loot.livestock!);
+  assert.equal(g.players[1].resources.livestock, before + FAUNA.wolf.loot.livestock!);
   assert.ok(canRaid(d), 'a dragon that cleared a hex, with health left, can still raid this round');
   assert.throws(() => apply(g, 1, `clear ${near} ${d.id}`), RuleError); // one fight a round
   const ev = g.log.map((e) => e.ev).filter((e) => e?.k === 'cleared');
   assert.ok(ev.some((e) => e?.k === 'cleared' && e.won && e.p === 1));
   apply(g, 1, 'end');
   for (const p of waitingOn(g)) apply(g, p, 'vote 1');
-  apply(g, 1, `commit ${d.id}`); // it cleared a hex, and raids the same round
-  assert.deepEqual(g.raid!.commits[1], [d.id]);
+  assert.ok(g.raid!.sent[1].includes(d.id), 'it cleared a hex, and raids the same round');
 });
 
 test('a lost fight leaves the beast at full health on its hex', () => {
@@ -914,7 +1173,7 @@ test('fauna cards place a beast on any land hex with no tower or beast, shutting
 
 test('a beast a card sent gives no loot when it falls', () => {
   const { g, near } = faunaGame();
-  g.map[near].fauna = 'wolf_pack';
+  g.map[near].fauna = 'wolf';
   g.map[near].sent = true; // as a card leaves it
   const d = g.dragons.find((x) => x.owner === 0)!;
   d.stage = 3;
@@ -929,15 +1188,15 @@ test('a beast a card sent gives no loot when it falls', () => {
   assert.deepEqual(g.players[0].resources, before);
 });
 
-test('in production, fauna wanders to adjacent land hexes with no tower or beast; great beasts stay', () => {
+test('in production, fauna wanders to adjacent land hexes with no tower or beast; the Thunderbird stays', () => {
   const g = newGame(2, 7);
   for (const k of Object.keys(g.map)) if (!BEASTS[g.map[k].fauna ?? '']) delete g.map[k].fauna;
   for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
   g.dragons.forEach((d) => (d.growth = -1000));
   let at = Object.keys(g.map).find((k) => g.map[k].terrain !== 'ocean' && !g.map[k].fauna && !g.buildings[k] && neighbors(k).every((n) => g.map[n]))!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   g.map[at].sent = true;
-  const great = Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort();
+  const peak = Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird');
   let moves = 0;
   let stays = 0;
   for (let i = 0; i < 40 && g.phase !== 'over'; i++) {
@@ -947,7 +1206,7 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    const now = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (now === at) stays++;
     else {
       moves++;
@@ -958,10 +1217,46 @@ test('in production, fauna wanders to adjacent land hexes with no tower or beast
       assert.equal(g.map[at].sent, undefined);
     }
     at = now;
-    assert.deepEqual(Object.keys(g.map).filter((k) => BEASTS[g.map[k].fauna ?? '']).sort(), great);
+    assert.deepEqual(Object.keys(g.map).filter((k) => g.map[k].fauna === 'thunderbird'), peak);
   }
   assert.ok(moves > 0 && stays > 0, `moved ${moves}, stayed ${stays}`);
   assert.ok(g.log.some((e) => e.ev?.k === 'wander'));
+});
+
+test('in production the Leviathan moves to another hex of its waters, more often a far one', () => {
+  const g = newGame(3, 11);
+  for (const d of g.dragons) d.stage = 0; // no raids: each round goes straight to the next
+  g.dragons.forEach((d) => (d.growth = -1000));
+  const waters = leviathanWaters(g.map, 3);
+  const dist = (a: string, b: string) => {
+    const [aq, ar] = parseKey(a)!, [bq, br] = parseKey(b)!;
+    return distance(aq - bq, ar - br);
+  };
+  let at = Object.keys(g.map).find((k) => g.map[k].fauna === 'leviathan')!;
+  assert.ok(waters.includes(at), 'it starts in its waters');
+  assert.ok(waters.length < Object.keys(g.map).filter((k) => g.map[k].terrain === 'ocean').length, 'its hold keeps clear of the towers');
+  const went: number[] = [];
+  for (let i = 0; i < 80 && g.phase !== 'over'; i++) {
+    keepAll(g);
+    while (g.phase === 'action') apply(g, g.turn, 'end');
+    while (g.phase === 'discard') for (const p of waitingOn(g)) {
+      const pl = g.players[p];
+      apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
+    }
+    const now = Object.keys(g.map).filter((k) => g.map[k].fauna === 'leviathan');
+    assert.equal(now.length, 1);
+    assert.notEqual(now[0], at, 'it moves every round');
+    assert.ok(waters.includes(now[0]), `${now[0]} is in its waters`);
+    went.push(dist(at, now[0]));
+    at = now[0];
+  }
+  // Weighted by distance: further on average than an even pick, but it
+  // still sometimes comes up close by.
+  const even = (from: string) => waters.filter((k) => k !== from).reduce((s, k) => s + dist(from, k), 0) / (waters.length - 1);
+  const mean = went.reduce((a, b) => a + b, 0) / went.length;
+  assert.ok(mean > even(at) + 0.5, `mean ${mean} vs even ${even(at)}`);
+  assert.ok(went.some((d) => d <= 2), 'sometimes close');
+  assert.ok(g.log.some((e) => e.ev?.k === 'wander' && e.ev.fauna === 'leviathan'));
 });
 
 test('a wandering beast still moves at random, but more often to a hex beside no other beast', () => {
@@ -972,9 +1267,9 @@ test('a wandering beast still moves at random, but more often to a hex beside no
   const openHex = (k: string) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.map[k].fauna && g.buildings[k]?.type !== 'tower';
   const lonely = (n: string, self: string) => !neighbors(n).some((m) => m !== self && g.map[m]?.fauna);
   // Only great beasts are left, and they never move. Count, over many moves of
-  // a wolf pack, how often it picks a lonely hex against how often it could.
+  // a wolf, how often it picks a lonely hex against how often it could.
   let at = Object.keys(g.map).sort().find(openHex)!;
-  g.map[at].fauna = 'wolf_pack';
+  g.map[at].fauna = 'wolf';
   let crowdedMoves = 0, lonelyMoves = 0, crowdedShare = 0;
   for (let i = 0; i < 400 && g.phase !== 'over'; i++) {
     const to = neighbors(at).filter(openHex);
@@ -986,7 +1281,7 @@ test('a wandering beast still moves at random, but more often to a hex beside no
       const pl = g.players[p];
       apply(g, p, `discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`);
     }
-    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf_pack')!;
+    at = Object.keys(g.map).find((k) => g.map[k].fauna === 'wolf')!;
     if (at === was || nLonely === 0 || nLonely === to.length) continue;
     if (lonely(at, at)) lonelyMoves++; else crowdedMoves++;
     crowdedShare += (to.length - nLonely) / to.length;
@@ -1029,7 +1324,7 @@ test('a building card shows what it makes now and with the upgrade', () => {
   keepAll(g);
   const k = neighbors(g.towers[0]).find((n) => g.map[n].terrain === 'mountain' && !g.map[n].fauna)
     ?? neighbors(g.towers[0]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna)!;
-  g.buildings[k] = { type: 'quarry', owner: 0, upgrade: null, floors: 0 };
+  g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
   g.players[0].hand.push({ id: 'cw', deck: 'building', key: 'workshop' });
   const hex = publicState(g, 10).map.find((h) => h.k === k)!;
   assert.deepEqual(hex.building!.does, { makes: { stone: { base: 0, dice: [4] } }, houses: 0, points: 1 });
@@ -1039,4 +1334,122 @@ test('a building card shows what it makes now and with the upgrade', () => {
   const tower = publicState(g, 10).map.find((h) => h.k === g.towers[0])!.building!.does;
   assert.equal(tower.houses, TUNING.towerDragonCapacity);
   assert.deepEqual(production(g, 0).stone, { base: (TUNING.towerProduction.stone ?? 0), dice: [4] });
+});
+
+// #350: a Workshop without the card, as a special project; #463: for triple the card.
+test('a Workshop is also a special project, at triple the card, and works like the card', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
+  g.buildings[k] = { type: 'quarry', owner: p, upgrades: [], floors: 0 };
+  const card = { timber: 4, stone: 4, crystal: 2 };
+  g.players[p].resources = { stone: 12, timber: 12, crystal: 5, livestock: 0, gold: 0 };
+  // Short of the triple cost: the phone says so, and the command is refused.
+  let u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.deepEqual(u.hexes, [k]);
+  assert.match(u.why!, /^You can't afford .*crystal.*\.$/);
+  assert.throws(() => apply(g, p, `project workshop ${k}`), RuleError);
+  g.players[p].resources.crystal = 6;
+  u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.equal(u.why, null);
+  assert.deepEqual(u.after[k].makes, { stone: { base: 2, dice: [4] } });
+  assert.match(playerView(g, p), /project workshop <hex>/);
+  // Not on a building it can't go on (the tower), nor twice on one building.
+  assert.throws(() => apply(g, p, `project workshop ${g.towers[p]}`), /Workshop can go on/);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(g.players[p].resources, { stone: 12 - 3 * card.stone, timber: 12 - 3 * card.timber, crystal: 6 - 3 * card.crystal, livestock: 0, gold: 0 });
+  assert.deepEqual(g.buildings[k].upgrades, ['workshop']);
+  assert.equal(buildingPoints(g, k), 1 + (UPGRADES.workshop.points ?? 0));
+  assert.match(g.log.at(-1)!.text, /adds Workshop to their Quarry at .* as a special project\./);
+  // Only base upgrades are special projects.
+  rich(g, p);
+  assert.throws(() => apply(g, p, `project nesting_grounds ${g.towers[p]}`), /Use: project </);
+});
+
+// #400: Workshops stack. A building takes any number of upgrades; the first
+// Workshop on it adds 2, each one after adds 1, and each is worth its point.
+test('Workshops stack on one building: +2, then +1 each, and a point each', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  const k = neighbors(g.towers[p]).find((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna && !g.buildings[n])!;
+  g.buildings[k] = { type: 'quarry', owner: p, upgrades: [], floors: 0 };
+  const pt = UPGRADES.workshop.points ?? 0;
+  rich(g, p);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 2, dice: [4] } });
+  // Still a target, and the preview shows the second Workshop on top of the first.
+  const u = seatState(g, p).upgradeProjects.find((x) => x.key === 'workshop')!;
+  assert.deepEqual(u.hexes, [k]);
+  assert.deepEqual(u.after[k].makes, { stone: { base: 3, dice: [4] } });
+  assert.equal(u.after[k].points, 1 + 2 * pt);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(g.buildings[k].upgrades, ['workshop', 'workshop']);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 3, dice: [4] } });
+  assert.equal(publicState(g).map.find((x) => x.k === k)!.building!.upgradeName, '2 Workshops');
+  rich(g, p);
+  apply(g, p, `project workshop ${k}`);
+  assert.deepEqual(buildingYield(g, k).makes, { stone: { base: 4, dice: [4] } });
+  assert.equal(buildingPoints(g, k), 1 + 3 * pt);
+  assert.match(playerView(g, p), new RegExp(`Quarry\\+3 Workshops@${k}`));
+  // Nesting Grounds stack too: each houses 2 more.
+  const cap = dragonCapacity(g, p);
+  g.buildings[g.towers[p]].upgrades.push('nesting_grounds', 'nesting_grounds');
+  assert.equal(dragonCapacity(g, p), cap + 2 * (UPGRADES.nesting_grounds.dragonCapacity ?? 0));
+});
+
+test('round 1\'s first player is random, then moves 1 seat left each round (#416)', () => {
+  const firsts = new Set<number>();
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = newGame(4, seed);
+    const f = turnOrder(g)[0];
+    firsts.add(f);
+    assert.match(g.log[0].text, new RegExp(`P${f + 1} goes first`));
+    keepAll(g);
+    assert.equal(g.turn, f, 'round 1 actions start with the first player');
+    g.round++;
+    assert.equal(turnOrder(g)[0], (f + 1) % 4);
+  }
+  assert.equal(firsts.size, 4, 'every seat goes first in some game');
+});
+
+test('a game saved before round 1\'s first player was random keeps its turn order', () => {
+  const g = newGame(3, 7);
+  delete g.firstSeat;
+  g.round = 2;
+  assert.deepEqual(turnOrder(g), [1, 2, 0]);
+});
+
+test("a view shows each player's expected production each round, and what they made at the latest roll", () => {
+  const g = newGame(3, 7);
+  // P1 has 2 Quarries: their stone is dice.
+  for (const k of neighbors(g.towers[0]).filter((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna).slice(0, 2)) g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
+  const rng = { state: 99 };
+  while (g.round < 3) botStep(g, rng); // a bot step plays its move
+  assert.match(playerView(g, 1), /^P1: .*makes stone \d+\+1d4\+1d4 \(expected \d+\)/m);
+  const view = playerView(g, 1);
+  for (let p = 0; p < 3; p++) {
+    const line = view.split('\n').find((l) => l.startsWith(`P${p + 1}${p === 1 ? ' (you)' : ''}: `))!;
+    const pr = production(g, p);
+    const want = Object.values(pr).reduce((a, v) => a + v.base + v.dice.reduce((s, d) => s + (d + 1) / 2, 0), 0);
+    assert.ok(line.includes(`; expected ${Math.round(want * 10) / 10} in all each round`), line);
+    const made = g.log.findLast((e) => e.ev?.k === 'produce' && e.ev.p === p)!;
+    const total = made.ev?.k === 'produce' ? Object.values(made.ev.got).reduce((a, b) => a + (b ?? 0), 0) : -1;
+    assert.ok(line.endsWith(`; made ${total} in round ${g.round}`), line);
+  }
+});
+
+test('a Claude player without the expected-production option sees production as it did before it', () => {
+  const g = newGame(3, 7);
+  for (const k of neighbors(g.towers[0]).filter((n) => g.map[n].terrain !== 'ocean' && !g.map[n].fauna).slice(0, 2)) g.buildings[k] = { type: 'quarry', owner: 0, upgrades: [], floors: 0 };
+  const rng = { state: 99 };
+  while (g.round < 3) botStep(g, rng);
+  const view = playerView(g, 1, 25, { expected: false });
+  assert.match(view, /^P1: .*; makes stone \d+\+1d4\+1d4(, |$)/m);
+  assert.doesNotMatch(view, /expected|each round;|made \d+ in round/);
+  assert.match(view, /^Each round you make: [^\n]*\.$/m);
+  // Every other line is the same as with the option on.
+  const strip = (v: string) => v.split('\n').filter((l) => !/^P\d|^Each round you make/.test(l));
+  assert.deepEqual(strip(view), strip(playerView(g, 1, 25)));
 });

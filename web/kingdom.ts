@@ -19,7 +19,7 @@ export function kingdomCard(t: TargetView, i: number, n: number, votes: (number 
 }
 
 // What a scoring kingdom is worth when it falls, and to whom: the raider with
-// the most power still fighting at the end. With `leader`, who that is now
+// the most power standing at the end. With `leader`, who that is now
 // (the most power sent; equal powers in turn order). Nothing for the others.
 export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; names: string[] } | null): string {
   if (!t.points) return '';
@@ -28,10 +28,10 @@ export function pointsLine(t: TargetView, size = 1.3, leader?: { p: number; name
 }
 
 // Who would score a kingdom's points if the fight ended now: the most power
-// sent (commits[p] is each player's dragons, power[id] each dragon's), equal
+// in the raid (sent[p] is each player's dragons, power[id] each dragon's), equal
 // powers in turn order. Null if no one has sent any.
-export function pointsLeader(g: PublicState, commits: string[][]): number | null {
-  const power = commits.map((ids) => ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0));
+export function pointsLeader(g: PublicState, sent: string[][]): number | null {
+  const power = sent.map((ids) => ids.reduce((s, id) => s + (g.dragons.find((d) => d.id === id)?.power ?? 0), 0));
   const best = Math.max(0, ...power);
   return best ? g.turnOrder.find((p) => power[p] === best) ?? null : null;
 }

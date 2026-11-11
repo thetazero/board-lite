@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { collect } from '../src/playtest/leaderboard.ts';
+import { collect, playerOf } from '../src/playtest/leaderboard.ts';
 import { placesFrom, rate, type RatedGame } from '../src/playtest/rating.ts';
 
 const game = (...order: string[]): RatedGame => ({ seats: order.map((player, i) => ({ player, place: i + 1 })) });
@@ -85,4 +85,11 @@ test('the leaderboard reads playtests, and room games with people, bots and Clau
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('a seat with player options is its own player, under the model it reported running', () => {
+  assert.equal(playerOf({ seat: 'P1', model: 'opus+expected', options: ['expected'], modelId: 'claude-opus-5-5' }), 'claude-opus-5-5+expected');
+  assert.equal(playerOf({ seat: 'P1', model: 'opus', options: [], modelId: 'claude-opus-5-5' }, 'high'), 'claude-opus-5-5 @high');
+  assert.equal(playerOf({ seat: 'P1', model: 'opus+expected', options: ['expected'] }), 'opus+expected');
+  assert.equal(playerOf({ seat: 'P1', model: 'codex:gpt-5.6-sol' }), 'codex:gpt-5.6-sol');
 });

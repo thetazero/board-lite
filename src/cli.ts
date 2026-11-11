@@ -19,8 +19,8 @@ Every game is hosted by a board-lite server (npm run serve; the TV shows its roo
 
   board-lite new [server-url]                             open a room with no TV; prints its address
   board-lite join <room-url> <name>                       take a seat; prints your token
-  board-lite bot <room-url> <token>                       add a bot to the room (first player only)
-  board-lite start <room-url> <token>                     start the game (first player only)
+  board-lite bot <room-url> <token>                       add a bot to the room (first to join only)
+  board-lite start <room-url> <token>                     start the game (first to join only)
   board-lite view <room-url> <token> [--log N]            what your seat sees, and its options
   board-lite do <room-url> <token> <command...>           make a decision
   board-lite wait <room-url> <token> [--timeout SECS]     block until you have a decision to make
@@ -75,7 +75,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'join': {
-      const r = await call(`${roomApi(room)}/join`, { name: args.slice(1).join(' ') });
+      const r = await call(`${roomApi(room)}/join`, { name: args.slice(1).join(' '), via: 'cli' });
       console.log(`You are seat ${r.seat}. Your token: ${r.token}\nUse it after the room's address, e.g. board-lite view ${room} ${r.token}`);
       return 0;
     }
@@ -98,7 +98,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     case 'do': {
       const since = nextIndex(await state());
-      const r = await call(`${roomApi(room)}/do`, { token, command: args.slice(2).join(' ') });
+      const r = await call(`${roomApi(room)}/do`, { token, command: args.slice(2).join(' '), via: 'cli' });
       console.log(afterMove(r.state as Snapshot, since));
       return 0;
     }
@@ -112,9 +112,9 @@ async function main(argv: string[]): Promise<number> {
         if (r.code === 2 && Date.now() - start < timeout * 1000) continue;
         const s = r.state as Snapshot;
         const g = s.game;
-        if (g?.phase === 'over') console.log('The game is over.');
+        if (g?.phase === 'over') console.log('Game over.');
         else if (r.code === 0) console.log(`${pname(s.seat)}: your decision. Run "view" to see the board.`);
-        else console.log(g ? `Still waiting on: ${g.waitingOn.map(pname).join(', ')}.` : 'The game has not started yet.');
+        else console.log(g ? `Waiting for ${g.waitingOn.map(pname).join(', ')}.` : "The game hasn't started.");
         return Number(r.code);
       }
     }

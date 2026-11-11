@@ -5,20 +5,25 @@
 // are fixed by the command line, so the player can't see other hands, act for
 // another seat, or reach files, shell or anything else on the network.
 //
-//   node src/playtest/seat-server.ts <room-url> <token> [moves-file]
+//   node src/playtest/seat-server.ts <room-url> <token> [moves-file] [--expected]
 //
 // The room URL looks like http://localhost:8080/ABCD. With a moves file, every
 // act and say is appended to it with the player's private reason ("why") and
 // what actually happened, so a playtest audit can read why each move was made.
 // Claude Code drops thinking from `claude -p` transcripts, so this is the record.
+// The flags are the seat's Claude player options that change what it sees
+// (src/playtest/players.ts): --expected shows each player's expected production.
 
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import type { EventView, Snapshot } from '../state.ts';
-import { eventLine, seatStatus, seatView } from '../view.ts';
+import { eventLine, seatStatus, seatView, type ViewOptions } from '../view.ts';
+import { MAP_IMAGE_KEY, mapImage } from '../mapimage.ts';
 
-const [roomUrl, token, movesFile] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const [roomUrl, token, movesFile] = argv.filter((a) => !a.startsWith('--'));
+const viewOptions: ViewOptions = { expected: argv.includes('--expected') };
 const m = /^(https?:\/\/[^/]+)\/([A-Za-z]{4})\/?$/.exec(roomUrl ?? '');
 if (!m || !token) {
   console.error('Usage: seat-server.ts <room-url> <token>');
@@ -54,7 +59,7 @@ function record(command: string, why: string | undefined, outcome: string) {
 }
 
 async function act(command: string, why?: string): Promise<string> {
-  const r = await call('/do', { token, command });
+  const r = await call('/do', { token, command, via: 'claude' });
   if (r.error) {
     record(command, why, `not allowed: ${r.error}`);
     return `Not allowed: ${r.error}`;
@@ -63,29 +68,39 @@ async function act(command: string, why?: string): Promise<string> {
   return listen(0, 'Done.');
 }
 
+// A tool's result: plain text, or MCP content blocks (text and images).
+type Content = string | ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
+
 const WHY = { type: 'string', description: 'Private: one or two sentences on why you chose this. No other player ever sees it; it is kept for the people studying the game after it ends.' };
 
 const TOOLS = [
   {
     name: 'view',
-    description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board, recent events, and your options when it is your decision.',
+    description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board as a text map and as a picture, recent events, and your options when it is your decision.',
     inputSchema: { type: 'object', properties: { log: { type: 'number', description: 'How many recent events to include (default 25).' } } },
-    run: async (a: { log?: number }) => {
+    run: async (a: { log?: number }): Promise<Content> => {
       const r = await call(`/state${q({ token })}`);
       if (r.error) return `Error: ${r.error}`;
       await listen(0); // the view shows the recent events: don't repeat them on the next wait
-      return seatView(r as Snapshot, a.log ?? 25);
+      const s = r as Snapshot;
+      const text = seatView(s, a.log ?? 25, viewOptions);
+      // The board as a picture too (#384): the text map's rows don't line up as a hex grid.
+      if (!s.game || !s.you) return text;
+      return [
+        { type: 'text', text: `${text}\n\n${MAP_IMAGE_KEY}` },
+        { type: 'image', data: mapImage(s.game, s.you.seat).toString('base64'), mimeType: 'image/png' },
+      ];
     },
   },
   {
     name: 'act',
-    description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "offer anyone give 1 crystal get 1 timber", "accept o40", "clear 2,-1 d3", "end", "vote 2", "commit d3", "ready", "fight", "bail", "discard c4". Returns what happened and your next options.',
+    description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "offer anyone give 1 crystal get 1 timber", "accept o40", "clear 2,-1 d3", "end", "vote 2", "fight", "fight d3 d5", "hold", "discard c4". Returns what happened and your next options.',
     inputSchema: { type: 'object', properties: { command: { type: 'string' }, why: WHY }, required: ['command', 'why'] },
     run: (a: { command: string; why?: string }) => act(String(a.command ?? ''), a.why),
   },
   {
     name: 'say',
-    description: 'Talk to the table. Without "to", everyone hears it; with "to" (e.g. "P2"), only that player does. Allowed any time, even when it is not your decision. Talk binds no one: only accepted offers do.',
+    description: 'Talk to the table, any time. With "to" (like "P2"), only that player hears it. Promises bind no one; only accepted offers do.',
     inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' }, why: WHY }, required: ['message'] },
     run: (a: { message: string; to?: string; why?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`, a.why),
   },
@@ -125,8 +140,8 @@ async function handle(req: { id?: number | string; method: string; params?: any 
       const tool = TOOLS.find((t) => t.name === req.params?.name);
       if (!tool) return send({ jsonrpc: '2.0', id: req.id, error: { code: -32602, message: `Unknown tool ${req.params?.name}` } });
       try {
-        const text = await (tool.run as (a: any) => string | Promise<string>)(req.params?.arguments ?? {});
-        return reply({ content: [{ type: 'text', text }] });
+        const out = await (tool.run as (a: any) => Content | Promise<Content>)(req.params?.arguments ?? {});
+        return reply({ content: typeof out === 'string' ? [{ type: 'text', text: out }] : out });
       } catch (e) {
         return reply({ content: [{ type: 'text', text: `Error: ${(e as Error).message}` }], isError: true });
       }

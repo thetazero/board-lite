@@ -20,7 +20,7 @@ import { BOT, placesFrom, rate, type RatedGame } from './rating.ts';
 
 const CACHE = join(homedir(), '.cache', 'board-lite');
 
-interface ResultSeat { seat: string; name?: string; model: string; modelId?: string; points?: number; costUsd?: number; tokens?: number }
+interface ResultSeat { seat: string; name?: string; model: string; options?: string[]; modelId?: string; points?: number; costUsd?: number; tokens?: number }
 interface Results { status: string; room?: string; effort?: string; advice?: string; winner: { seat: string } | null; seats: ResultSeat[] }
 
 /** A finished game, ready to rate, with what it cost each AI seat. */
@@ -31,12 +31,18 @@ export interface Played extends RatedGame {
 
 export interface Collected { games: Played[]; skipped: Record<string, number> }
 
-/** Who a results.json seat is on the leaderboard: a model (its effort, if set), a person, or the bot. */
+/**
+ * Who a results.json seat is on the leaderboard: a model with its Claude player
+ * options (and effort, if set), a person, or the bot. A seat's model is its
+ * label, like "opus+expected"; when the runner saw the model the alias ran
+ * ("claude-opus-5-5"), that name stands in for the alias, options kept.
+ */
 export function playerOf(s: ResultSeat, effort?: string): string | null {
   if (s.model === 'bot') return BOT;
   if (s.model.startsWith('player: ')) return person(s.model.slice('player: '.length));
   if (s.model.startsWith('open')) return null;
-  return `${s.modelId ?? s.model}${effort ? ` @${effort}` : ''}`;
+  const name = s.modelId ? [s.modelId, ...(s.options ?? [])].join('+') : s.model;
+  return `${name}${effort ? ` @${effort}` : ''}`;
 }
 
 // People are told apart by the name they joined with, whatever its case.

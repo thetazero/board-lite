@@ -28,6 +28,7 @@ import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Readable, Writable } from 'node:stream';
 import { Room, seatsFile } from '../server/room.ts';
+import { gameLogFile } from '../server/gamelog.ts';
 import { startServer } from '../server/server.ts';
 import { save } from '../store.ts';
 import { NAMES, picked, SCENES, stage, type Shot, type Staged } from './scenes.ts';
@@ -69,6 +70,19 @@ const COVERED = `(() => {
     }
   }
   return [...hits];
+})()`;
+// On any screen, the cards whose cost spills past the card's edge: each chip
+// must sit inside the card's paper. Measured in the card's own layout (offsets,
+// not screen boxes), so a card tilted in the hand counts the same as one lying flat.
+const SPILLS = `(() => {
+  const out = new Set();
+  for (const card of document.querySelectorAll('.card')) {
+    if (!card.offsetWidth) continue;
+    const box = (el) => { let x = 0; for (let e = el; e && e !== card; e = e.offsetParent) x += e.offsetLeft; return [x, x + el.offsetWidth]; };
+    const spilt = [...card.querySelectorAll('.ccost > *, .ccost .chip')].some((el) => { const [l, r] = box(el); return l < -0.5 || r > card.clientWidth + 0.5; });
+    if (spilt) out.add((card.querySelector('.cname')?.textContent ?? '?').trim() + (card.classList.contains('big') ? ' (open)' : ''));
+  }
+  return [...out];
 })()`;
 const FROZEN_NOW = Date.UTC(2026, 0, 1, 20, 0, 0); // the page's clock
 const LAN = { lan: ['192.168.1.20'], tailscale: [] as string[], port: 8080 }; // the address the TV shows
@@ -340,16 +354,17 @@ class Tab {
   // (Shooting the whole page at once stretches the screen to the page's
   // height, and everything sized against the screen grows with it.)
   // Each screen comes with what the phone's hand of cards sits over, if anything (COVERED).
-  async images(device: Device): Promise<{ image: Buffer; covered: string[] }[]> {
+  async images(device: Device): Promise<{ image: Buffer; covered: string[]; spills: string[] }[]> {
     const shoot = async () => ({
       image: Buffer.from((await this.send('Page.captureScreenshot', { format: 'webp', quality: QUALITY })).data, 'base64'),
       covered: device.mobile ? await this.eval<string[]>(COVERED) : [],
+      spills: await this.eval<string[]>(SPILLS),
     });
     if (!device.mobile) return [await shoot()];
     const [page, screen] = await this.eval<[number, number]>('[document.documentElement.scrollHeight, innerHeight]');
     // A page that scrolls only a sliver (under 24px: padding, nothing more to see) is one screen.
     const n = page - screen < 24 ? 1 : Math.min(MAX_SCREENS, Math.ceil(page / screen));
-    const out: { image: Buffer; covered: string[] }[] = [];
+    const out: { image: Buffer; covered: string[]; spills: string[] }[] = [];
     for (let i = 0; i < n; i++) {
       await this.eval(`scrollTo(0, ${n > 1 ? Math.round(((page - screen) * i) / (n - 1)) : 0})`);
       await this.settle();
@@ -376,7 +391,7 @@ const NEVER = 2 ** 31 - 1;
 function makeRoom(staged: Staged, code: string): Room {
   const file = join(CACHE, 'rooms', `${code}.json`);
   // A fresh room: not the game or the seats an earlier run left under this code.
-  for (const f of [file, seatsFile(file)]) rmSync(f, { force: true });
+  for (const f of [file, seatsFile(file), gameLogFile(file)]) rmSync(f, { force: true });
   const { scene } = staged;
   const names = scene.names ?? NAMES;
   // A finished game's recap: dated by the page's frozen clock, with an id that's the same every run.
@@ -396,6 +411,7 @@ function makeRoom(staged: Staged, code: string): Room {
   }
   // Seats count as here unless the scene says they've gone quiet.
   room.seats.forEach((s, i) => (s.seen = scene.away?.includes(i) || s.kind === 'open' ? 0 : Number.MAX_SAFE_INTEGER));
+  if (scene.saved) room.savedAt = FROZEN_NOW - 90 * 60 * 1000;
   room.changed();
   return room;
 }
@@ -477,7 +493,8 @@ async function main() {
     return;
   }
 
-  const { server, rooms } = startServer(0, { recaps: join(CACHE, 'recaps') });
+  // (A room a TV makes here, opening /tv, stays in the shots' own folder.)
+  const { server, rooms } = startServer(0, { dir: join(CACHE, 'rooms'), recaps: join(CACHE, 'recaps') });
   await new Promise<void>((ok) => (server.listening ? ok() : server.on('listening', () => ok())));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const chrome = await launchChrome();
@@ -492,6 +509,7 @@ async function main() {
   }
   const done: Done[] = [];
   const covered: string[] = []; // phone screens where the hand sits over the page
+  const spills: string[] = []; // screens where a card's cost spills past its edge
   let failures = 0;
   try {
     const cdp = chrome.cdp;
@@ -502,7 +520,7 @@ async function main() {
       const room = makeRoom(st, code);
       rooms.set(code, room);
       for (const shot of shots) {
-        const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? TV : PHONE];
+        const own: [string, Device] = ['', shot.client === 'tv' && !shot.table ? (shot.window ? { ...TV, width: shot.window[0], height: shot.window[1] } : TV) : PHONE];
         const sizes = [own, ...otherSizes(shot, everySize)];
         // Its taps can still change the room (Leave takes the seat away): each size starts from the room as it was.
         const before = sizes.length > 1 ? keep(room) : null;
@@ -515,6 +533,9 @@ async function main() {
             let url: string;
             if (shot.table) {
               url = `${base}/tv?room=${code}&remote&n=${n++}`;
+            } else if (shot.client === 'tv' && shot.path) {
+              url = `${base}${typeof shot.path === 'function' ? shot.path(room) : shot.path}?n=${n++}`;
+              tab.info = LAN;
             } else if (shot.client === 'tv') {
               url = `${base}/tv?room=${code}&n=${n++}`;
               if (!shot.guest) storage[`tv:${code}`] = room.hostToken; // the TV that made the room: its buttons work
@@ -528,7 +549,11 @@ async function main() {
             const screenGone = shot.screen ? room.connect(null) : null;
             await tab.load(url, device, { storage, loading: shot.loading });
             // A phone in a game with no TV: its table view has loaded (and so will see what happens next).
-            if (st.scene.remote && st.game && shot.seat !== undefined) await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
+            if (st.scene.remote && st.game && shot.seat !== undefined) {
+              await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.querySelector('#app .board')`, 'the table view to load');
+              // As at a real table, three.js is in before the fight, so its figures are folded, not flat.
+              await tab.waitFor(`document.querySelector('.tableview iframe')?.contentDocument?.body.classList.contains('folded')`, 'the table view to load its 3D', 30000);
+            }
             if (shot.live) {
               room.mutate((g) => st.scene.live!(g, st.rng));
               await sleep(100);
@@ -563,8 +588,9 @@ async function main() {
               if (!shot.loading) await tab.settle();
               const images = await tab.images(device);
               let changed: boolean | null = null;
-              images.forEach(({ image, covered: c }, i) => {
+              images.forEach(({ image, covered: c, spills: sp }, i) => {
                 if (c.length) covered.push(`${imageName(name, i)}: ${c.join(', ')}`);
+                if (sp.length) spills.push(`${imageName(name, i)}: ${sp.join(', ')}`);
                 const before = join(prev, imageName(name, i));
                 const differs = existsSync(before) ? !readFileSync(before).equals(image) : existsSync(prev) ? true : null;
                 // The same as last time: the same file, not a second copy of it.
@@ -601,6 +627,7 @@ async function main() {
   console.log(`Contact sheet: file://${join(out, 'index.html')}`);
   if (done.some((d) => d.changed !== null)) console.log(changed.length ? `Changed since the previous run (*): ${changed.length}` : 'Nothing changed since the previous run.');
   if (covered.length) console.log(`\nThe hand of cards sits over the page on ${covered.length} phone screen(s):\n${covered.map((c) => `  ${c}`).join('\n')}`);
+  if (spills.length) console.log(`\nA card's cost spills past its edge on ${spills.length} screen(s):\n${spills.map((c) => `  ${c}`).join('\n')}`);
   if (failures) {
     console.error(`${failures} screenshot(s) failed.`);
     process.exitCode = 1;

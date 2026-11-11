@@ -62,7 +62,7 @@ Options: `--since 2026-11-01` counts only games that ended on or after a date. U
 
 ### Who's who
 
-- A **model** is the model a Claude seat reported running (`claude-opus-5-5`), or the name it was given (`opus`) for games from before that was recorded; Codex seats are `codex:<model>`. An `--effort` other than the model's own is part of the name (`claude-opus-5-5 @high`): a model at another effort is another player.
+- A **model** is the model a Claude seat reported running (`claude-opus-5-5`), or the name it was given (`opus`) for games from before that was recorded; Codex seats are `codex:<model>`. A seat's [player options](playtest.md#claude-player-options) are part of the name (`claude-opus-5-5+expected`), and so is an `--effort` other than the model's own (`claude-opus-5-5 @high`): a model with other options or at another effort is another player.
 - A **person** is the name they joined with, whatever the case. Join with the same name every time to keep one rating. A player who quit partway (a bot finished for them) isn't rated for that game.
 - `bot` is the random bot (`src/bot.ts`), the same in playtests and on `npm run serve`.
 

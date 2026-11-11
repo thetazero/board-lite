@@ -2,10 +2,10 @@
 // seatState is one player's hidden state and choices (their phone). Like
 // view.ts, nothing hidden from a player ever goes into their state.
 
-import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type DragonDef, type Resource } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BEASTS, FAUNA, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, ELEMENT_BEATS, ELEMENT_WEAK, PRODUCTION_CLASSES, RESOURCES, faunaDef, STAGE_NAMES, TARGETING_TEXT, TARGETS, TERRAIN_NOUN, TUNING, UNITS, UPGRADES, combatPower, orList, targetPower, type BasicResource, type BuildingDef, type Bundle, type UpgradeDef, type DragonDef, type Resource } from './data.ts';
 import {
-  type GameEvent, TITLE_NAMES, acceptProblem, afford, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
-  onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
+  type GameEvent, TITLE_NAMES, acceptProblem, afford, autoClearTargets, offerFor, bankRates, besideText, blocked, buildingClass, buildingYield, buildableHexes, canAfford, canRaid, canVote, NO_VOTE, votePower, cardCost, cardKind, cardName, dragonCapacity, dragonPower, faunaHexes, faunaLoot, huntable, lootOf,
+  madeResource, onPeak, perCount, perchHexes, perchedOn, production, score, specialProjectCost, PROJECT_UPGRADES, standings, stageStats, titleValues, turnOrder, upgradeTargets, waitingOn,
   type BuildingYield, type Card, type Die, type Dragon, type Game, type Standing, type TradeSide, type Title,
 } from './engine.ts';
 import { PEAK, nearBeast, neighbors } from './map.ts';
@@ -17,12 +17,13 @@ export interface HexView {
   q: number;
   r: number;
   terrain: string;
-  building: { type: string; cls: string; name: string; owner: number; upgrade: string | null /* its key in UPGRADES */; upgradeName: string | null; floors: number; does: BuildingDoes } | null;
+  building: { type: string; cls: string; name: string; owner: number; upgrades: string[] /* keys in UPGRADES */; upgradeName: string | null /* "Workshop", "2 Workshops" */; floors: number; does: BuildingDoes } | null;
   fauna: FaunaView | null; // a beast holding the hex: nothing is built there, and a building under it produces nothing
-  perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it makes nothing while one is there
-  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain
+  perched: { d: string; owner: number; element: string }[]; // the dragons perched on its building (id, owner, element): it's suppressed while one is there
+  held?: string; // next to this great beast (a BEASTS key): nothing is built here until it is slain, and a building here is suppressed
+  suppressed?: true; // its building is suppressed (a beast on it or holding it, or a perched dragon): it counts as if it weren't there
   peak?: 'held' | 'free'; // the Thunderbird's peak
-  peakZone?: boolean; // on or next to the freed peak: a production building here makes more
+  peakZone?: number; // on or next to the freed peak: a production building here makes this many more each round
 }
 
 // What a building does each round on its hex (engine's buildingYield), with,
@@ -31,6 +32,9 @@ export interface HexView {
 // goes on it.
 export interface BuildingDoes extends BuildingYield {
   note?: string;
+  // Placing a building on or next to the freed peak (doesIfBuilt): 'more' if
+  // it makes the peak's bonus there, 'none' if it makes no resource to add it to.
+  peak?: 'more' | 'none';
 }
 
 export interface FaunaView extends UnitView {
@@ -55,6 +59,7 @@ export interface DragonView {
   weak: string[]; // the elements that beat it on the element wheel, as for every fighter
   power: number; // combat power (0 for an egg)
   status: 'ready' | 'egg' | 'perched' | 'out'; // out: knocked out, at 0 health, until it heals
+  hungry: boolean; // it went hungry at this round's production: it didn't heal or grow
   targeting: string;
   attack: string;
   key: string; // its card, for the card's art
@@ -79,19 +84,18 @@ export interface TargetView {
   units: UnitView[];
   loot: Res;
   power: number; // the defenders' combat power, summed
-  points?: number; // what it scores, when it falls, for the most power still fighting
+  points?: number; // what it scores, when it falls, for the most power standing
 }
 
 export interface RaidView {
-  step: 'vote' | 'commit' | 'bail';
+  step: 'vote' | 'choose';
   candidates: TargetView[];
   votes: (number | null)[]; // each player's vote (a candidate's index), public as it's cast
   voters: boolean[]; // who votes: only players with a raid-ready dragon
   votePower: number[]; // what each player's vote is worth: their raid-ready dragons' combat power, summed (0 for no vote)
   target: TargetView | null; // units carry current health once the fight starts
-  commits: string[][];
-  ready: boolean[];
-  decided: boolean[]; // fight-or-bail chosen (not what)
+  sent: string[][]; // each player's dragons in the raid, once the vote ends: all their raid-ready dragons
+  decided: boolean[]; // chosen which dragons fight (not which)
   fighting: boolean[]; // players still in the fight, once it starts
   fighters: string[];
 }
@@ -116,7 +120,7 @@ export interface PublicState {
   faunaWanderOdds: number; // in production, each beast but a great one moves with a 1 in this chance
   faunaSpreadWeight: number; // a moving beast is this many times as likely to pick a hex beside no other beast
   waitingOn: number[];
-  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; raids: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; bankRates: Record<BasicResource, number> }[];
+  players: { publicPoints: number; buildings: number; monuments: number; titles: number; beasts: number; raids: number; handSize: number; gold: number; production: Record<string, { base: number; dice: number[] }>; lastMade: { round: number; total: number } | null; bankRates: Record<BasicResource, number> }[];
   titles: { key: Title; name: string; holder: number | null; values: number[]; min: number }[];
   // The great beasts: where each is (or was), and who slew it.
   beasts: { key: string; name: string; hex: string | null; slainBy: number | null; points: number; hp: number; weak: string[] }[];
@@ -157,7 +161,7 @@ export interface CardView {
   cls?: string; // building cards: the building's class (art falls back to the class's)
   element?: string; // dragon cards: the dragon's element, for the card's art
   fauna?: FaunaView; // fauna cards: the beast it sends
-  after?: Record<string, BuildingDoes>; // upgrade cards: what each of `hexes` would do with it
+  after?: Record<string, BuildingDoes>; // upgrade cards: what each of `hexes` would do with it; building cards: what it would do built there
   dragon?: { growth: number; targeting: string; stages: DragonStageView[] }; // dragon cards: growth steps per stage, how it picks targets, hatchling/young/adult stats
 }
 
@@ -180,16 +184,20 @@ export interface SeatState {
   handCap: number;
   myTurn: boolean;
   deciding: boolean;
-  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; onTower: boolean; why: string | null }[]; // built without a card
+  basics: { key: string; cls: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes> /* what it would do on each of `hexes` */; onTower: boolean; why: string | null }[]; // built without a card
   eggProject: { cost: Res; affordable: boolean; elements: string[]; room: boolean; why: string | null };
-  raidReady: string[]; // my dragons that can be committed to a raid, or sent against fauna on my turn
+  // Upgrades added without the card, as a special project (the Workshop): on
+  // which of your buildings, and what each would do with it.
+  upgradeProjects: { key: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes>; why: string | null }[];
+  raidReady: string[]; // my dragons that can raid, or be sent against fauna on my turn
   huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
+  autoClear: string[]; // my buildings auto clear would clear, weakest first: under fauna (not a great beast) or rivals' perched dragons
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
   perched: string[]; // my perched dragons, to recall
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
-  myChoice: 'fight' | 'bail' | null;
+  myFight: string[] | null; // the dragons I chose to fight with in this raid ([]: I hold back), once chosen
   log: EventView[]; // private events for me
   talk: EventView[]; // talk I can see: everyone's public talk, and private messages to or from me
 }
@@ -209,7 +217,7 @@ function dragonView(g: Game, d: Dragon): DragonView {
   return {
     id: d.id, owner: d.owner, name: def.name, element: def.element, stage: d.stage, stageName: STAGE_NAMES[d.stage],
     growth: d.growth, growthTime: def.growthTime, hp: st ? st.hp - d.damage : 0, maxHp: st ? st.hp : 0,
-    canRaid: canRaid(d), perch: d.perch ?? null, weak: ELEMENT_WEAK[def.element], power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
+    canRaid: canRaid(d), perch: d.perch ?? null, hungry: !!d.hungry, weak: ELEMENT_WEAK[def.element], power: dragonPower(d), status, targeting: TARGETING_TEXT[def.targeting], attack: st ? attackText(st) : '',
     key: d.key, stages: stageViews(def),
   };
 }
@@ -260,6 +268,14 @@ export function visibleEvents(g: Game, p: number, since = 0): EventView[] {
   return events(g, (e) => !e.to || e.to.includes(p), Infinity, since);
 }
 
+// What a player's production made at its latest roll, every resource added up
+// (before their dragons eat), and the round it was: null before the first.
+function lastMade(g: Game, p: number): { round: number; total: number } | null {
+  const e = g.log.findLast((x) => x.ev?.k === 'produce' && x.ev.p === p);
+  if (e?.ev?.k !== 'produce') return null;
+  return { round: e.round, total: Object.values(e.ev.got).reduce((a: number, b) => a + (b ?? 0), 0) };
+}
+
 export function publicState(g: Game, logLines = 60): PublicState {
   const n = g.players.length;
   const raid = g.raid;
@@ -276,7 +292,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
     waitingOn: waitingOn(g),
     players: g.players.map((pl, p) => {
       const s = score(g, p);
-      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, raids: s.raids, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), bankRates: bankRates(g, p) };
+      return { publicPoints: s.public, buildings: s.buildings, monuments: s.monuments, titles: s.titles, beasts: s.beasts, raids: s.raids, handSize: pl.hand.length, gold: pl.resources.gold, production: production(g, p), lastMade: lastMade(g, p), bankRates: bankRates(g, p) };
     }),
     titles: (Object.keys(TITLE_NAMES) as Title[]).map((t) => ({ key: t, name: TITLE_NAMES[t], holder: g.titles[t], values: titleValues(g, t), min: TUNING.titleMinimum[t] })),
     beasts: Object.entries(BEASTS).map(([key, x]) => ({
@@ -286,11 +302,12 @@ export function publicState(g: Game, logLines = 60): PublicState {
     map: Object.entries(g.map).map(([k, h]) => {
       const b = g.buildings[k];
       return {
-        ...(!h.fauna && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
+        ...(!(h.fauna && BEASTS[h.fauna]) && h.terrain !== 'ocean' && nearBeast(g.map, k) ? { held: neighbors(k).map((n) => g.map[n]?.fauna).find((f) => f && BEASTS[f]) } : {}),
         ...(k === PEAK ? { peak: h.fauna ? 'held' as const : 'free' as const } : {}),
-        ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: true } : {}),
+        ...(h.terrain !== 'ocean' && onPeak(g, k) ? { peakZone: TUNING.peakBonus } : {}),
+        ...(b && blocked(g, k) ? { suppressed: true as const } : {}),
         k, q: h.q, r: h.r, terrain: h.terrain,
-        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrade: b.upgrade, upgradeName: b.upgrade ? UPGRADES[b.upgrade].name : null, floors: b.floors, does: buildingDoes(g, k) } : null,
+        building: b ? { type: b.type, cls: buildingClass(b)[0], name: b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name, owner: b.owner, upgrades: b.upgrades, upgradeName: upgradeNames(b.upgrades), floors: b.floors, does: buildingDoes(g, k) } : null,
         fauna: h.fauna ? faunaView(h.fauna, faunaLoot(g, k)) : null,
         perched: perchedOn(g, k).map((d) => ({ d: d.id, owner: d.owner, element: DRAGONS[d.key].element })),
       };
@@ -304,8 +321,7 @@ export function publicState(g: Game, logLines = 60): PublicState {
       voters: Array.from({ length: n }, (_, p) => canVote(g, p)),
       votePower: Array.from({ length: n }, (_, p) => votePower(g, p)),
       target: raid.target ? targetView(g, raid.target, raid.units.length ? raid.units.map((u) => u.hp) : undefined) : null,
-      commits: raid.commits,
-      ready: raid.ready,
+      sent: raid.sent,
       decided: raid.choices.map((c) => c !== null),
       fighting: Array.from({ length: n }, (_, p) => raid.fighters.some((id) => g.dragons.find((d) => d.id === id)!.owner === p)),
       fighters: raid.fighters,
@@ -320,11 +336,31 @@ export function publicState(g: Game, logLines = 60): PublicState {
   };
 }
 
-function buildingDoes(g: Game, k: string, upgrade?: string): BuildingDoes {
+// A building's upgrades, named and counted: "Workshop", "2 Workshops".
+function upgradeNames(ups: string[]): string | null {
+  const keys = [...new Set(ups)];
+  return keys.map((u) => {
+    const n = ups.filter((x) => x === u).length, name = UPGRADES[u].name;
+    return n === 1 ? name : `${n} ${name.endsWith('s') ? name : `${name}s`}`;
+  }).join(', ') || null;
+}
+
+function buildingDoes(g: Game, k: string, upgrades?: string[]): BuildingDoes {
   const b = g.buildings[k];
   const def = b.type === 'tower' ? null : BUILDINGS[b.type];
   const note = def && (def.growthBonus || def.bankRate) ? def.text : undefined;
-  return { ...buildingYield(g, k, upgrade), ...(note ? { note } : {}) };
+  return { ...buildingYield(g, k, upgrades), ...(note ? { note } : {}) };
+}
+
+// What a building of `type` would do built by seat p at each of `hexes`: what
+// the phone shows for a hex before the building goes on it (#366).
+function doesIfBuilt(g: Game, p: number, type: string, hexes: string[]): Record<string, BuildingDoes> {
+  const def = BUILDINGS[type];
+  return Object.fromEntries(hexes.map((k) => {
+    const there: Game = { ...g, buildings: { ...g.buildings, [k]: { type, owner: p, upgrades: [], floors: 0 } } };
+    const peak = onPeak(g, k) ? (madeResource(def) ? 'more' as const : 'none' as const) : undefined;
+    return [k, { ...buildingDoes(there, k), ...(peak ? { peak } : {}) }];
+  }));
 }
 
 // A card as a seat sees it, with what playing it now needs and, if it can't
@@ -346,24 +382,24 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
     const hexes = b.onTower ? [] : buildableHexes(g, p, c.key);
     const text = placeText(b);
     const counts = b.per ? Object.fromEntries(hexes.map((k) => [k, perCount(g, k, b, p)])) : undefined;
-    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), blocked: !b.onTower && !hexes.length ? noHex(b) : null };
+    return { ...base, text, cls: b.class, needs: b.onTower ? 'none' : 'hex', hexes, ...(counts ? { counts } : {}), after: doesIfBuilt(g, p, c.key, hexes), blocked: !b.onTower && !hexes.length ? noHex(b) : null };
   }
   if (kind === 'upgrade') {
     const u = UPGRADES[c.key];
     const hexes = upgradeTargets(g, p, c.key);
-    const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, c.key)]));
-    return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : `You have no ${orList(u.appliesTo.map((c) => CLASS_NAMES[c]))} without an upgrade.` };
+    const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, c.key])]));
+    return { ...base, text: u.text, needs: 'hex', hexes, after, blocked: hexes.length ? null : noUpgradeHex(u) };
   }
   if (kind === 'dragon') {
     const d = DRAGONS[c.key];
     const full = mine.length >= dragonCapacity(g, p);
     const adult = d.stages[2];
-    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon, hatches as an egg, grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. As an adult: ${adult.hp} health, attacks ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
+    const text = `${d.element[0].toUpperCase()}${d.element.slice(1)} dragon. Hatches as an egg and grows every ${d.growthTime} step${d.growthTime > 1 ? 's' : ''}. Adult: Health ${adult.hp}, Attack ${attackText(adult)}; ${TARGETING_TEXT[d.targeting]}.`;
     const dragon = { growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) };
     return { ...base, text, element: d.element, dragon, needs: 'none', blocked: full ? NO_ROOM : null };
   }
   const a = ACTIONS[c.key];
-  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'Keep this card in your hand to score its points.' };
+  if (a.effect === 'hidden_point') return { ...base, text: a.text, needs: 'unplayable', blocked: 'It’s never played.' };
   if (a.effect === 'gain_resource') return { ...base, text: a.text, needs: 'resource' };
   if (a.effect === 'grow_dragon') {
     const ids = mine.filter((d) => d.stage < 3).map((d) => d.id);
@@ -378,6 +414,7 @@ function cardOptions(g: Game, p: number, c: Card): Omit<CardView, 'verb' | 'why'
 }
 
 const NO_ROOM = 'No room for another dragon: build a roost first.';
+const noUpgradeHex = (u: UpgradeDef) => `You have no ${PRODUCTION_CLASSES.every((c) => u.appliesTo.includes(c)) ? 'production building' : orList(u.appliesTo.map((c) => CLASS_NAMES[c]))}.`;
 const noHex = (b: BuildingDef) => `No empty ${b.terrain ? TERRAIN_NOUN[b.terrain] : 'land hex'} is adjacent to your buildings${b.beside ? ` and to ${besideText(b.beside)}` : ''}.`;
 // A building's card text, plus where it must go.
 const placeText = (b: BuildingDef) => `${b.text}${b.terrain ? ` Build on a ${TERRAIN_NOUN[b.terrain]}.` : ''}${b.beside ? ` Build adjacent to ${besideText(b.beside)}.` : ''}`;
@@ -387,10 +424,11 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const s = score(g, p);
   const raid = g.raid;
   const housed = g.dragons.filter((d) => d.owner === p).length;
-  const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
+  const eggCost = specialProjectCost('egg', DRAGONS.fire_whelp.cost);
   const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
   const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, eat: 0, blocked: shut.has(r) }])) as SeatState['income'];
-  income.livestock.eat = housed * TUNING.livestockPerDragon;
+  // Eggs don't eat (#415): an egg that hatches at the next production eats from the one after.
+  income.livestock.eat = g.dragons.filter((d) => d.owner === p && d.stage > 0).length * TUNING.livestockPerDragon;
   return {
     seat: p,
     resources: { ...pl.resources },
@@ -409,17 +447,25 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
       const b = BUILDINGS[k];
       const hexes = buildableHexes(g, p, k);
       const why = (!b.onTower && !hexes.length ? noHex(b) : null) ?? afford(pl, b.cost);
-      return { key: k, cls: b.class, name: b.name, text: placeText(b), cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, onTower: !!b.onTower, why };
+      return { key: k, cls: b.class, name: b.name, text: placeText(b), cost: res(b.cost), affordable: canAfford(pl, b.cost), hexes, after: doesIfBuilt(g, p, k, hexes), onTower: !!b.onTower, why };
     }),
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
+    upgradeProjects: PROJECT_UPGRADES.map((key) => {
+      const u = UPGRADES[key];
+      const cost = specialProjectCost('upgrade', u.cost);
+      const hexes = upgradeTargets(g, p, key);
+      const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, key])]));
+      return { key, name: u.name, text: u.text, cost: res(cost), affordable: canAfford(pl, cost), hexes, after, why: (hexes.length ? null : noUpgradeHex(u)) ?? afford(pl, cost) };
+    }),
     raidReady: g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id),
     huntable: huntable(g, p),
+    autoClear: autoClearTargets(g, p),
     perchable: perchHexes(g, p),
     perched: g.dragons.filter((d) => d.owner === p && d.perch).map((d) => d.id),
     cantAccept: Object.fromEntries(g.offers.filter((o) => offerFor(o, p)).flatMap((o) => { const why = acceptProblem(g, o, p); return why ? [[o.id, why]] : []; })),
     myVote: raid?.votes[p] ?? null,
     whyNoVote: raid?.step === 'vote' && !canVote(g, p) ? NO_VOTE : null,
-    myChoice: raid?.choices[p] ?? null,
+    myFight: raid?.choices[p] ?? null,
     log: events(g, (e) => !!e.to?.includes(p) && !isTalk(e.text), logLines),
     talk: events(g, (e) => isTalk(e.text) && (!e.to || e.to.includes(p)), 40),
   };
@@ -432,6 +478,7 @@ export interface Lobby {
   code: string;
   started: boolean;
   seating: boolean; // a saved game hosted again, waiting in the lobby until every seat is taken
+  saved: number | null; // when someone at the table saved the game (ms epoch): it waits until someone continues it
   // standIn: a bot makes this player's moves (they quit: left, or they're away).
   seats: { name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean }[];
   minPlayers: number;
@@ -440,11 +487,24 @@ export interface Lobby {
   remote: boolean; // no TV: a phone made the room, and each phone shows the table itself
 }
 
+/** A saved game, as the TV's lobby and the phone's join form list it (GET /api/saved). */
+export interface SavedGame {
+  code: string;
+  savedAt: number; // ms epoch
+  round: number;
+  names: string[]; // everyone at the table, in seat order
+}
+
 export interface Snapshot {
   lobby: Lobby;
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
   scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
+  // How many times the room has changed when this was taken: a later snapshot
+  // has a higher one, so a phone can tell the answer to its own tap from an
+  // older push arriving after it (#456). Counted from the server's start, so
+  // only snapshots on the same stream compare. Absent where no room made it.
+  v?: number;
   recap?: string | null; // once the game is over: its recap's id (/recap/<id>, src/recap.ts)
   you: (SeatState & { name: string }) | null;
 }
@@ -457,20 +517,23 @@ export interface RecapStanding {
   tied: boolean;
   tiebreak: 'gold' | 'turn order' | null;
   total: number;
-  buildings: number;
+  buildings: number; // every building's points, monuments included
+  monuments?: number; // the monument cards' share of those (absent in recaps from before #461)
   titles: number;
   beasts: number; // great beasts slain
   raids: number; // kingdoms that score, taken
   hidden: number; // Secret Hoard cards in hand
 }
 
-// What happened that's worth telling, by round. Titles only when the holder
-// at a round's end differs from the round before (they can change hands
-// several times in a round); kingdoms only when they fall.
+// What happened that's worth telling, by round: the game's turning points,
+// not its routine. Titles only when the holder at a round's end differs from
+// the round before (they can change hands several times in a round); great
+// beasts when slain; a kingdom's fall only when it scores points or is the
+// strongest kingdom to fall yet (recaps from before #375 have every fall).
 export type Moment = { round: number } & (
   | { k: 'title'; t: Title; name: string; p: number }
   | { k: 'beast'; p: number; key: string; name: string; points: number }
-  | { k: 'fall'; name: string; ps: number[]; points?: number; scorer?: number } // scorer: who took a scoring kingdom's points
+  | { k: 'fall'; name: string; ps: number[]; points?: number; scorer?: number; times?: number } // scorer: who took a scoring kingdom's points; times: how often it fell that round to them, if more than once
 );
 
 export interface Recap {
@@ -481,6 +544,8 @@ export interface Recap {
   pointsToWin: number;
   names: string[]; // by seat; the colours are the seats'
   race: number[][]; // everyone's points at the start (0) and after each round; the last row has cards in hand too
+  power?: number[][]; // everyone's dragon power at the start (0) and after each round (absent in recaps from before it)
+  made?: number[][]; // [round-1]: the resources everyone's production made at the start of each round (absent in recaps from before it)
   standings: RecapStanding[];
   moments: Moment[];
 }
@@ -491,7 +556,7 @@ export interface Recap {
 export interface BookBuilding { key: string; name: string; cls: string; text: string; cost: Res; terrain?: string; basic: boolean }
 export interface Rulebook {
   buildings: BookBuilding[]; // the basic buildings, then the building cards
-  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */ }[];
+  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */; base: boolean /* also a special project */ }[];
   actions: { key: string; name: string; text: string; cost: Res; fauna?: FaunaView }[];
   dragons: { key: string; name: string; element: string; cost: Res; base: boolean; growth: number; targeting: string; stages: DragonStageView[] }[];
   fauna: FaunaView[];
@@ -511,7 +576,7 @@ export function rulebook(): Rulebook {
   };
   return {
     buildings: [...BASIC_BUILDINGS, ...Object.keys(BUILDINGS).filter((k) => !BUILDINGS[k].basic)].map(building),
-    upgrades: Object.entries(UPGRADES).map(([key, u]) => ({ key, name: u.name, text: u.text, cost: res(u.cost), on: u.appliesTo })),
+    upgrades: Object.entries(UPGRADES).map(([key, u]) => ({ key, name: u.name, text: u.text, cost: res(u.cost), on: u.appliesTo, base: !!u.base })),
     actions: Object.entries(ACTIONS).map(([key, a]) => ({ key, name: a.name, text: a.text, cost: res(a.cost), ...(a.fauna ? { fauna: faunaView(a.fauna, {}) } : {}) })),
     dragons: Object.entries(DRAGONS).map(([key, d]) => ({ key, name: d.name, element: d.element, cost: res(d.cost), base: !!d.base, growth: d.growthTime, targeting: TARGETING_TEXT[d.targeting], stages: stageViews(d) })),
     fauna: Object.keys(FAUNA).map((k) => faunaView(k)),
@@ -521,7 +586,7 @@ export function rulebook(): Rulebook {
       units: t.units.map((u) => unitView(u)),
     })),
     tower: { makes: res(TUNING.towerProduction), houses: TUNING.towerDragonCapacity },
-    terrains: ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'],
+    terrains: ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor', 'ocean'],
     peakBonus: TUNING.peakBonus,
     faunaWanderOdds: TUNING.faunaWanderOdds,
     elementBeats: ELEMENT_BEATS,

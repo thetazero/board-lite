@@ -31,12 +31,12 @@ export function elementalDamage(dmg: number, by: UnitElement, to: UnitElement): 
   return by !== 'neutral' && ELEMENT_BEATS[by] === to ? dmg * 2 : dmg;
 }
 
-export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'plains', 'harbor', 'ocean'] as const;
+export const TERRAINS = ['mountain', 'forest', 'ley', 'meadow', 'desert', 'harbor', 'ocean'] as const;
 export type Terrain = (typeof TERRAINS)[number];
 // How text names one hex of a terrain ("a mountain hex", "a crystal field hex"). Terrain
 // is a hex, so "meadow hex" can't be read as the building on it (#150).
 export const TERRAIN_NOUN: Record<Terrain, string> = {
-  mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', plains: 'plains hex', harbor: 'harbor hex', ocean: 'ocean hex',
+  mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', desert: 'desert hex', harbor: 'harbor hex', ocean: 'ocean hex',
 };
 // "a, b or c": how card text lists choices.
 export const orList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`);
@@ -47,7 +47,7 @@ export const TUNING = {
   // Each round a player draws this many building cards and keeps one.
   buildingCardsDrawn: 2,
   actionCardsPerRound: 1,
-  startingResources: { stone: 3, timber: 3, crystal: 3, livestock: 3 } as Bundle,
+  startingResources: { stone: 6, timber: 6, crystal: 6, livestock: 6 } as Bundle,
   // The tower produces this every round, no dice.
   towerProduction: { stone: 1, timber: 1, crystal: 1, livestock: 1 } as Bundle,
   bankRate: 4,
@@ -66,10 +66,19 @@ export const TUNING = {
   towerDragonCapacity: 1,
   // Each player's starting base dragon begins at this life stage (0 egg).
   startingDragonStage: 0,
-  // The base-egg special project costs this many times the base dragon card.
-  specialProjectMultiplier: 2,
+  // A special project costs this many times its card: a base egg, or an
+  // upgrade (the Workshop). The Workshop's went from 2 to 3 (#463): late in a
+  // game it was a points dump, 31 added as projects in one 4-player game.
+  specialProjectMultiplier: { egg: 2, upgrade: 3 },
   // The starting map has one fauna for every this many land hexes (src/map.ts).
   landHexesPerFauna: 8,
+  // Fair starts (#424): a start's opportunity in a ring around its tower is
+  // how many of its hexes a basic building can go on. Each other land hex
+  // (desert, harbor) costs 1 of the ring, each ocean hex only this much. The
+  // map is rerolled until, in each of the first this-many rings and in their
+  // total, every start's opportunity is within this share of the average
+  // across starts. The average itself may drift from game to game.
+  fairStart: { rings: 4, oceanCost: 0.7, tolerance: 0.2 },
   // In production, each beast of the fauna (not a great beast) has a 1 in this
   // many chance to move to a random adjacent land hex with no tower or beast.
   faunaWanderOdds: 3,
@@ -183,14 +192,16 @@ export interface UpgradeDef {
   cost: Bundle;
   text: string;
   baseBonus?: number; // more of what the building makes
+  stackBonus?: number; // instead of baseBonus, for each one after the first on the same building (#400)
   dragonCapacity?: number;
   points?: number; // added to the building's
   copies: number;
+  base?: boolean; // also added without the card, as a special project
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, points: 1, text: 'This stone, timber, crystal or livestock building makes 2 more; worth 1 point.', copies: 4 },
-  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This roost, hatchery or tower houses 2 more dragons.', copies: 3 },
+  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, stackBonus: 1, points: 1, text: 'This production building makes 2 more (1 if it already has a Workshop); worth 1 point.', copies: 4, base: true },
+  nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This dragon building houses 2 more dragons.', copies: 3 },
 };
 
 export type ActionEffect = 'gain_resource' | 'gain_gold' | 'grow_dragon' | 'heal_dragon' | 'extra_raid' | 'hidden_point' | 'send_fauna';
@@ -350,7 +361,7 @@ export interface FaunaDef extends UnitDef {
 }
 
 export const FAUNA: Record<string, FaunaDef> = {
-  wolf_pack: { name: 'Wolf Pack', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
+  wolf: { name: 'Wolf', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4 } },
   basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'neutral', loot: { livestock: 4, gold: 2 } },
 };
@@ -377,7 +388,7 @@ export function faunaDef(k: string): FaunaDef {
 
 // On the starting map, a beast's kind goes by its distance to the nearest
 // tower: wolves close in, the basilisk furthest out.
-export const FAUNA_BY_DISTANCE = ['wolf_pack', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
+export const FAUNA_BY_DISTANCE = ['wolf', 'cave_bear', 'basilisk']; // at 2, 3, 4 or more steps
 
 export interface TargetDef {
   name: string;
@@ -410,6 +421,6 @@ export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => 
 
 // Share of each terrain on the generated land. The ocean rings the land, and
 // each of its six coasts has one natural harbor (src/map.ts).
-export const TERRAIN_WEIGHTS: Partial<Record<Terrain, number>> = { mountain: 1, forest: 1, ley: 1, meadow: 1, plains: 1 };
+export const TERRAIN_WEIGHTS: Partial<Record<Terrain, number>> = { mountain: 1, forest: 1, ley: 1, meadow: 1, desert: 1 };
 
 export const STAGE_NAMES = ['egg', 'hatchling', 'young', 'adult'] as const;

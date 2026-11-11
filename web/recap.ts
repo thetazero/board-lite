@@ -6,22 +6,31 @@
 import type { Recap } from '../src/state.ts';
 import { PLAYER_COLORS, esc, playerTag } from './common.ts';
 import { ART_DEFS, winnerScene } from './art.ts';
-import { breakdownHtml, momentsHtml, raceSvg } from './recap-view.ts';
+import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 
 const app = document.getElementById('app')!;
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
+// Points, then dragon power and production, on the same rounds, one under
+// the other. A recap from before power and production were kept has points alone.
+function charts(r: Recap): string {
+  const race = raceSvg(r, { width: 600, height: 400 });
+  const more = [['Dragon power', powerSvg(r, { width: 600, height: 300 })], ['Production', madeSvg(r, { width: 600, height: 300 })]].filter(([, svg]) => svg);
+  if (!more.length) return race;
+  return `<h3>Points</h3>${race}${more.map(([h, svg]) => `<h3>${h}</h3>${svg}`).join('')}`;
+}
+
 function page(r: Recap): string {
   const w = r.standings[0];
   const when = new Date(r.ended).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
-  const tiebreak = w.tiebreak === 'gold' ? 'Wins the tie with the most gold' : w.tiebreak === 'turn order' ? 'Wins the tie by being earliest in turn order' : '';
+  const tiebreak = w.tiebreak === 'gold' ? 'Tie: most gold' : w.tiebreak === 'turn order' ? 'Tie: earliest in turn order' : '';
   const moments = momentsHtml(r);
   return `<div class="sheet" style="--pc:${PLAYER_COLORS[w.p]}">
     ${winnerScene(PLAYER_COLORS[w.p], r.names.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
     <header><h1>${playerTag(w.p, r.names)} wins!</h1>
       <p class="when">${esc(when)} · ${r.names.length} players · ${r.rounds} rounds</p>${tiebreak ? `<p class="when">${tiebreak}</p>` : ''}</header>
     <section><h2>Final scores</h2>${breakdownHtml(r)}</section>
-    <section><h2>How the game went</h2>${raceSvg(r, { width: 600, height: 400 })}</section>
+    <section><h2>How the game went</h2>${charts(r)}</section>
     ${moments ? `<section><h2>What happened</h2>${moments}</section>` : ''}
   </div>`;
 }

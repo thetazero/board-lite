@@ -8,14 +8,21 @@
 // Who sits where is saved beside it (<game>.seats.json: the code, the TV's and
 // each seat's token), so after a restart the room comes back under its own
 // code and every phone, the TV and each CLI player reconnect to their own seat.
+// Someone at the table can save the game partway through (Room.save): it stops
+// for everyone, the server keeps it however long it waits, and anyone at the
+// table picks it up again with Continue, Claude players included
+// (<game>.claude.json says which runners to bring back: src/playtest/run.ts).
+// Everything that happens in the room, timed and with who sent it, also goes
+// to <game>.log.jsonl, for analysis later (src/server/gamelog.ts).
 
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { botMove, standInMove } from '../bot.ts';
 import { RuleError, apply, newGame, waitingOn, type Game } from '../engine.ts';
 import { buildRecap } from '../recap.ts';
+import { GAME, GameLog, type Sender, type Via } from './gamelog.ts';
 import { publicState, seatState, visibleEvents, type EventView, type Lobby, type SeatKind, type Snapshot } from '../state.ts';
 import { load, save, withLock } from '../store.ts';
 import { scenesMs, scenesOf } from '../../web/scenes.ts';
@@ -23,6 +30,10 @@ import { scenesMs, scenesOf } from '../../web/scenes.ts';
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
 export const AWAY_MS = 60000; // a seat with no phone or CLI request for this long is away
+// The table plays with a TV while a TV page watches the room, and goes on
+// without one once the last TV has been gone this long: long enough for a TV
+// to reload or ride out a network blip without the phones switching back and forth.
+export const TV_GONE_MS = 20000;
 export const ROOMS_DIR = join(homedir(), '.cache', 'board-lite', 'rooms');
 // Each finished game's recap (src/recap.ts), kept after its room is gone so
 // its link still opens. The file name is the recap's id.
@@ -44,6 +55,7 @@ export interface Seat {
   // back by joining with its name.
   standIn: boolean;
   left: boolean; // quit: no phone holds the seat any more
+  via?: Via; // what the player last sent from (phone, CLI or a Claude player), for the game log; not saved
 }
 
 // A name as the table shows it: spaces collapsed, no control or invisible
@@ -69,22 +81,44 @@ export interface RoomOptions {
   dir?: string; // defaults to ROOMS_DIR
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
   awayMs?: number; // defaults to AWAY_MS (tests shorten it)
-  remote?: boolean; // no TV: made from a phone, and each phone shows the table itself
+  remote?: boolean; // made with no TV (from a phone or the CLI); whether there's a TV changes as TVs come and go (Room.hasTv)
+  tvGoneMs?: number; // defaults to TV_GONE_MS (tests shorten it)
   recaps?: string; // where finished games' recaps go (recapsDir)
   now?: () => number; // the clock a recap is dated by (the screenshots fix it)
   recapId?: string; // and its id (the screenshots fix it too, so the QR code is the same each run)
+  firstSeat?: number; // who goes first in round 1; random by default (tests fix it)
 }
 
 // What the seats file keeps: enough for every client to reconnect as before.
 interface SavedRoom {
   code: string;
   hostToken: string;
-  remote: boolean;
+  remote: boolean; // no TV, when last saved
+  savedAt?: number; // the game was saved partway through then (ms epoch), to continue later
   seats: Pick<Seat, 'name' | 'token' | 'kind' | 'standIn' | 'left'>[];
 }
 
 /** Where a game file's seats are saved. */
 export const seatsFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.seats.json`;
+
+/** Where a game file's Claude runners are listed: their --out directories, to bring back when a saved game continues. */
+export const claudeFile = (gameFile: string) => `${gameFile.replace(/\.json$/, '')}.claude.json`;
+
+/** The --out directories of the Claude runners that have played in this game (src/playtest/run.ts writes them). */
+export function claudeRunners(gameFile: string): string[] {
+  try {
+    const v = JSON.parse(readFileSync(claudeFile(gameFile), 'utf8'));
+    return Array.isArray(v?.runners) ? v.runners.filter((d: unknown): d is string => typeof d === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A Claude runner playing in this game, so continuing a saved game brings its players back. */
+export function addClaudeRunner(gameFile: string, dir: string) {
+  const runners = claudeRunners(gameFile);
+  if (!runners.includes(dir)) writeFileSync(claudeFile(gameFile), `${JSON.stringify({ runners: [...runners, dir] }, null, 2)}\n`);
+}
 
 function readSaved(file: string): SavedRoom | null {
   try {
@@ -102,10 +136,16 @@ export class Room {
   readonly opts: RoomOptions;
   seats: Seat[] = [];
   lastActive = Date.now();
+  // When someone at the table saved the game (ms epoch), until someone
+  // continues it: nothing moves, and the server keeps the room for good.
+  savedAt: number | null = null;
   private cached: Game | null = null;
+  readonly gameLog: GameLog;
   private botTimer: NodeJS.Timeout | null = null;
   private awayTimer: NodeJS.Timeout | null = null;
   private listeners = new Set<() => void>();
+  private version = 0; // how many times the room has changed (Snapshot.v)
+  private doneIds = new Set<string>(); // the latest commands carried out, by seat and the client's id for them
   private botRng = { state: Date.now() | 0 };
   private savedSeats = '';
   // While a TV is watching, a change that gives it a scene to play (a fight,
@@ -115,6 +155,14 @@ export class Room {
   private screens = 0; // open event streams with no seat: TVs
   private sceneUntil = 0; // ms epoch
   private sceneTimer: NodeJS.Timeout | null = null;
+  // Whether the table plays with a TV: with one, scenes play on it and phones
+  // say to watch it; without, each phone shows the table itself. A TV page
+  // opening the room turns it on, whenever that is (lobby or mid-game); the
+  // last TV staying gone for TV_GONE_MS turns it off. The room's other
+  // screens (a phone's table view, the screenshots) don't count.
+  private tvs = 0; // open event streams from TV pages
+  private hasTv: boolean;
+  private tvTimer: NodeJS.Timeout | null = null;
 
   constructor(code: string, opts: RoomOptions = {}) {
     this.code = code;
@@ -123,10 +171,15 @@ export class Room {
     // Hosted again after a restart: the same TV, the same players in the same seats.
     const saved = readSaved(seatsFile(this.file));
     this.hostToken = saved?.hostToken ?? token();
-    this.opts = saved ? { ...opts, remote: saved.remote } : opts;
+    this.opts = opts;
+    this.hasTv = saved ? !saved.remote : !opts.remote;
     if (saved) this.seats = saved.seats.map((s) => ({ ...s, connected: 0, seen: 0 }));
+    this.savedAt = saved?.savedAt ?? null;
+    this.gameLog = new GameLog(this.file);
     if (existsSync(this.file)) {
       this.cached = load(this.file);
+      const g = this.cached;
+      this.gameLog.write('load', GAME, { code, entries: g.log.length, round: g.round, phase: g.phase, saved: !!this.savedAt, seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, standIn: s.standIn, left: s.left })) });
       // A saved game with no seats file: every seat starts open, and players
       // claim them by joining.
       if (this.seats.length !== this.cached.players.length) {
@@ -134,6 +187,8 @@ export class Room {
       }
     }
     this.saveSeats();
+    // Hosted again with a TV: it has a while to reconnect, like any TV that goes away.
+    if (saved && this.hasTv) this.tvGone();
   }
 
   /** The code a game file was hosted under before, if its seats were saved. */
@@ -141,7 +196,7 @@ export class Room {
     return readSaved(seatsFile(gameFile))?.code ?? null;
   }
 
-  /** Rooms saved in `dir` and active in the last `withinMs`: their codes and game files, to host again after a restart. */
+  /** Rooms saved in `dir` and active in the last `withinMs`, and every saved game however old: their codes and game files, to host again after a restart. */
   static saved(dir = ROOMS_DIR, withinMs = Infinity): { code: string; file: string }[] {
     let names: string[];
     try {
@@ -154,13 +209,13 @@ export class Room {
       const file = join(dir, `${n.slice(0, -'.seats.json'.length)}.json`);
       const saved = readSaved(path);
       const touched = Math.max(statSync(path).mtimeMs, existsSync(file) ? statSync(file).mtimeMs : 0);
-      if (!saved || Date.now() - touched > withinMs) return [];
+      if (!saved || (!saved.savedAt && Date.now() - touched > withinMs)) return [];
       return [{ code: saved.code, file }];
     });
   }
 
   private saveSeats() {
-    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !!this.opts.remote, seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
+    const saved: SavedRoom = { code: this.code, hostToken: this.hostToken, remote: !this.hasTv, ...(this.savedAt ? { savedAt: this.savedAt } : {}), seats: this.seats.map(({ name, token, kind, standIn, left }) => ({ name, token, kind, standIn, left })) };
     const text = JSON.stringify(saved);
     if (text === this.savedSeats) return;
     this.savedSeats = text;
@@ -201,18 +256,20 @@ export class Room {
   }
 
   // The only way the room changes the game: through the engine, then saved.
-  mutate(fn: (g: Game) => void) {
+  // `by` sent it, for the game log, and `fn` returns the command it applied.
+  mutate(fn: (g: Game) => unknown, by: Sender = GAME) {
     const g = this.cached;
-    if (!g) throw new RoomError('The game has not started yet.');
+    if (!g) throw new RoomError("The game hasn't started.");
     const before = g.log.length;
-    fn(g); // apply() leaves the game untouched when it refuses a command
+    const command = fn(g); // apply() leaves the game untouched when it refuses a command
+    this.gameLog.events(g.log, before, by, typeof command === 'string' ? command : undefined);
     withLock(this.file, () => save(this.file, g));
     this.holdForScenes(g.log.slice(before).filter((e) => !e.to));
     this.changed();
   }
 
   private holdForScenes(events: Game['log']) {
-    const ms = this.screens > 0 ? scenesMs(scenesOf(events)) : 0;
+    const ms = this.watched ? scenesMs(scenesOf(events)) : 0;
     if (!ms) return;
     this.sceneUntil = Math.max(Date.now(), this.sceneUntil) + ms;
     this.wakeAfterScene();
@@ -232,16 +289,42 @@ export class Room {
     }, this.sceneLeft() + 1);
   }
 
+  // Someone sees the scenes: a TV or a phone's table view is open, or, with
+  // no TV, a phone is, whose table view opens with the game (the first scene,
+  // the opening round, comes before it can) (#449).
+  private get watched(): boolean {
+    return this.screens > 0 || (!this.hasTv && this.seats.some((s) => s.via === 'phone' && s.connected > 0));
+  }
+
   // How much longer the TV's scene runs (ms); 0 when there's none.
   sceneLeft(): number {
     return Math.max(0, this.sceneUntil - Date.now());
+  }
+
+  // ---- who sent it, for the game log ----
+
+  private sender(p: number): Sender {
+    const s = this.seats[p];
+    if (s.kind === 'bot') return { kind: 'bot', seat: p, name: s.name };
+    return { kind: s.via ?? 'player', seat: p, name: s.name };
+  }
+
+  senderOf(tok: string): Sender {
+    if (tok === this.hostToken) return { kind: 'tv' };
+    const p = this.seats.findIndex((s) => s.token === tok);
+    return p >= 0 ? this.sender(p) : GAME;
+  }
+
+  // A seat's client says what it is (phone, CLI, Claude player) on each request that can change something.
+  private heard(p: number, via?: Via) {
+    if (via && p >= 0) this.seats[p].via = via;
   }
 
   // ---- lobby ----
 
   private cleanName(name: string): string {
     const clean = tidyName(name);
-    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Pick a name.');
+    if (!/[\p{L}\p{N}\p{S}\p{P}]/u.test(clean)) throw new RoomError('Choose a name.');
     if (this.seats.some((s) => s.kind !== 'open' && s.name.toLowerCase() === clean.toLowerCase())) throw new RoomError(`Someone is already called ${clean}: choose another name.`);
     return clean;
   }
@@ -274,29 +357,35 @@ export class Room {
   // name of a seat nobody is at takes it back (a player on a new phone, or
   // after quitting, or someone taking over for a player who left); any other
   // name, or a bot, takes an open seat (in a saved game hosted again).
-  join(name: string, kind: SeatKind = 'player'): Seat {
+  join(name: string, kind: SeatKind = 'player', via?: Via): Seat {
     if (this.game) {
       const typed = tidyName(name).toLowerCase();
       const own = this.seats.find((s) => s.kind === 'player' && s.name.toLowerCase() === typed);
       if (own && kind === 'player') {
         if (this.here(own)) throw new RoomError(`${own.name} is playing on another phone.`);
-        Object.assign(own, { token: token(), standIn: false, left: false, seen: Date.now() });
+        const was = { standIn: own.standIn, left: own.left };
+        Object.assign(own, { token: token(), standIn: false, left: false, seen: Date.now(), via });
+        this.gameLog.write('handover', this.sender(this.seats.indexOf(own)), { seat: this.seats.indexOf(own), back: true, ...was });
         this.changed();
         return own;
       }
       const clean = this.cleanName(name);
       const open = this.seats.find((s) => s.kind === 'open');
-      if (!open) throw new RoomError('That game has already started and every seat is taken.');
+      if (!open) throw new RoomError('The game has started and every seat is taken.');
+      const was = open.name;
       open.name = clean;
       open.kind = kind;
       open.token = token();
+      open.via = via;
+      this.gameLog.write('handover', this.sender(this.seats.indexOf(open)), { seat: this.seats.indexOf(open), was });
       this.changed();
       return open;
     }
     const clean = this.cleanName(name);
     if (this.seats.length >= MAX_PLAYERS) throw new RoomError(`The game is full (${MAX_PLAYERS} players).`);
-    const seat: Seat = { name: clean, token: token(), kind, connected: 0, seen: Date.now(), standIn: false, left: false };
+    const seat: Seat = { name: clean, token: token(), kind, connected: 0, seen: Date.now(), standIn: false, left: false, via };
     this.seats.push(seat);
+    this.gameLog.write(kind === 'bot' ? 'bot' : 'join', this.sender(this.seats.length - 1), { seat: this.seats.length - 1 });
     this.changed();
     return seat;
   }
@@ -310,9 +399,10 @@ export class Room {
 
   // In the lobby a player (or bot) can be removed: before the game starts,
   // their seat goes; in a saved game still taking its seats, it's open again.
-  leave(seatIndex: number) {
+  leave(seatIndex: number, by: Sender = GAME) {
     const s = this.seats[seatIndex];
     if (!s || s.kind === 'open') throw new RoomError('No such player.');
+    if (this.seating || !this.game) this.gameLog.write('leave', by, { seat: seatIndex, name: s.name });
     if (this.seating) Object.assign(s, { name: `P${seatIndex + 1}`, kind: 'open', token: token(), standIn: false, left: false });
     else if (this.game) throw new RoomError('The game has started.');
     else this.seats.splice(seatIndex, 1);
@@ -323,8 +413,10 @@ export class Room {
   // phone no longer holds the seat.
   quit(tok: string) {
     const p = this.playerSeat(tok);
-    if (!this.game || this.seating) return this.leave(p);
+    if (!this.game || this.seating) return this.leave(p, this.sender(p));
     if (this.game.phase === 'over') throw new RoomError('The game is over.');
+    this.gameLog.write('quit', this.sender(p), { seat: p });
+    this.gameLog.write('standIn', GAME, { seat: p, name: this.seats[p].name, why: 'quit' });
     Object.assign(this.seats[p], { token: token(), standIn: true, left: true });
     this.changed();
   }
@@ -337,8 +429,42 @@ export class Room {
     if (!s || s.kind !== 'player') throw new RoomError('No such player.');
     if (s.standIn) return;
     if (this.here(s)) throw new RoomError(`${s.name} is back.`);
+    this.gameLog.write('standIn', this.senderOf(tok), { seat, name: s.name, why: 'away', seen: s.seen || null });
     s.standIn = true;
     this.changed();
+  }
+
+  // ---- saving ----
+
+  // The TV or a player at the table saves the game partway through: it stops
+  // where it is, for everyone (bots and Claude players too), until someone
+  // continues it. Everyone can leave; the server keeps it however long it waits.
+  save(tok: string) {
+    this.atTable(tok);
+    const g = this.game;
+    if (!g || this.seating) throw new RoomError("The game isn't under way.");
+    if (g.phase === 'over') throw new RoomError('The game is over.');
+    if (this.savedAt) return;
+    this.gameLog.write('save', this.senderOf(tok), { round: g.round, phase: g.phase, entries: g.log.length });
+    this.savedAt = Date.now();
+    this.changed();
+  }
+
+  // Someone at the table picks a saved game up again. True if it was saved
+  // (the server then brings its Claude players back).
+  continue(tok: string): boolean {
+    this.atTable(tok);
+    if (!this.savedAt) return false;
+    this.gameLog.write('continue', this.senderOf(tok), { savedAt: new Date(this.savedAt).toISOString() });
+    this.savedAt = null;
+    this.changed();
+    return true;
+  }
+
+  // The TV, or a player in one of the seats.
+  private atTable(tok: string) {
+    const p = this.seatOf(tok);
+    if (tok !== this.hostToken && (p < 0 || this.seats[p].kind !== 'player')) throw new RoomError('You are not in this game.');
   }
 
   // The TV (host token) or the first player to join can start the game.
@@ -347,12 +473,19 @@ export class Room {
   }
 
   start(tok: string, seed = Date.now()) {
-    if (!this.canStart(tok)) throw new RoomError('Only the TV or the first player can start the game.');
+    if (!this.canStart(tok)) throw new RoomError('Only the TV or the first to join can start the game.');
     if (this.game) throw new RoomError('The game has already started.');
-    if (this.seats.length < MIN_PLAYERS) throw new RoomError(`Need at least ${MIN_PLAYERS} players.`);
+    if (this.seats.length < MIN_PLAYERS) throw new RoomError(`The game needs at least ${MIN_PLAYERS} players.`);
     if (existsSync(this.file)) throw new RoomError(`A game already exists at ${this.file}.`);
-    this.cached = newGame(this.seats.length, seed);
+    this.cached = newGame(this.seats.length, seed, this.opts.firstSeat);
+    this.gameLog.write('start', this.senderOf(tok), { code: this.code, seed, seats: this.seats.map((s, i) => ({ name: s.name, kind: s.kind === 'bot' ? 'bot' : this.sender(i).kind })) });
+    this.gameLog.events(this.cached.log, 0, GAME);
     withLock(this.file, () => save(this.file, this.cached!));
+    // With no TV, each phone's table view plays the opening round's production
+    // (web/tv.ts), and it's held for like any other round's, so the table
+    // view is never behind the server (#449). With a TV, the TV shows it while
+    // the first turn goes on.
+    if (!this.hasTv) this.holdForScenes(this.cached.log.filter((e) => !e.to));
     this.changed();
   }
 
@@ -365,8 +498,19 @@ export class Room {
   // ---- play ----
 
   // A player's command, through the engine.
-  command(tok: string, cmd: string) {
-    this.act(this.playerSeat(tok), cmd);
+  // `id`, when the client gives one, names this one sending of the command: the
+  // same id again is the same tap retried (an answer lost on slow Wi-Fi, a
+  // browser resending), and it's done only once: no repeated action, no
+  // message said twice (#456).
+  command(tok: string, cmd: string, via?: Via, id?: string) {
+    const p = this.playerSeat(tok);
+    this.heard(p, via);
+    const key = id ? `${p} ${id}` : null;
+    if (key && this.doneIds.has(key)) return;
+    this.act(p, cmd);
+    if (!key) return;
+    this.doneIds.add(key);
+    if (this.doneIds.size > 500) this.doneIds.delete(this.doneIds.values().next().value!);
   }
 
   private playerSeat(tok: string): number {
@@ -391,6 +535,7 @@ export class Room {
   // A player a bot was playing for while they were away is back.
   private back(s: Seat) {
     if (!s.standIn || s.left) return;
+    this.gameLog.write('back', this.sender(this.seats.indexOf(s)), { seat: this.seats.indexOf(s) });
     s.standIn = false;
     this.changed();
   }
@@ -411,7 +556,7 @@ export class Room {
       const check = (): boolean => {
         const g = this.game;
         if (g?.phase === 'over') return finish(0);
-        if (g && waitingOn(g).includes(p) && !this.sceneLeft() && !this.seating) return finish(0);
+        if (g && waitingOn(g).includes(p) && !this.sceneLeft() && !this.seating && !this.savedAt) return finish(0);
         return false;
       };
       const finish = (code: number) => {
@@ -445,7 +590,7 @@ export class Room {
       const others = visibleEvents(g, p, since).filter((e) => !e.text.startsWith(`P${p + 1} `));
       if (others.some((e) => / says: "| \(private\): "/.test(e.text))) return true;
       const awaitingAnswer = g.phase === 'action' && g.turn === p && g.offers.some((o) => o.from === p) && !others.length;
-      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft() && !this.seating;
+      return waitingOn(g).includes(p) && !awaitingAnswer && !this.sceneLeft() && !this.seating && !this.savedAt;
     };
     if (timeoutMs <= 0 || ready()) return Promise.resolve(result());
     const left = this.holding(p);
@@ -464,11 +609,16 @@ export class Room {
   }
 
   private act(p: number, cmd: string) {
-    if (!this.game) throw new RoomError('The game has not started yet.');
+    if (!this.game) throw new RoomError("The game hasn't started.");
     if (this.seating) throw new RoomError('The game goes on once every seat is taken.');
+    if (this.savedAt) throw new RoomError('The game is saved: continue it first.');
     try {
-      this.mutate((g) => apply(g, p, cmd));
+      this.mutate((g) => {
+        apply(g, p, cmd);
+        return cmd;
+      }, this.sender(p));
     } catch (e) {
+      this.gameLog.write('refused', this.sender(p), { command: cmd, error: e instanceof Error ? e.message : String(e) });
       if (e instanceof RuleError) throw new RoomError(e.message);
       throw e;
     }
@@ -500,7 +650,7 @@ export class Room {
 
   private scheduleBot() {
     const g = this.game;
-    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.seating) return;
+    if (this.botTimer || !g || g.phase === 'over' || this.abandoned || this.seating || this.savedAt) return;
     if (this.sceneLeft()) {
       if (!this.sceneTimer) this.wakeAfterScene(); // something must end the wait
       return;
@@ -510,16 +660,15 @@ export class Room {
     this.botTimer = setTimeout(() => {
       this.botTimer = null;
       try {
-        if (this.abandoned) return;
+        if (this.abandoned || this.savedAt) return;
         // A scene began while this bot was waiting to move: it moves once the
         // scene is over, when the scene's timer wakes the room.
         if (this.sceneLeft()) return this.scheduleBot();
-        this.mutate((g2) => {
-          const p = waitingOn(g2).find(botPlays);
-          if (p === undefined) return;
-          if (this.seats[p].kind === 'bot') botMove(g2, p, this.botRng);
-          else standInMove(g2, p);
-        });
+        const p = waitingOn(this.game!).find(botPlays);
+        if (p === undefined) return;
+        const bot = this.seats[p].kind === 'bot';
+        const by: Sender = { kind: bot ? 'bot' : 'standIn', seat: p, name: this.seats[p].name };
+        this.mutate((g2) => (bot ? botMove(g2, p, this.botRng) : standInMove(g2, p)), by);
       } catch (e) {
         console.error(`Room ${this.code}: a bot is stuck:`, e);
       }
@@ -533,12 +682,13 @@ export class Room {
       code: this.code,
       started: !!this.game,
       seating: this.seating,
+      saved: this.savedAt,
       // Phones hold a stream open; a CLI player counts as here if it asked anything in the last minute.
       seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left })),
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       file: this.file,
-      remote: !!this.opts.remote,
+      remote: !this.hasTv,
     };
   }
 
@@ -550,6 +700,7 @@ export class Room {
       seat: p,
       game: g ? publicState(g) : null,
       scene: this.sceneLeft(),
+      v: this.version,
       recap: g?.phase === 'over' && existsSync(this.recapFile) ? this.recapId : null,
       you: g && p >= 0 && this.seats[p].kind === 'player' ? { ...seatState(g, p), name: this.seats[p].name } : null,
     };
@@ -560,23 +711,63 @@ export class Room {
     return () => this.listeners.delete(fn);
   }
 
-  connect(tok: string | null): () => void {
+  // A stream with no seat is a screen; `tv` says it's a TV page (not a
+  // phone's table view).
+  connect(tok: string | null, tv = false): () => void {
     if (tok === null) {
       this.screens++;
-      return () => void this.screens--;
+      if (tv) this.tvCame();
+      const screen: Sender = tv ? { kind: 'tv' } : GAME;
+      const what = tv ? 'tv' : 'screen'; // screen: a phone's table view, or the screenshots
+      this.gameLog.write('connect', screen, { what });
+      return () => {
+        this.screens--;
+        if (tv && --this.tvs === 0) this.tvGone();
+        this.gameLog.write('disconnect', screen, { what });
+      };
     }
     const s = this.seats.find((x) => x.token === tok);
     if (!s) return () => {};
+    const p = this.seats.indexOf(s);
+    if (s.kind === 'player') s.via = 'phone'; // only phones hold a stream open
     s.connected++;
+    this.gameLog.write('connect', this.sender(p), { seat: p, streams: s.connected });
     this.back(s);
     this.changed();
     return () => {
       s.connected--;
+      this.gameLog.write('disconnect', this.sender(p), { seat: p, streams: s.connected });
       this.changed();
     };
   }
 
+  /** Whether a TV is watching the room right now (not just a while ago). */
+  get tvWatching(): boolean {
+    return this.tvs > 0;
+  }
+
+  private tvCame() {
+    this.tvs++;
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.tvTimer = null;
+    if (this.hasTv) return;
+    this.hasTv = true;
+    this.changed();
+  }
+
+  private tvGone() {
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.tvTimer = setTimeout(() => {
+      this.tvTimer = null;
+      if (this.tvs > 0 || !this.hasTv) return;
+      this.hasTv = false;
+      this.changed();
+    }, this.opts.tvGoneMs ?? TV_GONE_MS);
+    this.tvTimer.unref();
+  }
+
   changed() {
+    this.version++;
     this.lastActive = Date.now();
     this.saveSeats();
     this.saveRecap(); // once the game is over (also one that ended before recaps were kept)
@@ -588,7 +779,8 @@ export class Room {
     if (this.botTimer) clearTimeout(this.botTimer);
     if (this.sceneTimer) clearTimeout(this.sceneTimer);
     if (this.awayTimer) clearTimeout(this.awayTimer);
-    this.botTimer = this.sceneTimer = this.awayTimer = null;
+    if (this.tvTimer) clearTimeout(this.tvTimer);
+    this.botTimer = this.sceneTimer = this.awayTimer = this.tvTimer = null;
     this.listeners.clear();
   }
 }

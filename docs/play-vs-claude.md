@@ -17,15 +17,23 @@ npm run serve -- --flee-seconds 60
 3. **Claude players:** in the repo on the laptop, with the room code the TV shows (the server's terminal prints this command with the room filled in when the TV opens the room):
 
    ```
-   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus,haiku
+   node src/playtest/run.ts --room http://localhost:8080/ABCD --models opus+expected,haiku+expected
    ```
 
-   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, a full model name, or a Codex model as `codex:<model>`. They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats; bring them back with `--resume` (below).
+   One `--models` entry per Claude player (1 to 5): `opus`, `sonnet`, `haiku`, a full model name, or a Codex model as `codex:<model>`, then its options: `+expected` shows it each player's expected production each round and what they made at the latest roll; without it, the player sees production as dice only. See [Claude player options](playtest.md#claude-player-options). They join the lobby with plain names (Rowan, Quinn, ...) that don't say which model plays which seat, so the Claude players can't tell either; the runner prints which is which. Leave it running: it runs the Claude players until the game ends. Ctrl-C stops them, and the game then waits on their seats; bring them back with `--resume` (below).
 4. **Start:** press **Start game** on the TV (or on the first player's phone). Bots can fill seats too ("Add a bot").
 
 Claude players start the moment the game does. Each is a `claude -p` process of 300 to 400 MB, and they share the machine-wide limit of 6 Claude seats with any playtests running (see [`playtest.md`](playtest.md#how-many-games-run-at-once)). If the slots aren't free, the runner prints `Waiting to start: ...` and only joins the lobby once they are, so wait for the Claude players to show up on the TV before you press Start.
 
-Other `run.ts` options work here too: `--budget-usd` (default $5 per Claude player for the whole game), `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
+Each Claude player may spend up to **$30** over the whole game. That's enough for a full game: in one 14-round game an Opus player had spent $6.80 and the game wasn't over. A player that reaches it stops, and so does the runner (`Finished (P2 hit its budget)`). Change it with `--budget-usd N`. Continuing a saved game keeps the budget the runner had, and counts what each player has already spent.
+
+Other `run.ts` options work here too: `--effort`, `--advice`, `--max-minutes`, `--stall-minutes` (60 by default with `--room`: it stops the Claude players if nothing happens in the game for that long).
+
+## Saving and continuing
+
+**Save game** on the TV or a phone stops the game for everyone, the Claude players too: their runner sees it and stops (its `runner.log` says so). When someone at the table presses **Continue**, the server starts that runner again with `--resume`, and the Claude players come back to their own seats with their memory of the game. Nobody needs a terminal. See [Saving a game](clients.md#saving-a-game).
+
+This works for a runner on the same machine as the server: when it takes its seats, it lists its `--out` directory beside the game (`~/.cache/board-lite/rooms/<code>.claude.json`), and Continue starts every runner listed there. A runner started again this way writes what it does to `runner.log` as usual, and anything it fails on to `runner.errors.log` in the same directory.
 
 ## If the Claude players stop
 

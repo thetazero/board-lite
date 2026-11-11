@@ -1,9 +1,9 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
-import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING } from './data.ts';
+import { ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, ELEMENTS, RESOURCES, TUNING, UPGRADES } from './data.ts';
 import {
-  acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost,
+  acceptProblem, apply, bankRates, offerFor, buildableHexes, canAfford, canRaid, cardCost, cardKind, dragonCapacity, huntable, perchHexes, specialProjectCost, PROJECT_UPGRADES,
   score, upgradeTargets, waitingOn, RuleError, type Game,
 } from './engine.ts';
 import { DRAGONS } from './data.ts';
@@ -57,7 +57,11 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     if (perched.length && next(rng) < 0.3) out.push(`recall ${pick(rng, perched).id}`);
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
-    if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
+    if (roomForDragon && canAfford(pl, specialProjectCost('egg', DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
+    for (const u of PROJECT_UPGRADES) {
+      const t = upgradeTargets(g, p, u);
+      if (t.length && canAfford(pl, specialProjectCost('upgrade', UPGRADES[u].cost))) out.push(`project ${u} ${pick(rng, t)}`);
+    }
     for (const b of shuffle(rng, BASIC_BUILDINGS.slice())) {
       if (b === 'roost' && roomForDragon) continue;
       const hexes = buildableHexes(g, p, b);
@@ -77,11 +81,9 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
   }
   const raid = g.raid!;
   if (raid.step === 'vote') return [`vote ${1 + Math.floor(next(rng) * raid.candidates.length)}`];
-  if (raid.step === 'commit') {
-    const ids = g.dragons.filter((d) => d.owner === p && canRaid(d)).map((d) => d.id);
-    return raid.commits[p].length || next(rng) < 0.2 ? ['ready'] : [`commit ${ids.join(' ')}`, 'ready'];
-  }
-  return [next(rng) < 0.85 ? 'fight' : 'bail'];
+  // Each dragon fights 85% of the time; the rest hold back.
+  const fight = raid.sent[p].filter(() => next(rng) < 0.85);
+  return [fight.length ? `fight ${fight.join(' ')}` : 'hold'];
 }
 
 function isNeighbour(a: string, b: string): boolean {
@@ -142,7 +144,7 @@ export function endingTarget(g: Game, target: number, by = 40): number {
 // table waits on them): as little as possible, so it keeps the game moving
 // without spending their resources, sending their dragons or taking a trade.
 // It answers offers with a decline, ends the turn, keeps the first building
-// card, votes for the first target, sends no dragons, and discards the
+// card, votes for the first target, sends no dragons (or holds back the ones it sent), and discards the
 // oldest cards.
 export function standInCommands(g: Game, p: number): string[] {
   const pl = g.players[p];
@@ -151,8 +153,7 @@ export function standInCommands(g: Game, p: number): string[] {
   if (g.phase === 'discard') return [`discard ${pl.hand.slice(0, pl.hand.length - TUNING.handCap).map((c) => c.id).join(' ')}`];
   const raid = g.raid!;
   if (raid.step === 'vote') return ['vote 1'];
-  if (raid.step === 'commit') return raid.commits[p].length ? ['commit none'] : ['ready'];
-  return ['bail'];
+  return ['hold'];
 }
 
 export function standInMove(g: Game, p: number): string {

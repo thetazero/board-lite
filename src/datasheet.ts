@@ -7,11 +7,11 @@
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import {
-  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TERRAIN_WEIGHTS, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
+  ACTIONS, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENT_BEATS, ELEMENT_WEAK, FAUNA, FAUNA_BY_DISTANCE, RESOURCES, STAGE_NAMES, TARGETS, TERRAINS, TERRAIN_NOUN, TUNING, UNITS, UNIT_ELEMENTS, UPGRADES, avgDamage, combatPower, orList, targetPower,
   type BuildingClass, type Bundle, type Resource,
 } from './data.ts';
-import { besideText, bundleText } from './engine.ts';
-import { mapRadius } from './map.ts';
+import { besideText, bundleText, specialProjectCost } from './engine.ts';
+import { distance, mapRadius, parseKey, terrainCounts, towerSpots } from './map.ts';
 
 
 // ---------- plain numbers ----------
@@ -41,7 +41,7 @@ function economy(): string {
 - Start: ${cost(TUNING.startingResources)}. Tower income: ${cost(TUNING.towerProduction)} a round, no dice.
 - Cards: each round, draw ${TUNING.buildingCardsDrawn} building cards and keep 1, plus ${TUNING.actionCardsPerRound} card from the action deck (action cards and dragons; see Decks); hand cap ${TUNING.handCap}. Basic buildings (${Object.values(BUILDINGS).filter((b) => b.basic).map((b) => b.name).join(', ')}) need no card.
 - Win at ${TUNING.pointsToWin} points. Titles are ${TUNING.titlePoints} points each, from a minimum (see Points).
-- Each dragon eats ${TUNING.livestockPerDragon} livestock a round, eggs included; the tower makes ${TUNING.towerProduction.livestock ?? 0}.
+- Each hatched dragon eats ${TUNING.livestockPerDragon} livestock a round; eggs don't eat. The tower makes ${TUNING.towerProduction.livestock ?? 0}.
 - Gold: no basic building makes it. It comes from raids${goldMakers().length ? `, ${goldMakers().join(', ')}` : ''} and clearing fauna. The merchants don't trade it.
 - Merchants: ${TUNING.bankRate}:1, basic resources only (not gold). With a port, its resource at ${orList([...new Set(Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => `${b.bankRate!.rate}:1`))])}: ${Object.values(BUILDINGS).filter((b) => b.bankRate).map((b) => b.name).join(', ')}.`;
 }
@@ -73,7 +73,7 @@ function production(): string {
     const p = b.produces!;
     return [b.name, terrainName(b.terrain!), cost(b.cost), `${p.base ? `${p.base} + ` : ''}d${p.die} ${p.resource} (avg ${n1(p.base + (p.die + 1) / 2)})`];
   });
-  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round.` : '';
+  const extra = workshop ? `\n\n${workshop.name} (${cost(workshop.cost)}): makes ${workshop.baseBonus} more a round${workshop.stackBonus !== undefined ? `, and each more ${workshop.name} on the same building ${workshop.stackBonus} more` : ''}.${workshop.base ? ` Also added without the card, as a special project, for ${cost(specialProjectCost('upgrade', workshop.cost))}.` : ''}` : '';
   return `## Basic production buildings
 
 Anyone may build these, no card needed.
@@ -99,14 +99,40 @@ ${table(['Card', 'Class', 'Counts', 'Cost', 'Each one adds'], rows)}`;
 
 function land(): string {
   const terrains = TERRAINS.filter((t) => t !== 'ocean');
-  const totalWeight = Object.values(TERRAIN_WEIGHTS).reduce((s, w) => s + w!, 0);
-  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', TERRAIN_WEIGHTS[t] ? pct(TERRAIN_WEIGHTS[t]! / totalWeight) : 'coast']);
-  const size = [2, 3, 4].map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
+  const counts = [2, 3, 4, 5, 6];
+  const deal = counts.map(terrainCounts);
+  const rows = terrains.map((t) => [terrainName(t), Object.values(BUILDINGS).filter((b) => b.terrain === t).map((b) => b.name).join(', ') || '—', ...deal.map((d, i) => t === 'harbor' ? '6' : t === 'mountain' ? `${d[t]} + peak` : t === 'desert' ? `${d[t]} + ${counts[i]} towers` : `${d[t]}`)]);
+  const size = counts.map((p) => { const R = mapRadius(p); return `${p}p radius ${R} (${3 * R * (R + 1) + 1} land hexes)`; }).join(', ');
   return `## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: ${size}. The rest of the land is dealt a fixed number of each terrain, shuffled: each terrain gets an equal share, rounded down, and the remainder is desert. So every map for a player count has the same mix; only where each hex lies is random.
 
-${table(['Terrain', 'For', 'Share of land'], rows)}`;
+Towers sit on desert hexes at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+Where the terrain lies is random, but the map is shuffled again until every start has about as much room for basic buildings as the others: in each ring from 1 to ${TUNING.fairStart.rings} steps out from its tower, and in those rings together, a start's opportunity is within ${pct(TUNING.fairStart.tolerance)} of the average across starts. Opportunity is the hexes a basic building can go on, plus ${n1(1 - TUNING.fairStart.oceanCost)} for each ocean hex (desert and harbor hexes count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+
+${table(['Players', 'Towers', 'From the centre', 'Land within 3 steps', 'Land nearest each tower'], counts.map(towerRow))}
+
+${table(['Terrain', 'For', ...counts.map((p) => `${p}p`)], rows)}`;
+}
+
+// Each seat's land at the start: within 3 steps of its tower, and nearest its
+// tower (a hex as near two towers counts half to each).
+function towerRow(p: number): string[] {
+  const R = mapRadius(p);
+  const towers = towerSpots(p).map((k) => parseKey(k)!);
+  const land: [number, number][] = [];
+  for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (distance(q, r) <= R) land.push([q, r]);
+  const near = towers.map(() => 0);
+  for (const [q, r] of land) {
+    const d = towers.map(([a, b]) => distance(q - a, r - b));
+    const m = Math.min(...d);
+    const ties = d.filter((x) => x === m).length;
+    d.forEach((x, i) => { if (x === m) near[i] += 1 / ties; });
+  }
+  const span = (xs: number[]) => { const lo = Math.min(...xs), hi = Math.max(...xs); return lo === hi ? `${lo}` : `${lo}–${hi}`; };
+  const within3 = towers.map(([a, b]) => land.filter(([q, r]) => distance(q - a, r - b) <= 3).length);
+  return [`${p}`, towerSpots(p).join(' '), span(towers.map(([q, r]) => distance(q, r))), span(within3), span(near.map((x) => Math.round(x)))];
 }
 
 function growth(gt: number, perRound: number, stage: number) {
@@ -130,7 +156,7 @@ function points(): string {
   const rows = pointSources().map((s) => [s.name, s.shown, s.points, perPoint(s.pays, s.points), s.ready]);
   return `## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power standing (see Raids).
 
 ${table(['Source', 'Pays', 'Points', 'Pays per point', 'Ready'], rows)}
 
@@ -181,7 +207,7 @@ ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 ${table(['Kingdom', 'Defenders', 'Power', 'Total health', 'Avg damage a round', 'Loot', 'Points'], targetRows)}
 
@@ -197,7 +223,7 @@ function fauna(): string {
   const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), a.copies]);
   return `## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is ${TUNING.faunaSpreadWeight === 2 ? 'twice' : `${TUNING.faunaSpreadWeight} times`} as likely. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is ${TUNING.faunaSpreadWeight === 2 ? 'twice' : `${TUNING.faunaSpreadWeight} times`} as likely. New fauna comes only from cards.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Loot', 'Starts'], unitRows)}
 
@@ -212,7 +238,7 @@ ${table(['Card', 'Sends', 'Cost', 'Copies'], cardRows)}`;
 function beasts(): string {
   const unitRows = Object.entries(BEASTS).map(([k, b]) => [
     b.name, b.hp, `${b.targets}×${b.dice}d${b.sides} (${n1(avgAttack(b))})`, b.element, b.points,
-    k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean beside one harbor',
+    k === 'thunderbird' ? 'the mountain peak at the centre' : 'the ocean, starting beside one harbor; in production it moves to another ocean hex, each as likely as it is far',
   ]);
   const base = Object.values(DRAGONS).find((d) => d.base)!;
   const hatchery = Object.values(BUILDINGS).find((b) => b.growthBonus)!;
@@ -220,7 +246,7 @@ function beasts(): string {
   const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
   return `## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 
@@ -263,7 +289,7 @@ ${table(['Card', 'Kind', 'Copies', 'Share of deck'], rows)}`;
   });
   return `## Decks
 
-There are ${Object.keys(DECKS).length} decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
+There are ${Object.keys(DECKS).length} decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. A card goes to its deck's discards when it's built, played or discarded, so a copy's count doesn't cap how many of it can be on the board. When a deck runs out, its discards are shuffled into a new one.
 
 ${decks.join('\n\n')}`;
 }
@@ -287,7 +313,7 @@ function demand(): string {
   const rows = RESOURCES.map((r) => [r, spend[r], pct(spend[r] / total), sources(r)]);
   return `## Resource demand
 
-How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per dragon a round) comes on top.
+How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (${TUNING.livestockPerDragon} livestock per hatched dragon a round) comes on top.
 
 ${table(['Resource', 'In all card costs', 'Share', 'Comes from'], rows)}`;
 }

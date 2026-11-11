@@ -4,16 +4,16 @@ Generated from `src/data.ts` by `npm run datasheet`; don't edit by hand. `npm te
 
 ## Economy baseline
 
-- Start: 3 stone, 3 timber, 3 crystal, 3 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
+- Start: 6 stone, 6 timber, 6 crystal, 6 livestock. Tower income: 1 stone, 1 timber, 1 crystal, 1 livestock a round, no dice.
 - Cards: each round, draw 2 building cards and keep 1, plus 1 card from the action deck (action cards and dragons; see Decks); hand cap 7. Basic buildings (Quarry, Lumber Camp, Crystal Mine, Pasture, Roost, Tower Floor) need no card.
 - Win at 50 points. Titles are 7 points each, from a minimum (see Points).
-- Each dragon eats 1 livestock a round, eggs included; the tower makes 1.
+- Each hatched dragon eats 1 livestock a round; eggs don't eat. The tower makes 1.
 - Gold: no basic building makes it. It comes from raids, Markets and clearing fauna. The merchants don't trade it.
 - Merchants: 4:1, basic resources only (not gold). With a port, its resource at 2:1: Stone Port, Timber Port, Crystal Port, Livestock Port.
 
 ## Decks
 
-There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. When a deck runs out, its discards are shuffled into a new one.
+There are 2 decks, and these tables are all of each one: every card in it, its copies, and the total. The building deck holds every building card and upgrade. The action deck holds every action card and every dragon, base dragons included. Basic buildings are in neither deck. A card goes to its deck's discards when it's built, played or discarded, so a copy's count doesn't cap how many of it can be on the board. When a deck runs out, its discards are shuffled into a new one.
 
 ### Building deck: 42 cards
 
@@ -110,8 +110,8 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
 | Lighthouse | building card | building | 2 | 7 stone, 4 timber | Worth 2 points. Build adjacent to an ocean hex. | 2 |
 | Guildhall | building card | building | 1 | 5 stone, 6 timber | Worth 2 points. Build adjacent to a trade building. | 2 |
-| Workshop | upgrade | building | 4 | 4 stone, 4 timber, 2 crystal | This stone, timber, crystal or livestock building makes 2 more; worth 1 point. | 1 |
-| Nesting Grounds | upgrade | building | 3 | 4 stone, 2 timber | This roost, hatchery or tower houses 2 more dragons. | — |
+| Workshop | upgrade | building | 4 | 4 stone, 4 timber, 2 crystal | This production building makes 2 more (1 if it already has a Workshop); worth 1 point. | 1 |
+| Nesting Grounds | upgrade | building | 3 | 4 stone, 2 timber | This dragon building houses 2 more dragons. | — |
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
 | Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
@@ -147,20 +147,32 @@ Anyone may build these, no card needed.
 | Crystal Mine | crystal field | 4 stone, 4 timber, 3 livestock | d4 crystal (avg 2.5) |
 | Pasture | meadow | 3 stone, 4 timber, 4 crystal | d4 livestock (avg 2.5) |
 
-Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round.
+Workshop (4 stone, 4 timber, 2 crystal): makes 2 more a round, and each more Workshop on the same building 1 more. Also added without the card, as a special project, for 12 stone, 12 timber, 6 crystal.
 
 ## Land
 
-The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes). Terrain shares are of the random land, before towers and harbors are placed.
+The land is ringed by ocean, where nothing is built. Each of its six coasts has one natural harbor at a random spot between its corners; ports go only on harbors. Land: 2p radius 4 (61 land hexes), 3p radius 4 (61 land hexes), 4p radius 5 (91 land hexes), 5p radius 6 (127 land hexes), 6p radius 6 (127 land hexes). The rest of the land is dealt a fixed number of each terrain, shuffled: each terrain gets an equal share, rounded down, and the remainder is desert. So every map for a player count has the same mix; only where each hex lies is random.
 
-| Terrain | For | Share of land |
-|---|---|---|
-| mountain | Quarry | 20% |
-| forest | Lumber Camp | 20% |
-| crystal field | Crystal Mine | 20% |
-| meadow | Pasture | 20% |
-| plains | — | 20% |
-| harbor | Stone Port, Timber Port, Crystal Port, Livestock Port | coast |
+Towers sit on desert hexes at fixed spots by player count: on corners of the ring one in from the coast, except with 5 players: then they spread evenly around the ring 4 from the centre, since five of six corners would give the two seats beside the empty one far more land.
+
+Where the terrain lies is random, but the map is shuffled again until every start has about as much room for basic buildings as the others: in each ring from 1 to 4 steps out from its tower, and in those rings together, a start's opportunity is within 20% of the average across starts. Opportunity is the hexes a basic building can go on, plus 0.3 for each ocean hex (desert and harbor hexes count nothing). The average can differ from game to game, and which resources lie near each start is still random.
+
+| Players | Towers | From the centre | Land within 3 steps | Land nearest each tower |
+|---|---|---|---|---|
+| 2 | 3,0 -3,0 | 3 | 23 | 31 |
+| 3 | 3,0 0,-3 -3,3 | 3 | 23 | 20 |
+| 4 | 4,0 4,-4 -4,0 -4,4 | 4 | 23 | 23 |
+| 5 | 4,-1 3,-4 -2,-2 -4,2 -1,4 | 4 | 33 | 24–28 |
+| 6 | 5,0 5,-5 0,-5 -5,0 -5,5 0,5 | 5 | 23 | 21 |
+
+| Terrain | For | 2p | 3p | 4p | 5p | 6p |
+|---|---|---|---|---|---|---|
+| mountain | Quarry | 10 + peak | 10 + peak | 16 + peak | 23 + peak | 22 + peak |
+| forest | Lumber Camp | 10 | 10 | 16 | 23 | 22 |
+| crystal field | Crystal Mine | 10 | 10 | 16 | 23 | 22 |
+| meadow | Pasture | 10 | 10 | 16 | 23 | 22 |
+| desert | — | 12 + 2 towers | 11 + 3 towers | 16 + 4 towers | 23 + 5 towers | 26 + 6 towers |
+| harbor | Stone Port, Timber Port, Crystal Port, Livestock Port | 6 | 6 | 6 | 6 | 6 |
 
 ## Building cards that count their neighbours
 
@@ -183,7 +195,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 
 ## Points
 
-Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power still fighting (see Raids).
+Every way to buy points. Building points are flat: they never count what's adjacent. Dragons are worth no points. Great beasts are worth their points to whoever slays them (see Great beasts), and the top kingdoms theirs each time they fall, to the most combat power standing (see Raids).
 
 | Source | Pays | Points | Pays per point | Ready |
 |---|---|---|---|---|
@@ -256,7 +268,7 @@ Defenders:
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player still has fighting at the end (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most combat power still fighting at the end (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Points |
 |---|---|---|---|---|---|---|
@@ -273,11 +285,11 @@ Healing: a hurt dragon heals 7 health at each production it's fed, instead of gr
 
 ## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna produces nothing (a basic production building loses its output). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is twice as likely. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is twice as likely. New fauna comes only from cards.
 
 | Beast | Health | Attack (avg) | Element | Loot | Starts |
 |---|---|---|---|---|---|
-| Wolf Pack | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
+| Wolf | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
 | Basilisk | 26 | 2×1d8 (9) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 
@@ -292,12 +304,12 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 ## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 | Beast | Health | Attack (avg) | Element | Points | Lives in |
 |---|---|---|---|---|---|
 | Thunderbird | 70 | 2×2d8 (18) | air | 4 | the mountain peak at the centre |
-| Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean beside one harbor |
+| Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean, starting beside one harbor; in production it moves to another ocean hex, each as likely as it is far |
 
 A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
 
@@ -305,7 +317,7 @@ When that force exists: a base egg (any element, by special project, or a dragon
 
 ## Resource demand
 
-How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (1 livestock per dragon a round) comes on top.
+How much of each resource every card in both decks costs in total (each card counted once per copy; basic buildings aren't cards and aren't counted), plus where it comes from. Dragon upkeep (1 livestock per hatched dragon a round) comes on top.
 
 | Resource | In all card costs | Share | Comes from |
 |---|---|---|---|

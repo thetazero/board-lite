@@ -8,8 +8,18 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseSpec, type PlayerOption } from './players.ts';
 
-export interface SavedSeat { p: number; model: string; token: string; session: string; starts: number; cost: number; tokens?: number }
+export interface SavedSeat {
+  p: number;
+  model: string; // the claude --model, or codex:<model> for a Codex seat
+  options?: PlayerOption[]; // the seat's Claude player options (src/playtest/players.ts); runners before them had none
+  token: string;
+  session: string;
+  starts: number;
+  cost: number;
+  tokens?: number; // what a Codex seat used (Codex reports no cost)
+}
 
 export interface RunnerState {
   pid?: number; // the runner running this directory, while it runs
@@ -18,7 +28,24 @@ export interface RunnerState {
   seed?: number;
   effort?: string;
   advice?: string;
+  budget?: number; // --budget-usd, per Claude seat over the whole game
   seats: SavedSeat[];
+}
+
+/** Default --budget-usd for a runner seated in someone else's room (a game with people in it). */
+export const ROOM_BUDGET_USD = 30;
+/** Default --budget-usd for a playtest the runner hosts itself. */
+export const PLAYTEST_BUDGET_USD = 5;
+
+/**
+ * The spending cap per Claude seat, over the whole game. A game with people
+ * in it runs long (14 rounds cost an Opus player $6.80), so it gets room to
+ * finish; a playtest the runner hosts keeps the cheaper cap. Resuming keeps
+ * the budget the runner had, unless --budget-usd is given again.
+ */
+export function budgetUsd(given: string | undefined, resumed: RunnerState | null, inRoom: boolean): number {
+  if (given !== undefined) return Number(given);
+  return resumed?.budget ?? (inRoom ? ROOM_BUDGET_USD : PLAYTEST_BUDGET_USD);
 }
 
 export const stateFile = (out: string) => join(out, 'runner.json');
@@ -44,10 +71,11 @@ function fromLeftovers(out: string): RunnerState {
     room ||= url;
     const session = /"(?:session_id|thread_id)":"([^"]+)"/.exec(read(`seat-${n}.jsonl`))?.[1]; // Claude's session, or Codex's thread
     const fromResults = (results.seats as { seat: string; model: string; costUsd?: number; starts?: number }[] | undefined)?.find((s) => s.seat === `P${n}`);
-    const model = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
-    if (!model) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
+    const label = fromResults?.model ?? new RegExp(`P${n} \\((\\S+)\\) starts`).exec(log)?.[1];
+    if (!label) throw new Error(`Can't tell which model played seat ${n} (no results.json or runner.log in ${out}).`);
     // No session id: the player never got going, so it starts afresh.
-    seats.push({ p: n - 1, model, token, session: session ?? '', starts: session ? Math.max(1, fromResults?.starts ?? 1) : 0, cost: fromResults?.costUsd ?? 0 });
+    const { model, options } = parseSpec(label); // results.json and runner.log name the seat's configuration, like opus+expected
+    seats.push({ p: n - 1, model, options, token, session: session ?? '', starts: session ? Math.max(1, fromResults?.starts ?? 1) : 0, cost: fromResults?.costUsd ?? 0 });
   }
   if (!seats.length) throw new Error(`Nothing to resume in ${out}: no Claude player ever took a seat there.`);
   return { room, hosted: existsSync(join(out, 'game.json')), ...(typeof results.seed === 'number' ? { seed: results.seed } : {}), ...(results.advice ? { advice: results.advice } : {}), seats };
