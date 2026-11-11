@@ -22,7 +22,7 @@ npm run eval -- --models opus,sonnet,haiku,codex:gpt-5.6-sol
 - Each game has `--seats` players (default 3). The eval plays every lineup of 3 from the roster, and each lineup in every seat order (seat order matters: see [`playtest.md`](playtest.md#depth-batches)). That's one **round**: with 4 models, 4 lineups × 3 seat orders = 12 games, each model in 9. `--games N` plays N games instead: every lineup comes up once before any comes up twice, so a short eval is still fair.
 - Games go in `~/.cache/board-lite/playtests/<time>-eval-<models>/g<i>`, each one a normal playtest directory ([`playtest.md`](playtest.md#results)). At the end it writes `leaderboard.md` there, for those games alone.
 - **Stopped, or want more?** Run the same command with `--out <that directory>` and a bigger `--games`. Finished games are kept; unfinished ones are played again; new ones are added. Two rounds of 4 models is `--games 24`.
-- Other options: `--parallel N` (games at once, default 1), `--budget-usd N` (cap per Claude seat a game, default 25), `--seed N`, `--effort`, `--max-minutes`, `--stall-minutes`. `node src/playtest/eval.ts --help` lists them.
+- Other options: `--parallel N` (games at once, default 1), `--budget-usd N` (cap per Claude seat a game, default 60), `--seed N`, `--effort`, `--max-minutes`, `--stall-minutes`. `node src/playtest/eval.ts --help` lists them.
 
 ## Run a contest
 
@@ -61,7 +61,7 @@ It only reads the contest's directory, on every refresh, so it works for a conte
 
 From the playtest at c4162c8 (19 rounds, about 75 minutes): $11.55 for the Opus seat, $4.56 for Sonnet, $2.40 for Haiku (API-equivalent). So one round of `opus,sonnet,haiku` plus one Codex model is about 12 game-lengths (15 hours) and $170 of Claude, plus the Codex seat's usage of your ChatGPT plan. Codex reports tokens, not dollars; the leaderboard shows its tokens a game.
 
-The default budget of $25 a seat is there because Opus spends over $10 a game: at the playtest default of $5, Opus seats would stop partway and the games wouldn't count.
+The default budget of $60 a seat is there because Opus spends over $10 a game, and an Opus seat with advice in a long 6-player game went past $25 (contest-1111, game 15): with a lower cap, seats stop partway and the games don't count. The playtest default is $5.
 
 One game at a time by default: three Claude seats starting at once, with other work on the machine, has set off the memory reaper, which killed the game server and the runner. The seat pool and memory checks ([`playtest.md`](playtest.md#how-many-games-run-at-once)) still apply on top of `--parallel`. A game killed for low memory isn't lost: rerun the same command.
 
