@@ -32,7 +32,7 @@ const USAGE = `node src/playtest/eval.ts --models <m1,m2,...> [options]
   --out DIR          the eval directory (default ~/.cache/board-lite/playtests/<time>-eval-<models>);
                      game i goes in DIR/gi. Rerunning into the same DIR keeps the finished
                      games and plays the rest.
-  --budget-usd N     spending cap per Claude seat a game (default 25)
+  --budget-usd N     spending cap per Claude seat a game (default 60)
   --seed N           seed of game 1; game i gets N+i-1 (default random per game). With a
                      range of sizes it also seeds the draw
   --effort, --max-minutes, --stall-minutes   passed to every game
@@ -120,7 +120,7 @@ await runGames({
   games,
   atOnce,
   seats,
-  args: (i) => ['--budget-usd', opt('--budget-usd') ?? '25', ...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...adviceFor(i), ...passed],
+  args: (i) => ['--budget-usd', opt('--budget-usd') ?? '60', ...(seed ? ['--seed', String(Number(seed) + i - 1)] : []), ...adviceFor(i), ...passed],
 });
 const text = leaderboard(collect({ dirs: [out], rooms: null }));
 writeFileSync(join(out, 'leaderboard.md'), draw ? `${text}\n## The draw\n\n\`\`\`\n${balance(roster, draw.games.slice(0, games))}\n\`\`\`\n` : text);
