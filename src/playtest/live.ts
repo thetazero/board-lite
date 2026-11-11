@@ -2,9 +2,14 @@
 // A live page for a contest or an eval while it runs: the ratings so far with
 // how sure each is, games finished and left, the game being played now, and
 // the last games' results. It only reads the directory (draw.json, each game's
-// results.json, game.json and runner.json), on every request, so it works for
+// results.json, game.json, game.seats.json and runner.json), on every request, so it works for
 // a contest that's already running, started before this existed, and starts
 // or stops nothing.
+//
+// A game being played can be watched from the page too: its runner hosts the
+// room on this machine (127.0.0.1 only), so this server passes the room's
+// table view (/tv?room=CODE&remote, the phone's Table) through to the phone,
+// read-only: only GET requests, for that room, its stream and the page's files.
 //
 //   node src/playtest/live.ts DIR [--port 8790] [--host ADDR]
 //
@@ -14,7 +19,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, request, type IncomingMessage, type ServerResponse } from 'node:http';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TUNING } from '../data.ts';
@@ -23,7 +28,14 @@ import { qrMatrix } from '../../web/qr.ts';
 import { collect } from './leaderboard.ts';
 import { rate } from './rating.ts';
 
-export interface LiveSeat { seat: string; player: string; points: number; costUsd?: number }
+export interface LiveSeat {
+  seat: string;
+  player: string;
+  points: number;
+  costUsd?: number;
+  /** Its name at the table (game.seats.json), the one the table view shows, for a game being played. */
+  name?: string;
+}
 export interface LiveGame {
   game: number;
   /** For a game being played: "playing", or "stopped" when its runner is gone. Otherwise its results' status. */
@@ -33,6 +45,8 @@ export interface LiveGame {
   minutes: number;
   seats: LiveSeat[];
   winner?: string; // the winning seat, of a finished game
+  /** For a game being played in a room on this machine: the page that shows its board (the room's table view), through this server. */
+  watch?: string;
 }
 export interface LiveRating { player: string; rating: number; range: number; games: number; wins: number; place: number; costPerGame?: string }
 export interface LiveState {
@@ -64,6 +78,31 @@ const PHASES: Record<string, string> = { cards: 'Cards', action: 'Actions', raid
 function alive(pid: unknown): boolean {
   if (typeof pid !== 'number') return false;
   try { process.kill(pid, 0); return true; } catch (e: any) { return e?.code === 'EPERM'; }
+}
+
+/** The room a runner plays in, when it's on this machine: its server and its code. */
+export function localRoom(runner: any): { origin: string; code: string } | null {
+  try {
+    const u = new URL(String(runner?.room));
+    const code = u.pathname.replace(/^\/|\/$/g, '');
+    if (!['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) || !/^[A-Za-z]{4}$/.test(code)) return null;
+    return { origin: u.origin, code: code.toUpperCase() };
+  } catch {
+    return null;
+  }
+}
+
+/** The rooms of the games being played now, whose runners are alive, by code: what the page lets a phone watch. */
+export function watchable(dir: string): Map<string, string> {
+  const rooms = new Map<string, string>();
+  const names = existsSync(dir) ? readdirSync(dir) : [];
+  for (const n of names.filter((n) => /^g\d+$/.test(n)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))) {
+    if (readJson(join(dir, n, 'results.json'))) continue;
+    const runner = readJson(join(dir, n, 'runner.json'));
+    const room = alive(runner?.pid) ? localRoom(runner) : null;
+    if (room) rooms.set(room.code, room.origin);
+  }
+  return rooms;
 }
 
 const started = (dir: string) => {
@@ -99,18 +138,23 @@ export function liveState(dir: string, now = Date.now()): LiveState {
     const game = readJson(join(g, 'game.json')) as Game | null;
     const runner = readJson(join(g, 'runner.json'));
     const players = lineup(i);
+    const tableNames = readJson(join(g, 'game.seats.json'))?.seats?.map((x: any) => x?.name);
     const seats: LiveSeat[] = (game?.players ?? players ?? []).map((_: unknown, p: number) => {
       const r = runner?.seats?.find((s: any) => s.p === p);
       return {
         seat: `P${p + 1}`,
         player: players?.[p] ?? (r ? [r.model, ...(r.options ?? [])].join('+') : '?'),
         points: game ? score(game, p).total : 0,
+        ...(typeof tableNames?.[p] === 'string' ? { name: tableNames[p] } : {}),
         ...(r?.cost ? { costUsd: Math.round(r.cost * 100) / 100 } : {}),
       };
     });
+    const status = results ? results.status : alive(runner?.pid) ? 'playing' : 'stopped';
+    const room = status === 'playing' ? localRoom(runner) : null;
     playing.push({
       game: i,
-      status: results ? results.status : alive(runner?.pid) ? 'playing' : 'stopped',
+      status,
+      ...(room ? { watch: `tv?room=${room.code}&remote` } : {}),
       ...(game ? { round: game.round, phase: PHASES[game.phase] ?? game.phase } : {}),
       minutes: Math.round((now - started(g)) / 600) / 100,
       seats,
@@ -172,6 +216,41 @@ export function terminalQr(text: string): string {
   return lines.join('\n');
 }
 
+// The headers passed on each way: enough for the page's files (caching) and the room's event stream.
+const UP = ['accept', 'if-none-match', 'last-event-id', 'user-agent'];
+const DOWN = ['content-type', 'cache-control', 'etag', 'content-length', 'connection'];
+
+/**
+ * A request for a game's table view, passed to the server of the room it's
+ * for (named in the path, /api/rooms/CODE/..., or the query, ?room=CODE; the
+ * page's own files from any of them). Only GET: watching changes nothing.
+ */
+export function watchProxy(dir: string, req: IncomingMessage, res: ServerResponse) {
+  const fail = (status: number, text: string) => {
+    res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(text);
+  };
+  if (req.method !== 'GET' && req.method !== 'HEAD') return fail(405, 'This page only watches the game.');
+  const url = new URL(req.url ?? '/', 'http://x');
+  const rooms = watchable(dir);
+  const named = (/^\/api\/rooms\/([A-Za-z]{4})(\/|$)/.exec(url.pathname)?.[1] ?? url.searchParams.get('room') ?? '').toUpperCase();
+  if (url.pathname.startsWith('/api/') && !/^\/api\/(rooms\/[A-Za-z]{4}(\/events)?|rulebook|info)$/.test(url.pathname)) return fail(404, 'Not found');
+  if (url.searchParams.has('token')) return fail(403, 'This page only watches the game.');
+  const origin = named ? rooms.get(named) : [...rooms.values()].at(-1);
+  if (!origin) return fail(named ? 400 : 404, named ? 'That game is over, or not being played here.' : 'Not found');
+  const headers: Record<string, string> = {};
+  for (const h of UP) if (typeof req.headers[h] === 'string') headers[h] = req.headers[h] as string;
+  const up = request(`${origin}${url.pathname}${url.search}`, { method: req.method, headers }, (r) => {
+    const out: Record<string, string | string[]> = {};
+    for (const h of DOWN) if (r.headers[h] !== undefined) out[h] = r.headers[h]!;
+    res.writeHead(r.statusCode ?? 502, out);
+    r.pipe(res);
+  });
+  up.on('error', () => { if (!res.headersSent) fail(502, "Can't reach the game's server."); else res.end(); });
+  res.on('close', () => up.destroy()); // the phone left: its stream to the room closes too
+  up.end();
+}
+
 const USAGE = `node src/playtest/live.ts DIR [options]
 
   DIR            the contest's (or an eval's) directory, as given to eval.ts --out
@@ -189,7 +268,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const port = Number(opt('--port') ?? 8790);
   const page = readFileSync(fileURLToPath(new URL('./live.html', import.meta.url)), 'utf8');
 
-  const handler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
     const path = new URL(req.url ?? '/', 'http://x').pathname;
     if (path === '/state.json') {
       try {
@@ -207,8 +286,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       res.end(page);
       return;
     }
-    res.writeHead(404, { 'content-type': 'text/plain' });
-    res.end('Not found');
+    watchProxy(dir, req, res); // a game's table view
   };
 
   const ts = opt('--host') ? null : tailnet();

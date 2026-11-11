@@ -49,6 +49,7 @@
   .tag { font-size: 12px; padding: 1px 7px; border-radius: 9px; border: 1px solid currentColor; color: var(--muted); white-space: nowrap; }
   .tag.live { color: var(--good); }
   .tag.stopped { color: var(--warn); }
+  a.watch { display: block; margin-top: 10px; padding: 10px; border-radius: 9px; background: var(--accent); color: #fff; font-weight: 600; text-align: center; text-decoration: none; }
   .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
   footer { margin-top: 28px; font-size: 13px; color: var(--muted); }
   #offline { display: none; color: var(--warn); }
@@ -104,11 +105,12 @@ function playing(s) {
       <div class="row"><span class="name">Game ${g.game} · ${g.seats.length} players</span>${tag}</div>
       <div class="sub">${g.round ? `Round ${g.round} · ${esc(g.phase)} · ` : ''}${duration(g.minutes)}${spent ? ` · ${usd(spent)} so far` : ''}</div>
       ${order.map((x) => `<div class="row seat">
-        <span><span class="muted">${x.seat}</span> <span class="name">${esc(x.player)}</span></span>
+        <span><span class="muted">${x.seat}</span> <span class="name">${esc(x.player)}</span>${x.name ? ` <span class="muted">· ${esc(x.name)}</span>` : ''}</span>
         <span><b>${x.points}</b> <span class="muted">points</span></span>
         <div class="bar"><div style="width:${pct((100 * x.points) / s.pointsToWin)}"></div></div>
       </div>`).join('')}
       <div class="note">First to ${s.pointsToWin} points wins.</div>
+      ${g.watch ? `<a class="watch" href="${esc(g.watch)}">Watch the table</a>` : ''}
     </div>`;
   }).join('');
 }

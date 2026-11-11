@@ -13,7 +13,7 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 - Tuning datasheet, generated from the code: [`docs/datasheet.md`](docs/datasheet.md): the raw rules: every cost, output, stat and point, with nothing simulated. Read it before and after changing any number; `npm run datasheet` regenerates it.
 - Analyze any finished game, a room people played in included (points by round, what each seat did, trade surplus, production): `npm run analyze -- <room code>`; see [`docs/analyze.md`](docs/analyze.md)
 - Sandboxed Claude playtests (one Claude per seat, game tools only): [`docs/playtest.md`](docs/playtest.md)
-- Model eval and leaderboard (Claude and Codex models, and you from your games, each with a rating): [`docs/eval.md`](docs/eval.md); watch a contest live, from a phone over Tailscale: `npm run live -- <contest directory>`
+- Model eval and leaderboard (Claude and Codex models, and you from your games, each with a rating): [`docs/eval.md`](docs/eval.md); watch a contest live, and its games' boards, from a phone over Tailscale: `npm run live -- <contest directory>`
 
 ## Code
 
