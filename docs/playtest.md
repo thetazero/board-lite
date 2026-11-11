@@ -1,6 +1,6 @@
 # Sandboxed Claude playtests
 
-`src/playtest/run.ts` runs one game where every seat is a Claude player (or the random bot). Each Claude player is its own `claude -p` process, and the only tools it has are five game tools for its own seat. It can't run commands, read or write files, browse, or act for another seat.
+`src/playtest/run.ts` runs one game where every seat is a Claude player (or a bot: the random one, or the [strong bot](strongbot.md)). Each Claude player is its own `claude -p` process, and the only tools it has are five game tools for its own seat. It can't run commands, read or write files, browse, or act for another seat.
 
 Claude players are clients like phones: the runner hosts the game in a room on a board-lite server of its own (on `127.0.0.1` only, on a random port) and each Claude player joins it through the same room interface the phones and the CLI use. To seat Claude players at a game people are playing, with the server the TV uses, see [`play-vs-claude.md`](play-vs-claude.md) (`--room`).
 
@@ -8,7 +8,7 @@ Claude players are clients like phones: the runner hosts the game in a room on a
 node src/playtest/run.ts --models opus,haiku,haiku
 ```
 
-One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...), a Codex model as `codex:<model>` (`codex:gpt-5.6-sol`; sandboxed the same way, see [`eval.md`](eval.md#codex-seats)), or `bot`, and for a Claude or Codex seat the [options](#claude-player-options) it plays with, like `opus+advice+expected`. To rank models against each other, see the eval and leaderboard in [`eval.md`](eval.md). Other options:
+One `--models` entry per seat, 2 to 6 seats, in seat order: any `claude --model` alias or full model name (`opus`, `sonnet`, `haiku`, `claude-haiku-5-5`, ...), a Codex model as `codex:<model>` (`codex:gpt-5.6-sol`; sandboxed the same way, see [`eval.md`](eval.md#codex-seats)), `bot` (the random bot) or `strongbot` (the [strong bot](strongbot.md), pure code: a free baseline), and for a Claude or Codex seat the [options](#claude-player-options) it plays with, like `opus+advice+expected`. To rank models against each other, see the eval and leaderboard in [`eval.md`](eval.md). Other options:
 
 | Option | Default | |
 |---|---|---|
@@ -64,7 +64,7 @@ node src/playtest/batch.ts --games 30 --models opus+fable51,opus+fable51,opus,op
 
 Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine has 14 GB shared with everything else, including every vibrant tab. Several tabs and the orchestrator may each run a batch at the same time, so the limit is machine-wide, not per batch:
 
-- **Free memory sets the limit: a game's Claude seats start only if at least 3 GB would stay free** once they do, counting 450 MB a seat, across every playtest from every tab. On an idle machine with 10 GB free that's 15 seats: five 3-seat games, or three 4-seat ones; when the tabs are busy it's fewer. `bot` seats don't count.
+- **Free memory sets the limit: a game's Claude seats start only if at least 3 GB would stay free** once they do, counting 450 MB a seat, across every playtest from every tab. On an idle machine with 10 GB free that's 15 seats: five 3-seat games, or three 4-seat ones; when the tabs are busy it's fewer. `bot` and `strongbot` seats don't count.
 - A game takes one slot per Claude seat before it starts any of them. If its seats would leave under 3 GB free (`MemAvailable`, less 450 MB a seat for each game that took its slots in the last 2 minutes, whose processes are still starting), it waits, logs `Waiting to start: <why>` in `runner.log`, and starts on its own once there's room. `--max-minutes` counts from the start, not from the wait.
 - A running game whose machine falls under 1 GB free for 10 seconds stops itself (status `low memory` in `results.json`) rather than let the machine OOM. Resume it later with `--resume` (below), or rerun it.
 - So start a whole batch at once (`batch.ts`, below, or all games in the background): the pool runs them as many at a time as memory allows. Expect a batch to take about (games × seats ÷ seats that fit) game-lengths, where seats that fit is (free GB − 3) × 2.2.
@@ -75,7 +75,7 @@ Each Claude seat is a `claude -p` process of 300 to 400 MB, and the dev machine 
 
 In the `--out` directory:
 
-- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, effort, the advice if any seat had it, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, `player: <name>` for someone else's seat in a `--room` game, or a Claude seat's configuration like `opus+expected`), a Claude seat's `options`, final points (hidden ones included), and for Claude and Codex seats the model it reported running (`modelId`, when the alias differs), cost (Codex: `tokens`) and how many times its process was (re)started; plus counts of public and private messages.
+- `results.json`: status (`over`, `stalled`, `time limit`, ...), the commit the runner ran on, seed, effort, the advice if any seat had it, rounds, minutes, winner (seat and model), and per seat: name, model (`bot`, `strongbot`, `player: <name>` for someone else's seat in a `--room` game, or a Claude seat's configuration like `opus+expected`), a Claude seat's `options`, final points (hidden ones included), and for Claude and Codex seats the model it reported running (`modelId`, when the alias differs), cost (Codex: `tokens`) and how many times its process was (re)started; plus counts of public and private messages.
 - `log.txt`: the whole game log as the engine recorded it, talk included. Lines only some players saw are marked `(only P1, P3)`: private messages, card draws, secret votes and fight-or-hold-back choices.
 - `talk.txt`: just the talk.
 - `seat-N.moves.txt`: why seat N made each move. Every `act` (and `say`) carries a private `why` that no other player sees, and this file pairs each one with what really happened (`-> done` or `-> not allowed: can't afford ...`). It's the record of reasoning to audit: read it, not the narration.

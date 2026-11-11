@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isBot } from './players.ts';
 import { defaultPool, holders, seatsThatFit } from './slots.ts';
 
 const runner = fileURLToPath(new URL('./run.ts', import.meta.url));
@@ -68,7 +69,7 @@ function roomFor(plan: Plan, i: number, running: number): boolean {
   const held = holders(pool);
   for (const pid of waiting) if (held.some((h) => h.pid === pid)) waiting.delete(pid);
   if (waiting.size > 0) return false;
-  return seatsThatFit(pool, held) >= plan.seats(i).filter((m) => m !== 'bot').length;
+  return seatsThatFit(pool, held) >= plan.seats(i).filter((m) => !isBot(m.split('+')[0])).length;
 }
 
 /** Plays every game of the plan not already finished; Ctrl-C lets the running ones end and starts no more. */

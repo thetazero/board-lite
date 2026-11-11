@@ -18,7 +18,7 @@ Then run it, in the background:
 npm run eval -- --models opus,sonnet,haiku,codex:gpt-5.6-sol
 ```
 
-- `--models` is the roster: Claude models (`opus`, `sonnet`, `haiku`, or a full name like `claude-haiku-5-5`), Codex models as `codex:<model>`, and `bot` (the random bot), each Claude or Codex model with any [player options](playtest.md#claude-player-options) (`opus+expected`). List a model twice to give it two entries.
+- `--models` is the roster: Claude models (`opus`, `sonnet`, `haiku`, or a full name like `claude-haiku-5-5`), Codex models as `codex:<model>`, `bot` (the random bot) and `strongbot` (the [strong bot](strongbot.md)), each Claude or Codex model with any [player options](playtest.md#claude-player-options) (`opus+expected`). List a model twice to give it two entries.
 - Each game has `--seats` players (default 3). The eval plays every lineup of 3 from the roster, and each lineup in every seat order (seat order matters: see [`playtest.md`](playtest.md#depth-batches)). That's one **round**: with 4 models, 4 lineups × 3 seat orders = 12 games, each model in 9. `--games N` plays N games instead: every lineup comes up once before any comes up twice, so a short eval is still fair.
 - Games go in `~/.cache/board-lite/playtests/<time>-eval-<models>/g<i>`, each one a normal playtest directory ([`playtest.md`](playtest.md#results)). At the end it writes `leaderboard.md` there, for those games alone.
 - **Stopped, or want more?** Run the same command with `--out <that directory>` and a bigger `--games`. Finished games are kept; unfinished ones are played again; new ones are added. Two rounds of 4 models is `--games 24`.
@@ -83,7 +83,7 @@ Options: `--since 2026-11-01` counts only games that ended on or after a date. U
 
 - A **model** is the model a Claude seat reported running (`claude-opus-5-5`), or the name it was given (`opus`) for games from before that was recorded; Codex seats are `codex:<model>`. A seat's [player options](playtest.md#claude-player-options) are part of the name (`claude-opus-5-5+expected`), and so is an `--effort` other than the model's own (`claude-opus-5-5 @high`): a model with other options or at another effort is another player.
 - A **person** is the name they joined with, whatever the case. Join with the same name every time to keep one rating. A player who quit partway (a bot finished for them) isn't rated for that game.
-- `bot` is the random bot (`src/bot.ts`), the same in playtests and on `npm run serve`.
+- `bot` is the random bot (`src/bot.ts`), the same in playtests and on `npm run serve`. `strongbot` is the strong bot (`src/strongbot.ts`): pure code that plays to win, a free baseline between the random bot and the models.
 
 ### What counts
 

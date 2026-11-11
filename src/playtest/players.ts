@@ -31,7 +31,7 @@ export const OPTIONS = {
 export type PlayerOption = keyof typeof OPTIONS;
 
 export interface PlayerSpec {
-  model: string; // a claude --model alias or name, or "bot"
+  model: string; // a claude --model alias or name, "bot" (the random bot) or "strongbot" (src/strongbot.ts)
   options: PlayerOption[]; // in OPTIONS order, so the same configuration always gets the same label
   label: string; // "opus+advice+expected": what results.json and the batch's tallies call it
 }
@@ -43,10 +43,13 @@ export function parseSpec(entry: string): PlayerSpec {
   for (const o of given) {
     if (!(o in OPTIONS)) throw new Error(`"${o}" in "${entry}" isn't a Claude player option. The options: ${optionList()}.`);
   }
-  if (model === 'bot' && given.length) throw new Error(`A bot takes no options ("${entry}").`);
+  if (isBot(model) && given.length) throw new Error(`A bot takes no options ("${entry}").`);
   const options = (Object.keys(OPTIONS) as PlayerOption[]).filter((o) => given.includes(o));
   return { model, options, label: [model, ...options].join('+') };
 }
+
+/** A seat the server plays, no Claude: the random bot or the strong bot. */
+export const isBot = (model: string) => model === 'bot' || model === 'strongbot';
 
 export const optionList = () => Object.entries(OPTIONS).map(([k, v]) => `+${k} (${v})`).join(', ');
 
@@ -59,6 +62,6 @@ export function parseSeats(models: string[], advice: string | undefined): Player
   const specs = models.map(parseSpec);
   const anyAdvice = specs.some((s) => s.options.includes('advice'));
   if (anyAdvice && advice === undefined) throw new Error('A seat has +advice, so give the advice with --advice TEXT.');
-  if (advice !== undefined && !anyAdvice) return specs.map((s) => (s.model === 'bot' ? s : parseSpec(`${s.label}+advice`)));
+  if (advice !== undefined && !anyAdvice) return specs.map((s) => (isBot(s.model) ? s : parseSpec(`${s.label}+advice`)));
   return specs;
 }

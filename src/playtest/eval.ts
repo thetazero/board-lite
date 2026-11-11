@@ -15,13 +15,13 @@ import { join, resolve } from 'node:path';
 import { runGames } from './games.ts';
 import { collect, leaderboard } from './leaderboard.ts';
 import { balance, extend, parseSizes, rng, type DrawState } from './draw.ts';
-import { parseSeats, parseSpec } from './players.ts';
+import { isBot, parseSeats, parseSpec } from './players.ts';
 import { defaultPool } from './slots.ts';
 
 const USAGE = `node src/playtest/eval.ts --models <m1,m2,...> [options]
 
   --models ...       the roster, 2 or more: claude models (opus, sonnet, haiku, claude-...),
-                     Codex models (codex:<model>, e.g. codex:gpt-5.6-sol), or bot; a Claude
+                     Codex models (codex:<model>, e.g. codex:gpt-5.6-sol), bot (random) or strongbot; a Claude
                      or Codex entry can add player options, like opus+advice+expected
   --seats K          players a game (default 3, at most the roster's size), or a range like
                      2-6: each game then draws its size and players at random, balanced
@@ -96,7 +96,7 @@ function seats(i: number): string[] {
   return [...line.slice(turn), ...line.slice(0, turn)];
 }
 
-const claudeSeats = Math.max(...Array.from({ length: mixed ? games : Math.min(games, round) }, (_, i) => seats(i + 1).filter((m) => m !== 'bot').length));
+const claudeSeats = Math.max(...Array.from({ length: mixed ? games : Math.min(games, round) }, (_, i) => seats(i + 1).filter((m) => !isBot(m.split('+')[0])).length));
 const atOnce = Math.max(1, Math.min(Number(opt('--parallel') ?? 1), Math.floor(defaultPool().maxSeats / Math.max(1, claudeSeats))));
 
 if (args.includes('--dry-run')) {

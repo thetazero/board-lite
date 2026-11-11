@@ -175,7 +175,7 @@ export function startServer(port: number, opts: RoomOptions = {}, hostFiles: str
       }
       case 'bot':
         if (!room.canStart(tok)) throw new RoomError('Only the TV or the first to join can add bots.');
-        room.addBot();
+        room.addBot(b.strong === true);
         return json(res, 200, {});
       case 'leave': {
         // A player can leave the lobby; the TV or first player can remove anyone.

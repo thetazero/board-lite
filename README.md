@@ -22,7 +22,7 @@ TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `n
 - `src/data.ts`: every card, unit, kingdom and tuning number; `src/datasheet.ts` turns them into `docs/datasheet.md`
 - `src/engine.ts`: the rules; `apply(game, seat, command)` is the only way to change a game
 - `src/view.ts`: a snapshot from `src/state.ts` as text (what the CLI and Claude players print): what one seat sees, and its options; `src/mapimage.ts`: the board as a PNG, which Claude players get beside the text map
-- `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/store.ts`: the game file and its lock
+- `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/strongbot.ts`: the strong bot, pure code, a free baseline for playtests and contests ([`docs/strongbot.md`](docs/strongbot.md)); `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude and Codex players (hosting a playtest, or joining a room) and the per-seat MCP server they play through; the eval (`eval.ts`) and the leaderboard's rating (`leaderboard.ts`, `rating.ts`)
 - `src/recap.ts`: a finished game's recap, the story the TV plays at the end and the recap page (`web/recap.ts`) shows
 - `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)

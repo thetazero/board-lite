@@ -142,13 +142,13 @@ export function collect(opts: { dirs: string[]; rooms: string | null; since?: nu
       seen.add(code);
       const ran = runners.get(code) ?? [];
       const places = placesFrom(final.totals, final.winner);
-      add(file, saved.seats.map((s: { name: string; kind: string; left?: boolean }, p: number) => {
+      add(file, saved.seats.map((s: { name: string; kind: string; left?: boolean; strong?: boolean }, p: number) => {
         // A player who quit had a bot finish for them: that seat isn't theirs to rate.
         if (s.left) return { player: null, place: places[p] };
-        if (s.kind === 'bot') return { player: BOT, place: places[p] };
+        if (s.kind === 'bot') return { player: s.strong ? 'strongbot' : BOT, place: places[p] };
         if (s.kind !== 'player') return { player: null, place: places[p] };
         for (const r of ran) {
-          const mine = r.seats.find((x) => x.name?.toLowerCase() === s.name.toLowerCase() && !x.model.startsWith('player: ') && x.model !== 'bot');
+          const mine = r.seats.find((x) => x.name?.toLowerCase() === s.name.toLowerCase() && !x.model.startsWith('player: ') && x.model !== 'bot' && x.model !== 'strongbot');
           if (mine) return { player: playerOf(mine, r.effort, r.advice), place: places[p], costUsd: mine.costUsd, tokens: mine.tokens };
         }
         return { player: person(s.name), place: places[p] };
