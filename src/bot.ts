@@ -57,10 +57,10 @@ export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
     if (perched.length && next(rng) < 0.3) out.push(`recall ${pick(rng, perched).id}`);
     // Keep enough livestock for the dragons before spending on projects.
     const roomForDragon = g.dragons.filter((d) => d.owner === p).length < dragonCapacity(g, p);
-    if (roomForDragon && canAfford(pl, specialProjectCost(DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
+    if (roomForDragon && canAfford(pl, specialProjectCost('egg', DRAGONS.fire_whelp.cost)) && next(rng) < 0.5) out.push(`project ${pick(rng, ELEMENTS)}`);
     for (const u of PROJECT_UPGRADES) {
       const t = upgradeTargets(g, p, u);
-      if (t.length && canAfford(pl, specialProjectCost(UPGRADES[u].cost))) out.push(`project ${u} ${pick(rng, t)}`);
+      if (t.length && canAfford(pl, specialProjectCost('upgrade', UPGRADES[u].cost))) out.push(`project ${u} ${pick(rng, t)}`);
     }
     for (const b of shuffle(rng, BASIC_BUILDINGS.slice())) {
       if (b === 'roost' && roomForDragon) continue;

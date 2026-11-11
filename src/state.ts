@@ -416,7 +416,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
   const s = score(g, p);
   const raid = g.raid;
   const housed = g.dragons.filter((d) => d.owner === p).length;
-  const eggCost = specialProjectCost(DRAGONS.fire_whelp.cost);
+  const eggCost = specialProjectCost('egg', DRAGONS.fire_whelp.cost);
   const shut = new Set(Object.entries(g.buildings).filter(([k, b]) => b.owner === p && blocked(g, k)).flatMap(([k]) => Object.keys(buildingYield(g, k).makes)));
   const income = Object.fromEntries(Object.entries(production(g, p)).map(([r, x]) => [r, { ...x, eat: 0, blocked: shut.has(r) }])) as SeatState['income'];
   // Eggs don't eat (#415): an egg that hatches at the next production eats from the one after.
@@ -444,7 +444,7 @@ export function seatState(g: Game, p: number, logLines = 15): SeatState {
     eggProject: { cost: res(eggCost), affordable: canAfford(pl, eggCost), elements: [...ELEMENTS], room: housed < dragonCapacity(g, p), why: (housed < dragonCapacity(g, p) ? null : NO_ROOM) ?? afford(pl, eggCost) },
     upgradeProjects: PROJECT_UPGRADES.map((key) => {
       const u = UPGRADES[key];
-      const cost = specialProjectCost(u.cost);
+      const cost = specialProjectCost('upgrade', u.cost);
       const hexes = upgradeTargets(g, p, key);
       const after = Object.fromEntries(hexes.map((k) => [k, buildingDoes(g, k, [...g.buildings[k].upgrades, key])]));
       return { key, name: u.name, text: u.text, cost: res(cost), affordable: canAfford(pl, cost), hexes, after, why: (hexes.length ? null : noUpgradeHex(u)) ?? afford(pl, cost) };

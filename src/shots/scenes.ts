@@ -368,7 +368,7 @@ export const SCENES: Scene[] = [
   },
   {
     // #350: a Workshop as a special project. The acting player has a quarry
-    // and can afford double the card, so Upgrade opens the choice of building.
+    // and can afford the project, so Upgrade opens the choice of building.
     // The quarry already has 2 Workshops, so a third adds 1 (#400).
     name: 'workshop-project-3p',
     players: 3,
