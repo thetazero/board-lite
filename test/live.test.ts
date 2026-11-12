@@ -134,3 +134,23 @@ test("a game's table view is passed through from its room, read-only", async () 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a game with a person in it: their link into the seat, and that the game waits for them until it starts', () => {
+  mkdirSync(base, { recursive: true });
+  const dir = mkdtempSync(join(base, 'test-live-'));
+  try {
+    writeFileSync(join(dir, 'draw.json'), JSON.stringify({ roster: ['opus+expected+fable51', 'person:Lesha', 'bot'], sizes: [2, 3], seed: 1, games: [[0, 2], [1, 0, 2]] }));
+    mkdirSync(join(dir, 'g1'));
+    writeFileSync(join(dir, 'g1', 'results.json'), JSON.stringify({ status: 'over', minutes: 30, rounds: 9, winner: { seat: 'P1' }, seats: [{ seat: 'P1', model: 'opus+fable51+expected', points: 50 }, { seat: 'P2', model: 'bot', points: 20 }] }));
+    mkdirSync(join(dir, 'g2'));
+    writeFileSync(join(dir, 'g2', 'runner.json'), JSON.stringify({ pid: process.pid, room: 'http://127.0.0.1:41234/ABCD', hosted: true, seats: [], people: [{ p: 0, name: 'Lesha', token: 'tok' }], port: 41234 }));
+    const s = liveState(dir);
+    assert.deepEqual(s.playing[0].play, [{ name: 'Lesha', port: 41234, hash: '#code=ABCD&token=tok' }]);
+    assert.deepEqual(s.playing[0].waitingFor, ['Lesha'], 'no game.json yet: it waits for them');
+    assert.deepEqual(s.unrated, ['person:Lesha'], 'a roster entry is matched to its results by its label, options in any order');
+    writeFileSync(join(dir, 'g2', 'game.json'), JSON.stringify(newGame(3, 7)));
+    assert.equal(liveState(dir).playing[0].waitingFor, undefined, 'started');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

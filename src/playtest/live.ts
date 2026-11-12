@@ -26,6 +26,7 @@ import { TUNING } from '../data.ts';
 import { score, type Game } from '../engine.ts';
 import { qrMatrix } from '../../web/qr.ts';
 import { collect } from './leaderboard.ts';
+import { resultsLabel } from './players.ts';
 import { rate } from './rating.ts';
 
 export interface LiveSeat {
@@ -47,6 +48,14 @@ export interface LiveGame {
   winner?: string; // the winning seat, of a finished game
   /** For a game being played in a room on this machine: the page that shows its board (the room's table view), through this server. */
   watch?: string;
+  /**
+   * For a game being played with people in it (person:<name> seats): each one's
+   * way into their seat, on the room's own port on this machine; the page puts
+   * its own host name in front. The hash holds the seat's token.
+   */
+  play?: { name: string; port: number; hash: string }[];
+  /** People whose game waits for them: it starts once they've opened their link. */
+  waitingFor?: string[];
 }
 export interface LiveRating { player: string; rating: number; range: number; games: number; wins: number; place: number; costPerGame?: string }
 export interface LiveState {
@@ -170,10 +179,13 @@ export function liveState(dir: string, now = Date.now()): LiveState {
     });
     const status = results ? results.status : alive(runner?.pid) ? 'playing' : 'stopped';
     const room = status === 'playing' ? localRoom(runner) : null;
+    const people: { p: number; name: string; token: string }[] = room && runner.port ? runner.people ?? [] : [];
     playing.push({
       game: i,
       status,
       ...(room ? { watch: `tv?room=${room.code}&remote` } : {}),
+      ...(people.length ? { play: people.map((x) => ({ name: x.name, port: runner.port, hash: `#code=${room!.code}&token=${x.token}` })) } : {}),
+      ...(people.length && !game ? { waitingFor: people.map((x) => x.name) } : {}),
       ...(game ? { round: game.round, phase: PHASES[game.phase] ?? game.phase } : {}),
       minutes: Math.round((now - started(g)) / 600) / 100,
       seats,
@@ -205,7 +217,7 @@ export function liveState(dir: string, now = Date.now()): LiveState {
     playing: playing.reverse(),
     recent: done.reverse().slice(0, 12),
     ratings,
-    unrated: draw ? draw.roster.filter((m) => !seen.has(m)) : [],
+    unrated: draw ? draw.roster.filter((m) => !seen.has(resultsLabel(m))) : [],
     skipped: c.skipped,
     updated: new Date(now).toISOString(),
   };

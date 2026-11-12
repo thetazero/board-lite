@@ -9,7 +9,17 @@
 // - Seats: each player goes to the seat they've had less of than their share
 //   (a player in a game of k gets 1/k of each of its seats).
 // Ties are broken at random. Each game's draw depends only on the games before
-// it, so a contest can be extended with more games and stay balanced.
+// it, so a contest can be extended with more games and stay balanced, and can
+// take new players partway (added to the end of the roster).
+//
+// With focus players (eval.ts --focus, such as players just added), the games
+// drawn concentrate on them instead: every seat of a game but one goes to focus
+// players (as many as there are), the ones with the fewest games first, and the
+// other seats to the rest of the bucket, the ones who've met those focus players
+// least first, so their opponents come from the whole bucket (the focus players
+// also meet each other as evenly as they can). One player from the rest is
+// enough to anchor a game: simulated, it rates newcomers as well as half the
+// seats would, in fewer games and with fewer paid seats (docs/eval.md).
 
 export interface DrawState {
   roster: string[];
@@ -17,6 +27,13 @@ export interface DrawState {
   sizes: [number, number];
   /** Each game so far: the roster index of each seat, in seat order. */
   games: number[][];
+  /** Roster indices the games drawn next concentrate on (none: the balanced draw). */
+  focus?: number[];
+}
+
+/** How many of a game of k's seats go to focus players: all but one, if there are that many. */
+export function focusSeats(k: number, focus: number): number {
+  return Math.min(focus, k - 1);
 }
 
 /** A seeded random number generator (mulberry32): the same seed draws the same contest. */
@@ -77,6 +94,9 @@ export function extend(state: DrawState, count: number, rand: () => number): Dra
   if (lo < 2 || hi > 6 || lo > hi) throw new Error('Game sizes go from 2 to 6.');
   if (hi > n) throw new Error(`Games of ${hi} need at least ${hi} players in --models (a model can be listed twice).`);
   const games = [...state.games];
+  const focus = new Set(state.focus ?? []);
+  if ([...focus].some((p) => p < 0 || p >= n)) throw new Error('A focus player is not in the roster.');
+  if (focus.size === n) throw new Error('Every player is a focus player: leave out --focus for the balanced draw.');
   const span = hi - lo + 1;
   let block: number[] = [];
   // Sizes come in blocks of every size once; a block cut short by an earlier run is finished first.
@@ -90,12 +110,22 @@ export function extend(state: DrawState, count: number, rand: () => number): Dra
     const k = block.shift()!;
     const t = tally(roster, games);
     // Players: fewest games first, then fewest meetings among them; random among equals.
-    let best: number[] = [], bestCost = [Infinity, Infinity];
+    // With focus players: the focus seats' fewest games, then the fewest meetings of
+    // the focus seats (with the others and each other), then the others' fewest
+    // games, then fewest meetings in all.
+    let best: number[] = [], bestCost = [Infinity, Infinity, Infinity, Infinity];
+    const want = focusSeats(k, focus.size);
     for (const s of shuffle(subsets(n, k), rand)) {
-      const g = s.reduce((a, p) => a + t.played[p], 0);
-      let m = 0;
-      for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) m += t.met[s[i]][s[j]];
-      if (g < bestCost[0] || (g === bestCost[0] && m < bestCost[1])) { best = s; bestCost = [g, m]; }
+      if (focus.size && s.filter((p) => focus.has(p)).length !== want) continue;
+      let m = 0, mf = 0, gf = 0, go = 0;
+      for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) {
+        m += t.met[s[i]][s[j]];
+        if (focus.has(s[i]) || focus.has(s[j])) mf += t.met[s[i]][s[j]];
+      }
+      for (const p of s) if (focus.has(p)) gf += t.played[p]; else go += t.played[p];
+      const cost = focus.size ? [gf, mf, go, m] : [gf + go, m, 0, 0];
+      const better = cost.findIndex((c, i) => c !== bestCost[i]);
+      if (better >= 0 && cost[better] < bestCost[better]) { best = s; bestCost = cost; }
     }
     // Seats: each player where they're furthest under their share, counting the share this game adds.
     let order: number[] = [], orderCost = Infinity;

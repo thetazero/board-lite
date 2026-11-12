@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FABLE_5_1_ADVICE, parseSeats, parseSpec, seatAdvice } from '../src/playtest/players.ts';
+import { FABLE_5_1_ADVICE, isAi, parseSeats, parseSpec, resultsLabel, seatAdvice } from '../src/playtest/players.ts';
 import { tally, type GameResult } from '../src/playtest/tally.ts';
 
 test('a seat is a model and its options, labeled the same whatever order the options come in', () => {
@@ -40,4 +40,14 @@ test('+fable51 gives a seat the Fable 5.1 advice word for word, with no --advice
   assert.equal(seatAdvice(['advice', 'fable51'], 'raid early'), `\n\nAdvice: raid early\n\nAdvice:\n\n${FABLE_5_1_ADVICE}`);
   // --advice with no +advice seat still goes to every Claude seat, the +fable51 ones too.
   assert.deepEqual(parseSeats(['opus+fable51', 'opus'], 'raid early').map((s) => s.label), ['opus+advice+fable51', 'opus+advice']);
+});
+
+test('a person is a seat too: person:<name>, with no options, and no AI seat to take a slot', () => {
+  assert.deepEqual(parseSpec('person:Lesha'), { model: 'person:Lesha', options: [], label: 'person:Lesha' });
+  assert.throws(() => parseSpec('person:Lesha+expected'), /person takes no options/);
+  assert.throws(() => parseSpec('person:'), /names no one/);
+  assert.deepEqual(['opus+expected', 'codex:gpt-5.6-sol', 'bot', 'strongbot', 'person:Lesha'].map(isAi), [true, true, false, false, false]);
+  assert.equal(resultsLabel('person:Lesha'), 'player: Lesha', 'named in results.json as any person at the table');
+  assert.equal(resultsLabel('opus+expected+fable51'), 'opus+fable51+expected', 'options in their own order');
+  assert.deepEqual(parseSeats(['opus', 'person:Lesha'], 'Hoard gold.').map((x) => x.label), ['opus+advice', 'person:Lesha'], 'advice goes to the Claude seats only');
 });

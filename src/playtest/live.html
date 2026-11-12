@@ -105,12 +105,14 @@ function playing(s) {
     return `<div class="card">
       <div class="row"><span class="name">Game ${g.game} · ${g.seats.length} players</span>${tag}</div>
       <div class="sub">${g.round ? `Round ${g.round} · ${esc(g.phase)} · ` : ''}${duration(g.minutes)}${spent ? ` · ${usd(spent)} so far` : ''}</div>
+      ${g.waitingFor ? `<div class="note">Waiting for ${esc(g.waitingFor.join(' and '))}: the game starts when they open their seat.</div>` : ''}
       ${order.map((x) => `<div class="row seat">
         <span><span class="muted">${x.seat}</span> <span class="name">${esc(x.player)}</span>${x.name ? ` <span class="muted">· ${esc(x.name)}</span>` : ''}</span>
         <span><b>${x.points}</b> <span class="muted">points</span></span>
         <div class="bar"><div style="width:${pct((100 * x.points) / s.pointsToWin)}"></div></div>
       </div>`).join('')}
       <div class="note">First to ${s.pointsToWin} points wins.</div>
+      ${(g.play ?? []).map((x) => `<a class="watch" href="${esc(`${location.protocol}//${location.hostname}:${x.port}/${x.hash}`)}">Play as ${esc(x.name)}</a>`).join('')}
       ${g.watch ? `<a class="watch" href="${esc(g.watch)}">Watch the table</a>` : ''}
     </div>`;
   }).join('');

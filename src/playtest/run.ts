@@ -24,6 +24,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
+import { createServer, type RequestListener } from 'node:http';
 import { pname, score, type Game } from '../engine.ts';
 import { load } from '../store.ts';
 import { Room, addClaudeRunner } from '../server/room.ts';
@@ -31,15 +32,16 @@ import { lanAddresses, startServer, tailscaleAddresses } from '../server/server.
 import type { Lobby } from '../state.ts';
 import { FLOOR_MB, alive, defaultPool, release, tryAcquire } from './slots.ts';
 import { budgetUsd, readState, stateFile, type RunnerState } from './resume.ts';
-import { OPTIONS, isBot, parseSeats, seatAdvice, type PlayerOption, type PlayerSpec } from './players.ts';
+import { OPTIONS, isAi, isBot, isPerson, personName, parseSeats, seatAdvice, type PlayerOption, type PlayerSpec } from './players.ts';
 
 const USAGE = `node src/playtest/run.ts --models <m1,m2,...> [options]
 node src/playtest/run.ts --resume DIR [options]
 
   --models opus,haiku,sonnet,bot   the Claude seats: a claude model alias or name each, "codex:<model>" for a
                                     Codex seat (e.g. codex:gpt-5.6-sol; plain "codex" is Codex's default model),
-                                    "bot" (random) or "strongbot"; a Claude or Codex seat can add options, like opus+advice+expected
-                                    (see below)
+                                    "bot" (random), "strongbot", or person:<name> (a person, who plays the seat
+                                    on their phone: see docs/eval.md); a Claude or Codex seat can add options,
+                                    like opus+advice+expected (see below)
   --room URL                        join these Claude seats to a room someone else hosts (npm run serve),
                                     e.g. http://localhost:8080/ABCD; without it, this runner hosts the game
   --seed N                          game seed when hosting (default random)
@@ -70,7 +72,7 @@ function opt(args: string[], name: string): string | undefined {
 const args = process.argv.slice(2);
 const resumeDir = opt(args, '--resume');
 const resumed: RunnerState | null = resumeDir ? readState(resolve(resumeDir)) : null;
-const modelsArg = opt(args, '--models') ?? resumed?.seats.map((s) => [s.model, ...(s.options ?? [])].join('+')).join(',');
+const modelsArg = opt(args, '--models') ?? (resumed && [...resumed.seats.map((s) => [s.model, ...(s.options ?? [])].join('+')), ...(resumed.people ?? []).map((x) => `person:${x.name}`)].join(','));
 if (!modelsArg || args.includes('--help')) {
   console.log(USAGE);
   process.exit(modelsArg ? 0 : 1);
@@ -83,12 +85,15 @@ if (resumed) {
 } else if (joinUrl) {
   if (!models.length || models.length > 5) throw new Error('Give 1 to 5 Claude seats in --models.');
   if (models.some((m) => isBot(m))) throw new Error('With --room, add bots from the TV ("Add a bot"); --models is only for Claude seats.');
+  if (models.some(isPerson)) throw new Error('With --room, people join the room from their phones; --models is only for Claude seats.');
 } else if (models.length < 2 || models.length > 6) throw new Error('Need 2 to 6 seats in --models.');
 const seed = Number(opt(args, '--seed') ?? resumed?.seed ?? Math.floor(Math.random() * 2 ** 31));
 const effort = opt(args, '--effort') ?? resumed?.effort;
 const budget = budgetUsd(opt(args, '--budget-usd'), resumed, !!joinUrl);
 const maxMinutes = Number(opt(args, '--max-minutes') ?? 240);
-const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl ? 60 : 15));
+// People at the table play at human speed, and step away: give a game with one longer before it counts as stalled.
+const withPeople = models.some(isPerson) || !!resumed?.people?.length;
+const stallMinutes = Number(opt(args, '--stall-minutes') ?? (joinUrl || withPeople ? 60 : 15));
 const advice = opt(args, '--advice') ?? resumed?.advice;
 const specs: PlayerSpec[] = parseSeats(models, advice);
 const servePort = opt(args, '--serve');
@@ -110,6 +115,7 @@ let roomUrl = ''; // http://host:port/CODE
 let api = '';
 let hosted: Room | null = null; // the room, when this runner hosts it
 let gameFile = '';
+let networkPort = 0; // the room's port on the network, when it listens there (--serve, or a person at the table)
 
 async function call(path: string, body?: object): Promise<Record<string, any>> {
   const r = await fetch(api + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
@@ -139,13 +145,23 @@ async function host() {
   const code = resumed ? Room.savedCode(gameFile) : null;
   if (resumed && !code) throw new Error(`Nothing to resume: ${gameFile} or its seats file is missing.`);
   if (!resumed && existsSync(gameFile)) throw new Error(`${gameFile} already exists; pick a new --out.`);
-  const { server, rooms } = startServer(Number(servePort ?? 0), { botDelayMs: 300 }, [], servePort ? '0.0.0.0' : '127.0.0.1');
+  // A person's phone has to reach the room: a game with one listens on this
+  // machine's Tailscale address too (on the same port), as the live page does,
+  // and not the rest of the network; on every address only without Tailscale.
+  const tailnet = withPeople && !servePort ? tailscaleAddresses()[0] : undefined;
+  const everywhere = !!servePort || (withPeople && !tailnet);
+  const { server, rooms } = startServer(Number(servePort ?? 0), { botDelayMs: 300 }, [], everywhere ? '0.0.0.0' : '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const port = (server.address() as AddressInfo).port;
+  if (tailnet) {
+    const also = createServer(server.listeners('request')[0] as RequestListener);
+    await new Promise<void>((ok, fail) => { also.once('error', fail); also.listen(port, tailnet, ok); });
+  }
   hosted = new Room(code ?? Room.newCode((c) => rooms.has(c)), { botDelayMs: 300, file: gameFile });
   rooms.set(hosted.code, hosted);
   roomUrl = `http://127.0.0.1:${port}/${hosted.code}`;
   api = `http://127.0.0.1:${port}/api/rooms/${hosted.code}`;
+  networkPort = everywhere || tailnet ? port : 0;
   if (servePort) {
     const addr = lanAddresses()[0] ?? tailscaleAddresses()[0] ?? 'localhost';
     note(`Watch on a TV: http://${addr}:${port}/tv?room=${hosted.code}`);
@@ -165,6 +181,17 @@ function seatName(taken: string[]): string {
 
 // session: the Claude session id, or for a Codex seat its thread id (Codex picks it, so it's empty until the first start reports it).
 // modelId: the model a Claude seat's process reports it runs (an alias like "opus" resolved). tokens: what a Codex seat used (Codex reports no cost).
+// A person's seat: the runner takes it for them, under their name, and their
+// phone takes it over from the link it prints (and the live page shows).
+interface PersonSeat { p: number; name: string; token: string }
+const people: PersonSeat[] = [];
+
+/** The link that puts a person's phone in their seat: the room's address on the network, with the seat's token. */
+function personLink(x: PersonSeat): string {
+  const addr = tailscaleAddresses()[0] ?? lanAddresses()[0] ?? 'localhost';
+  return `http://${addr}:${networkPort}/#code=${hosted!.code}&token=${x.token}`;
+}
+
 interface Seat { p: number; model: string; options: PlayerOption[]; label: string; token: string; session: string; proc: ChildProcess | null; starts: number; startsHere: number; cost: number; tokens: number; modelId?: string; exitedAt: number }
 const seats: Seat[] = [];
 let table: Lobby['seats'] = []; // everyone at the table, once the game starts
@@ -174,6 +201,7 @@ function saveState() {
   const state: RunnerState = {
     pid: process.pid, room: roomUrl, hosted: !!hosted, ...(hosted ? { seed } : {}), ...(effort ? { effort } : {}), ...(advice ? { advice } : {}), budget,
     seats: seats.map(({ p, model, options, token, session, starts, cost, tokens }) => ({ p, model, options, token, session, starts, cost, ...(tokens ? { tokens } : {}) })),
+    ...(people.length ? { people: people.map((x) => ({ ...x })), ...(networkPort ? { port: networkPort } : {}) } : {}),
   };
   writeFileSync(stateFile(out), `${JSON.stringify(state, null, 2)}\n`);
 }
@@ -368,7 +396,7 @@ let interrupted = false;
 
 /** Blocks until this game's Claude seats fit in the machine-wide pool. */
 async function admit(): Promise<boolean> {
-  const claudeSeats = specs.filter((m) => !isBot(m.model)).length;
+  const claudeSeats = specs.filter((m) => isAi(m.model)).length;
   let said = '';
   for (;;) {
     const r = tryAcquire(pool, claudeSeats, out);
@@ -392,7 +420,7 @@ async function main() {
   process.on('SIGTERM', () => { interrupted = true; stopAll(); });
   process.on('exit', () => {
     release(pool);
-    if (seats.length) { // no runner holds this directory any more
+    if (seats.length || people.length) { // no runner holds this directory any more
       try { const st = readState(out); delete st.pid; writeFileSync(stateFile(out), `${JSON.stringify(st, null, 2)}\n`); } catch { /* nothing saved */ }
     }
   });
@@ -407,17 +435,28 @@ async function main() {
     api = `${m[1]}/api/rooms/${m[2].toUpperCase()}`;
   } else await host();
   note(`${resumed ? 'Resuming: ' : ''}${hosted ? 'Playtest' : 'Claude players'} in ${out}: room ${roomUrl}${hosted ? `; seed ${seed}` : ''}; budget $${budget} per Claude player.`);
-  if (status === 'running' && resumed) await reclaim(resumed);
+  if (status === 'running' && resumed) {
+    await reclaim(resumed);
+    if (interrupted) status = 'interrupted';
+  }
   else if (status === 'running') {
+    const personNames = specs.filter((x) => isPerson(x.model)).map((x) => personName(x.model));
     for (const { model, options, label } of specs) {
       if (isBot(model)) { await call('/bot', { token: hosted!.hostToken, ...(model === 'strongbot' ? { strong: true } : {}) }); continue; }
-      const name = seatName((await lobby()).seats.map((t) => t.name));
+      if (isPerson(model)) {
+        const r = await call('/join', { name: personName(model), via: 'phone' });
+        people.push({ p: r.seat - 1, name: (await lobby()).seats[r.seat - 1].name, token: r.token });
+        saveState();
+        continue;
+      }
+      const name = seatName([...(await lobby()).seats.map((t) => t.name), ...personNames]);
       const r = await call('/join', { name, via: 'claude' });
       seats.push({ p: r.seat - 1, model, options, label, token: r.token, session: isCodex(model) ? '' : randomUUID(), proc: null, starts: 0, startsHere: 0, cost: 0, tokens: 0, exitedAt: 0 });
       saveState();
       note(`${name} (${label}) takes seat ${r.seat}.`);
     }
-    if (hosted) hosted.start(hosted.hostToken, seed);
+    if (hosted && people.length && !(await awaitPeople())) status = 'interrupted';
+    if (hosted && status === 'running') hosted.start(hosted.hostToken, seed);
     else note('Waiting for the game to start (press Start game on the TV, or the first to join does on their phone).');
     while (!(await lobby()).started && !interrupted) await new Promise((r) => setTimeout(r, 2000));
     if (interrupted) status = 'interrupted';
@@ -480,6 +519,22 @@ async function main() {
   process.exit(0); // the hosted server would keep the process alive
 }
 
+// Every person at the table opens their link before the game starts, so no
+// AI seat runs (and spends) while the table waits for them. However long it takes.
+async function awaitPeople(): Promise<boolean> {
+  for (const x of people) note(`${x.name} plays seat ${x.p + 1}: open ${personLink(x)} on their phone (the live page shows it too).`);
+  const waiting = () => people.filter((x) => !(hosted!.seats[x.p].connected > 0));
+  let said = '';
+  while (waiting().length) {
+    const names = waiting().map((x) => x.name).join(', ');
+    if (names !== said) { note(`Waiting for ${names} to take their seat.`); said = names; }
+    await new Promise((r) => setTimeout(r, 2000));
+    if (interrupted) return false;
+  }
+  note(`${people.map((x) => x.name).join(', ')} ${people.length > 1 ? 'are' : 'is'} at the table.`);
+  return true;
+}
+
 // --resume: back into the seats this runner's Claude players held, in the game
 // under way. The old seat token still holds the seat unless the player quit or
 // someone took it over; then joining with the seat's name takes it back.
@@ -488,7 +543,8 @@ async function reclaim(state: RunnerState) {
   if (!l.started) throw new Error(`The game in ${roomUrl} hasn't started, so there's nothing to resume; start a new runner with --room instead.`);
   table = l.seats;
   gameFile ||= l.file;
-  const now = await call(`/listen?token=${state.seats[0].token}&since=0&timeout=0`).catch(() => null);
+  const anyToken = state.seats[0]?.token ?? state.people?.[0]?.token;
+  const now = anyToken ? await call(`/listen?token=${anyToken}&since=0&timeout=0`).catch(() => null) : null;
   if (now && /^The game is over/.test(now.status)) throw new Error(`The game in ${roomUrl} is already over.`);
   for (const [i, saved] of state.seats.entries()) {
     const name = table[saved.p]?.name;
@@ -501,9 +557,12 @@ async function reclaim(state: RunnerState) {
     seats.push(s);
     note(`${name} (${s.label}) is back in seat ${s.p + 1}${s.starts ? ', with its memory of the game so far' : ''}.`);
   }
+  people.push(...(state.people ?? []));
   saveState();
   listBesideGame();
   note(`The table: ${table.map((t, q) => `${pname(q)} ${t.name} (${seatLabel(q)})`).join(', ')}.`);
+  // The room is back on a new port: each person opens their link again before the AI seats start.
+  if (hosted && people.length && !(await awaitPeople())) interrupted = true;
 }
 
 void main();

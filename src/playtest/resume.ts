@@ -30,6 +30,10 @@ export interface RunnerState {
   advice?: string;
   budget?: number; // --budget-usd, per Claude seat over the whole game
   seats: SavedSeat[];
+  /** People at the table (person:<name> seats): the seat the runner took for each, under their name, and its token, for their phone's link. */
+  people?: { p: number; name: string; token: string }[];
+  /** The room's port on the network, when it listens there (a person's link goes to it). */
+  port?: number;
 }
 
 /** Default --budget-usd for a runner seated in someone else's room (a game with people in it). */

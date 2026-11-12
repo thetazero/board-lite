@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isBot } from './players.ts';
+import { isAi } from './players.ts';
 import { defaultPool, holders, seatsThatFit } from './slots.ts';
 
 const runner = fileURLToPath(new URL('./run.ts', import.meta.url));
@@ -25,6 +25,8 @@ export interface Plan {
   args: (i: number) => string[];
   /** At most this many games run at once (Infinity: as many as free memory can seat). */
   atOnce: number;
+  /** Asked before each game not yet finished starts: true plays no more (eval.ts --until-sure). */
+  enough?: () => boolean;
 }
 
 const pool = defaultPool();
@@ -69,15 +71,21 @@ function roomFor(plan: Plan, i: number, running: number): boolean {
   const held = holders(pool);
   for (const pid of waiting) if (held.some((h) => h.pid === pid)) waiting.delete(pid);
   if (waiting.size > 0) return false;
-  return seatsThatFit(pool, held) >= plan.seats(i).filter((m) => !isBot(m.split('+')[0])).length;
+  return seatsThatFit(pool, held) >= plan.seats(i).filter(isAi).length;
 }
 
-/** Plays every game of the plan not already finished; Ctrl-C lets the running ones end and starts no more. */
-export async function runGames(plan: Plan): Promise<void> {
+/**
+ * Plays every game of the plan not already finished; Ctrl-C lets the running
+ * ones end and starts no more, and so does plan.enough(). Returns how many of
+ * the plan's games it got to (every one, unless it stopped early).
+ */
+export async function runGames(plan: Plan): Promise<number> {
   let stopping = false;
   process.on('SIGINT', () => { stopping = true; });
   const running = new Set<Promise<void>>();
-  for (let i = 1; i <= plan.games && !stopping;) {
+  let i = 1;
+  while (i <= plan.games && !stopping) {
+    if (!done(join(plan.out, `g${i}`)) && plan.enough?.()) break;
     if (roomFor(plan, i, running.size)) {
       const g = runGame(plan, i++);
       running.add(g);
@@ -87,4 +95,5 @@ export async function runGames(plan: Plan): Promise<void> {
     }
   }
   await Promise.all(running);
+  return i - 1;
 }

@@ -17,6 +17,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resultsLabel } from './players.ts';
 import { BOT, placesFrom, rate, type RatedGame } from './rating.ts';
 
 const CACHE = join(homedir(), '.cache', 'board-lite');
@@ -181,6 +182,38 @@ export function leaderboard(c: Collected): string {
   if (left.length) lines.push('', `Left out: ${left.map(([why, n]) => `${n} ${why}`).join('; ')}.`);
   return `${lines.join('\n')}\n`;
 }
+
+/**
+ * Whether every focus entry (eval.ts --focus, as written in --models) of the
+ * contest in dir is rated as surely as the rest were when the focus began at
+ * game `from`: its 95% range, from the games finished, no wider than the middle
+ * one (the median) of the other players' ranges from the games before `from`.
+ * A fixed bar: the rest keep playing and narrowing, so a bar that moved with
+ * them would ask the newcomers to catch up game for game. Says so when it is
+ * met; null while it isn't.
+ */
+export function sureEnough(dir: string, focusEntries: string[], from: number): string | null {
+  const c = collect({ dirs: [dir], rooms: null });
+  const rows = rate(c.games);
+  const before = rate(c.games.filter((g) => Number(/[/\\]g(\d+)$/.exec(g.source)?.[1] ?? Infinity) < from));
+  // Each entry's name on the leaderboard, from a game it finished (a model's alias resolves to its full name there).
+  const names = new Map<string, string>();
+  for (const n of readdirSync(dir).filter((n) => /^g\d+$/.test(n))) {
+    let r: any;
+    try { r = JSON.parse(readFileSync(join(dir, n, 'results.json'), 'utf8')); } catch { continue; }
+    if (r?.status !== 'over') continue;
+    for (const s of r.seats ?? []) { const p = playerOf(s, r.effort, r.advice); if (p) names.set(s.model, p); }
+  }
+  const mine = focusEntries.map((f) => names.get(resultsLabel(f)));
+  if (mine.some((m) => !m)) return null;
+  const range = (p: string) => rows.find((r) => r.player === p)?.range ?? Infinity;
+  const rest = before.filter((r) => !mine.includes(r.player)).map((r) => r.range).sort((a, b) => a - b);
+  if (!rest.length) return null;
+  const middle = rest.length % 2 ? rest[(rest.length - 1) / 2] : (rest[rest.length / 2 - 1] + rest[rest.length / 2]) / 2;
+  if (mine.some((m) => range(m!) > middle)) return null;
+  return `Every --focus entry's 95% range is now within ±${Math.round(middle)}, the middle of the rest's before game ${from}.`;
+}
+
 
 const USAGE = `node src/playtest/leaderboard.ts [DIR ...] [options]
 

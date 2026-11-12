@@ -31,7 +31,7 @@ export const OPTIONS = {
 export type PlayerOption = keyof typeof OPTIONS;
 
 export interface PlayerSpec {
-  model: string; // a claude --model alias or name, "bot" (the random bot) or "strongbot" (src/strongbot.ts)
+  model: string; // a claude --model alias or name, codex:<model>, "bot" (the random bot), "strongbot" (src/strongbot.ts) or person:<name>
   options: PlayerOption[]; // in OPTIONS order, so the same configuration always gets the same label
   label: string; // "opus+advice+expected": what results.json and the batch's tallies call it
 }
@@ -44,12 +44,26 @@ export function parseSpec(entry: string): PlayerSpec {
     if (!(o in OPTIONS)) throw new Error(`"${o}" in "${entry}" isn't a Claude player option. The options: ${optionList()}.`);
   }
   if (isBot(model) && given.length) throw new Error(`A bot takes no options ("${entry}").`);
+  if (isPerson(model)) {
+    if (given.length) throw new Error(`A person takes no options ("${entry}").`);
+    if (!personName(model)) throw new Error(`"${entry}" names no one; a person's seat looks like person:Lesha.`);
+  }
   const options = (Object.keys(OPTIONS) as PlayerOption[]).filter((o) => given.includes(o));
   return { model, options, label: [model, ...options].join('+') };
 }
 
 /** A seat the server plays, no Claude: the random bot or the strong bot. */
 export const isBot = (model: string) => model === 'bot' || model === 'strongbot';
+
+/** A seat a person plays, on their phone: person:<the name they play under>. */
+export const isPerson = (entry: string) => entry.startsWith('person:');
+export const personName = (entry: string) => entry.slice('person:'.length).trim();
+
+/** A seat played by an AI model (Claude or Codex), which takes a slot from the seat pool: not a bot, not a person. */
+export const isAi = (entry: string) => { const model = entry.split('+')[0]; return !isBot(model) && !isPerson(model); };
+
+/** What a game's results.json calls the seat of a --models entry: its label, or "player: <name>" for a person. */
+export const resultsLabel = (entry: string) => (isPerson(entry) ? `player: ${personName(entry)}` : parseSpec(entry).label);
 
 export const optionList = () => Object.entries(OPTIONS).map(([k, v]) => `+${k} (${v})`).join(', ');
 
@@ -62,6 +76,6 @@ export function parseSeats(models: string[], advice: string | undefined): Player
   const specs = models.map(parseSpec);
   const anyAdvice = specs.some((s) => s.options.includes('advice'));
   if (anyAdvice && advice === undefined) throw new Error('A seat has +advice, so give the advice with --advice TEXT.');
-  if (advice !== undefined && !anyAdvice) return specs.map((s) => (isBot(s.model) ? s : parseSpec(`${s.label}+advice`)));
+  if (advice !== undefined && !anyAdvice) return specs.map((s) => (isBot(s.model) || isPerson(s.model) ? s : parseSpec(`${s.label}+advice`)));
   return specs;
 }
