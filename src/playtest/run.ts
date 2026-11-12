@@ -19,7 +19,7 @@
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -248,7 +248,7 @@ function startSeat(s: Seat) {
     : resumed && s.startsHere === 0
       ? 'You were away from the table for a while (your connection to the game dropped, or the table took a break), and now you are back in your seat. The game is not over yet and may have moved on: call view to see where things stand, then keep playing: call wait, and act when it is your decision.'
       : 'The game is not over yet. Keep playing: call wait, and act when it is your decision.';
-  const [cmd, argv] = codex ? ['codex', codexArgv(s, first, first ? `${systemPrompt(s)}\n\n${prompt}` : prompt, serverArgs)] : ['claude', [
+  const [cmd, argv] = codex ? ['codex', codexArgv(s, dir, first, first ? `${systemPrompt(s)}\n\n${prompt}` : prompt, serverArgs)] : ['claude', [
     '-p', prompt,
     '--model', s.model,
     ...(first ? ['--session-id', s.session, '--append-system-prompt', systemPrompt(s)] : ['--resume', s.session]),
@@ -304,7 +304,8 @@ function startSeat(s: Seat) {
 
 // A Codex seat's `codex exec` command line, sandboxed like a Claude seat: the
 // game's MCP server is its only way to act. Codex's shell, web, image, browser,
-// plugin and sub-agent tools are switched off; none of the owner's Codex config,
+// plugin and sub-agent tools are switched off (see codexCatalog for sub-agents
+// on the newer models); none of the owner's Codex config,
 // rules, hooks or project docs load (--ignore-user-config; auth still comes from
 // ~/.codex). Codex 0.154 keeps two things on: apply_patch, which the read-only
 // sandbox rejects, and "code mode", a JavaScript runner it calls tools through,
@@ -315,8 +316,27 @@ const CODEX_OFF = [
   'shell_tool', 'unified_exec', 'apps', 'browser_use', 'browser_use_external', 'computer_use', 'in_app_browser', 'image_generation',
   'view_image', 'multi_agent', 'plugins', 'remote_plugin', 'hooks', 'goals', 'skill_search', 'skill_mcp_dependency_install', 'tool_suggest',
 ];
-function codexArgv(s: Seat, first: boolean, prompt: string, serverArgs: string[]): string[] {
+// Sub-agents on the newer Codex models. A model's entry in Codex's model list
+// picks its sub-agent tools: "v1" ones are off with --disable multi_agent and
+// agents.max_depth=0, but "v2" ones (gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra)
+// ignore every flag and stay on (#498). So the seat gets its own copy of the
+// list, from ~/.codex/models_cache.json, with every model on v1. As a backstop,
+// if that list can't be read or Codex stops honouring it, v2 is capped at one
+// thread per session, the seat's own, so a sub-agent fails to start.
+function codexCatalog(dir: string): string | undefined {
+  try {
+    const cache = JSON.parse(readFileSync(join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'models_cache.json'), 'utf8'));
+    for (const m of cache.models) m.multi_agent_version = 'v1';
+    const file = join(dir, 'codex-models.json');
+    writeFileSync(file, JSON.stringify(cache));
+    return file;
+  } catch {
+    return undefined;
+  }
+}
+function codexArgv(s: Seat, dir: string, first: boolean, prompt: string, serverArgs: string[]): string[] {
   const str = (v: string) => JSON.stringify(v); // a TOML basic string
+  const catalog = codexCatalog(dir);
   const config = [
     `mcp_servers.game.command=${str(process.execPath)}`,
     `mcp_servers.game.args=[${serverArgs.map(str).join(', ')}]`,
@@ -327,6 +347,8 @@ function codexArgv(s: Seat, first: boolean, prompt: string, serverArgs: string[]
     'sandbox_mode="read-only"',
     'web_search="disabled"',
     'agents.max_depth=0', // no sub-agents (--disable multi_agent leaves them on)
+    ...(catalog ? [`model_catalog_json=${str(catalog)}`] : []),
+    'features.multi_agent_v2.max_concurrent_threads_per_session=1',
     'project_doc_max_bytes=0',
     'history.persistence="none"',
     ...(effort ? [`model_reasoning_effort=${str(effort)}`] : []),
