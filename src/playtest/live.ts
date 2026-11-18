@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// A live page for a contest or an eval while it runs: the ratings so far with
+// A live page for a contest or an eval while it runs, or for the whole
+// leaderboard. For a contest: the ratings so far with
 // how sure each is, games finished and left, the game being played now, and
 // the last games' results. It only reads the directory (draw.json, each game's
 // results.json, game.json, game.seats.json and runner.json), on every request, so it works for
@@ -13,6 +14,13 @@
 //
 //   node src/playtest/live.ts DIR [--port 8790] [--host ADDR]
 //
+// With no DIR it follows the whole leaderboard instead: every rated game, the
+// same set `npm run leaderboard` counts (playtests, evals, contests and games
+// played on `npm run serve`), with the last games finished. It reads them all
+// again on every request too, so a game counts as soon as it ends.
+//
+//   node src/playtest/live.ts [--since DATE] [--rooms DIR] [--no-rooms] [--port 8790] [--host ADDR]
+//
 // It listens on this machine and on its Tailscale address, and prints the
 // Tailscale link (and a QR code of it) for a phone on the same tailnet. See
 // "Watch a contest live" in docs/eval.md.
@@ -25,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { TUNING } from '../data.ts';
 import { score, type Game } from '../engine.ts';
 import { qrMatrix } from '../../web/qr.ts';
-import { collect } from './leaderboard.ts';
+import { CACHE, collect, type Collected } from './leaderboard.ts';
 import { resultsLabel } from './players.ts';
 import { rate } from './rating.ts';
 
@@ -57,8 +65,23 @@ export interface LiveGame {
   /** People whose game waits for them: it starts once they've opened their link. */
   waitingFor?: string[];
 }
-export interface LiveRating { player: string; rating: number; range: number; games: number; wins: number; place: number; costPerGame?: string }
+export interface LiveRating {
+  player: string;
+  rating: number;
+  range: number;
+  /** The 95% range's ends, rounded as the leaderboard prints them. */
+  low: number;
+  high: number;
+  games: number;
+  wins: number;
+  place: number;
+  costPerGame?: string;
+}
+/** A finished game on the whole leaderboard's page: when it ended, and who sat in it, by place. */
+export interface BoardGame { ended: string; seats: { player: string; place: number }[] }
 export interface LiveState {
+  /** A contest's (or an eval's) page, or the whole leaderboard's. */
+  kind: 'contest' | 'leaderboard';
   name: string;
   dir: string;
   /** Games in the plan (a contest's draw); null for an eval, whose plan isn't on disk. */
@@ -75,6 +98,8 @@ export interface LiveState {
   pointsToWin: number;
   playing: LiveGame[];
   recent: LiveGame[];
+  /** The whole leaderboard's last games finished, newest first (empty for a contest). */
+  latest: BoardGame[];
   ratings: LiveRating[];
   /** Roster entries with no finished game yet (a contest's), by their name in the draw. */
   unrated: string[];
@@ -193,18 +218,14 @@ export function liveState(dir: string, now = Date.now()): LiveState {
   }
 
   const c = collect({ dirs: [dir], rooms: null });
-  const ratings = rate(c.games).map((r) => {
-    const spent = c.games.flatMap((g) => g.spent.filter((s) => s.player === r.player));
-    const usd = spent.reduce((t, s) => t + (s.costUsd ?? 0), 0), tokens = spent.reduce((t, s) => t + (s.tokens ?? 0), 0);
-    const costPerGame = !spent.length ? undefined : usd ? `$${(usd / spent.length).toFixed(2)}` : `${Math.round(tokens / spent.length / 1000)}k tokens`;
-    return { player: r.player, rating: Math.round(r.rating), range: Math.round(r.range), games: r.games, wins: r.wins, place: Math.round(r.place * 100) / 100, ...(costPerGame ? { costPerGame } : {}) };
-  });
+  const ratings = ratingsOf(c);
   const minutes = done.map((g) => g.minutes).filter((m) => m > 0);
   const minutesPerGame = minutes.length ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : null;
   const total = draw ? draw.games.length : null;
   const live = playing.filter((g) => g.status === 'playing');
   const left = total === null ? null : Math.max(0, total - done.length);
   return {
+    kind: 'contest',
     name: basename(dir),
     dir,
     total,
@@ -216,8 +237,62 @@ export function liveState(dir: string, now = Date.now()): LiveState {
     pointsToWin: TUNING.pointsToWin,
     playing: playing.reverse(),
     recent: done.reverse().slice(0, 12),
+    latest: [],
     ratings,
     unrated: draw ? draw.roster.filter((m) => !seen.has(resultsLabel(m))) : [],
+    skipped: c.skipped,
+    updated: new Date(now).toISOString(),
+  };
+}
+
+/** Each player's rating, as the leaderboard ranks and prints them. */
+function ratingsOf(c: Collected): LiveRating[] {
+  return rate(c.games).map((r) => {
+    const spent = c.games.flatMap((g) => g.spent.filter((s) => s.player === r.player));
+    const usd = spent.reduce((t, s) => t + (s.costUsd ?? 0), 0), tokens = spent.reduce((t, s) => t + (s.tokens ?? 0), 0);
+    const costPerGame = !spent.length ? undefined : usd ? `$${(usd / spent.length).toFixed(2)}` : `${Math.round(tokens / spent.length / 1000)}k tokens`;
+    return {
+      player: r.player,
+      rating: Math.round(r.rating),
+      range: Math.round(r.range),
+      low: Math.round(r.rating - r.range),
+      high: Math.round(r.rating + r.range),
+      games: r.games,
+      wins: r.wins,
+      place: Math.round(r.place * 100) / 100,
+      ...(costPerGame ? { costPerGame } : {}),
+    };
+  });
+}
+
+/** Where the whole leaderboard reads its games, as `npm run leaderboard` does by default. */
+export interface Sources { dirs: string[]; rooms: string | null; since?: number }
+export const DEFAULT_SOURCES: Sources = { dirs: [join(CACHE, 'playtests')], rooms: join(CACHE, 'rooms') };
+
+/** The whole leaderboard's page: every rated game the leaderboard counts, read now. */
+export function leaderboardState(sources: Sources = DEFAULT_SOURCES, now = Date.now()): LiveState {
+  const c = collect(sources);
+  const latest = c.games
+    .filter((g) => g.ended)
+    .sort((a, b) => b.ended! - a.ended!)
+    .slice(0, 12)
+    .map((g) => ({ ended: new Date(g.ended!).toISOString(), seats: [...g.seats].sort((a, b) => a.place - b.place) }));
+  return {
+    kind: 'leaderboard',
+    name: 'Leaderboard',
+    dir: sources.dirs.join(', '),
+    total: null,
+    finished: c.games.length,
+    replayed: 0,
+    minutesPerGame: null,
+    atOnce: 0,
+    minutesLeft: null,
+    pointsToWin: TUNING.pointsToWin,
+    playing: [],
+    recent: [],
+    latest,
+    ratings: ratingsOf(c),
+    unrated: [],
     skipped: c.skipped,
     updated: new Date(now).toISOString(),
   };
@@ -288,20 +363,35 @@ export function watchProxy(dir: string, req: IncomingMessage, res: ServerRespons
   up.end();
 }
 
-const USAGE = `node src/playtest/live.ts DIR [options]
+const USAGE = `node src/playtest/live.ts [DIR] [options]
 
   DIR            the contest's (or an eval's) directory, as given to eval.ts --out
+                 (none: the whole leaderboard, every game npm run leaderboard counts)
   --port N       the port (default 8790)
-  --host ADDR    listen only on ADDR (default: this machine, 127.0.0.1, and its Tailscale address)`;
+  --host ADDR    listen only on ADDR (default: this machine, 127.0.0.1, and its Tailscale address)
+
+  With no DIR, as for npm run leaderboard:
+  --since DATE   only games that ended on or after DATE (e.g. 2026-11-01)
+  --rooms DIR    where npm run serve keeps its games (default ~/.cache/board-lite/rooms)
+  --no-rooms     leave out the games played on npm run serve`;
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-  const valued = new Set(['--port', '--host']);
+  const valued = new Set(['--port', '--host', '--since', '--rooms']);
   const dirs = args.filter((a, i) => !a.startsWith('--') && !valued.has(args[i - 1]));
-  if (args.includes('--help') || dirs.length !== 1) { console.log(USAGE); process.exit(args.includes('--help') ? 0 : 1); }
-  const dir = resolve(dirs[0]);
-  if (!existsSync(dir)) throw new Error(`No directory ${dir}: give the contest's directory, the one eval.ts --out names.`);
+  if (args.includes('--help') || dirs.length > 1) { console.log(USAGE); process.exit(args.includes('--help') ? 0 : 1); }
+  const dir = dirs.length ? resolve(dirs[0]) : null;
+  if (dir && !existsSync(dir)) throw new Error(`No directory ${dir}: give the contest's directory, the one eval.ts --out names, or none for the whole leaderboard.`);
+  if (dir && ['--since', '--rooms', '--no-rooms'].some((o) => args.includes(o))) throw new Error('--since, --rooms and --no-rooms are for the whole leaderboard: leave out the directory.');
+  const since = opt('--since') ? Date.parse(opt('--since')!) : undefined;
+  if (since !== undefined && Number.isNaN(since)) throw new Error(`--since takes a date like 2026-11-01, not ${opt('--since')}.`);
+  const sources: Sources = {
+    ...DEFAULT_SOURCES,
+    rooms: args.includes('--no-rooms') ? null : resolve(opt('--rooms') ?? DEFAULT_SOURCES.rooms!),
+    since,
+  };
+  const state = () => (dir ? liveState(dir) : leaderboardState(sources));
   const port = Number(opt('--port') ?? 8790);
   const page = readFileSync(fileURLToPath(new URL('./live.html', import.meta.url)), 'utf8');
 
@@ -310,7 +400,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (path === '/state.json') {
       try {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        res.end(JSON.stringify(liveState(dir)));
+        res.end(JSON.stringify(state()));
       } catch (e) {
         console.error(e);
         res.writeHead(500, { 'content-type': 'application/json' });
@@ -321,6 +411,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (path === '/') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end(page);
+      return;
+    }
+    if (!dir) {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Not found');
       return;
     }
     watchProxy(dir, req, res); // a game's table view
@@ -334,8 +429,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     server.listen(port, host);
   }
 
-  const s = liveState(dir);
-  console.log(`Watching ${dir}: ${s.finished}${s.total ? ` of ${s.total}` : ''} games finished.`);
+  const s = state();
+  if (dir) console.log(`Watching ${dir}: ${s.finished}${s.total ? ` of ${s.total}` : ''} games finished.`);
+  else console.log(`Watching the whole leaderboard: ${s.finished} rated games, from ${[...sources.dirs, ...(sources.rooms ? [sources.rooms] : [])].join(' and ')}.`);
   console.log(`On this machine: http://127.0.0.1:${port}/`);
   if (opt('--host')) console.log(`Listening on http://${opt('--host')}:${port}/`);
   else if (ts) {

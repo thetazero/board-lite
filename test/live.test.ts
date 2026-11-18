@@ -4,14 +4,15 @@
 // is gone shows as stopped, not playing.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { newGame } from '../src/engine.ts';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { liveState, terminalQr, timeLeft, watchProxy } from '../src/playtest/live.ts';
+import { leaderboardState, liveState, terminalQr, timeLeft, watchProxy } from '../src/playtest/live.ts';
+import { collect, leaderboard } from '../src/playtest/leaderboard.ts';
 
 const base = join(homedir(), '.cache', 'board-lite'); // not /tmp, which is RAM on the dev machine
 
@@ -152,5 +153,37 @@ test('a game with a person in it: their link into the seat, and that the game wa
     assert.equal(liveState(dir).playing[0].waitingFor, undefined, 'started');
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the whole leaderboard: every rated game, room games too, as npm run leaderboard rates them, and the last games first', () => {
+  mkdirSync(base, { recursive: true });
+  const root = mkdtempSync(join(base, 'test-live-'));
+  try {
+    const play = join(root, 'playtests'), rooms = join(root, 'rooms');
+    mkdirSync(join(play, 'contest', 'g1'), { recursive: true });
+    mkdirSync(rooms);
+    const results = join(play, 'contest', 'g1', 'results.json');
+    writeFileSync(results, JSON.stringify({ status: 'over', winner: { seat: 'P1' }, seats: [{ seat: 'P1', model: 'opus', points: 50, costUsd: 9 }, { seat: 'P2', model: 'bot', points: 20 }] }));
+    utimesSync(results, new Date('2026-11-01'), new Date('2026-11-01'));
+    // A game on npm run serve: a person against a bot, newer.
+    writeFileSync(join(rooms, 'XPNB.seats.json'), JSON.stringify({ code: 'XPNB', hostToken: 't', seats: [{ name: 'Shoggoth', kind: 'player' }, { name: 'Cog', kind: 'bot' }] }));
+    writeFileSync(join(rooms, 'XPNB.json'), JSON.stringify({ phase: 'over', log: [{ round: 9, text: '', ev: { k: 'final', totals: [50, 30], winner: 0 } }] }));
+
+    const s = leaderboardState({ dirs: [play], rooms });
+    assert.equal(s.kind, 'leaderboard');
+    assert.equal(s.finished, 2);
+    assert.deepEqual(s.latest.map((g) => g.seats.map((x) => `${x.player}#${x.place}`).join(' ')), ['Shoggoth (person)#1 bot#2', 'opus#1 bot#2'], 'newest first, by place');
+    const text = leaderboard(collect({ dirs: [play], rooms }));
+    for (const r of s.ratings) assert.ok(text.includes(`| ${r.player} | ${r.rating} | ${r.low} to ${r.high} | ${r.games} |`), `${r.player} as the leaderboard prints it`);
+    assert.equal(s.ratings.find((r) => r.player === 'opus')?.costPerGame, '$9.00');
+
+    // A game that ends while the page is open counts on the next request.
+    writeFileSync(join(rooms, 'ABCD.seats.json'), JSON.stringify({ code: 'ABCD', hostToken: 't', seats: [{ name: 'Shoggoth', kind: 'player' }, { name: 'Cog', kind: 'bot' }] }));
+    writeFileSync(join(rooms, 'ABCD.json'), JSON.stringify({ phase: 'over', log: [{ round: 9, text: '', ev: { k: 'final', totals: [50, 30], winner: 0 } }] }));
+    assert.equal(leaderboardState({ dirs: [play], rooms }).finished, 3);
+    assert.equal(leaderboardState({ dirs: [play], rooms: null }).finished, 1, '--no-rooms');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

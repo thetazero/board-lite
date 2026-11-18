@@ -85,7 +85,7 @@ Or add yourself to a contest that has run, as [above](#add-players-to-a-contest)
 npm run live -- ~/.cache/board-lite/playtests/<the contest's directory>
 ```
 
-serves a page for a contest (or an eval) while it runs: the ratings so far, over all its games, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take at the number of games being played at once now (so a contest restarted with another `--parallel` is timed by how it plays now); the game being played now, its round, phase and each seat's points, and a button to watch its board; and the last games' results. A game with a person in it has a **Play as <name>** button that puts their phone in their seat, and says when the game is waiting for them. It updates by itself every 10 seconds, and it's laid out for a phone.
+serves a page for a contest (or an eval) while it runs (with no directory, the whole leaderboard: [below](#watch-the-leaderboard-live)): the ratings so far, over all its games, each with its 95% range drawn as a bar; games finished and left, with about how long the rest will take at the number of games being played at once now (so a contest restarted with another `--parallel` is timed by how it plays now); the game being played now, its round, phase and each seat's points, and a button to watch its board; and the last games' results. A game with a person in it has a **Play as <name>** button that puts their phone in their seat, and says when the game is waiting for them. It updates by itself every 10 seconds, and it's laid out for a phone.
 
 It prints a link for this machine and, when Tailscale is running, a link on the tailnet (`http://<machine>.<tailnet>.ts.net:8790/`) with a QR code of it in the terminal: open it on a phone on the same tailnet. It listens only on this machine and its Tailscale address, not the rest of the network (`--host ADDR` to pick one, `--port N` for another port).
 
@@ -128,6 +128,16 @@ How to read it:
 - **Cost a game:** what a Claude seat spent, or a Codex seat's tokens.
 
 Options: `--since 2026-11-01` counts only games that ended on or after a date. Use it after a rules change, since a rating mixes every game it reads. `--no-rooms` leaves out games on `npm run serve`, and `--out FILE` also writes the table to a file.
+
+### Watch the leaderboard live
+
+```
+npm run live
+```
+
+with no directory serves the whole leaderboard as a page, for a phone: the same games, players, ratings and 95% ranges `npm run leaderboard` prints, your games on `npm run serve` included, each rating with its range drawn as a bar, and the last games finished. It reads every game again on each refresh (every 10 seconds), so a game counts as soon as it ends, with no restart. It takes the leaderboard's `--since`, `--rooms DIR` and `--no-rooms`.
+
+It prints the same links as a contest's page ([above](#watch-a-contest-live)): one for this machine, and one on the tailnet with a QR code, for your phone. It's on port 8790 too, so to run it beside a contest's page give one of them another port: `npm run live -- --port 8791`.
 
 ### Who's who
 

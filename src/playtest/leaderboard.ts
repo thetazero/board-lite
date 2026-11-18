@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { resultsLabel } from './players.ts';
 import { BOT, placesFrom, rate, type RatedGame } from './rating.ts';
 
-const CACHE = join(homedir(), '.cache', 'board-lite');
+export const CACHE = join(homedir(), '.cache', 'board-lite');
 
 interface ResultSeat { seat: string; name?: string; model: string; options?: string[]; modelId?: string; points?: number; costUsd?: number; tokens?: number }
 interface Results { status: string; room?: string; effort?: string; advice?: string; winner: { seat: string } | null; seats: ResultSeat[] }
@@ -28,6 +28,7 @@ interface Results { status: string; room?: string; effort?: string; advice?: str
 /** A finished game, ready to rate, with what it cost each AI seat. */
 export interface Played extends RatedGame {
   source: string; // the directory or room file it came from
+  ended?: number; // when it finished (its results' or room file's time), ms
   spent: { player: string; costUsd?: number; tokens?: number }[];
 }
 
@@ -105,24 +106,25 @@ export function collect(opts: { dirs: string[]; rooms: string | null; since?: nu
       if (code) runners.set(code, [...(runners.get(code) ?? []), r]);
       continue;
     }
-    fromResults(r, join(f, '..'));
+    fromResults(r, join(f, '..'), statSync(f).mtimeMs);
   }
 
-  function fromResults(r: Results, dir: string) {
+  function fromResults(r: Results, dir: string, ended?: number) {
     if (r.status !== 'over' || !r.winner) return skip('not finished');
     // Before seats had options (#476), --advice went to every seat with nothing in its name to say so.
     if (r.advice && !r.seats.some((s) => s.options?.includes('advice'))) return skip('played with --advice before seats were named by it');
     const final = dir ? finalScores(readJson(join(dir, 'game.json'))) : null;
     const winner = r.seats.findIndex((s) => s.seat === r.winner!.seat);
     const places = final ? placesFrom(final.totals, final.winner) : placesFrom(r.seats.map((s) => s.points ?? 0), winner);
-    add(dir, r.seats.map((s, p) => ({ player: playerOf(s, r.effort, r.advice), place: places[p], costUsd: s.costUsd, tokens: s.tokens })));
+    add(dir, r.seats.map((s, p) => ({ player: playerOf(s, r.effort, r.advice), place: places[p], costUsd: s.costUsd, tokens: s.tokens })), ended);
   }
 
-  function add(source: string, seats: { player: string | null; place: number; costUsd?: number; tokens?: number }[]) {
+  function add(source: string, seats: { player: string | null; place: number; costUsd?: number; tokens?: number }[], ended?: number) {
     const held = seats.filter((s): s is typeof s & { player: string } => !!s.player);
     if (new Set(held.map((s) => s.player)).size < 2) return skip('fewer than two different players');
     games.push({
       source,
+      ...(ended ? { ended } : {}),
       seats: held.map(({ player, place }) => ({ player, place })),
       spent: held.filter((s) => s.player !== BOT && (s.costUsd || s.tokens)).map(({ player, costUsd, tokens }) => ({ player, costUsd, tokens })),
     });
@@ -153,7 +155,7 @@ export function collect(opts: { dirs: string[]; rooms: string | null; since?: nu
           if (mine) return { player: playerOf(mine, r.effort, r.advice), place: places[p], costUsd: mine.costUsd, tokens: mine.tokens };
         }
         return { player: person(s.name), place: places[p] };
-      }));
+      }), statSync(file).mtimeMs);
     }
   }
   // A room game whose room file is gone: its runner's results still say who sat where.
