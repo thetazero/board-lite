@@ -20,7 +20,7 @@ board-lite is running on port 8080.
   Phones over Tailscale: http://100.101.102.103:8080/
 ```
 
-1. **TV:** open the TV address and press **Full screen** in the top corner (or F11). The button is always there in the lobby; in a game it shows while the mouse moves. It shows the room's QR code, address and 4-letter code. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
+1. **TV:** open the TV address (or the bare address on the TV or a desktop, and press **Host on this screen**; on a phone, **Host on a TV** says what to open on the TV) and press **Full screen** in the top corner (or F11). The button is always there in the lobby; in a game it shows while the mouse moves. It shows the room's QR code, address and 4-letter code. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
 2. **Phones:** scan the QR code (or type the address), type a name, tap **Join**. The name is remembered.
 3. **Start:** with 2 to 6 players, press **Start game** on the TV or the phone of the first to join. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
 
@@ -66,7 +66,7 @@ The recap is one file, `~/.cache/board-lite/recaps/<id>.json` (built by `src/rec
 
 ## Playing with no TV
 
-On the join form (the server's bare address), type your name and tap **New game** under "No TV". Your phone makes the room and shows its QR code for the others, and the address to open on a TV if one turns up later. One phone and a few bots is a whole game.
+On the home page (the server's bare address), type your name and tap **Play with no TV**. Your phone makes the room and shows its QR code for the others, and the address to open on a TV if one turns up later. One phone and a few bots is a whole game.
 
 Each phone has a **You / Table** switch by the talk bar: Table shows what the TV would, as a flat map. Scenes (production rolls, dragons healing and growing, fights) cut to the table on their own and back when they end; while one plays, You is off, since there is nothing to do there yet. Whatever was showing, a decision that opens for you (a vote, your turn, a card to keep) always shows on You.
 
