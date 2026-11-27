@@ -2023,10 +2023,13 @@ export class Board3D {
     }
   }
 
-  update(g: PublicState, highlight: number | null) {
+  update(g: Pick<PublicState, 'map' | 'dragons'>, highlight: number | null) {
     this.highlight = highlight;
     const sig = g.map.map((h) => `${h.k}${h.terrain}`).join();
-    if (sig !== this.mapSig) this.buildMap(g.map, sig);
+    if (sig !== this.mapSig) {
+      this.buildMap(g.map, sig);
+      this.firstUpdate = true; // another map (the lobby's, then the game's) is there at once, not folded up
+    }
     const now = clock();
     const animate = !this.firstUpdate;
     // Each hex with something new gets its turn in the cascade; its scenery
@@ -2370,7 +2373,7 @@ export class Board3D {
     this.resize();
   }
 
-  private placeDragons(g: PublicState, animate: boolean, now: number) {
+  private placeDragons(g: Pick<PublicState, 'dragons' | 'map'>, animate: boolean, now: number) {
     // Perches: each owner's tower, roosts and hatcheries, in that order; eggs
     // go to a hatchery's nest first. Any extra dragons stand round the tower.
     const perches = new Map<number, { pos: THREE.Vector3; face: number; home: THREE.Vector3; egg: boolean }[]>();

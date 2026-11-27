@@ -5,6 +5,7 @@
 // searches for a lucky game, so a tuning change can't make a scene fail to
 // stage unless it takes away what the scene shows.
 
+import { STEPS } from '../../web/explain-steps.ts';
 import { botStep, standInMove } from '../bot.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, TUNING, UPGRADES, targetPower } from '../data.ts';
 import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, stageStats, standings, turnOrder, upgradeTargets, waitingOn, type Dragon, type Game } from '../engine.ts';
@@ -1176,7 +1177,11 @@ export const SCENES: Scene[] = [
     players: 0,
     seed: 1,
     lobby: { bots: 0 },
-    shots: () => [{ file: 'tv-lobby-empty', caption: 'TV lobby: a new room, nobody yet', client: 'tv' }],
+    shots: () => [
+      { file: 'tv-lobby-empty', caption: 'TV lobby: a new room, nobody yet', client: 'tv' },
+      { file: 'tv-lobby-explain-fighting', caption: 'TV lobby: the explanation, partway through the fight', client: 'tv', run: `window.explainAt('fight', 2).then(() => { window.boardClock = 60; })`, waitMs: 800 },
+      ...STEPS.slice(1).map((s) => ({ file: `tv-lobby-explain-${s.show}`, caption: `TV lobby: the explanation, ${s.show}`, client: 'tv' as const, run: `window.explainAt('${s.show}').then(() => { window.boardClock = 60; })`, waitMs: 800, sizes: s.show === 'cards' || s.show === 'vote' || s.show === 'production' })),
+    ],
   },
   {
     name: 'lobby-alone',

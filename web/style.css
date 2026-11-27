@@ -171,6 +171,45 @@ svg.token { flex: none; }
 .tv .tipline b { color: var(--accent); margin-right: .4em; }
 .lobby-actions { display: flex; gap: 1em; font-size: 1.3em; }
 .hint { color: var(--muted); }
+/* A new game's lobby explains the game where the title picture is (explain.ts):
+   the board, the fight or the title picture fills it; what a step shows stands
+   over that, between the round's phases and the step's words. */
+.lobby > .under { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tv .hero.explain { --band: 4.2em; flex-basis: 52vh; }
+.lobby.new:has(.savedgames) .hero.explain { flex-basis: 44vh; }
+.explain > div { position: absolute; inset: 0; }
+.explain .xboard { inset: var(--band) 0; }
+.explain .board3d { inset: calc(-1 * var(--band)) 0 calc(-1 * var(--band)) -14%; } /* a little left, for the sheets on the right */
+.explain .xboard svg.map { position: absolute; inset: 0; }
+.explain .xtitle, .explain .xfight { opacity: 0; transition: opacity .6s; overflow: hidden; }
+.explain[data-show="title"] .xtitle, .explain[data-show="fight"] .xfight { opacity: 1; }
+.explain .xtitle { background: var(--bg); }
+.explain .xphases { position: absolute; top: 0; left: 0; right: 0; list-style: none; margin: 0; padding: .4em 0; display: flex; justify-content: center; align-items: center; gap: 1.4em; height: 2.4em; box-sizing: border-box; font-size: 1.25em; font-weight: 600; color: #f3ead7a0; background: #1d1934c8; }
+.explain .xphases li.phase { color: var(--accent); font-family: var(--serif); font-size: 1.3em; font-weight: 800; }
+.explain .xtext { position: absolute; bottom: 0; left: 0; right: 0; margin: 0; padding: .4em 1em .5em; text-align: center; font-size: 1.7em; font-weight: 700; color: var(--text); background: #1d1934d8; }
+.explain[data-show="title"] :is(.xphases, .xtext) { display: none; }
+.explain .xshow { top: 3em; bottom: 4.4em; display: flex; align-items: center; justify-content: center; }
+.explain:is([data-show="cards"], [data-show="vote"]) .xboard { filter: brightness(.5); }
+.explain .xsheet { background: var(--sheet); color: var(--ink); border-radius: 2px; box-shadow: var(--lift); padding: .6em 1.4em; font-size: 1.15em; animation: enter .5s both; }
+.explain .xsheet h2 { margin: 0; font-family: var(--serif); font-size: 1.8em; }
+.explain .xsheet .loot { font-size: 1.3em; }
+.explain .xrow :is(.chip, .gains) { margin: 0 .25em; }
+.explain .xrow { display: flex; align-items: center; gap: .3em; min-height: 3em; font-size: 1.2em; }
+.explain .xdie { display: inline-flex; align-items: center; gap: .8em; }
+.explain:is([data-show="production"], [data-show="fight"], [data-show="points"]) .xshow { justify-content: flex-end; padding-right: 2%; }
+.explain[data-show="fight"] .xsheet { font-size: 1em; }
+.explain .xscores { display: flex; flex-direction: column; gap: .4em; font-size: 1.45em; }
+.explain .xscores span { display: flex; justify-content: space-between; align-items: center; gap: 1.5em; }
+.explain .xcards { display: flex; align-items: center; gap: 1.6em; }
+.explain .xcards i { width: 1.5em; }
+.explain .card { width: 11.5em; cursor: default; font-size: 1.1em; animation: enter .5s both; transition: transform .6s, opacity .6s; }
+.explain .card.kept { transform: scale(1.1); box-shadow: 0 0 0 4px var(--accent); }
+.explain .card.gone { transform: translateY(2em) scale(.85); opacity: .25; }
+.explain .xkingdoms { display: flex; gap: 1.6em; font-size: .85em; }
+.explain .xflat { position: absolute; inset: 20% 8% 22%; display: flex; justify-content: space-between; align-items: flex-end; }
+.explain .xflat > div { display: flex; align-items: flex-end; }
+.explain .xflat span { width: 7em; transition: opacity .5s, transform .5s; }
+.explain .xflat span.down { transform: rotate(80deg); opacity: .4; }
 /* Full screen (tv.ts): top right, over the lobby's sky or the board's goal;
    in a game only while the mouse moves. */
 #tvbtns { position: fixed; top: .8em; right: 1em; z-index: 50; font-size: 1.2em; display: flex; gap: .6em; }

@@ -1,4 +1,4 @@
-// Tips for mistakes players often make. The TV lobby shows one at a time,
+// Tips for mistakes players often make. A resumed game's lobby shows one at a time,
 // a random one every TIP_MS (tv.ts); docs/rules.md's Tips section lists them
 // all, word for word (test/tips.test.ts), and bots read it with the rules.
 export const TIPS = [
