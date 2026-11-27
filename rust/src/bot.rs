@@ -130,7 +130,7 @@ pub fn candidates(g: &Game, p: usize, rng: &mut Rng) -> Vec<String> {
     out
 }
 
-fn first_legal(g: &mut Game, p: usize, cmds: Vec<String>) -> Option<String> {
+pub fn first_legal(g: &mut Game, p: usize, cmds: Vec<String>) -> Option<String> {
     cmds.into_iter().find(|c| g.apply(p, c).is_ok())
 }
 
@@ -140,13 +140,16 @@ pub fn bot_move(g: &mut Game, p: usize, rng: &mut Rng) -> Option<String> {
 }
 
 /// The move made for a seat whose player has gone: as little as possible.
-pub fn stand_in_move(g: &mut Game, p: usize) -> Option<String> {
+pub fn stand_in_commands(g: &Game, p: usize) -> Vec<String> {
     let pl = &g.players[p];
-    let cmds = match g.phase {
+    match g.phase {
         Phase::Action => g.offers.iter().filter(|o| o.waits_on(p)).map(|o| format!("decline {}", o.id)).chain((g.turn == p).then(|| "end".into())).collect(),
         Phase::Cards => pl.choice.first().map(|c| format!("keep {}", c.id)).into_iter().collect(),
         Phase::Raid => vec![if g.raid.as_ref().unwrap().step == Step::Vote { "vote 1".into() } else { "hold".into() }],
         _ => vec![format!("discard {}", join(&pl.hand[..pl.hand.len().saturating_sub(tuning().hand_cap)].iter().map(|c| c.id).collect::<Vec<_>>()))],
-    };
+    }
+}
+pub fn stand_in_move(g: &mut Game, p: usize) -> Option<String> {
+    let cmds = stand_in_commands(g, p);
     first_legal(g, p, cmds)
 }

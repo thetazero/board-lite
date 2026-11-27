@@ -31,3 +31,17 @@ Where they differ on purpose: changes that come faster than a viewer reads them 
 | Image compressed | 89 MB | 48 MB | 1.9 MB |
 | Container memory, idle | 49.9 MB | not measured | 0.6 MB |
 | Time to first answer | 268 ms | not measured | 6–11 ms |
+
+With people connected (each table a TV and 4 phones, about 0.3 moves a second, each saved and pushed to all five), 12 seconds measured at each step, one run, other work going on on the machine:
+
+| People | | Node | Rust |
+|---|---|---|---|
+| 0 | container memory / CPU | 58 MB / 0.2% | 2.6 MB / 0% |
+| 50 | container memory / CPU | 72 MB / 2.6% | 6.9 MB / 0.6% |
+| | a move, median / p95 | 5.3 / 8.9 ms | 1.8 / 5.1 ms |
+| 500 | container memory / CPU | 89 MB / 19% | 31 MB / 5.8% |
+| | a move, median / p95 | 5.4 / 9.6 ms | 1.6 / 3.4 ms |
+| 2,500 | container memory / CPU | 157 MB / 86% | 136 MB / 28% |
+| | a move, median / p95 | 10.0 / 35.4 ms | 1.5 / 3.2 ms |
+
+Container memory counts file cache too, so it moves a few MB between runs (the idle figures above are from another run). The Rust server keeps each table's JSON for as long as the table is busy, which is probably most of its memory at 2,500: not confirmed. Some of the CPU gain is that JSON being made once rather than for each viewer, not Rust itself; how much wasn't measured. Games were minutes old: long games weren't measured.

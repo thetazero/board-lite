@@ -2,12 +2,13 @@
 //! request a line on stdin, one JSON answer a line on stdout.
 use board_lite::engine::Game;
 use board_lite::rng::Rng;
-use board_lite::{bot, mapimage, recap, scenes, state, store, view};
+use board_lite::{bot, mapimage, recap, scenes, state, store, strongbot, view};
 use serde_json::{Value, json};
 use std::io::{BufRead, Write};
 
 fn main() {
     let mut g: Option<Game> = None;
+    let mut seen = strongbot::Seen::new();
     let mut out = std::io::stdout().lock();
     for line in std::io::stdin().lock().lines() {
         let q: Value = serde_json::from_str(&line.unwrap()).unwrap();
@@ -30,6 +31,13 @@ fn main() {
                     "bot" => {
                         let mut rng = Rng { state: int("state") as i32 };
                         let cmd = bot::bot_move(g, p, &mut rng);
+                        json!({"cmd": cmd, "state": rng.state})
+                    }
+                    "strong" => {
+                        let mut rng = Rng { state: int("state") as i32 };
+                        let tune = strongbot::Tune::default();
+                        let bot = strongbot::Bot { p, name: q["name"].as_str(), now: int("now"), tune: &tune };
+                        let cmd = strongbot::strong_move(g, &bot, &mut rng, &mut seen).unwrap();
                         json!({"cmd": cmd, "state": rng.state})
                     }
                     "standin" => json!(bot::stand_in_move(g, p)),

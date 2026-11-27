@@ -13,6 +13,7 @@ pub mod scenes;
 pub mod server;
 pub mod state;
 pub mod store;
+pub mod strongbot;
 pub mod view;
 
 pub const RULEBOOK: &str = include_str!("../generated/rulebook.json");

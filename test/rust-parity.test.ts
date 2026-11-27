@@ -16,6 +16,7 @@ import { mapImage } from '../src/mapimage.ts';
 import { buildRecap } from '../src/recap.ts';
 import { next, pick, type Rng } from '../src/rng.ts';
 import { publicState, rulebook, seatState, visibleEvents, type Lobby, type Snapshot } from '../src/state.ts';
+import { strongMove } from '../src/strongbot.ts';
 import { seatStatus, seatView } from '../src/view.ts';
 import { scenesMs, scenesOf } from '../web/scenes.ts';
 
@@ -126,5 +127,39 @@ test('a game saved by an older version loads the same', { skip }, async () => {
     const text = JSON.stringify(newGame(3, 9)).replaceAll('"desert"', '"plains"').replaceAll('"wolf"', '"wolf_pack"');
     await r.ask('load', { text });
     assert.deepEqual(await r.ask('game'), plain(newGame(3, 9)));
+  } finally { r.stop(); }
+});
+
+test('the Rust strong bot makes the moves this one does', { skip, timeout: 110000 }, async () => {
+  const r = rust();
+  try {
+    let moves = 0;
+    for (const [players, seed] of [[2, 31], [3, 47], [4, 5], [6, 88]]) {
+      const g = newGame(players, seed);
+      await r.ask('new', { players, seed });
+      const rng: Rng = { state: seed };
+      let now = 1_000_000 * seed;
+      for (let step = 0; step < Number(process.env.STRONG_STEPS ?? 250) && g.phase !== 'over'; step++) {
+        const where = `${players} players, seed ${seed}, step ${step}, round ${g.round} ${g.phase}`;
+        now += 9000;
+        if (next(rng) < 0.15) {
+          const q = Math.floor(next(rng) * players);
+          const cmd = pick(rng, ['say Tick, want to raid?', `tell P${1 + Math.floor(next(rng) * players)} need some gold`, 'say P1 hello', 'say nice weather', 'say P2: hold back, or fight?', 'say trades, anyone?']);
+          let error: string | null = null;
+          try { apply(g, q, cmd); } catch (e) { error = (e as Error).message; }
+          assert.equal(await r.ask('apply', { p: q, cmd }), error, where);
+        }
+        // Waiting on answers to its own offer: the others go first.
+        for (const p of [...waitingOn(g)].reverse()) {
+          const state = rng.state;
+          const cmd = strongMove(g, p, rng, { name: 'Tick', now });
+          assert.deepEqual(await r.ask('strong', { p, state, name: 'Tick', now }), { cmd, state: rng.state }, where);
+          moves++;
+          if (cmd !== null) break;
+        }
+        if (step % 25 === 0) assert.deepEqual(await r.ask('game'), plain(g), where);
+      }
+    }
+    console.log(`${moves} strong bot moves`);
   } finally { r.stop(); }
 });
