@@ -27,7 +27,7 @@ const MAX_PLAYERS: usize = 6;
 const AWAY_MS: i64 = 60_000;
 const TV_GONE_MS: i64 = 20_000;
 const BOT_DELAY_MS: i64 = 700;
-const CACHE_MS: i64 = 5_000; // how long a quiet room keeps the JSON it last sent
+const CACHE_MS: i64 = 500; // how long a quiet room keeps the JSON it last sent
 
 #[derive(Debug)]
 pub enum Fail {
@@ -160,10 +160,8 @@ struct Inner {
     has_tv: bool,
     recapped: bool,
     closed: bool,
-    // The game as JSON, as it was last sent: everyone watching gets the same
-    // public bytes, and each seat its own.
+    // The game as JSON, as it was last sent: everyone watching gets the same public bytes.
     public: Option<Bytes>,
-    private: Vec<Option<Bytes>>,
     seen: HashMap<String, usize>, // the events each Claude player has been shown up to (mcp.rs)
 }
 
@@ -313,7 +311,6 @@ impl Room {
             recapped: false,
             closed: false,
             public: None,
-            private: vec![],
             seen: HashMap::new(),
         };
         let again = saved.is_some();
@@ -414,7 +411,6 @@ impl Room {
         let command = make(g, &mut i.bot_rng).map_err(Fail::Room)?;
         i.log.events(&g.log, before, &by, Some(&command));
         i.public = None;
-        i.private.clear();
         let saved = store::save(&self.file, &**g);
         let ms = scenes::ms(&g.log[before..]);
         self.hold_for(i, ms);
@@ -853,8 +849,7 @@ impl Room {
         let head = format!(r#","scene":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.version, json!(recap));
         match (&i.game, p.filter(|p| i.seats[*p].kind == Kind::Player)) {
             (Some(g), Some(p)) => {
-                i.private.resize(g.players.len().max(p + 1), None);
-                let you = i.private[p].get_or_insert_with(|| json_bytes(&state::seat_state(g, p))).clone();
+                let you = json_bytes(&state::seat_state(g, p));
                 out.push(Bytes::from(format!(r#"{head}{{"name":{},"#, json!(i.seats[p].name))));
                 out.push(you.slice(1..));
                 out.push(Bytes::from_static(b"}"));
@@ -917,7 +912,6 @@ impl Room {
         let i = &mut *lock(&self.inner);
         if now_ms() - i.last_active > CACHE_MS {
             i.public = None;
-            i.private = vec![];
         }
     }
     /// Whether the server forgets the room now, and if so whether its files go too.

@@ -249,7 +249,7 @@ impl Server {
         }
     }
     async fn keep_house(&self) {
-        let mut tick = interval(Duration::from_secs(5));
+        let mut tick = interval(Duration::from_secs(1));
         tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
         for n in 0u64.. {
             tick.tick().await;
@@ -257,7 +257,7 @@ impl Server {
             for r in &rooms {
                 r.rest();
             }
-            if n % 12 == 0 {
+            if n % 60 == 0 {
                 self.limits.sweep();
                 for r in &rooms {
                     if let Some(files) = r.forget() {
@@ -269,7 +269,7 @@ impl Server {
                     }
                 }
             }
-            if n % 720 == 0 {
+            if n % 3600 == 0 {
                 clear_old(&self.site.dir, |code| lock(&self.rooms).contains_key(code));
             }
         }
