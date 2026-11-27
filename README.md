@@ -6,7 +6,7 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 - Rules as the engine plays them: [`docs/rules.md`](docs/rules.md)
 - How the game words things (cards, buttons, the TV, the rules): [`docs/wording.md`](docs/wording.md), a style guide based on published board games. Read it before writing any text a player sees.
 - Play on a TV with phones: `npm run serve`, then see [`docs/clients.md`](docs/clients.md)
-- Play with no TV, phones only (one phone and bots works too): tap **New game** on the join form; see [`docs/clients.md`](docs/clients.md#playing-with-no-tv)
+- Play with no TV, phones only (one phone and bots works too): tap **Play with no TV** on the home page; see [`docs/clients.md`](docs/clients.md#playing-with-no-tv)
 - Screenshots of the TV and phones in staged situations, for look tuning: `npm run shots -- --only <name>`, the screens a change touched ([`docs/clients.md`](docs/clients.md#staged-screenshots-for-look-tuning))
 - Play from the command line: [`docs/cli.md`](docs/cli.md)
 - Put it up as a public website, where a Claude client joins from a game's link: [`docs/deploy.md`](docs/deploy.md)

@@ -100,6 +100,10 @@ const roomInfo = (c: string): Promise<RoomInfo> => fetch(`/api/rooms/${c}`).then
 // only for a name; a game that has started instead shows the seats a player
 // can take back. What was typed survives a failed join, so a wrong code
 // doesn't cost the name too.
+// With no room, it's the home page. On a phone, Join comes first, and Host on a
+// TV says what to open there (a phone can't be the TV). A big screen can be
+// the TV, so its main action is hosting right there (style.css, the home page:
+// which of the two shows is the screen's size, nothing here).
 // `news` says what just happened to this phone (you quit, you were removed).
 async function renderJoin(err = '', typed?: { code: string; name: string }, news = '') {
   const name = typed?.name ?? localStorage.getItem('name') ?? '';
@@ -110,8 +114,13 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
   // With no room yet, the server's saved games are offered too: each opens on its seats.
   const saved: SavedGame[] = known ? [] : await fetch('/api/saved').then((r) => (r.ok ? r.json() : [])).catch(() => []);
   app.innerHTML = `
-    <div class="joinpage">
-      <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}<h1 class="title">board-lite</h1></div>
+    <div class="joinpage${known ? '' : ' home'}">
+      <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}${known ? '' : tableScene(PLAYER_COLORS.slice(0, 3), 480, 124, 0.4, 1)}<h1 class="title">board-lite</h1></div>
+      ${known ? '' : `<div class="hosthere">
+        <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
+        <a class="button primary big" href="/tv">Host on this screen</a>
+        <p>The board is on this screen. Everyone joins on their phone.</p>
+      </div>`}
       <form class="joinform" id="join">
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
@@ -120,7 +129,11 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <button class="primary big" type="submit">Join</button>
         <p class="error">${esc(err)}</p>
-        ${known ? '' : '<div class="hostline"><p>No TV: start a game on this phone, and the others join from it.</p><button id="host" type="button">New game</button></div>'}
+        ${known ? '' : `<div class="hostline">
+          <button id="hosttv" class="big" type="button">Host on a TV</button>
+          <p id="hosthow" hidden>On the TV, open <b class="url">${esc(`${location.host}/tv`)}</b>. Then join here with the room code it shows.</p>
+          <button id="notv" class="quiet" type="button">Play with no TV</button>
+        </div>`}
         ${saved.length ? `<div class="hostline savedgames"><p>Saved games</p><ul>${saved.slice(0, 5).map((g) => `<li><a class="button" href="/${esc(g.code)}"><b>${esc(g.names.join(', '))}</b><small>Round ${g.round}, saved ${esc(savedWhen(g.savedAt))}</small></a></li>`).join('')}</ul></div>` : ''}
       </form>
     </div>`;
@@ -131,9 +144,16 @@ function wireJoin() {
   const form = document.getElementById('join') as HTMLFormElement | null;
   if (!form) return;
   // A game with no TV: this phone makes the room and is its first player.
-  const host = document.getElementById('host');
-  // One room, one seat, however often New game or Join is tapped while it's on its way.
-  if (host) host.onclick = () => tapper.tap('join', async () => {
+  const noTv = document.getElementById('notv');
+  const hostTv = document.getElementById('hosttv');
+  if (hostTv) hostTv.onclick = () => {
+    const how = document.getElementById('hosthow')!;
+    hostTv.hidden = true;
+    how.hidden = false;
+    how.scrollIntoView({ block: 'nearest' });
+  };
+  // One room, one seat, however often Play with no TV or Join is tapped while it's on its way.
+  if (noTv) noTv.onclick = () => tapper.tap('join', async () => {
     const name = document.getElementById('name') as HTMLInputElement;
     if (!name.reportValidity()) return;
     try {
