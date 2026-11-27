@@ -152,6 +152,7 @@ struct Inner {
     scene_timer: Option<AbortHandle>,
     tv_timer: Option<AbortHandle>,
     version: u64,
+    game_rev: u64, // how many times the game has changed
     done_ids: VecDeque<String>,
     bot_rng: Rng,
     offers_seen: Seen, // the strong bots' own offers, and since when they've waited
@@ -167,11 +168,28 @@ struct Inner {
     seen: HashMap<String, usize>, // the events each Claude player has been shown up to (mcp.rs)
 }
 
+/// What a room waits, and what tests and screenshots fix.
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Opts {
+    pub bot_delay_ms: i64, // a pause before a bot moves, so the TV can show it
+    pub away_ms: i64,
+    pub tv_gone_ms: i64,
+    pub first_seat: Option<usize>,
+    pub recap_id: Option<String>,
+    pub ended: Option<i64>, // the time a recap is dated by
+}
+impl Default for Opts {
+    fn default() -> Opts {
+        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, tv_gone_ms: TV_GONE_MS, first_seat: None, recap_id: None, ended: None }
+    }
+}
 /// Where rooms and recaps go, and whether it's a home's server.
 pub struct Place {
     pub rooms: PathBuf,
     pub recaps: PathBuf,
     pub home: bool,
+    pub opts: Opts,
 }
 
 pub struct Room {
@@ -181,6 +199,7 @@ pub struct Room {
     pub recap_id: String,
     home: bool, // not a public website: strong bots, and clients are told where the file is
     recaps: PathBuf,
+    opts: Opts,
     changes: watch::Sender<u64>,
     inner: Mutex<Inner>,
     me: Weak<Room>,
@@ -230,8 +249,8 @@ impl Drop for Here {
 }
 
 impl Seat {
-    fn here(&self, now: i64) -> bool {
-        self.kind == Kind::Bot || (!self.left && (self.connected > 0 || now - self.seen < AWAY_MS))
+    fn here(&self, now: i64, away: i64) -> bool {
+        self.kind == Kind::Bot || (!self.left && (self.connected > 0 || now - self.seen < away))
     }
 }
 
@@ -311,6 +330,7 @@ impl Room {
             scene_timer: None,
             tv_timer: None,
             version: 0,
+            game_rev: 1,
             done_ids: VecDeque::new(),
             bot_rng: Rng::new(now_ms()),
             offers_seen: Seen::new(),
@@ -341,8 +361,8 @@ impl Room {
                 }
             }
         }
-        let recap_id = hex(&Sha256::digest(format!("recap:{host}")))[..12].to_string();
-        let room = Arc::new_cyclic(|me| Room { code: code.into(), file, host, recap_id, home: place.home, recaps: place.recaps.clone(), changes: watch::Sender::new(0), inner: Mutex::new(i), me: me.clone() });
+        let recap_id = place.opts.recap_id.clone().unwrap_or_else(|| hex(&Sha256::digest(format!("recap:{host}")))[..12].to_string());
+        let room = Arc::new_cyclic(|me| Room { code: code.into(), file, host, recap_id, home: place.home, recaps: place.recaps.clone(), opts: place.opts.clone(), changes: watch::Sender::new(0), inner: Mutex::new(i), me: me.clone() });
         {
             let i = &mut *lock(&room.inner);
             i.recapped = room.recap_file().exists();
@@ -415,7 +435,7 @@ impl Room {
             return;
         }
         let names: Vec<String> = i.seats.iter().map(|s| s.name.clone()).collect();
-        let r = recap::build(i.game.as_ref().unwrap(), &names, &self.recap_id, now_ms());
+        let r = recap::build(i.game.as_ref().unwrap(), &names, &self.recap_id, self.opts.ended.unwrap_or_else(now_ms));
         match std::fs::create_dir_all(&self.recaps).and_then(|_| store::save(&self.recap_file(), &r)) {
             Ok(()) => i.recapped = true,
             Err(e) => eprintln!("Room {}: could not save the recap: {e}", self.code),
@@ -443,6 +463,7 @@ impl Room {
         let command = make(g, &mut i.bot_rng).map_err(Fail::Room)?;
         i.log.events(&g.log, before, &by, Some(&command));
         i.public = None;
+        i.game_rev += 1;
         let saved = store::save(&self.file, &**g);
         let ms = scenes::ms(&g.log[before..]);
         self.hold_for(i, ms);
@@ -489,7 +510,7 @@ impl Room {
             let own = i.seats.iter().position(|s| s.kind == Kind::Player && s.name.to_lowercase() == typed);
             if let Some(p) = own.filter(|_| kind == Kind::Player) {
                 let s = &mut i.seats[p];
-                if s.here(now) {
+                if s.here(now, self.opts.away_ms) {
                     return no(format!("{} is playing on another phone.", s.name));
                 }
                 let was = (s.stand_in, s.left);
@@ -595,7 +616,7 @@ impl Room {
         if s.stand_in {
             return Ok(());
         }
-        if s.here(now_ms()) {
+        if s.here(now_ms(), self.opts.away_ms) {
             return no(format!("{} is back.", s.name));
         }
         let fields = json!({"seat": p, "name": s.name, "why": "away", "seen": Some(s.seen).filter(|n| *n != 0)});
@@ -647,6 +668,9 @@ impl Room {
         tok == self.host || i.seats.first().is_some_and(|s| s.token == tok && s.kind == Kind::Player)
     }
     pub fn start(&self, tok: &str) -> Res {
+        self.start_seeded(tok, now_ms())
+    }
+    pub fn start_seeded(&self, tok: &str, seed: i64) -> Res {
         let i = &mut *lock(&self.inner);
         if !self.can_start(i, tok) {
             return no("Only the TV or the first to join can start the game.");
@@ -657,8 +681,7 @@ impl Room {
         if i.seats.len() < MIN_PLAYERS {
             return no(format!("The game needs at least {MIN_PLAYERS} players."));
         }
-        let seed = now_ms();
-        let g = Box::new(Game::new(i.seats.len(), seed, None));
+        let g = Box::new(Game::new(i.seats.len(), seed, self.opts.first_seat));
         let seats: Vec<Value> = (0..i.seats.len()).map(|p| json!({"name": i.seats[p].name, "kind": i.sender(p).kind})).collect();
         let by = self.sender_of(i, tok);
         i.log.write("start", &by, json!({"code": self.code, "seed": seed, "seats": seats}));
@@ -666,6 +689,7 @@ impl Room {
         let saved = store::save(&self.file, &*g);
         let ms = scenes::ms(&g.log);
         i.game = Some(g);
+        i.game_rev += 1;
         if !i.has_tv {
             self.hold_for(i, ms);
         }
@@ -809,8 +833,9 @@ impl Room {
     fn watch_away(&self, i: &mut Inner) {
         clear(&mut i.away_timer);
         let now = now_ms();
-        let ends = i.seats.iter().filter(|s| s.kind == Kind::Player && !s.left && s.connected == 0 && s.here(now)).map(|s| s.seen + AWAY_MS).min();
-        if let Some(at) = ends {
+        let ends = i.seats.iter().filter(|s| s.kind == Kind::Player && !s.left && s.connected == 0 && s.here(now, self.opts.away_ms)).map(|s| s.seen + self.opts.away_ms).min();
+        // (The screenshots mark everyone here for good: no timer for that.)
+        if let Some(at) = ends.filter(|at| at - now < i32::MAX as i64) {
             i.away_timer = self.after(at - now + 10, |room, i| {
                 i.away_timer = None;
                 room.changed(i);
@@ -831,7 +856,7 @@ impl Room {
         if !g.waiting_on().into_iter().any(|p| bot_plays(i, p)) {
             return;
         }
-        i.bot_timer = self.after(BOT_DELAY_MS, |room, i| {
+        i.bot_timer = self.after(self.opts.bot_delay_ms, |room, i| {
             i.bot_timer = None;
             if i.abandoned() || i.saved_at.is_some() {
                 return;
@@ -881,7 +906,7 @@ impl Room {
             started: i.game.is_some(),
             seating: i.seating(),
             saved: i.saved_at,
-            seats: i.seats.iter().map(|s| LobbySeat { name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            seats: i.seats.iter().map(|s| LobbySeat { name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
             min_players: MIN_PLAYERS,
             max_players: MAX_PLAYERS,
             file: if self.home { self.file.display().to_string() } else { String::new() }, // a public website doesn't say where its files are
@@ -958,7 +983,7 @@ impl Room {
     }
     fn tv_gone(&self, i: &mut Inner) {
         clear(&mut i.tv_timer);
-        i.tv_timer = self.after(TV_GONE_MS, |room, i| {
+        i.tv_timer = self.after(self.opts.tv_gone_ms, |room, i| {
             i.tv_timer = None;
             if i.tvs == 0 && i.has_tv {
                 i.has_tv = false;
@@ -1057,4 +1082,90 @@ impl Heard<'_> {
 /// Makes the tables now rather than in the first game.
 pub fn warm() {
     let _ = DATA.tuning.points_to_win;
+}
+
+// ---- for the tests, the screenshots and the playtest runner (src/bin/stage.rs) ----
+
+#[cfg(feature = "stage")]
+pub mod stage {
+    use super::*;
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SeatNow {
+        uid: u64,
+        name: String,
+        token: String,
+        kind: Kind,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        connected: Option<usize>,
+        seen: i64,
+        stand_in: bool,
+        left: bool,
+        strong: bool,
+        via: Option<String>,
+    }
+    fn via(v: Option<String>) -> Option<&'static str> {
+        ["phone", "cli", "claude"].into_iter().find(|x| v.as_deref() == Some(*x))
+    }
+    impl Room {
+        /// What a driver keeps of the room, past the log it has and the game it's seen.
+        pub fn stage_state(&self, seen: i64, logged: usize) -> Value {
+            let i = &*lock(&self.inner);
+            let seats: Vec<SeatNow> = i.seats.iter().map(|s| SeatNow { uid: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, connected: Some(s.connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.via.map(|v| v.into()) }).collect();
+            let mut v = json!({"seats": seats, "savedAt": i.saved_at, "version": i.version, "lastActive": i.last_active, "abandoned": i.abandoned(), "sceneLeft": i.scene_left(), "gameRev": i.game_rev});
+            if let Some(g) = i.game.as_ref().filter(|_| seen != i.game_rev as i64) {
+                v["game"] = json!(g.clone_without_log());
+                v["log"] = json!(&g.log[logged.min(g.log.len())..]);
+                v["logFrom"] = logged.min(g.log.len()).into();
+            }
+            v
+        }
+        /// Seats, and when it was saved, as the driver has changed them.
+        pub fn stage_seats(&self, seats: Vec<SeatNow>, saved_at: Option<i64>) {
+            let i = &mut *lock(&self.inner);
+            let mut old: Vec<Seat> = std::mem::take(&mut i.seats);
+            for s in seats {
+                let connected = old.iter().find(|o| o.uid == s.uid).map_or(0, |o| o.connected);
+                i.seats.push(Seat { uid: s.uid, name: s.name, token: s.token, kind: s.kind, connected: s.connected.unwrap_or(connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: via(s.via) });
+            }
+            old.clear();
+            i.saved_at = saved_at;
+        }
+        /// The game as the driver has changed it: what it is without its log, and the entries added.
+        pub fn stage_game(&self, g: Value, added: Value) -> Result<(), String> {
+            let i = &mut *lock(&self.inner);
+            let mut g: Game = serde_json::from_str(&g.to_string()).map_err(|e| e.to_string())?;
+            g.log = std::mem::take(&mut i.game.as_mut().ok_or("no game")?.log);
+            let more: Vec<crate::engine::LogEntry> = serde_json::from_str(&added.to_string()).map_err(|e| e.to_string())?;
+            g.log.extend(more);
+            i.game = Some(Box::new(g));
+            i.game_rev += 1;
+            i.public = None;
+            Ok(())
+        }
+        /// After such a change, as if the room had made it: log entries from `before` on are news.
+        pub fn stage_mutated(&self, before: usize) -> Res {
+            let i = &mut *lock(&self.inner);
+            let Some(g) = i.game.as_ref() else { return no("The game hasn't started.") };
+            i.log.events(&g.log, before, &Sender::GAME, None);
+            let saved = store::save(&self.file, &**g);
+            let ms = scenes::ms(&g.log[before.min(g.log.len())..]);
+            self.hold_for(i, ms);
+            self.changed(i);
+            saved.map_err(|e| Fail::Server(e.to_string()))
+        }
+        pub fn stage_changed(&self) {
+            self.changed(&mut lock(&self.inner));
+        }
+        pub fn stage_join(&self, name: &str, bot: bool, v: Option<String>) -> Res<usize> {
+            self.join_as(&mut lock(&self.inner), name, if bot { Kind::Bot } else { Kind::Player }, via(v))
+        }
+        pub fn stage_leave(&self, seat: usize) -> Res {
+            self.leave_seat(&mut lock(&self.inner), Some(seat), Sender::GAME)
+        }
+        pub fn stage_can_start(&self, tok: &str) -> bool {
+            self.can_start(&lock(&self.inner), tok)
+        }
+    }
 }

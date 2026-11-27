@@ -445,7 +445,7 @@ function invite(c: string): string {
 // With no TV, the frame loads with the game. In a game with a TV it's only made
 // when Table is first tapped, so a phone at the TV doesn't load a second board
 // or cut away from the hand. A TV can come or go at any time
-// (src/server/room.ts, Room.hasTv), and the phone follows: once a TV is back,
+// (rust/src/room.rs, Room.hasTv), and the phone follows: once a TV is back,
 // a table nobody tapped goes.
 const table = (() => {
   let wrap: HTMLElement | null = null;

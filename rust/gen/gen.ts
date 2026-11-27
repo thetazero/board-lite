@@ -8,7 +8,6 @@ import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as D from '../../src/data.ts';
 import { ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../../src/seattools.ts';
-import { headers } from '../../src/server/public.ts';
 import { MAP_IMAGE_KEY } from '../../src/mapimage.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -36,5 +35,7 @@ for (const n of readdirSync(join(root, 'web')).sort()) {
 }
 const three = fileURLToPath(new URL('./', import.meta.resolve('three')));
 for (const n of ['three.module.js', 'three.core.js']) add(`/vendor/three/${n}`, readFileSync(join(three, n), 'utf8'), TYPES['.js'], 'max-age=86400');
-const csp = headers('https://x', join(root, 'web/'))['content-security-policy'];
+// Scripts come from the site alone, and the pages' import map.
+const maps = new Set(['phone.html', 'tv.html', 'recap.html'].flatMap((page) => [...readFileSync(join(root, 'web', page), 'utf8').matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`)));
+const csp = `default-src 'self'; script-src ${["'self'", ...maps].join(' ')}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`;
 writeFileSync(join(out, 'assets.rs'), `pub static CSP: &str = ${JSON.stringify(csp)};\npub static ASSETS: &[Asset] = &[\n${rows.join('\n')}\n];\n`);

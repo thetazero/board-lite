@@ -19,7 +19,7 @@ import { publicState, rulebook, seatState, visibleEvents, type Lobby, type Snaps
 import { seatStatus, seatView } from '../src/view.ts';
 import { scenesMs, scenesOf } from '../web/scenes.ts';
 
-const BIN = fileURLToPath(new URL('../rust/target/release/parity', import.meta.url));
+const BIN = fileURLToPath(new URL('../rust/target/home/parity', import.meta.url));
 const skip = existsSync(BIN) ? false : 'the Rust server is not built (npm run rust:build)';
 const GAMES = Number(process.env.PARITY_GAMES ?? 2); // of each player count
 

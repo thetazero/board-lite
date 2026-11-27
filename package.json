@@ -9,7 +9,7 @@
   },
   "scripts": {
     "game": "node src/cli.ts",
-    "serve": "node rust/gen/gen.ts && cargo build --quiet --profile home --locked --bin board-lite --manifest-path rust/Cargo.toml && rust/target/home/board-lite",
+    "serve": "node rust/gen/gen.ts && cargo build --quiet --profile home --features stage --bin board-lite --locked --manifest-path rust/Cargo.toml && rust/target/home/board-lite",
     "datasheet": "node src/datasheet.ts",
     "analyze": "node src/analyze.ts",
     "typecheck": "tsc && tsc -p web",
@@ -20,7 +20,7 @@
     "leaderboard": "node src/playtest/leaderboard.ts",
     "live": "node src/playtest/live.ts",
     "wasm:build": "node rust/gen/gen.ts && cargo build --lib --profile wasm --no-default-features --target wasm32-unknown-unknown --locked --manifest-path rust/Cargo.toml && cp rust/target/wasm32-unknown-unknown/wasm/board_lite.wasm rust/board_lite.wasm",
-    "rust:build": "node rust/gen/gen.ts && cargo build --release --locked --manifest-path rust/Cargo.toml"
+    "rust:build": "npm run wasm:build && cargo build --profile home --features stage --bins --locked --manifest-path rust/Cargo.toml"
   },
   "engines": {
     "node": ">=22.18"

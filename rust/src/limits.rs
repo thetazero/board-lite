@@ -32,8 +32,8 @@ struct Held {
 pub struct Limits {
     counts: Mutex<HashMap<(What, String), (u32, Instant)>>,
     open: Arc<Mutex<Held>>,
-    most: [u32; 3],
-    open_each: usize,
+    pub most: [u32; 3], // requests a minute, rooms an hour, wrong codes a minute
+    pub open_each: usize,
 }
 /// Something held open (a stream, a wait), until dropped.
 #[derive(Debug)]

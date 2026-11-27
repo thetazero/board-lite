@@ -8,6 +8,8 @@ publish = false
 default = ["server"]
 # The website and its rooms; without it, the rules alone (the WASM module).
 server = ["dep:bytes", "dep:futures-util", "dep:getrandom", "dep:http-body-util", "dep:hyper", "dep:hyper-util", "dep:libc", "dep:sha2", "dep:tokio", "dep:unicode-general-category"]
+# What the tests, the screenshots and the playtest runner drive (src/host.ts); not in the image.
+stage = ["server"]
 
 [lib]
 name = "board_lite"
@@ -17,6 +19,11 @@ crate-type = ["rlib", "cdylib"]
 name = "board-lite"
 path = "src/main.rs"
 required-features = ["server"]
+
+[[bin]]
+name = "stage"
+path = "src/bin/stage.rs"
+required-features = ["stage"]
 
 # Answers test/rust-parity.test.ts; not in the image.
 [[bin]]
@@ -37,7 +44,7 @@ miniz_oxide = { version = "0.8", default-features = false, features = ["with-all
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
 sha2 = { version = "0.10", optional = true }
-tokio = { optional = true, version = "1", features = ["rt", "net", "time", "sync", "macros", "signal", "process"] }
+tokio = { optional = true, version = "1", features = ["rt", "net", "io-util", "io-std", "time", "sync", "macros", "signal", "process"] }
 unicode-general-category = { version = "1", optional = true }
 
 [profile.release]

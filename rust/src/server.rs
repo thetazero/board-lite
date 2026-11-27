@@ -49,7 +49,8 @@ pub struct Server {
     port: u16,
     hosted: Vec<PathBuf>, // game files named at the start: never forgotten
     rooms: Mutex<HashMap<String, Arc<Room>>>,
-    limits: Option<Limits>,
+    pub limits: Option<Limits>,
+    drops: watch::Sender<u64>, // closes every connection
     headers: HeaderMap,
 }
 
@@ -205,7 +206,7 @@ fn room_page(path: &str) -> Option<(&str, bool)> {
 }
 
 impl Server {
-    pub fn new(site: Option<Site>, place: Place, port: u16, hosted: Vec<PathBuf>) -> Result<Arc<Server>, String> {
+    pub fn new(site: Option<Site>, place: Place, port: u16, hosted: Vec<PathBuf>, resume: bool) -> Result<Arc<Server>, String> {
         let mut headers = HeaderMap::new();
         if let Some(site) = &site {
             let mut put = |k: &'static str, v: &'static str| headers.insert(k, HeaderValue::from_static(v));
@@ -218,7 +219,8 @@ impl Server {
             }
         }
         let mut rooms = HashMap::new();
-        for (code, file) in Room::saved(&place.rooms, ROOM_IDLE).into_iter().filter(|(_, f)| !hosted.contains(f)) {
+        let saved = if resume { Room::saved(&place.rooms, ROOM_IDLE) } else { vec![] };
+        for (code, file) in saved.into_iter().filter(|(_, f)| !hosted.contains(f)) {
             match Room::host(&code, file.clone(), &place, false) {
                 Ok(room) => drop(rooms.insert(code, room)),
                 Err(e) => eprintln!("Could not host room {code} again ({}): {e}", file.display()),
@@ -232,7 +234,7 @@ impl Server {
             rooms.insert(code, room);
         }
         let limits = site.is_some().then(Limits::default);
-        Ok(Arc::new(Server { site, place, port, hosted, rooms: Mutex::new(rooms), limits, headers }))
+        Ok(Arc::new(Server { site, place, port, hosted, rooms: Mutex::new(rooms), limits, drops: watch::Sender::new(0), headers }))
     }
     /// The rooms with a game or players, and their files.
     pub fn in_use(&self) -> Vec<(String, PathBuf)> {
@@ -243,6 +245,21 @@ impl Server {
     }
     fn max_wait(&self) -> f64 {
         if self.site.is_some() { 60.0 } else { 3600.0 }
+    }
+    pub fn drop_connections(&self) {
+        self.drops.send_modify(|n| *n += 1);
+    }
+    pub fn rooms(&self) -> Vec<Arc<Room>> {
+        lock(&self.rooms).values().cloned().collect()
+    }
+    pub fn set_room(&self, room: Arc<Room>) {
+        lock(&self.rooms).insert(room.code.clone(), room);
+    }
+    pub fn delete_room(&self, code: &str) {
+        lock(&self.rooms).remove(code);
+    }
+    pub fn clear_rooms(&self) {
+        lock(&self.rooms).clear();
     }
     pub fn count(&self) -> usize {
         lock(&self.rooms).len()
@@ -261,13 +278,19 @@ impl Server {
             };
             let _ = sock.set_nodelay(true);
             let me = self.clone();
+            let me_drops = self.drops.subscribe();
             tokio::spawn(async move {
                 let service = hyper::service::service_fn(move |req| {
                     let me = me.clone();
                     async move { Ok::<_, Infallible>(me.serve(req, peer.ip()).await) }
                 });
+                let mut drops = me_drops;
                 // A broken connection is the visitor's business.
-                let _ = hyper::server::conn::http1::Builder::new().timer(TokioTimer::new()).header_read_timeout(Duration::from_secs(60)).max_buf_size(16 * 1024).serve_connection(TokioIo::new(sock), service).await;
+                let serving = hyper::server::conn::http1::Builder::new().timer(TokioTimer::new()).header_read_timeout(Duration::from_secs(60)).max_buf_size(16 * 1024).serve_connection(TokioIo::new(sock), service);
+                tokio::select! {
+                    _ = serving => {}
+                    _ = drops.changed() => {}
+                }
             });
         }
     }

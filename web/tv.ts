@@ -1,6 +1,6 @@
 // The TV: the shared board. Shows everything public, never anyone's hand.
 // Opening it on any room, in the lobby or mid-game, makes it that table's TV;
-// closing it, the table goes on with no TV (src/server/room.ts, Room.hasTv).
+// closing it, the table goes on with no TV (rust/src/room.rs, Room.hasTv).
 // Lobby -> board, with overlays for production dice, the raid and the end.
 // With ?remote, it's the table view inside a phone of a game with no TV
 // (phone.ts): the flat map, laid out for a phone. There it plays a scene only

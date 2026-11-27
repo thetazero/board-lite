@@ -2,7 +2,7 @@
 //! (docs/deploy.md).
 //!
 //!   board-lite [--port 8080] [--game <file>] [--data <dir>] [--public https://example.com [--trust-proxy]]
-use board_lite::room::Place;
+use board_lite::room::{Opts, Place};
 use board_lite::server::{Server, Site};
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -51,8 +51,8 @@ fn main() {
     let cache = || std::path::PathBuf::from(env("HOME").unwrap_or_else(|| ".".into())).join(".cache/board-lite");
     let data = flag("--data").or(env("BOARD_LITE_DATA")).map(|d| std::path::absolute(d).unwrap_or_else(|e| die(&e.to_string())));
     let place = match data {
-        Some(d) => Place { recaps: d.join("recaps"), rooms: d, home: site.is_none() },
-        None => Place { rooms: cache().join("rooms"), recaps: cache().join("recaps"), home: site.is_none() },
+        Some(d) => Place { recaps: d.join("recaps"), rooms: d, home: site.is_none(), opts: Opts::default() },
+        None => Place { rooms: cache().join("rooms"), recaps: cache().join("recaps"), home: site.is_none(), opts: Opts::default() },
     };
     let games = flag("--game").map(|g| std::path::absolute(g).unwrap_or_else(|e| die(&e.to_string()))).into_iter().collect();
     board_lite::room::warm();
@@ -61,7 +61,7 @@ fn main() {
         let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await.unwrap_or_else(|e| die(&format!("Port {port}: {e}")));
         let port = listener.local_addr().map_or(port, |a| a.port());
         let origin = site.as_ref().map(|s| s.origin.clone());
-        let server = Server::new(site, place, port, games).unwrap_or_else(|e| die(&e));
+        let server = Server::new(site, place, port, games, true).unwrap_or_else(|e| die(&e));
         match origin {
             Some(o) => println!("board-lite is running on port {port}, for {o} ({} rooms).", server.count()),
             None => welcome(&server, port),

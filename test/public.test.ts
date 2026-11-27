@@ -1,6 +1,6 @@
 // The server as a public website, and the /mcp a Claude client joins through.
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { connect } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
@@ -8,9 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { waitingOn } from '../src/engine.ts';
-import { codeIn } from '../src/server/mcp.ts';
-import { clearOld, parseOrigin, visitor, type Site } from '../src/server/public.ts';
-import { startServer } from '../src/server/server.ts';
+import { startServer, visitor, type Site } from '../src/host.ts';
 
 const tmp = mkdtempSync(join(tmpdir(), 'board-lite-test-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
@@ -77,9 +75,6 @@ test('the link tells a client that reads it how to join; a browser gets the page
     const html = await fetch(`${s.url}/ABCD`, { headers: { accept: 'text/html' } });
     assert.match(html.headers.get('content-type')!, /html/);
     assert.match(await html.text(), /llms\.txt/);
-    assert.equal(codeIn('https://x.example/abcd'), 'ABCD');
-    assert.equal(codeIn('https://x.example/tv?room=ABCD'), 'ABCD');
-    assert.throws(() => codeIn('https://x.example/'));
   } finally { s.close(); }
 });
 
@@ -94,7 +89,7 @@ test('a public website says nothing of its machine or of other games, and limits
     const lobby = (await (await fetch(`${s.url}/api/rooms/${code}`)).json()).lobby;
     assert.equal(lobby.file, '', 'not where the game file is');
     await s.post(`/api/rooms/${code}/bot`, { token: hostToken, strong: true });
-    assert.equal(s.rooms.get(code)!.seats[0].strong, undefined, 'no strong bots');
+    assert.ok(!s.rooms.get(code)!.seats[0].strong, 'no strong bots');
     await s.post(`/api/rooms/${code}/join`, { name: 'Ada' });
     await s.post(`/api/rooms/${code}/start`, { token: hostToken });
     await s.post(`/api/rooms/${code}/save`, { token: hostToken });
@@ -128,28 +123,10 @@ test('a request no URL parser takes is refused, and the server goes on', async (
   } finally { s.close(); }
 });
 
-test('old rooms and recaps are cleared; hosted, recent and unknown files stay', () => {
-  const dir = mkdtempSync(join(tmp, 'old-'));
-  const put = (name: string, days: number) => {
-    writeFileSync(join(dir, name), '{}');
-    const t = Date.now() / 1000 - days * 86400;
-    utimesSync(join(dir, name), t, t);
-  };
-  put('BBBB.json', 40); put('BBBB.seats.json', 40); put('BBBB.log.jsonl', 40);
-  put('CCCC.json', 40);
-  put('DDDD.json', 1);
-  put('notes.json', 400);
-  clearOld(dir, (c) => c === 'CCCC');
-  assert.deepEqual(['BBBB.json', 'BBBB.seats.json', 'BBBB.log.jsonl', 'CCCC.json', 'DDDD.json', 'notes.json'].map((f) => existsSync(join(dir, f))), [false, false, false, true, true, true]);
-});
-
-test('the public address is an origin, and a visitor is their address', () => {
-  assert.equal(parseOrigin('https://dragons.example/'), 'https://dragons.example');
-  for (const bad of ['dragons.example', 'ftp://x', 'https://x/path']) assert.throws(() => parseOrigin(bad));
-  const req = (ip: string, fwd?: string) => ({ headers: { 'x-forwarded-for': fwd }, socket: { remoteAddress: ip } }) as any;
-  assert.equal(visitor(req('::ffff:10.0.0.1')), '10.0.0.1');
-  assert.equal(visitor(req('10.0.0.1', '1.2.3.4')), '10.0.0.1', 'not trusted without a proxy');
-  assert.equal(visitor(req('10.0.0.1', '9.9.9.9, 1.2.3.4'), true), '1.2.3.4');
-  assert.equal(visitor(req('2001:db8:1:2:a:b:c:d')), visitor(req('2001:db8:1:2::9')));
-  assert.notEqual(visitor(req('2001:db8:1:2::9')), visitor(req('2001:db8:1:3::9')));
+// (Which links name a game, and clearing old rooms and recaps, are tested in rust/src/mcp.rs and limits.rs.)
+test('a visitor is their address', () => {
+  assert.equal(visitor('::ffff:10.0.0.1'), '10.0.0.1');
+  assert.equal(visitor('10.0.0.1', '9.9.9.9, 1.2.3.4'), '1.2.3.4');
+  assert.equal(visitor('2001:db8:1:2:a:b:c:d'), visitor('2001:db8:1:2::9'));
+  assert.notEqual(visitor('2001:db8:1:2::9'), visitor('2001:db8:1:3::9'));
 });
