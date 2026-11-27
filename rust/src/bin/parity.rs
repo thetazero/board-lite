@@ -23,7 +23,7 @@ fn main() {
                 g = Some(store::parse(q["text"].as_str().unwrap()).unwrap());
                 json!(null)
             }
-            "rulebook" => serde_json::from_str(board_lite::RULEBOOK).unwrap(),
+            "rulebook" => state::rulebook(),
             op => {
                 let g = g.as_mut().unwrap();
                 match op {

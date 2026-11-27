@@ -500,6 +500,10 @@ fn does_if_upgraded(g: &Game, up: S, hexes: &[K]) -> Pairs<K, Does> {
 }
 
 pub fn public_state(g: &Game) -> PublicState<'_> {
+    public_state_with(g, 60)
+}
+/// With this many of the latest public events.
+pub fn public_state_with(g: &Game, lines: usize) -> PublicState<'_> {
     let n = g.players.len();
     let t = tuning();
     let min = [t.title_minimum.army, t.title_minimum.tower, t.title_minimum.hoard];
@@ -597,7 +601,7 @@ pub fn public_state(g: &Game) -> PublicState<'_> {
         winner: g.winner,
         final_totals: over.then(|| g.totals()),
         standings: over.then(|| g.standings()),
-        log: events(g, |e| e.to.is_none() && !is_talk(&e.text), 60, 0),
+        log: events(g, |e| e.to.is_none() && !is_talk(&e.text), lines, 0),
         talk: events(g, |e| e.to.is_none() && is_talk(&e.text), 12, 0),
     }
 }
@@ -715,6 +719,9 @@ fn card_view(g: &Game, p: usize, c: &Card) -> CardView {
 }
 
 pub fn seat_state(g: &Game, p: usize) -> SeatState<'_> {
+    seat_state_with(g, p, 15)
+}
+pub fn seat_state_with(g: &Game, p: usize, lines: usize) -> SeatState<'_> {
     let pl = &g.players[p];
     let s = g.score(p);
     let raid = g.raid.as_ref();
@@ -777,7 +784,52 @@ pub fn seat_state(g: &Game, p: usize) -> SeatState<'_> {
         my_vote: raid.and_then(|r| r.votes[p]),
         why_no_vote: raid.filter(|r| r.step == Step::Vote && !g.can_vote(p)).map(|_| NO_VOTE),
         my_fight: raid.and_then(|r| r.choices[p].as_deref()),
-        log: events(g, |e| e.to.as_ref().is_some_and(|t| t.contains(&p)) && !is_talk(&e.text), 15, 0),
+        log: events(g, |e| e.to.as_ref().is_some_and(|t| t.contains(&p)) && !is_talk(&e.text), lines, 0),
         talk: events(g, |e| is_talk(&e.text) && e.seen_by(p), 40, 0),
     }
+}
+
+/// Every building, card, beast and kingdom, as printed, for the phone's rulebook.
+pub fn rulebook() -> serde_json::Value {
+    use serde_json::{Value, json};
+    let d = &*DATA;
+    let mut b: Vec<(&S, &BuildingDef)> = d.buildings.iter().collect();
+    b.sort_by_key(|(_, b)| !b.basic);
+    let buildings: Vec<Value> = b
+        .into_iter()
+        .map(|(key, b)| {
+            let mut v = json!({"key": key, "name": b.name, "cls": b.class, "text": place_text(b), "cost": b.cost.nonzero(), "basic": b.basic});
+            if let Some(t) = b.terrain {
+                v["terrain"] = t.into();
+            }
+            v
+        })
+        .collect();
+    let actions: Vec<Value> = d
+        .actions
+        .iter()
+        .map(|(key, a)| {
+            let mut v = json!({"key": key, "name": a.name, "text": a.text, "cost": a.cost.nonzero()});
+            if let Some(f) = a.fauna {
+                v["fauna"] = json!(fauna_view(f, Bundle::default()));
+            }
+            v
+        })
+        .collect();
+    let beasts = |m: &indexmap::IndexMap<S, UnitDef>| m.iter().map(|(k, x)| fauna_view(Key::of(k).0, x.loot)).collect::<Vec<_>>();
+    let kingdoms: Vec<TargetView> = d.targets.iter().map(|(key, t)| TargetView { key, name: t.name, loot: t.loot.nonzero(), power: t.power(), points: t.points, units: t.units.iter().map(|u| unit_view(&d.units[u], d.units[u].hp)).collect() }).collect();
+    json!({
+        "buildings": buildings,
+        "upgrades": d.upgrades.iter().map(|(key, u)| json!({"key": key, "name": u.name, "text": u.text, "cost": u.cost.nonzero(), "on": u.applies_to, "base": u.base})).collect::<Vec<_>>(),
+        "actions": actions,
+        "dragons": d.dragons.iter().map(|(key, x)| json!({"key": key, "name": x.name, "element": x.element, "cost": x.cost.nonzero(), "base": x.base, "growth": x.growth_time, "targeting": d.targeting_text[x.targeting], "stages": stage_views(x)})).collect::<Vec<_>>(),
+        "fauna": beasts(&d.fauna),
+        "greatBeasts": beasts(&d.beasts),
+        "kingdoms": kingdoms,
+        "tower": {"makes": tuning().tower_production.nonzero(), "houses": tuning().tower_dragon_capacity},
+        "terrains": ["mountain", "forest", "ley", "meadow", "desert", "harbor", "ocean"],
+        "peakBonus": tuning().peak_bonus,
+        "faunaWanderOdds": tuning().fauna_wander_odds,
+        "elementBeats": d.element_beats,
+    })
 }

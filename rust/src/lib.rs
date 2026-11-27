@@ -22,5 +22,4 @@ pub mod store;
 pub mod strongbot;
 pub mod view;
 
-pub const RULEBOOK: &str = include_str!("../generated/rulebook.json");
 pub const RULES: &str = include_str!("../generated/rules.md");

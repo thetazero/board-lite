@@ -390,7 +390,7 @@ impl Server {
         let first = parts_.first().copied().unwrap_or("");
         match first {
             "info" => return Ok(ok(json!({"lan": [], "tailscale": [], "port": 0, "origin": self.site.origin}))),
-            "rulebook" if get => return Ok(json_text(StatusCode::OK, Bytes::from_static(crate::RULEBOOK.as_bytes()))),
+            "rulebook" if get => return Ok(ok(crate::state::rulebook())),
             "recaps" if get && parts_.len() == 2 => return Ok(self.recap(parts_[1])),
             "saved" if get => return Ok(ok(json!([]))), // strangers' games aren't listed: open the room's link
             "rooms" => {}

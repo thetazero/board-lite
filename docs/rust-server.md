@@ -19,7 +19,8 @@ Where they differ on purpose: changes that come faster than a viewer reads them 
 
 - **Numbers and card text aren't written twice.** `rust/gen/gen.ts` writes `src/data.ts`'s tables, the rulebook, the rules and the pages into `rust/generated/` (not committed). A change to those needs no Rust.
 - **The rules, the simple bot and the strong bot are Rust only.** `src/engine.ts`, `bot.ts` and `strongbot.ts` call them through a WASM module (`src/wasm.ts`), built by `npm run wasm:build` and not committed: working on the game needs Rust (`rustup target add wasm32-unknown-unknown`).
-- **Still twice, for now:** what's read off a game (scores, production, where things can go), `state.ts`, `view.ts`, `recap.ts`, `mapimage.ts` and `src/server/`. A change there is made in `rust/src/` too, and CI's `rust` job compares them.
+- **The JSON clients get and the recap are Rust only too** (`src/state.ts` keeps its types).
+- **Still twice, for now:** small readers in `src/engine.ts` the tools and tests use (scores, production, where things can go), `view.ts`, `mapimage.ts`, `map.ts`, scene lengths and `src/server/`. A change there is made in `rust/src/` too.
 - `test/rust-parity.test.ts` plays the same seeds through both engines, with junk commands among the moves, and compares everything; `PARITY_GAMES=6` plays more. `test/rust-server.test.ts` makes the same requests of both servers. Both are skipped until `npm run rust:build`.
 
 ## Measured

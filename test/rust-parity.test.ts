@@ -1,7 +1,7 @@
-// The Rust server's engine (rust/) against this one: the same seeds and the
-// same commands, bots' moves and junk alike, have to give the same game, the
-// same JSON for every client, the same text and picture for Claude players and
-// the same recap. Skipped until it's built: npm run rust:build. CI builds it.
+// The rules natively (the website) against the same rules as WASM (the tools):
+// the same seeds and commands, bots' moves and junk alike, give the same games
+// and JSON. The text view, the picture and scene lengths still have TypeScript
+// versions, and are compared with those. Skipped until it's built: npm run rust:build. CI builds it.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';

@@ -233,25 +233,12 @@ export function cardName(c: Card): string {
   return (BUILDINGS[c.key] ?? UPGRADES[c.key] ?? ACTIONS[c.key] ?? DRAGONS[c.key]).name;
 }
 
-export function cardKind(c: Card): 'building' | 'upgrade' | 'action' | 'dragon' {
-  return BUILDINGS[c.key] ? 'building' : UPGRADES[c.key] ? 'upgrade' : ACTIONS[c.key] ? 'action' : 'dragon';
-}
-
-export function cardCost(c: Card): Bundle {
-  return (BUILDINGS[c.key] ?? UPGRADES[c.key] ?? ACTIONS[c.key] ?? DRAGONS[c.key]).cost;
-}
-
 export function dragonName(d: Dragon): string {
   return DRAGONS[d.key].name;
 }
 
 export function stageStats(d: Dragon): DragonStage | null {
   return d.stage === 0 ? null : DRAGONS[d.key].stages[d.stage - 1];
-}
-
-// A raid defender or a beast of the fauna: the same stats, the same combat.
-export function foeDef(k: string): UnitDef {
-  return UNITS[k] ?? faunaDef(k);
 }
 
 // A dragon fights (raids, clears, perches) whenever it's hatched, has health
@@ -723,8 +710,6 @@ export function canVote(g: Game, p: number): boolean {
   return eligibleDragons(g, p).length > 0;
 }
 
-export const NO_VOTE = "You have no raid-ready dragon, so you don't vote.";
-
 // What a player's vote is worth: the combat power of their raid-ready
 // dragons, summed (what they could send to the target). 0 for no vote.
 export function votePower(g: Game, p: number): number {
@@ -739,10 +724,6 @@ export function votePower(g: Game, p: number): number {
 interface Battle {
   units: { key: string; hp: number; d?: string }[];
   fighters: string[];
-}
-
-export function unitsText(g: Game): string {
-  return g.raid!.units.map((u, i) => `${UNITS[u.key].name} #${i + 1} ${u.hp}/${UNITS[u.key].hp}hp`).join(', ');
 }
 
 // Loot split by power (power[p] is 0 for a player not fighting). Each
@@ -778,16 +759,6 @@ export function pointsLeader(power: number[], order: number[]): number | undefin
 // The dragons of players other than p perched on hex k: what p fights there.
 export function rivalsPerched(g: Game, p: number, k: string): Dragon[] {
   return perchedOn(g, k).filter((d) => d.owner !== p);
-}
-
-// Where player p's dragons may perch: any rival's building but a tower.
-export function perchHexes(g: Game, p: number): string[] {
-  return Object.keys(g.buildings).filter((k) => g.buildings[k].owner !== p && g.buildings[k].type !== 'tower').sort();
-}
-
-// What clearing the beast on hex k pays: its loot, or nothing if a card sent it.
-export function faunaLoot(g: Game, k: string): Bundle {
-  return g.map[k].sent ? {} : faunaDef(g.map[k].fauna!).loot;
 }
 
 // In production, each beast of the fauna (not a great beast) may move to a
@@ -866,31 +837,10 @@ export function autoClearTargets(g: Game, p: number): string[] {
 
 // ---------- commands ----------
 
-export function tradeText(g: Game, s: TradeSide): string {
-  const parts: string[] = [];
-  if (Object.values(s.res).some((n) => n)) parts.push(bundleText(s.res));
-  for (const id of s.cards) {
-    const c = g.players.flatMap((pl) => pl.hand).find((x) => x.id === id);
-    parts.push(c ? `${cardName(c)} card (${id})` : `card ${id}`);
-  }
-  return parts.join(', ') || 'nothing';
-}
-
-function hasTradeSide(g: Game, p: number, s: TradeSide): boolean {
-  return canAfford(g.players[p], s.res) && s.cards.every((id) => g.players[p].hand.some((c) => c.id === id));
-}
-
 // Whether offer o waits on p's answer: it's made to them, or open to anyone
 // and they haven't declined it.
 export function offerFor(o: Offer, p: number): boolean {
   return o.to === null ? o.from !== p && !(o.passed ?? []).includes(p) : o.to === p;
-}
-
-// Why player p, who the offer is made to, can't accept it now, or null if they can.
-export function acceptProblem(g: Game, o: Offer, p: number): string | null {
-  if (!hasTradeSide(g, o.from, o.give)) return `${pname(o.from)} no longer has what they offered.`;
-  if (!hasTradeSide(g, p, o.get)) return `You don't have ${tradeText(g, o.get)}.`;
-  return null;
 }
 
 export function buildableHexes(g: Game, p: number, type: string): string[] {
@@ -912,14 +862,9 @@ export function upgradeTargets(g: Game, p: number, up: string): string[] {
     .sort();
 }
 
-// The upgrades a player may add without the card, as a special project.
-export const PROJECT_UPGRADES = Object.keys(UPGRADES).filter((k) => UPGRADES[k].base);
-
 export function specialProjectCost(kind: 'egg' | 'upgrade', cost: Bundle): Bundle {
   return scale(cost, TUNING.specialProjectMultiplier[kind]);
 }
-
-export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object.keys(DRAGONS).find((k) => DRAGONS[k].base && DRAGONS[k].element === e)!])) as Record<Element, string>;
 
 // A refused command changes nothing. The rules are Rust (rust/src/engine.rs).
 export function apply(g: Game, p: number, command: string): void {

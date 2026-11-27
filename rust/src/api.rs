@@ -28,6 +28,9 @@ pub fn call(text: &str) -> String {
         Err(e) => json!({"error": e}).to_string(),
     }
 }
+fn ok(v: &impl serde::Serialize) -> Result<String, String> {
+    Ok(format!("{{\"ok\":{}}}", serde_json::to_string(v).map_err(|e| e.to_string())?))
+}
 fn answer(text: &str) -> Result<String, String> {
     let a: Ask = serde_json::from_str(text).map_err(|e| e.to_string())?;
     set_points_to_win(a.win);
@@ -36,6 +39,9 @@ fn answer(text: &str) -> Result<String, String> {
     if a.op == "new" {
         let g = Game::new(int("players") as usize, int("seed"), a.q["first"].as_u64().map(|n| n as usize));
         return Ok(json!({"ok": g}).to_string());
+    }
+    if a.op == "rulebook" {
+        return Ok(format!("{{\"ok\":{}}}", json!(crate::state::rulebook())));
     }
     let mut g: Game = serde_json::from_str(a.g.ok_or("no game")?.get()).map_err(|e| e.to_string())?;
     let mut rng = Rng { state: int("state") as i32 };
@@ -74,6 +80,17 @@ fn answer(text: &str) -> Result<String, String> {
         "merchantPlan" => {
             let cost = serde_json::from_value(a.q["cost"].clone()).map_err(|e| e.to_string())?;
             Ok(json!({"ok": b.merchant_plan(&g, &cost)}).to_string())
+        }
+        "publicState" => ok(&crate::state::public_state_with(&g, int("lines") as usize)),
+        "seatState" => ok(&crate::state::seat_state_with(&g, p, int("lines") as usize)),
+        "visibleEvents" => ok(&crate::state::visible_events(&g, p, int("since") as usize)),
+        "recap" => {
+            let names: Vec<String> = serde_json::from_value(a.q["names"].clone()).map_err(|e| e.to_string())?;
+            ok(&crate::recap::build(&g, &names, a.q["id"].as_str().unwrap_or(""), int("ended")))
+        }
+        "mapImage" => {
+            use base64::Engine;
+            ok(&base64::engine::general_purpose::STANDARD.encode(crate::mapimage::map_image(&crate::state::public_state(&g), p)))
         }
         "strongWaits" => Ok(json!({"ok": strongbot::strong_waits(&g, &b, seen)}).to_string()),
         "candidates" => {
