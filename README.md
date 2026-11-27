@@ -28,6 +28,7 @@ TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `n
 - `src/recap.ts`: a finished game's recap, the story the TV plays at the end and the recap page (`web/recap.ts`) shows
 - `src/server/`: the web server and rooms for the TV and phone clients, what a public website adds (`public.ts`) and the MCP endpoint Claude clients join through (`mcp.ts`); `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
 - `src/shots/`: staged screenshots of the clients (`npm run shots`)
+- `rust/`: the public website again in Rust, a 5.7 MB image ([`docs/rust-server.md`](docs/rust-server.md)); a change to a rule or a view has to be made there too, and CI compares the two
 
 Design rules between tuning numbers (payback, point efficiency) are tests in `test/design/`, with their own [README](test/design/README.md).
 

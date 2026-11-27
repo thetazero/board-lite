@@ -18,7 +18,8 @@
     "shots": "node src/shots/shots.ts",
     "eval": "node src/playtest/eval.ts",
     "leaderboard": "node src/playtest/leaderboard.ts",
-    "live": "node src/playtest/live.ts"
+    "live": "node src/playtest/live.ts",
+    "rust:build": "node rust/gen/gen.ts && cargo build --release --locked --manifest-path rust/Cargo.toml"
   },
   "engines": {
     "node": ">=22.18"

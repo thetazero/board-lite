@@ -1,0 +1,1001 @@
+//! A room: one game hosted by the server, and the players seated at it, as
+//! src/server/room.ts runs it. Files are the same, so either server can host a
+//! room the other did.
+use crate::bot;
+use crate::data::DATA;
+use crate::engine::{Game, Phase};
+use crate::gamelog::{GameLog, Sender, now_ms};
+use crate::limits::lock;
+use crate::rng::Rng;
+use crate::state::{self, Lobby, LobbySeat};
+use crate::view::Shown;
+use crate::{recap, scenes, store};
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, VecDeque};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
+use tokio::sync::watch;
+use tokio::task::AbortHandle;
+use unicode_general_category::{GeneralCategory as Cat, get_general_category};
+
+const MIN_PLAYERS: usize = 2;
+const MAX_PLAYERS: usize = 6;
+const AWAY_MS: i64 = 60_000;
+const TV_GONE_MS: i64 = 20_000;
+const BOT_DELAY_MS: i64 = 700;
+const CACHE_MS: i64 = 5_000; // how long a quiet room keeps the JSON it last sent
+
+#[derive(Debug)]
+pub enum Fail {
+    Room(String),
+    Limit(&'static str),
+    Server(String),
+}
+pub type Res<T = ()> = Result<T, Fail>;
+fn no<T>(m: impl Into<String>) -> Res<T> {
+    Err(Fail::Room(m.into()))
+}
+
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    Player,
+    Bot,
+    Open,
+}
+impl Kind {
+    fn name(self) -> &'static str {
+        match self {
+            Kind::Player => "player",
+            Kind::Bot => "bot",
+            Kind::Open => "open",
+        }
+    }
+}
+pub struct Seat {
+    uid: u64, // which seat a stream or a wait is on, as seats come and go in the lobby
+    pub name: String,
+    pub token: String,
+    pub kind: Kind,
+    connected: usize,
+    seen: i64,
+    stand_in: bool,
+    left: bool,
+    strong: bool, // set by a server at home; here it's played as any bot is
+    via: Option<&'static str>,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedSeat {
+    name: String,
+    token: String,
+    kind: Kind,
+    #[serde(default)]
+    stand_in: bool,
+    #[serde(default)]
+    left: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    strong: bool,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedRoom {
+    code: String,
+    host_token: String,
+    #[serde(default)]
+    remote: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    saved_at: Option<i64>,
+    seats: Vec<SavedSeat>,
+}
+fn read_saved(file: &Path) -> Option<SavedRoom> {
+    serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()
+}
+fn beside(file: &Path, end: &str) -> PathBuf {
+    let f = file.to_string_lossy();
+    PathBuf::from(format!("{}{end}", f.strip_suffix(".json").unwrap_or(&f)))
+}
+pub fn remove_files(file: &Path) {
+    for end in [".json", ".seats.json", ".log.jsonl"] {
+        let _ = std::fs::remove_file(beside(file, end));
+    }
+}
+
+fn random<const N: usize>() -> [u8; N] {
+    let mut b = [0; N];
+    getrandom::fill(&mut b).expect("the system's randomness");
+    b
+}
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+fn token() -> String {
+    hex(&random::<12>())
+}
+pub fn new_code(dir: &Path, taken: impl Fn(&str) -> bool) -> String {
+    const LETTERS: &[u8] = b"BCDFGHJKLMNPQRSTVWXZ"; // no vowels: no accidental words
+    loop {
+        let c: String = random::<4>().iter().map(|b| LETTERS[*b as usize % LETTERS.len()] as char).collect();
+        if !taken(&c) && !dir.join(format!("{c}.json")).exists() && !dir.join(format!("{c}.seats.json")).exists() {
+            return c;
+        }
+    }
+}
+
+// A name as the table shows it: spaces collapsed, no control or invisible
+// characters, at most 12 characters. A joiner inside an emoji stays.
+fn tidy_name(name: &str) -> String {
+    let spaced = name.split(crate::engine::js_space).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+    let seen: String = spaced.chars().filter(|c| *c == '\u{200d}' || !(matches!(get_general_category(*c), Cat::Control | Cat::Format) || "\u{115F}\u{1160}\u{2800}\u{3164}\u{FFA0}".contains(*c))).collect();
+    let one = seen.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+    one.chars().take(12).collect::<String>().trim().to_string()
+}
+fn shows(c: char) -> bool {
+    use Cat::*;
+    !matches!(get_general_category(c), NonspacingMark | SpacingMark | EnclosingMark | SpaceSeparator | LineSeparator | ParagraphSeparator | Control | Format | Surrogate | PrivateUse | Unassigned)
+}
+
+struct Inner {
+    seats: Vec<Seat>,
+    next_uid: u64,
+    last_active: i64,
+    saved_at: Option<i64>,
+    game: Option<Box<Game>>,
+    log: GameLog,
+    bot_timer: Option<AbortHandle>,
+    away_timer: Option<AbortHandle>,
+    scene_timer: Option<AbortHandle>,
+    tv_timer: Option<AbortHandle>,
+    version: u64,
+    done_ids: VecDeque<String>,
+    bot_rng: Rng,
+    saved_seats: String,
+    screens: usize,
+    scene_until: i64,
+    tvs: usize,
+    has_tv: bool,
+    recapped: bool,
+    closed: bool,
+    // The game as JSON, as it was last sent: everyone watching gets the same
+    // public bytes, and each seat its own.
+    public: Option<Bytes>,
+    private: Vec<Option<Bytes>>,
+    seen: HashMap<String, usize>, // the events each Claude player has been shown up to (mcp.rs)
+}
+
+pub struct Room {
+    pub code: String,
+    pub file: PathBuf,
+    pub host: String,
+    pub recap_id: String,
+    recaps: PathBuf,
+    changes: watch::Sender<u64>,
+    inner: Mutex<Inner>,
+    me: Weak<Room>,
+}
+
+/// A seat's client is here (a stream, a wait), or a screen is, until dropped.
+pub struct Here {
+    room: Arc<Room>,
+    who: Who,
+}
+enum Who {
+    Nobody,
+    Seat { uid: u64, stream: bool },
+    Screen { tv: bool },
+}
+impl Drop for Here {
+    fn drop(&mut self) {
+        let room = &self.room;
+        let i = &mut *lock(&room.inner);
+        match self.who {
+            Who::Nobody => {}
+            Who::Screen { tv } => {
+                i.screens -= 1;
+                if tv {
+                    i.tvs -= 1;
+                    if i.tvs == 0 {
+                        room.tv_gone(i);
+                    }
+                }
+                i.log.write("disconnect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
+            }
+            Who::Seat { uid, stream } => {
+                let Some(p) = i.seats.iter().position(|s| s.uid == uid) else { return };
+                i.seats[p].connected -= 1;
+                if stream {
+                    let streams = i.seats[p].connected;
+                    let by = i.sender(p);
+                    i.log.write("disconnect", &by, json!({"seat": p, "streams": streams}));
+                    room.changed(i);
+                } else {
+                    i.seats[p].seen = now_ms();
+                    room.watch_away(i);
+                }
+            }
+        }
+    }
+}
+
+impl Seat {
+    fn here(&self, now: i64) -> bool {
+        self.kind == Kind::Bot || (!self.left && (self.connected > 0 || now - self.seen < AWAY_MS))
+    }
+}
+
+impl Inner {
+    fn seat_of(&mut self, tok: &str) -> Option<usize> {
+        let p = self.seats.iter().position(|s| s.token == tok)?;
+        self.seats[p].seen = now_ms();
+        Some(p)
+    }
+    fn sender(&self, p: usize) -> Sender {
+        let s = &self.seats[p];
+        let kind = if s.kind == Kind::Bot { "bot" } else { s.via.unwrap_or("player") };
+        Sender { kind, seat: Some(p), name: Some(s.name.clone()) }
+    }
+    fn seating(&self) -> bool {
+        self.game.is_some() && self.seats.iter().any(|s| s.kind == Kind::Open)
+    }
+    fn abandoned(&self) -> bool {
+        let mut people = self.seats.iter().filter(|s| s.kind == Kind::Player).peekable();
+        self.game.is_some() && people.peek().is_some() && people.all(|s| s.left)
+    }
+    fn phase(&self) -> Option<Phase> {
+        self.game.as_ref().map(|g| g.phase)
+    }
+    fn scene_left(&self) -> i64 {
+        (self.scene_until - now_ms()).max(0)
+    }
+    fn watched(&self) -> bool {
+        self.screens > 0 || (!self.has_tv && self.seats.iter().any(|s| s.via == Some("phone") && s.connected > 0))
+    }
+    fn clean_name(&self, name: &str) -> Res<String> {
+        let clean = tidy_name(name);
+        if !clean.chars().any(shows) {
+            return no("Choose a name.");
+        }
+        if self.seats.iter().any(|s| s.kind != Kind::Open && s.name.to_lowercase() == clean.to_lowercase()) {
+            return no(format!("Someone is already called {clean}: choose another name."));
+        }
+        Ok(clean)
+    }
+    fn new_seat(&mut self, name: String, kind: Kind) -> Seat {
+        self.next_uid += 1;
+        Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, seen: 0, stand_in: false, left: false, strong: false, via: None }
+    }
+    /// Whether the game waits on seat p now.
+    fn waits_on(&self, p: usize) -> bool {
+        self.game.as_ref().is_some_and(|g| g.waiting_on().contains(&p)) && self.scene_left() == 0 && !self.seating() && self.saved_at.is_none()
+    }
+}
+
+fn clear(t: &mut Option<AbortHandle>) {
+    if let Some(t) = t.take() {
+        t.abort();
+    }
+}
+
+impl Room {
+    pub fn new(code: &str, dir: &Path, remote: bool) -> Result<Arc<Room>, String> {
+        let file = dir.join(format!("{code}.json"));
+        Room::host(code, file, dir, remote)
+    }
+    /// Hosted again after a restart: the same TV, the same players in the same seats.
+    pub fn host(code: &str, file: PathBuf, dir: &Path, remote: bool) -> Result<Arc<Room>, String> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let saved = read_saved(&beside(&file, ".seats.json"));
+        let game = if file.exists() { Some(Box::new(store::load(&file)?)) } else { None };
+        let host = saved.as_ref().map_or_else(token, |s| s.host_token.clone());
+        let mut i = Inner {
+            seats: vec![],
+            next_uid: 0,
+            last_active: now_ms(),
+            saved_at: saved.as_ref().and_then(|s| s.saved_at),
+            game,
+            log: GameLog::new(beside(&file, ".log.jsonl")),
+            bot_timer: None,
+            away_timer: None,
+            scene_timer: None,
+            tv_timer: None,
+            version: 0,
+            done_ids: VecDeque::new(),
+            bot_rng: Rng::new(now_ms()),
+            saved_seats: String::new(),
+            screens: 0,
+            scene_until: 0,
+            tvs: 0,
+            has_tv: saved.as_ref().map_or(!remote, |s| !s.remote),
+            recapped: false,
+            closed: false,
+            public: None,
+            private: vec![],
+            seen: HashMap::new(),
+        };
+        let again = saved.is_some();
+        for s in saved.into_iter().flat_map(|s| s.seats) {
+            let seat = i.new_seat(s.name, s.kind);
+            i.seats.push(Seat { token: s.token, stand_in: s.stand_in, left: s.left, strong: s.strong, ..seat });
+        }
+        if let Some(g) = &i.game {
+            let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left})).collect();
+            i.log.write("load", &Sender::GAME, json!({"code": code, "entries": g.log.len(), "round": g.round, "phase": g.phase, "saved": i.saved_at.is_some(), "seats": seats}));
+            let n = g.players.len();
+            if i.seats.len() != n {
+                i.seats.clear();
+                for p in 0..n {
+                    let s = i.new_seat(format!("P{}", p + 1), Kind::Open);
+                    i.seats.push(s);
+                }
+            }
+        }
+        let recap_id = hex(&Sha256::digest(format!("recap:{host}")))[..12].to_string();
+        let room = Arc::new_cyclic(|me| Room { code: code.into(), file, host, recap_id, recaps: dir.join("recaps"), changes: watch::Sender::new(0), inner: Mutex::new(i), me: me.clone() });
+        {
+            let i = &mut *lock(&room.inner);
+            i.recapped = room.recap_file().exists();
+            room.save_seats(i);
+            if again && i.has_tv {
+                room.tv_gone(i);
+            }
+        }
+        Ok(room)
+    }
+    /// Rooms saved in `dir` and active in the last `within`, and every saved game however old.
+    pub fn saved(dir: &Path, within: Duration) -> Vec<(String, PathBuf)> {
+        let touched = |f: &Path| std::fs::metadata(f).and_then(|m| m.modified()).ok();
+        let recent = |f: &Path| touched(f).is_some_and(|t| t.elapsed().map_or(true, |d| d <= within));
+        let Ok(files) = std::fs::read_dir(dir) else { return vec![] };
+        files
+            .filter_map(|e| {
+                let path = e.ok()?.path();
+                let base = path.to_str()?.strip_suffix(".seats.json")?.to_string();
+                let saved = read_saved(&path)?;
+                let file = PathBuf::from(format!("{base}.json"));
+                (saved.saved_at.is_some() || recent(&path) || recent(&file)).then_some((saved.code, file))
+            })
+            .collect()
+    }
+
+    fn recap_file(&self) -> PathBuf {
+        self.recaps.join(format!("{}.json", self.recap_id))
+    }
+    fn save_seats(&self, i: &mut Inner) {
+        let saved = SavedRoom {
+            code: self.code.clone(),
+            host_token: self.host.clone(),
+            remote: !i.has_tv,
+            saved_at: i.saved_at,
+            seats: i.seats.iter().map(|s| SavedSeat { name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+        };
+        let text = json!(saved).to_string();
+        if text == i.saved_seats {
+            return;
+        }
+        if let Err(e) = store::save(&beside(&self.file, ".seats.json"), &saved) {
+            return eprintln!("Room {}: could not save the seats: {e}", self.code);
+        }
+        i.saved_seats = text;
+    }
+    fn save_recap(&self, i: &mut Inner) {
+        if i.recapped || i.phase() != Some(Phase::Over) {
+            return;
+        }
+        let names: Vec<String> = i.seats.iter().map(|s| s.name.clone()).collect();
+        let r = recap::build(i.game.as_ref().unwrap(), &names, &self.recap_id, now_ms());
+        match std::fs::create_dir_all(&self.recaps).and_then(|_| store::save(&self.recap_file(), &r)) {
+            Ok(()) => i.recapped = true,
+            Err(e) => eprintln!("Room {}: could not save the recap: {e}", self.code),
+        }
+    }
+
+    fn after(&self, ms: i64, then: impl FnOnce(&Room, &mut Inner) + Send + 'static) -> Option<AbortHandle> {
+        let me = self.me.clone();
+        let task = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(ms.max(0) as u64)).await;
+            if let Some(room) = me.upgrade() {
+                let i = &mut *lock(&room.inner);
+                if !i.closed {
+                    then(&room, i);
+                }
+            }
+        });
+        Some(task.abort_handle())
+    }
+
+    // The only way the room changes the game: through the engine, then saved.
+    fn mutate(&self, i: &mut Inner, by: Sender, make: impl FnOnce(&mut Game, &mut Rng) -> Result<String, String>) -> Res {
+        let Some(g) = i.game.as_mut() else { return no("The game hasn't started.") };
+        let before = g.log.len();
+        let command = make(g, &mut i.bot_rng).map_err(Fail::Room)?;
+        i.log.events(&g.log, before, &by, Some(&command));
+        i.public = None;
+        i.private.clear();
+        let saved = store::save(&self.file, &**g);
+        let ms = scenes::ms(&g.log[before..]);
+        self.hold_for(i, ms);
+        self.changed(i);
+        saved.map_err(|e| Fail::Server(format!("Room {}: could not save the game: {e}", self.code)))
+    }
+    fn hold_for(&self, i: &mut Inner, ms: f64) {
+        if ms <= 0.0 || !i.watched() {
+            return;
+        }
+        i.scene_until = now_ms().max(i.scene_until) + ms.ceil() as i64;
+        self.wake_after_scene(i);
+    }
+    fn wake_after_scene(&self, i: &mut Inner) {
+        clear(&mut i.scene_timer);
+        i.scene_timer = self.after(i.scene_left() + 1, |room, i| {
+            i.scene_timer = None;
+            if i.scene_left() > 0 { room.wake_after_scene(i) } else { room.changed(i) }
+        });
+    }
+
+    fn changed(&self, i: &mut Inner) {
+        i.version += 1;
+        i.last_active = now_ms();
+        self.save_seats(i);
+        self.save_recap(i);
+        self.schedule_bot(i);
+        self.watch_away(i);
+        self.changes.send_replace(i.version);
+    }
+
+    // ---- lobby ----
+
+    /// The seat's token and number.
+    pub fn join(&self, name: &str, via: Option<&'static str>) -> Res<(String, usize, String)> {
+        let i = &mut *lock(&self.inner);
+        let p = self.join_as(i, name, Kind::Player, via)?;
+        Ok((i.seats[p].token.clone(), p, i.seats[p].name.clone()))
+    }
+    fn join_as(&self, i: &mut Inner, name: &str, kind: Kind, via: Option<&'static str>) -> Res<usize> {
+        let now = now_ms();
+        if i.game.is_some() {
+            let typed = tidy_name(name).to_lowercase();
+            let own = i.seats.iter().position(|s| s.kind == Kind::Player && s.name.to_lowercase() == typed);
+            if let Some(p) = own.filter(|_| kind == Kind::Player) {
+                let s = &mut i.seats[p];
+                if s.here(now) {
+                    return no(format!("{} is playing on another phone.", s.name));
+                }
+                let was = (s.stand_in, s.left);
+                (s.token, s.stand_in, s.left, s.seen, s.via) = (token(), false, false, now, via);
+                let by = i.sender(p);
+                i.log.write("handover", &by, json!({"seat": p, "back": true, "standIn": was.0, "left": was.1}));
+                self.changed(i);
+                return Ok(p);
+            }
+            let clean = i.clean_name(name)?;
+            let Some(p) = i.seats.iter().position(|s| s.kind == Kind::Open) else { return no("The game has started and every seat is taken.") };
+            let s = &mut i.seats[p];
+            let was = std::mem::replace(&mut s.name, clean);
+            (s.kind, s.token, s.via) = (kind, token(), via);
+            let by = i.sender(p);
+            i.log.write("handover", &by, json!({"seat": p, "was": was}));
+            self.changed(i);
+            return Ok(p);
+        }
+        let clean = i.clean_name(name)?;
+        if i.seats.len() >= MAX_PLAYERS {
+            return no(format!("The game is full ({MAX_PLAYERS} players)."));
+        }
+        let seat = i.new_seat(clean, kind);
+        i.seats.push(Seat { seen: now, via, ..seat });
+        let p = i.seats.len() - 1;
+        let by = i.sender(p);
+        i.log.write(if kind == Kind::Bot { "bot" } else { "join" }, &by, json!({"seat": p}));
+        self.changed(i);
+        Ok(p)
+    }
+    pub fn add_bot(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        if !self.can_start(i, tok) {
+            return no("Only the TV or the first to join can add bots.");
+        }
+        let free = ["Tick", "Gizmo", "Widget", "Pinion", "Cog", "Ratchet", "Bolt"].into_iter().find(|n| !i.seats.iter().any(|s| s.kind != Kind::Open && s.name.eq_ignore_ascii_case(n)));
+        let name = free.map_or_else(|| format!("Cog {}", i.seats.len() + 1), |n| n.into());
+        self.join_as(i, &name, Kind::Bot, None).map(|_| ())
+    }
+    /// A player leaves the lobby; the TV or first player can remove anyone.
+    pub fn leave(&self, tok: &str, seat: Option<usize>) -> Res {
+        let i = &mut *lock(&self.inner);
+        let own = i.seat_of(tok);
+        let p = seat.or(own);
+        if p != own && !self.can_start(i, tok) {
+            return no("You can only remove yourself.");
+        }
+        let by = self.sender_of(i, tok);
+        self.leave_seat(i, p, by)
+    }
+    fn leave_seat(&self, i: &mut Inner, p: Option<usize>, by: Sender) -> Res {
+        let Some(p) = p.filter(|p| i.seats.get(*p).is_some_and(|s| s.kind != Kind::Open)) else { return no("No such player.") };
+        let seating = i.seating();
+        if i.game.is_some() && !seating {
+            return no("The game has started.");
+        }
+        let name = i.seats[p].name.clone();
+        i.log.write("leave", &by, json!({"seat": p, "name": name}));
+        if seating {
+            let s = &mut i.seats[p];
+            (s.name, s.kind, s.token, s.stand_in, s.left) = (format!("P{}", p + 1), Kind::Open, token(), false, false);
+        } else {
+            i.seats.remove(p);
+        }
+        self.changed(i);
+        Ok(())
+    }
+    /// Mid-game, a bot plays the seat from now on.
+    pub fn quit(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        let p = self.player_seat(i, tok)?;
+        let by = i.sender(p);
+        if i.game.is_none() || i.seating() {
+            return self.leave_seat(i, Some(p), by);
+        }
+        if i.phase() == Some(Phase::Over) {
+            return no("The game is over.");
+        }
+        let name = i.seats[p].name.clone();
+        i.log.write("quit", &by, json!({"seat": p}));
+        i.log.write("standIn", &Sender::GAME, json!({"seat": p, "name": name, "why": "quit"}));
+        let s = &mut i.seats[p];
+        (s.token, s.stand_in, s.left) = (token(), true, true);
+        self.changed(i);
+        Ok(())
+    }
+    /// Anyone at the table lets a bot play for a player who is away.
+    pub fn stand_in_for(&self, tok: &str, seat: Option<usize>) -> Res {
+        let i = &mut *lock(&self.inner);
+        self.player_seat(i, tok)?;
+        if i.game.is_none() || i.phase() == Some(Phase::Over) {
+            return no("The game is not running.");
+        }
+        let Some(p) = seat.filter(|p| i.seats.get(*p).is_some_and(|s| s.kind == Kind::Player)) else { return no("No such player.") };
+        let s = &i.seats[p];
+        if s.stand_in {
+            return Ok(());
+        }
+        if s.here(now_ms()) {
+            return no(format!("{} is back.", s.name));
+        }
+        let fields = json!({"seat": p, "name": s.name, "why": "away", "seen": Some(s.seen).filter(|n| *n != 0)});
+        let by = self.sender_of(i, tok);
+        i.log.write("standIn", &by, fields);
+        i.seats[p].stand_in = true;
+        self.changed(i);
+        Ok(())
+    }
+
+    // ---- saving ----
+
+    pub fn save(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        self.at_table(i, tok)?;
+        let Some(g) = i.game.as_ref().filter(|_| !i.seating()) else { return no("The game isn't under way.") };
+        if g.phase == Phase::Over {
+            return no("The game is over.");
+        }
+        if i.saved_at.is_some() {
+            return Ok(());
+        }
+        let fields = json!({"round": g.round, "phase": g.phase, "entries": g.log.len()});
+        let by = self.sender_of(i, tok);
+        i.log.write("save", &by, fields);
+        i.saved_at = Some(now_ms());
+        self.changed(i);
+        Ok(())
+    }
+    pub fn resume(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        self.at_table(i, tok)?;
+        let Some(at) = i.saved_at else { return Ok(()) };
+        let by = self.sender_of(i, tok);
+        i.log.write("continue", &by, json!({"savedAt": recap::iso(at)}));
+        i.saved_at = None;
+        self.changed(i);
+        Ok(())
+    }
+    fn at_table(&self, i: &mut Inner, tok: &str) -> Res {
+        let p = i.seat_of(tok);
+        if tok != self.host && p.is_none_or(|p| i.seats[p].kind != Kind::Player) {
+            return no("You are not in this game.");
+        }
+        Ok(())
+    }
+    fn can_start(&self, i: &Inner, tok: &str) -> bool {
+        tok == self.host || i.seats.first().is_some_and(|s| s.token == tok && s.kind == Kind::Player)
+    }
+    pub fn start(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        if !self.can_start(i, tok) {
+            return no("Only the TV or the first to join can start the game.");
+        }
+        if i.game.is_some() || self.file.exists() {
+            return no("The game has already started.");
+        }
+        if i.seats.len() < MIN_PLAYERS {
+            return no(format!("The game needs at least {MIN_PLAYERS} players."));
+        }
+        let seed = now_ms();
+        let g = Box::new(Game::new(i.seats.len(), seed, None));
+        let seats: Vec<Value> = (0..i.seats.len()).map(|p| json!({"name": i.seats[p].name, "kind": i.sender(p).kind})).collect();
+        let by = self.sender_of(i, tok);
+        i.log.write("start", &by, json!({"code": self.code, "seed": seed, "seats": seats}));
+        i.log.events(&g.log, 0, &Sender::GAME, None);
+        let saved = store::save(&self.file, &*g);
+        let ms = scenes::ms(&g.log);
+        i.game = Some(g);
+        if !i.has_tv {
+            self.hold_for(i, ms);
+        }
+        self.changed(i);
+        saved.map_err(|e| Fail::Server(format!("Room {}: could not save the game: {e}", self.code)))
+    }
+
+    fn sender_of(&self, i: &Inner, tok: &str) -> Sender {
+        if tok == self.host {
+            return Sender::TV;
+        }
+        i.seats.iter().position(|s| s.token == tok).map_or(Sender::GAME, |p| i.sender(p))
+    }
+
+    // ---- play ----
+
+    /// A player's command. `id`, when the client gives one, names this one
+    /// sending of it: the same id again is the same tap retried.
+    pub fn command(&self, tok: &str, cmd: &str, via: Option<&'static str>, id: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        let p = self.player_seat(i, tok)?;
+        if via.is_some() {
+            i.seats[p].via = via;
+        }
+        let key = (!id.is_empty()).then(|| format!("{p} {id}"));
+        if key.as_ref().is_some_and(|k| i.done_ids.contains(k)) {
+            return Ok(());
+        }
+        self.act(i, p, cmd)?;
+        if let Some(k) = key {
+            i.done_ids.push_back(k);
+            if i.done_ids.len() > 500 {
+                i.done_ids.pop_front();
+            }
+        }
+        Ok(())
+    }
+    fn act(&self, i: &mut Inner, p: usize, cmd: &str) -> Res {
+        if i.game.is_none() {
+            return no("The game hasn't started.");
+        }
+        if i.seating() {
+            return no("The game goes on once every seat is taken.");
+        }
+        if i.saved_at.is_some() {
+            return no("The game is saved: continue it first.");
+        }
+        let by = i.sender(p);
+        let done = self.mutate(i, by.clone(), |g, _| g.apply(p, cmd).map(|_| cmd.to_string()));
+        if let Err(Fail::Room(why)) = &done {
+            i.log.write("refused", &by, json!({"command": cmd, "error": why}));
+        }
+        done
+    }
+    fn player_seat(&self, i: &mut Inner, tok: &str) -> Res<usize> {
+        let Some(p) = i.seat_of(tok).filter(|p| i.seats[*p].kind == Kind::Player) else { return no("You are not in this game.") };
+        self.back(i, p);
+        Ok(p)
+    }
+    // A player a bot was playing for while they were away is back.
+    fn back(&self, i: &mut Inner, p: usize) {
+        if !i.seats[p].stand_in || i.seats[p].left {
+            return;
+        }
+        let by = i.sender(p);
+        i.log.write("back", &by, json!({"seat": p}));
+        i.seats[p].stand_in = false;
+        self.changed(i);
+    }
+    fn holding(&self, i: &mut Inner, p: usize) -> Here {
+        i.seats[p].connected += 1;
+        Here { room: self.me.upgrade().expect("a room in use"), who: Who::Seat { uid: i.seats[p].uid, stream: false } }
+    }
+
+    /// What a client that holds no stream open asks for: the snapshot a phone gets.
+    pub fn state(&self, tok: &str) -> Res<Vec<Bytes>> {
+        let i = &mut *lock(&self.inner);
+        if !tok.is_empty() && tok != self.host {
+            self.player_seat(i, tok)?;
+        }
+        Ok(self.snapshot_of(i, Some(tok).filter(|t| !t.is_empty())))
+    }
+    /// Waits for this seat's decision, or the game's end (0), or until time runs out (2).
+    pub async fn wait(&self, tok: &str, secs: f64) -> Res<(u8, Vec<Bytes>)> {
+        let end = tokio::time::Instant::now() + Duration::from_secs_f64(secs);
+        let (p, here, mut rx) = {
+            let i = &mut *lock(&self.inner);
+            let p = self.player_seat(i, tok)?;
+            (p, self.holding(i, p), self.changes.subscribe())
+        };
+        let code = loop {
+            {
+                let i = &*lock(&self.inner);
+                if i.phase() == Some(Phase::Over) || i.waits_on(p) {
+                    break 0;
+                }
+            }
+            tokio::select! {
+                _ = rx.changed() => {}
+                _ = tokio::time::sleep_until(end) => break 2,
+            }
+        };
+        drop(here);
+        Ok((code, self.snapshot(Some(tok))))
+    }
+    /// Every event this seat can see from `since` on, the index to ask from
+    /// next, and what `then` makes of them. With a time, waits first until it's
+    /// this seat's decision, someone else talks or the game ends.
+    pub async fn listen<T>(&self, tok: &str, since: usize, secs: f64, then: impl FnOnce(&Room, &mut Heard) -> T) -> Res<T> {
+        let end = tokio::time::Instant::now() + Duration::from_secs_f64(secs);
+        let (p, here, mut rx) = {
+            let i = &mut *lock(&self.inner);
+            let p = self.player_seat(i, tok)?;
+            let here = (secs > 0.0 && !ready(i, p, since)).then(|| self.holding(i, p));
+            (p, here, self.changes.subscribe())
+        };
+        while here.is_some() {
+            tokio::select! {
+                _ = rx.changed() => {}
+                _ = tokio::time::sleep_until(end) => break,
+            }
+            if ready(&lock(&self.inner), p, since) {
+                break;
+            }
+        }
+        drop(here);
+        let i = &mut *lock(&self.inner);
+        let p = i.seat_of(tok).unwrap_or(p);
+        Ok(then(self, &mut Heard { i, p, since, tok }))
+    }
+    /// For a Claude player: what it has been shown so far, if anything.
+    pub fn shown(&self, tok: &str) -> Option<usize> {
+        lock(&self.inner).seen.get(tok).copied()
+    }
+    pub fn log_len(&self) -> usize {
+        lock(&self.inner).game.as_ref().map_or(0, |g| g.log.len())
+    }
+
+    // ---- timers ----
+
+    fn watch_away(&self, i: &mut Inner) {
+        clear(&mut i.away_timer);
+        let now = now_ms();
+        let ends = i.seats.iter().filter(|s| s.kind == Kind::Player && !s.left && s.connected == 0 && s.here(now)).map(|s| s.seen + AWAY_MS).min();
+        if let Some(at) = ends {
+            i.away_timer = self.after(at - now + 10, |room, i| {
+                i.away_timer = None;
+                room.changed(i);
+            });
+        }
+    }
+    fn schedule_bot(&self, i: &mut Inner) {
+        let Some(g) = &i.game else { return };
+        if i.bot_timer.is_some() || g.phase == Phase::Over || i.abandoned() || i.seating() || i.saved_at.is_some() {
+            return;
+        }
+        if i.scene_left() > 0 {
+            if i.scene_timer.is_none() {
+                self.wake_after_scene(i);
+            }
+            return;
+        }
+        if !g.waiting_on().into_iter().any(|p| bot_plays(i, p)) {
+            return;
+        }
+        i.bot_timer = self.after(BOT_DELAY_MS, |room, i| {
+            i.bot_timer = None;
+            if i.abandoned() || i.saved_at.is_some() {
+                return;
+            }
+            if i.scene_left() > 0 {
+                return room.schedule_bot(i);
+            }
+            let Some(p) = i.game.as_ref().and_then(|g| g.waiting_on().into_iter().find(|p| bot_plays(i, *p))) else { return };
+            let bot = i.seats[p].kind == Kind::Bot;
+            let by = Sender { kind: if bot { "bot" } else { "standIn" }, seat: Some(p), name: Some(i.seats[p].name.clone()) };
+            let done = room.mutate(i, by, |g, rng| if bot { bot::bot_move(g, p, rng) } else { bot::stand_in_move(g, p) }.ok_or_else(|| "no legal move".into()));
+            if let Err(Fail::Room(e) | Fail::Server(e)) = done {
+                eprintln!("Room {}: a bot is stuck: {e}", room.code);
+            }
+        });
+    }
+
+    // ---- what clients see ----
+
+    fn lobby_of(&self, i: &Inner) -> Lobby {
+        let now = now_ms();
+        Lobby {
+            code: self.code.clone(),
+            started: i.game.is_some(),
+            seating: i.seating(),
+            saved: i.saved_at,
+            seats: i.seats.iter().map(|s| LobbySeat { name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            min_players: MIN_PLAYERS,
+            max_players: MAX_PLAYERS,
+            file: String::new(), // a public website doesn't say where its files are
+            remote: !i.has_tv,
+        }
+    }
+    /// Does the room exist, is this token seated in it, and who's in it.
+    pub fn about(&self, tok: &str) -> Value {
+        let i = &mut *lock(&self.inner);
+        let seated = i.seat_of(tok).is_some();
+        json!({"seated": seated, "host": tok == self.host, "lobby": self.lobby_of(i)})
+    }
+    pub fn snapshot(&self, tok: Option<&str>) -> Vec<Bytes> {
+        self.snapshot_of(&mut lock(&self.inner), tok)
+    }
+    /// The snapshot's JSON, in pieces: the game's are shared by everyone who gets them.
+    fn snapshot_of(&self, i: &mut Inner, tok: Option<&str>) -> Vec<Bytes> {
+        let p = tok.and_then(|t| i.seat_of(t));
+        let lobby = json!(self.lobby_of(i));
+        let seat = p.map_or(-1, |p| p as i64);
+        let mut out = vec![Bytes::from(format!(r#"{{"lobby":{lobby},"seat":{seat},"game":"#))];
+        out.push(match &i.game {
+            None => Bytes::from_static(b"null"),
+            Some(g) => i.public.get_or_insert_with(|| json_bytes(&state::public_state(g))).clone(),
+        });
+        let recap = (i.recapped && i.phase() == Some(Phase::Over)).then_some(&self.recap_id);
+        let head = format!(r#","scene":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.version, json!(recap));
+        match (&i.game, p.filter(|p| i.seats[*p].kind == Kind::Player)) {
+            (Some(g), Some(p)) => {
+                i.private.resize(g.players.len().max(p + 1), None);
+                let you = i.private[p].get_or_insert_with(|| json_bytes(&state::seat_state(g, p))).clone();
+                out.push(Bytes::from(format!(r#"{head}{{"name":{},"#, json!(i.seats[p].name))));
+                out.push(you.slice(1..));
+                out.push(Bytes::from_static(b"}"));
+            }
+            _ => out.push(Bytes::from(format!("{head}null}}"))),
+        }
+        out
+    }
+    pub fn watch(&self) -> watch::Receiver<u64> {
+        self.changes.subscribe()
+    }
+    /// A stream with no seat is a screen; `tv` says it's a TV page.
+    pub fn connect(&self, tok: Option<&str>, tv: bool) -> Here {
+        let room = self.me.upgrade().expect("a room in use");
+        let i = &mut *lock(&self.inner);
+        let Some(tok) = tok else {
+            i.screens += 1;
+            if tv {
+                i.tvs += 1;
+                clear(&mut i.tv_timer);
+                if !i.has_tv {
+                    i.has_tv = true;
+                    self.changed(i);
+                }
+            }
+            i.log.write("connect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
+            return Here { room, who: Who::Screen { tv } };
+        };
+        let Some(p) = i.seats.iter().position(|s| s.token == tok) else { return Here { room, who: Who::Nobody } };
+        let s = &mut i.seats[p];
+        if s.kind == Kind::Player {
+            s.via = Some("phone");
+        }
+        s.connected += 1;
+        let (uid, streams) = (s.uid, s.connected);
+        let by = i.sender(p);
+        i.log.write("connect", &by, json!({"seat": p, "streams": streams}));
+        self.back(i, p);
+        self.changed(i);
+        Here { room, who: Who::Seat { uid, stream: true } }
+    }
+    pub fn tv_watching(&self) -> bool {
+        lock(&self.inner).tvs > 0
+    }
+    fn tv_gone(&self, i: &mut Inner) {
+        clear(&mut i.tv_timer);
+        i.tv_timer = self.after(TV_GONE_MS, |room, i| {
+            i.tv_timer = None;
+            if i.tvs == 0 && i.has_tv {
+                i.has_tv = false;
+                room.changed(i);
+            }
+        });
+    }
+
+    // ---- housekeeping ----
+
+    /// Let go of what can be made again once the room is quiet.
+    pub fn rest(&self) {
+        let i = &mut *lock(&self.inner);
+        if now_ms() - i.last_active > CACHE_MS {
+            i.public = None;
+            i.private = vec![];
+        }
+    }
+    /// Whether the server forgets the room now, and if so whether its files go too.
+    pub fn forget(&self) -> Option<bool> {
+        const HOUR: i64 = 60 * 60 * 1000;
+        let i = &*lock(&self.inner);
+        let idle = now_ms() - i.last_active;
+        if let Some(at) = i.saved_at {
+            let keep = crate::limits::SAVED_KEEP.as_millis() as i64;
+            return (now_ms() - at > keep && idle > 6 * HOUR).then_some(true);
+        }
+        let empty = i.game.is_none() && idle > HOUR && self.changes.receiver_count() == 0;
+        (idle > 6 * HOUR || empty || (i.abandoned() && idle > 10 * 60 * 1000)).then_some(false)
+    }
+    pub fn close(&self) {
+        let i = &mut *lock(&self.inner);
+        i.closed = true;
+        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.scene_timer, &mut i.tv_timer] {
+            clear(t);
+        }
+    }
+}
+
+fn bot_plays(i: &Inner, p: usize) -> bool {
+    i.seats.get(p).is_some_and(|s| s.kind == Kind::Bot || s.stand_in)
+}
+fn json_bytes(v: &impl Serialize) -> Bytes {
+    let mut b = serde_json::to_vec(v).expect("a state is JSON");
+    b.shrink_to_fit();
+    b.into()
+}
+fn ready(i: &Inner, p: usize, since: usize) -> bool {
+    let Some(g) = &i.game else { return false };
+    if g.phase == Phase::Over {
+        return true;
+    }
+    let me = format!("P{} ", p + 1);
+    let mut others = g.log.iter().skip(since).filter(|e| e.seen_by(p) && !e.text.starts_with(&me)).peekable();
+    let any = others.peek().is_some();
+    if others.any(|e| state::is_talk(&e.text)) {
+        return true;
+    }
+    let awaiting = g.phase == Phase::Action && g.turn == p && g.offers.iter().any(|o| o.from == p) && !any;
+    i.waits_on(p) && !awaiting
+}
+
+/// What a listen heard.
+pub struct Heard<'a> {
+    i: &'a mut Inner,
+    p: usize,
+    since: usize,
+    tok: &'a str,
+}
+impl Heard<'_> {
+    pub fn events(&self) -> Vec<state::EventView<'_>> {
+        self.i.game.as_ref().map_or(vec![], |g| state::visible_events(g, self.p, self.since))
+    }
+    pub fn next(&self) -> usize {
+        self.i.game.as_ref().map_or(0, |g| g.log.len())
+    }
+    pub fn mark_shown(&mut self) {
+        let n = self.next();
+        self.i.seen.insert(self.tok.to_string(), n);
+    }
+    pub fn snapshot(&mut self, room: &Room) -> Vec<Bytes> {
+        room.snapshot_of(self.i, Some(self.tok))
+    }
+    /// The seat's snapshot as the text views take it, and its picture's bytes if `then` makes one.
+    pub fn show<T>(&self, room: &Room, then: impl FnOnce(&Shown) -> T) -> T {
+        let lobby = room.lobby_of(self.i);
+        let game = self.i.game.as_ref().map(|g| state::public_state(g));
+        let you = self.i.game.as_ref().filter(|_| self.i.seats[self.p].kind == Kind::Player).map(|g| state::seat_state(g, self.p));
+        let shown = Shown { lobby: &lobby, game: game.as_ref(), you: you.as_ref().map(|y| (y, self.i.seats[self.p].name.as_str())) };
+        then(&shown)
+    }
+}
+
+/// Makes the tables now rather than in the first game.
+pub fn warm() {
+    let _ = DATA.tuning.points_to_win;
+}

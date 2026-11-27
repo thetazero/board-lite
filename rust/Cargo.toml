@@ -1,0 +1,39 @@
+[package]
+name = "board-lite"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "board_lite"
+
+[[bin]]
+name = "board-lite"
+path = "src/main.rs"
+
+# Answers test/rust-parity.test.ts; not in the image.
+[[bin]]
+name = "parity"
+path = "src/bin/parity.rs"
+
+[dependencies]
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+bytes = "1"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+getrandom = "0.3"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+indexmap = { version = "2", features = ["serde"] }
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
+sha2 = "0.10"
+tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros", "signal"] }
+unicode-general-category = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
