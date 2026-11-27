@@ -1,4 +1,4 @@
-//! The hex map in axial coordinates, as src/map.ts makes it.
+//! The hex map in axial coordinates.
 use crate::data::*;
 use crate::rng::Rng;
 use indexmap::IndexMap;

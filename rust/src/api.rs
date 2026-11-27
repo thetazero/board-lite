@@ -1,9 +1,11 @@
 //! The rules as a WASM module, for the TypeScript tools and tests (src/wasm.ts):
 //! one JSON request in, one JSON answer out, and no state kept but the strong
 //! bots' memory of their own offers.
-use crate::data::set_points_to_win;
+use crate::data::{Key, set_points_to_win};
 use crate::engine::Game;
+use crate::map::K;
 use crate::rng::Rng;
+use crate::state::ByRes;
 use crate::{bot, strongbot};
 use serde::Deserialize;
 use serde_json::value::RawValue;
@@ -40,6 +42,17 @@ fn answer(text: &str) -> Result<String, String> {
         let g = Game::new(int("players") as usize, int("seed"), a.q["first"].as_u64().map(|n| n as usize));
         return Ok(json!({"ok": g}).to_string());
     }
+    if a.op == "generateMap" {
+        let mut rng = Rng { state: int("state") as i32 };
+        let map = crate::map::generate_map(&mut rng, int("players") as usize);
+        return ok(&json!({"map": map, "state": rng.state}));
+    }
+    if a.op == "splitLoot" {
+        let loot = serde_json::from_value(a.q["loot"].clone()).map_err(|e| e.to_string())?;
+        let nums = |k: &str| -> Vec<i64> { serde_json::from_value(a.q[k].clone()).unwrap_or_default() };
+        let order: Vec<usize> = nums("order").into_iter().map(|n| n as usize).collect();
+        return ok(&crate::engine::split_loot(&loot, &nums("power"), &order));
+    }
     if a.op == "rulebook" {
         return Ok(format!("{{\"ok\":{}}}", json!(crate::state::rulebook())));
     }
@@ -47,6 +60,7 @@ fn answer(text: &str) -> Result<String, String> {
     let mut rng = Rng { state: int("state") as i32 };
     let before = g.log.len();
     let name = a.q["name"].as_str();
+    let text = |k: &str| a.q[k].as_str().unwrap_or("");
     let moved = |g: &mut Game, cmd: Value, rng: Rng| {
         let log = g.log.split_off(before);
         g.log = log; // the new entries alone
@@ -80,6 +94,34 @@ fn answer(text: &str) -> Result<String, String> {
         "merchantPlan" => {
             let cost = serde_json::from_value(a.q["cost"].clone()).map_err(|e| e.to_string())?;
             Ok(json!({"ok": b.merchant_plan(&g, &cost)}).to_string())
+        }
+        "score" => {
+            let s = g.score(p);
+            ok(&json!({"buildings": s.buildings, "monuments": s.monuments, "titles": s.titles, "beasts": s.beasts, "raids": s.raids, "hidden": s.hidden, "public": s.public, "total": s.total}))
+        }
+        "standings" => ok(&g.standings()),
+        "turnOrder" => ok(&g.turn_order()),
+        "waitingOn" => ok(&g.waiting_on()),
+        "titleValues" => ok(&g.title_values(int("t") as usize)),
+        "production" => ok(&ByRes(g.production(p).map(Some))),
+        "dragonCapacity" => ok(&g.dragon_capacity(p)),
+        "bankRates" => ok(&crate::state::Rates(g.bank_rates(p))),
+        "buildableHexes" => ok(&g.buildable_hexes(p, text("key"))),
+        "upgradeTargets" => ok(&g.upgrade_targets(p, text("key"))),
+        "faunaHexes" => ok(&g.fauna_hexes()),
+        "autoClearTargets" => ok(&g.auto_clear_targets(p)),
+        "lootOf" => ok(&g.loot_of(Key::of(text("t")))),
+        "buildingYield" => {
+            let k = K::parse(text("k")).ok_or("no such hex")?;
+            let b = g.buildings.get(&k).ok_or("no building there")?;
+            let ups: Vec<Key> = serde_json::from_value(a.q["upgrades"].clone()).unwrap_or_else(|_| b.upgrades.clone());
+            let y = g.building_yield(k, b, &ups);
+            ok(&json!({"makes": ByRes(y.makes), "houses": y.houses, "points": y.points}))
+        }
+        "buildingPoints" => {
+            let k = K::parse(text("k")).ok_or("no such hex")?;
+            let b = g.buildings.get(&k).ok_or("no building there")?;
+            ok(&g.building_points(b, &b.upgrades))
         }
         "publicState" => ok(&crate::state::public_state_with(&g, int("lines") as usize)),
         "seatState" => ok(&crate::state::seat_state_with(&g, p, int("lines") as usize)),

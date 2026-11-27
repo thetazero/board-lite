@@ -1,4 +1,4 @@
-//! POST /mcp: how a Claude client someone brings joins and plays a game, as src/server/mcp.ts answers it.
+//! POST /mcp: how a Claude client someone brings joins and plays a game.
 use crate::data::DATA;
 use crate::mapimage::map_image;
 use crate::room::{Fail, Heard, Res, Room};

@@ -1,6 +1,5 @@
-//! The rules engine, the same rules, dice and log as src/engine.ts: a game
-//! saved by either server goes on under the other, and test/rust-parity.test.ts
-//! plays both side by side. Change a rule in src/engine.ts first, then here.
+//! The rules engine. `apply` is the only way to change a game; its dice and log
+//! are in the game, so a saved one goes on the same.
 use crate::data::*;
 use crate::map::*;
 use crate::rng::Rng;

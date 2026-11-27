@@ -336,8 +336,13 @@ class Server extends EventEmitter {
     });
   }
   address() { return { port: this.port }; }
-  closeAllConnections() { call('drop', { server: this.id }); }
+  private closed = false;
+  closeAllConnections() {
+    if (!this.closed) call('drop', { server: this.id });
+  }
   close() {
+    if (this.closed) return;
+    this.closed = true;
     clearInterval(this.holds);
     call('close', { server: this.id });
   }

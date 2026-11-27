@@ -1,4 +1,4 @@
-//! A finished game's recap, as src/recap.ts builds it.
+//! A finished game's recap.
 use crate::data::*;
 use crate::engine::*;
 use crate::map::K;

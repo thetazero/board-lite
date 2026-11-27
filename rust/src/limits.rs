@@ -1,4 +1,4 @@
-//! What a public website adds (src/server/public.ts): limits on what one
+//! What a public website adds: limits on what one
 //! visitor, and everyone together, can use, and clearing old games off the disk.
 use crate::room::{Fail, Res};
 use std::collections::HashMap;

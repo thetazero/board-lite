@@ -1,4 +1,4 @@
-//! The game log, for development, as src/server/gamelog.ts writes it.
+//! The game log, for development.
 use crate::engine::LogEntry;
 use crate::recap::iso;
 use serde::Serialize;

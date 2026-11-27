@@ -1,4 +1,4 @@
-//! What the web clients receive, as JSON, as src/state.ts makes it.
+//! What the web clients receive, as JSON.
 use crate::data::*;
 use crate::engine::*;
 use crate::map::*;

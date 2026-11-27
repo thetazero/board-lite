@@ -1,4 +1,4 @@
-//! The game file on disk, as src/store.ts keeps it.
+//! The game file on disk.
 use crate::engine::Game;
 use serde::Serialize;
 use serde_json::Value;

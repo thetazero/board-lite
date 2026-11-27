@@ -1,4 +1,4 @@
-//! The website: serves the clients and runs rooms, as src/server/server.ts does with --public.
+//! The server: serves the clients and runs rooms, at home or as a public website.
 use crate::limits::{Hold, Limits, clear_old, is_recap_id, lock, visitor};
 use crate::mcp;
 use crate::room::{Fail, Here, Place, Res, Room, new_code, remove_files};

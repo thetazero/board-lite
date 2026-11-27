@@ -1,4 +1,4 @@
-//! The simple bot and the stand-in, as src/bot.ts plays them.
+//! The simple bot and the stand-in.
 use crate::data::*;
 use crate::engine::*;
 use crate::map::*;

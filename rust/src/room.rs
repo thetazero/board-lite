@@ -1,6 +1,8 @@
-//! A room: one game hosted by the server, and the players seated at it, as
-//! src/server/room.ts runs it. Files are the same, so either server can host a
-//! room the other did.
+//! A room: one game hosted by the server, and the players seated at it. Every
+//! client (phones, the TV, the CLI, Claude players) joins with a name, gets a
+//! seat token and sends the engine's commands through the room; every change is
+//! pushed to whoever is watching. The game is saved after each change, and who
+//! sits where beside it (<game>.seats.json), so a restart loses nothing.
 use crate::bot;
 use crate::data::DATA;
 use crate::engine::{Game, Phase};
