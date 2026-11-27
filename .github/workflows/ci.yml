@@ -15,6 +15,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: rustup target add wasm32-unknown-unknown && npm run wasm:build
       - run: npm run typecheck
       # `npm test` takes 30-40 s here (about 8 s on a dev machine). Past
       # TEST_CAP seconds it is stopped and the run fails as too slow. Raise
@@ -45,16 +46,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: rustup target add wasm32-unknown-unknown && npm run wasm:build
       - run: npm run rust:build
       - run: cargo test --release --locked --manifest-path rust/Cargo.toml
       - run: node --test test/rust-parity.test.ts test/rust-server.test.ts
-      - run: docker build -f Dockerfile.rust -t board-lite-rust .
-      - run: |
-          docker run -d --name site -p 8080:8080 --read-only --cap-drop ALL -v games:/data -e BOARD_LITE_PUBLIC_URL=https://dragons.example board-lite-rust
-          for i in $(seq 20); do curl -fsS localhost:8080/healthz && break; sleep 1; done
-          docker exec site /board-lite --health
-          curl -fsS -X POST localhost:8080/api/rooms | grep hostToken
-          curl -fsS localhost:8080/vendor/three/three.module.js -o /dev/null
   # The public website's container (docs/deploy.md) builds, starts, and answers.
   image:
     runs-on: ubuntu-latest

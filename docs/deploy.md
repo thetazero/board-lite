@@ -18,7 +18,7 @@ Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.e
 
 **Back up:** the `games` volume is the only state.
 
-**Another host** (Fly, Render, a machine with its own proxy): run `ghcr.io/thetazero/board-lite` (published from each merge to `main` that passes CI, tagged `latest` and by commit) or build the `Dockerfile`, mount a disk at `/data` that the image's `node` user (uid 1000) can write, run exactly one copy, and set:
+**Another host** (Fly, Render, a machine with its own proxy): run `ghcr.io/thetazero/board-lite` (published from each merge to `main` that passes CI, tagged `latest` and by commit) or build the `Dockerfile`, mount a disk at `/data` that uid 1000 can write, run exactly one copy, and set:
 
 | Variable | What |
 |---|---|

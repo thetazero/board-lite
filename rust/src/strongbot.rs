@@ -243,7 +243,7 @@ impl Bot<'_> {
             .max()
             .unwrap() as f64;
         let pace = 1.6f64.max(lead / g.round.max(1) as f64);
-        (((tuning().points_to_win as f64 - lead) / pace) * self.tune.pace).min(18.0).max(1.0)
+        (((points_to_win() as f64 - lead) / pace) * self.tune.pace).min(18.0).max(1.0)
     }
     pub fn horizon(&self, g: &Game) -> f64 {
         self.rounds_left(g) * self.tune.horizon
@@ -523,7 +523,7 @@ impl Bot<'_> {
     }
     fn warning(&self, g: &Game) -> Option<String> {
         let (q, pts) = self.leader(g);
-        let win = tuning().points_to_win;
+        let win = points_to_win();
         if pts < win - 14 || pts <= g.score(self.p).total || self.talked(g) || self.said_this_round(g, "points") {
             return None;
         }
@@ -553,7 +553,7 @@ impl Bot<'_> {
         }
         if any(&["stone", "timber", "crystal", "livestock", "gold", "trade", "offer", "swap", "deal", "need", "want", "give"]) {
             let (q, pts) = self.leader(g);
-            if m.from == q && pts >= tuning().points_to_win - 12 {
+            if m.from == q && pts >= points_to_win() - 12 {
                 return Some(format!("{to}You're too close to winning: no trades with you."));
             }
             return Some(format!("{to}Make me an offer. I take any trade that helps me, and 2 for 1 usually does."));
@@ -728,7 +728,7 @@ impl Bot<'_> {
             return no;
         }
         let (q, pts) = self.leader(g);
-        if o.from == q && (pts >= tuning().points_to_win - 12 || pts > g.score(self.p).total + 8) {
+        if o.from == q && (pts >= points_to_win() - 12 || pts > g.score(self.p).total + 8) {
             return no;
         }
         let before = self.prospects(g, h);

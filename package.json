@@ -19,6 +19,7 @@
     "eval": "node src/playtest/eval.ts",
     "leaderboard": "node src/playtest/leaderboard.ts",
     "live": "node src/playtest/live.ts",
+    "wasm:build": "node rust/gen/gen.ts && cargo build --lib --profile wasm --no-default-features --target wasm32-unknown-unknown --locked --manifest-path rust/Cargo.toml && cp rust/target/wasm32-unknown-unknown/wasm/board_lite.wasm rust/board_lite.wasm",
     "rust:build": "node rust/gen/gen.ts && cargo build --release --locked --manifest-path rust/Cargo.toml"
   },
   "engines": {

@@ -8,7 +8,7 @@ src/playtest/*
 src/shots
 !web
 !docs/rules.md
-# The Rust server (Dockerfile.rust).
+# The Rust server.
 !rust/Cargo.toml
 !rust/Cargo.lock
 !rust/src

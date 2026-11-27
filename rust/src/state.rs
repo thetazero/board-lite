@@ -509,7 +509,7 @@ pub fn public_state(g: &Game) -> PublicState<'_> {
         phase: g.phase,
         turn: g.turn,
         turn_order: g.turn_order(),
-        points_to_win: t.points_to_win,
+        points_to_win: points_to_win(),
         title_points: t.title_points,
         element_beats: &DATA.element_beats,
         fauna_wander_odds: t.fauna_wander_odds,

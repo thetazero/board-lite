@@ -2,10 +2,11 @@
 // decision goes through apply(game, player, command).
 
 import {
-  ACTIONS, BASIC_BUILDINGS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DECKS, DRAGONS, ELEMENTS, ELEMENT_WEAK, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, elementalDamage, faunaDef, orList,
-  type Attack, type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
+  ACTIONS, BASIC_RESOURCES, BEASTS, BUILDINGS, CLASS_NAMES, DRAGONS, ELEMENTS, FAUNA, PRODUCTION_CLASSES, RESOURCES, TARGETS, TERRAIN_NOUN, TOWER_CLASSES, TUNING, UNITS, UPGRADES, combatPower, faunaDef,
+  type BasicResource, type BuildingClass, type BuildingDef, type Bundle, type Counted, type DragonStage, type Element, type Resource, type UnitDef,
 } from './data.ts';
-import { PEAK, distance, generateMap, key, leviathanWaters, nearBeast, neighbors, parseKey, towerSpots, type Hex } from './map.ts';
+import { PEAK, distance, leviathanWaters, nearBeast, neighbors, parseKey, type Hex } from './map.ts';
+import { Refused, ask, moved } from './wasm.ts';
 import { type Rng, pick, roll, shuffle } from './rng.ts';
 
 export interface Card {
@@ -191,13 +192,7 @@ const fail = (msg: string): never => {
 };
 
 export const pname = (p: number) => `P${p + 1}`;
-const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
-
 // ---------- small helpers ----------
-
-function newId(g: Game, prefix: string): string {
-  return `${prefix}${g.nextId++}`;
-}
 
 function log(g: Game, text: string, ev: GameEvent, opts: { to?: number[]; dice?: Die[] } = {}) {
   const e: LogEntry = { round: g.round, text, ev };
@@ -228,12 +223,6 @@ export function canAfford(pl: Player, cost: Bundle): boolean {
 // web/phone.ts matches these words to leave the line out under a greyed button.
 export function afford(pl: Player, cost: Bundle): string | null {
   return canAfford(pl, cost) ? null : `You can't afford ${bundleText(cost)}.`;
-}
-
-function pay(pl: Player, cost: Bundle) {
-  const why = afford(pl, cost);
-  if (why) fail(why);
-  for (const r of RESOURCES) pl.resources[r] -= cost[r] ?? 0;
 }
 
 function gain(pl: Player, b: Bundle) {
@@ -291,28 +280,6 @@ export function blocked(g: Game, k: string): boolean {
 export function dragonPower(d: Dragon): number {
   const st = stageStats(d);
   return st ? combatPower(st) : 0;
-}
-
-function parsePlayer(g: Game, s: string | undefined): number {
-  const m = /^p?(\d+)$/i.exec(s ?? '');
-  const p = m ? Number(m[1]) - 1 : -1;
-  if (p < 0 || p >= g.players.length) fail(`Unknown player "${s ?? ''}". Players are P1..P${g.players.length}.`);
-  return p;
-}
-
-function parseResource(s: string | undefined): Resource {
-  const r = RESOURCES.find((x) => x === s?.toLowerCase());
-  return r ?? fail(`Unknown resource "${s ?? ''}". Resources: ${RESOURCES.join(', ')}.`);
-}
-
-function handCard(g: Game, p: number, id: string | undefined): Card {
-  const c = g.players[p].hand.find((x) => x.id === id);
-  return c ?? fail(`You have no card "${id ?? ''}" in hand.`);
-}
-
-function ownDragon(g: Game, p: number, id: string | undefined): Dragon {
-  const d = g.dragons.find((x) => x.id === id && x.owner === p);
-  return d ?? fail(`You have no dragon "${id ?? ''}".`);
 }
 
 // ---------- derived values ----------
@@ -517,59 +484,11 @@ export function score(g: Game, p: number): Score {
 
 // ---------- setup ----------
 
-function buildDeck(g: Game, deck: 'building' | 'action'): Card[] {
-  const defs: readonly Record<string, { copies?: number }>[] = DECKS[deck];
-  const cards: Card[] = [];
-  for (const d of defs) for (const [k, def] of Object.entries(d)) for (let i = 0; i < (def.copies ?? 0); i++) cards.push({ id: '', deck, key: k });
-  shuffle(g.rng, cards);
-  for (const c of cards) c.id = newId(g, 'c');
-  return cards;
-}
-
 // `first` pins who goes first in round 1 (tests, staged scenes); by default
 // it's random.
 export function newGame(players: number, seed: number, first?: number): Game {
   if (!Number.isInteger(players) || players < 2 || players > 6) fail('A game needs 2 to 6 players.');
-  const rng: Rng = { state: seed | 0 };
-  const g: Game = {
-    version: 1,
-    players: [],
-    round: 0,
-    phase: 'action',
-    turn: 0,
-    map: generateMap(rng, players),
-    buildings: {},
-    towers: towerSpots(players),
-    dragons: [],
-    decks: { building: [], action: [] },
-    discards: { building: [], action: [] },
-    offers: [],
-    raidsLeft: 0,
-    raid: null,
-    hoard: Object.fromEntries(Object.keys(TARGETS).map((t) => [t, 0])),
-    titles: { army: null, tower: null, hoard: null },
-    slain: {},
-    raidPoints: Array(players).fill(0),
-    beastTried: Array(players).fill(0),
-    winner: null,
-    nextId: 1,
-    log: [],
-    rng,
-  };
-  // Drawn from its own stream off the seed, so the map, decks and dice of a
-  // seed stay what they were before round 1's first player was random.
-  g.firstSeat = first ?? roll({ state: seed ^ 0x51a7 }, players) - 1;
-  g.decks.building = buildDeck(g, 'building');
-  g.decks.action = buildDeck(g, 'action');
-  for (let p = 0; p < players; p++) {
-    const resources = Object.fromEntries(RESOURCES.map((r) => [r, TUNING.startingResources[r] ?? 0])) as Record<Resource, number>;
-    g.players.push({ resources, hand: [], choice: [] });
-    g.buildings[g.towers[p]] = { type: 'tower', owner: p, upgrades: [], floors: 0 };
-    g.dragons.push({ id: newId(g, 'd'), owner: p, key: PROJECT_DRAGONS.fire, stage: TUNING.startingDragonStage, growth: 0, damage: 0 });
-  }
-  log(g, `A ${players}-player game begins. ${pname(g.firstSeat)} goes first. First to ${TUNING.pointsToWin} points wins.`, { k: 'begin', players, first: g.firstSeat });
-  startRound(g);
-  return g;
+  return ask('new', null, { players, seed, first });
 }
 
 // ---------- round flow ----------
@@ -705,18 +624,6 @@ export function turnOrder(g: Game): number[] {
   return g.players.map((_, i) => (firstPlayer(g) + i) % g.players.length);
 }
 
-function endTurn(g: Game) {
-  for (const o of g.offers) log(g, `Offer ${o.id} expires.`, { k: 'expire', from: o.from, to: o.to, give: tradeText(g, o.give), get: tradeText(g, o.get) });
-  g.offers = [];
-  const next = (g.turn + 1) % g.players.length;
-  if (next !== firstPlayer(g)) {
-    g.turn = next;
-    log(g, `${pname(g.turn)}'s turn.`, { k: 'turn', p: g.turn });
-    return;
-  }
-  startRaid(g);
-}
-
 function startRaid(g: Game) {
   g.phase = 'raid';
   const n = g.players.length;
@@ -824,59 +731,6 @@ export function votePower(g: Game, p: number): number {
   return eligibleDragons(g, p).reduce((s, d) => s + dragonPower(d), 0);
 }
 
-function resolveVote(g: Game) {
-  const raid = g.raid!;
-  const counts = raid.candidates.map((_, i) => raid.votes.reduce<number>((s, v, p) => s + (v === i ? votePower(g, p) : 0), 0));
-  const best = Math.max(...counts);
-  const tied = raid.candidates.filter((_, i) => counts[i] === best);
-  raid.target = tied.length > 1 ? pick(g.rng, tied) : tied[0];
-  const target: GameEvent = { k: 'target', t: raid.target, name: TARGETS[raid.target].name, votes: counts, coin: tied.length > 1 };
-  log(g, `Votes: ${raid.votes.flatMap((v, p) => (v === null ? [] : [`${pname(p)} (power ${votePower(g, p)})→${TARGETS[raid.candidates[v]].name}`])).join(', ')}.`, { k: 'votes', votes: [...raid.votes] });
-  log(g, `The raid target is ${TARGETS[raid.target].name}${tied.length > 1 ? ' (tie broken by a coin flip)' : ''}.`, target);
-  // Every raid-ready dragon is in the raid: the ones whose power counted in the vote.
-  raid.sent = g.players.map((_, p) => eligibleDragons(g, p).map((d) => d.id));
-  const ins = raid.sent.flatMap((c, p) => (c.length ? [p] : []));
-  log(g, `In the raid: ${ins.map((p) => `${pname(p)} (${raid.sent[p].join(' ')})`).join(', ')}. Each chooses in secret which dragons fight; the rest hold back.`, { k: 'locked', ps: ins, sent: ins.map((p) => [...raid.sent[p]]) });
-  raid.step = 'choose';
-}
-
-function resolveChoices(g: Game) {
-  const raid = g.raid!;
-  const fighters: number[] = [];
-  const heldBack: { p: number; ds: string[] }[] = [];
-  for (let p = 0; p < g.players.length; p++) {
-    const fight = raid.choices[p];
-    if (!fight) continue;
-    if (fight.length) fighters.push(p);
-    const held = raid.sent[p].filter((id) => !fight.includes(id));
-    if (!held.length) continue;
-    heldBack.push({ p, ds: held });
-    if (!fight.length) log(g, `${pname(p)} holds back.`, { k: 'hold', p, ds: held });
-    else log(g, `${pname(p)} holds back ${held.join(' ')}.`, { k: 'hold', p, ds: held });
-  }
-  if (fighters.length === 0) {
-    log(g, 'Everyone holds back. The raid is off.', { k: 'noRaid', why: 'held' });
-    return finishRaid(g);
-  }
-  raid.fighters = fighters.flatMap((p) => raid.choices[p]!);
-  raid.units = TARGETS[raid.target!].units.map((k) => ({ key: k, hp: UNITS[k].hp }));
-  const first = coinFlip(g);
-  log(g, `${andList(fighters.map(pname))} ${fighters.length === 1 ? 'attacks' : 'attack'} ${TARGETS[raid.target!].name}. ${firstText(first, 'the defenders')}`, { k: 'fight', ps: fighters, t: raid.target!, name: TARGETS[raid.target!].name, ds: [...raid.fighters], hps: raid.fighters.map((id) => healthOf(dragonById(g, id))), units: raid.units.map((u) => ({ name: UNITS[u.key].name, hp: u.hp, el: UNITS[u.key].element })), first, held: heldBack });
-  // No retreat: the fight goes on until every defender falls or every dragon is knocked out.
-  for (let round = 1; !checkRaidOver(g); round++) combatRound(g, raid, round, first);
-}
-
-// A hatched dragon's health now: its life stage's, less the hits it carries.
-function healthOf(d: Dragon): number {
-  return Math.max(0, stageStats(d)!.hp - d.damage);
-}
-
-function rollAttack(g: Game, a: Attack): number {
-  let sum = 0;
-  for (let i = 0; i < a.dice; i++) sum += roll(g.rng, a.sides);
-  return sum;
-}
-
 // One fight: dragons against foes (a raid's defenders, or one beast of the
 // fauna). The raid keeps its fight in g.raid; clearing fauna uses its own.
 // A defender is a unit or beast by its key, or a perched dragon (`d`, its id,
@@ -885,103 +739,6 @@ function rollAttack(g: Game, a: Attack): number {
 interface Battle {
   units: { key: string; hp: number; d?: string }[];
   fighters: string[];
-}
-
-function unitDef(g: Game, u: Battle['units'][number]): UnitDef {
-  if (!u.d) return foeDef(u.key);
-  const d = dragonById(g, u.d);
-  return { name: dragonName(d), ...stageStats(d)!, element: DRAGONS[d.key].element };
-}
-
-function pickTargets(g: Game, b: Battle, d: Dragon, n: number): number[] {
-  const alive = b.units.flatMap((u, i) => (u.hp > 0 ? [i] : []));
-  const rule = DRAGONS[d.key].targeting;
-  let order = shuffle(g.rng, alive.slice());
-  if (rule === 'lowest_health') order.sort((x, y) => b.units[x].hp - b.units[y].hp);
-  if (rule === 'strongest_attacker') {
-    const power = (i: number) => { const u = unitDef(g, b.units[i]); return u.targets * u.dice * (u.sides + 1); };
-    order.sort((x, y) => power(y) - power(x));
-  }
-  if (rule === 'weak_to_me') {
-    const weak = (i: number) => (ELEMENT_WEAK[unitDef(g, b.units[i]).element].includes(DRAGONS[d.key].element) ? 0 : 1);
-    order.sort((x, y) => weak(x) - weak(y));
-  }
-  return order.slice(0, n);
-}
-
-function dragonById(g: Game, id: string): Dragon {
-  return g.dragons.find((d) => d.id === id)!;
-}
-
-// A dragon at 0 health is knocked out: it leaves the fight and heals at home.
-function knockedOut(b: Battle, d: Dragon): boolean {
-  if (d.damage < stageStats(d)!.hp) return false;
-  d.damage = stageStats(d)!.hp;
-  b.fighters = b.fighters.filter((id) => id !== d.id);
-  return true;
-}
-
-// A perched dragon takes its hits like any other; at 0 health it is knocked
-// out and goes home.
-function defenderHit(g: Game, u: Battle['units'][number]) {
-  const d = dragonById(g, u.d!);
-  d.damage = stageStats(d)!.hp - u.hp;
-  if (u.hp === 0) delete d.perch;
-}
-
-// Who strikes first in a fight: a coin flip, once for the whole fight.
-function coinFlip(g: Game): Side {
-  return roll(g.rng, 2) === 1 ? 'dragons' : 'defenders';
-}
-
-// The log's line for the flip; `them` names what the dragons attack, one
-// beast or dragon unless `many`.
-function firstText(first: Side, them: string, many = true): string {
-  return first === 'dragons' ? 'Coin flip: the dragons strike first.' : `Coin flip: ${them} ${many ? 'strike' : 'strikes'} first.`;
-}
-
-// One combat round: the side that won the fight's coin flip strikes first,
-// then the other, with what it has left standing.
-function combatRound(g: Game, b: Battle, round: number, first: Side) {
-  const lines: string[] = [];
-  const hits: Hit[] = [];
-  if (first === 'defenders') defendersStrike(g, b, lines, hits);
-  dragonsStrike(g, b, lines, hits);
-  if (first === 'dragons') defendersStrike(g, b, lines, hits);
-  log(g, `Combat round ${round}: ${lines.join('; ')}.`, { k: 'combat', round, hits });
-}
-
-function dragonsStrike(g: Game, b: Battle, lines: string[], hits: Hit[]) {
-  for (const id of b.fighters) {
-    const d = dragonById(g, id);
-    const st = stageStats(d)!;
-    for (const ui of pickTargets(g, b, d, st.targets)) {
-      const u = b.units[ui];
-      const def = unitDef(g, u);
-      const roll = rollAttack(g, st);
-      const dmg = elementalDamage(roll, DRAGONS[d.key].element, def.element);
-      u.hp = Math.max(0, u.hp - dmg);
-      if (u.d) defenderHit(g, u);
-      lines.push(`${d.id} hits ${def.name} #${ui + 1} for ${dmg}${u.hp === 0 ? ' (falls)' : ''}`);
-      hits.push({ d: d.id, u: ui, by: 'dragon', dmg, down: u.hp === 0, ...(dmg > roll ? { beats: true as const } : {}) });
-    }
-  }
-}
-
-function defendersStrike(g: Game, b: Battle, lines: string[], hits: Hit[]) {
-  for (const [ui, u] of b.units.entries()) {
-    if (u.hp <= 0) continue;
-    const def = unitDef(g, u);
-    for (let t = 0; t < def.targets && b.fighters.length; t++) {
-      const d = dragonById(g, pick(g.rng, b.fighters));
-      const roll = rollAttack(g, def);
-      const dmg = elementalDamage(roll, def.element, DRAGONS[d.key].element);
-      d.damage += dmg;
-      const down = knockedOut(b, d);
-      lines.push(`${def.name} #${ui + 1} hits ${d.id} for ${dmg}${down ? ' (knocked out, goes home)' : ''}`);
-      hits.push({ d: d.id, u: ui, by: 'unit', dmg, down, ...(dmg > roll ? { beats: true as const } : {}) });
-    }
-  }
 }
 
 export function unitsText(g: Game): string {
@@ -1016,88 +773,7 @@ export function pointsLeader(power: number[], order: number[]): number | undefin
   return best ? order.find((p) => power[p] === best) : undefined;
 }
 
-function checkRaidOver(g: Game): boolean {
-  const raid = g.raid!;
-  if (raid.units.every((u) => u.hp <= 0)) {
-    // Loot is split by the combat power each player has in the raid not
-    // knocked out: the dragons still fighting and the ones held back.
-    const standing = raid.sent.flat().map((id) => dragonById(g, id)).filter((d) => healthOf(d) > 0);
-    const power = g.players.map((_, p) => standing.reduce((s, d) => s + (d.owner === p ? dragonPower(d) : 0), 0));
-    const winners = g.players.flatMap((_, p) => (power[p] ? [p] : []));
-    const loot = lootOf(g, raid.target!);
-    const order = turnOrder(g);
-    const shares = splitLoot(loot, power, order);
-    for (const p of winners) gain(g.players[p], shares[p]);
-    const take = winners.map((p) => `${pname(p)} (power ${power[p]}) takes ${bundleText(shares[p]) || 'nothing'}`).join('; ');
-    // A kingdom that scores gives its points to the most power standing
-    // (not knocked out); equal powers go in turn order, as the loot's odd ones do.
-    const points = TARGETS[raid.target!].points;
-    const scorer = points ? pointsLeader(power, order) : undefined;
-    if (points && scorer !== undefined) {
-      g.raidPoints ??= g.players.map(() => 0);
-      g.raidPoints[scorer] += points;
-    }
-    const scored = points && scorer !== undefined ? ` ${pname(scorer)} has the most power standing and scores ${points} point${points === 1 ? '' : 's'}.` : '';
-    log(g, `${TARGETS[raid.target!].name} falls. ${take}.${scored}`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: true, winners, shares: winners.map((p) => shares[p]), power: winners.map((p) => power[p]), ...(points && scorer !== undefined ? { points, scorer } : {}) });
-    finishRaid(g, raid.target!);
-    return true;
-  }
-  if (raid.fighters.length === 0) {
-    log(g, `${TARGETS[raid.target!].name} holds.`, { k: 'raidEnd', t: raid.target!, name: TARGETS[raid.target!].name, won: false, winners: [], shares: [], power: [] });
-    finishRaid(g);
-    return true;
-  }
-  return false;
-}
-
 // ---------- fauna ----------
-
-// A player's dragons attack what holds hex k, in a raid's combat, to the end:
-// its beast and every rival dragon perched there, together. The hits they
-// take stay on them, into the round's raids. If every defender falls, the beast is gone and
-// its loot (and a great beast's points, for good) goes to the player, and the
-// perched dragons are knocked out and go home. If not, the beast stays,
-// healed; perched dragons keep their hits, and stay unless knocked out. A
-// player gets one try at a great beast a round.
-function clearHex(g: Game, p: number, k: string, ds: Dragon[]): boolean {
-  const f = g.map[k].fauna ?? null;
-  const great = f ? BEASTS[f] : undefined;
-  if (great) {
-    if (g.beastTried[p] === g.round) fail(`You've fought a great beast this round already: 1 try each round.`);
-    g.beastTried[p] = g.round;
-  }
-  const perched = rivalsPerched(g, p, k);
-  const units: Battle['units'] = [
-    ...(f ? [{ key: f, hp: faunaDef(f).hp }] : []),
-    ...perched.map((d) => ({ key: d.key, hp: healthOf(d), d: d.id })),
-  ];
-  const b: Battle = { units, fighters: ds.map((d) => d.id) };
-  const name = f ? faunaDef(f).name : dragonName(perched[0]);
-  const foes = [...(f ? [`the ${name}`] : []), ...perched.map((d) => `${pname(d.owner)}'s ${dragonName(d)} (${d.id})`)].join(' and ');
-  const first = coinFlip(g);
-  const them = units.length > 1 ? 'the defenders' : f ? `the ${name}` : `${pname(perched[0].owner)}'s ${dragonName(perched[0])}`;
-  log(g, `${pname(p)} sends ${ds.map((d) => d.id).join(' ')} against ${foes} at ${k}. ${firstText(first, them, units.length > 1)}`, {
-    k: 'hunt', p, hex: k, fauna: f, name, hp: units[0].hp, ds: [...b.fighters], hps: ds.map(healthOf), units: units.map((u) => ({ name: unitDef(g, u).name, hp: u.hp, ...(u.d ? { d: u.d } : {}), el: unitDef(g, u).element })), first,
-  });
-  for (let round = 1; b.units.some((u) => u.hp > 0) && b.fighters.length; round++) combatRound(g, b, round, first);
-  const won = b.units.every((u) => u.hp <= 0);
-  const home = perched.filter((d) => !d.perch).map((d) => d.id);
-  const loot = f ? faunaLoot(g, k) : {};
-  if (won && f) {
-    delete g.map[k].fauna;
-    delete g.map[k].sent;
-    gain(g.players[p], loot);
-    if (great) g.slain[f] = p;
-  }
-  const flown = home.length ? ` ${home.join(' ')} ${home.length === 1 ? 'goes' : 'go'} home.` : '';
-  let text: string;
-  if (!f) text = won ? `${pname(p)} clears ${k}.${flown}` : `The dragons at ${k} hold against ${pname(p)}.${flown}`;
-  else if (!won) text = `The ${name} at ${k} holds against ${pname(p)}.${flown}`;
-  else if (great) text = `The ${name} is slain. ${pname(p)} scores ${great.points} point${great.points === 1 ? '' : 's'}.${f === 'thunderbird' ? ` Production buildings on and adjacent to its peak make ${TUNING.peakBonus} more each round.` : ''}`;
-  else text = `The ${name} at ${k} falls.${Object.keys(loot).length ? ` ${pname(p)} gains ${bundleText(loot)}.` : ''}${flown}`;
-  log(g, text, { k: 'cleared', p, hex: k, fauna: f, name, won, gain: won ? loot : {}, ...(great && won ? { points: great.points } : {}), ...(home.length ? { home } : {}) });
-  return won;
-}
 
 // The dragons of players other than p perched on hex k: what p fights there.
 export function rivalsPerched(g: Game, p: number, k: string): Dragon[] {
@@ -1188,37 +864,7 @@ export function autoClearTargets(g: Game, p: number): string[] {
     .map((t) => t.k);
 }
 
-// Auto clear: clear player p's own buildings one at a time, weakest first,
-// each wave sending all p's raid-ready dragons, exactly as "clear" would. It
-// stops when nothing is left to clear, no dragon is raid-ready, or a wave
-// loses.
-function autoClear(g: Game, p: number) {
-  const ready = () => g.dragons.filter((d) => d.owner === p && canRaid(d));
-  if (!autoClearTargets(g, p).length) fail(`Nothing holds your buildings: there's nothing to auto clear.`);
-  if (!ready().length) fail(`You have no raid-ready dragon to send.`);
-  for (;;) {
-    const [k] = autoClearTargets(g, p);
-    const ds = ready();
-    if (!k || !ds.length) return;
-    if (!clearHex(g, p, k, ds)) return;
-  }
-}
-
 // ---------- commands ----------
-
-function parseTradeSide(g: Game, tokens: string[]): TradeSide {
-  const side: TradeSide = { res: {}, cards: [] };
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i].replace(/,$/, '');
-    if (!t) continue;
-    if (/^c\d+$/.test(t)) side.cards.push(t);
-    else if (/^\d+$/.test(t)) {
-      const r = parseResource(tokens[++i]?.replace(/,$/, ''));
-      side.res[r] = (side.res[r] ?? 0) + Number(t);
-    } else fail(`Can't read "${t}" in a trade. Use amounts like "2 stone" and card ids like "c12".`);
-  }
-  return side;
-}
 
 export function tradeText(g: Game, s: TradeSide): string {
   const parts: string[] = [];
@@ -1234,10 +880,6 @@ function hasTradeSide(g: Game, p: number, s: TradeSide): boolean {
   return canAfford(g.players[p], s.res) && s.cards.every((id) => g.players[p].hand.some((c) => c.id === id));
 }
 
-function tradesNothing(s: TradeSide): boolean {
-  return !s.cards.length && !Object.values(s.res).some((n) => n);
-}
-
 // Whether offer o waits on p's answer: it's made to them, or open to anyone
 // and they haven't declined it.
 export function offerFor(o: Offer, p: number): boolean {
@@ -1249,33 +891,6 @@ export function acceptProblem(g: Game, o: Offer, p: number): string | null {
   if (!hasTradeSide(g, o.from, o.give)) return `${pname(o.from)} no longer has what they offered.`;
   if (!hasTradeSide(g, p, o.get)) return `You don't have ${tradeText(g, o.get)}.`;
   return null;
-}
-
-function moveTradeSide(g: Game, from: number, to: number, s: TradeSide) {
-  pay(g.players[from], s.res);
-  gain(g.players[to], s.res);
-  for (const id of s.cards) {
-    const i = g.players[from].hand.findIndex((c) => c.id === id);
-    g.players[to].hand.push(...g.players[from].hand.splice(i, 1));
-  }
-}
-
-function placeCheck(g: Game, p: number, type: string, hexArg: string | undefined): string {
-  const def = BUILDINGS[type];
-  if (def.onTower) return g.towers[p];
-  const coords = parseKey(hexArg ?? '');
-  if (!coords) fail(`Say where to build, as a hex like "2,-1".`);
-  const k = key(...coords!);
-  const hex = g.map[k];
-  if (!hex) fail(`${k} is not on the map.`);
-  if (hex.terrain === 'ocean') fail(`${k} is ocean: build on land.`);
-  if (g.buildings[k]) fail(`${k} already has a building.`);
-  if (hex.fauna) fail(`A ${faunaDef(hex.fauna).name} holds ${k}: clear it first.`);
-  if (nearBeast(g.map, k)) fail(`A great beast holds ${k} from an adjacent hex: slay it first.`);
-  if (def.terrain && hex.terrain !== def.terrain) fail(`A ${def.name} must go on a ${TERRAIN_NOUN[def.terrain]}; ${k} is a ${TERRAIN_NOUN[hex.terrain]}.`);
-  if (!neighbors(k).some((n) => g.buildings[n]?.owner === p && !blocked(g, n))) fail(`${k} isn't adjacent to any of your buildings.`);
-  if (def.beside && !neighbourCount(g, k, def.beside)) fail(`A ${def.name} must go adjacent to ${besideText(def.beside)}; ${k} isn't.`);
-  return k;
 }
 
 export function buildableHexes(g: Game, p: number, type: string): string[] {
@@ -1290,38 +905,11 @@ export function buildableHexes(g: Game, p: number, type: string): string[] {
   return [...out].sort();
 }
 
-function placeBuilding(g: Game, p: number, type: string, k: string, project = false) {
-  const def = BUILDINGS[type];
-  if (def.onTower) {
-    g.buildings[k].floors++;
-    log(g, `${pname(p)} adds a floor to their tower (now ${g.buildings[k].floors})${project ? ' as a special project' : ''}.`, { k: 'floor', p, floors: g.buildings[k].floors, ...(project ? { project } : {}) });
-  } else {
-    g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 };
-    log(g, `${pname(p)} builds a ${def.name} at ${k}${project ? ' as a special project' : ''}.`, { k: 'build', p, b: type, name: def.name, hex: k, ...(project ? { project } : {}) });
-  }
-}
-
 export function upgradeTargets(g: Game, p: number, up: string): string[] {
   return ownedBuildings(g, p)
     .filter(([, b]) => buildingClass(b).some((c) => UPGRADES[up].appliesTo.includes(c)))
     .map(([k]) => k)
     .sort();
-}
-
-// The hex an upgrade goes on, from what the player typed, or why it can't.
-function upgradeCheck(g: Game, p: number, up: string, typed: string | undefined): string {
-  const coords = parseKey(typed ?? '');
-  const k = coords ? key(...coords) : '';
-  const ok = upgradeTargets(g, p, up);
-  if (!ok.includes(k)) fail(`${UPGRADES[up].name} can go on: ${ok.join(' ') || 'none of your buildings'}.`);
-  return k;
-}
-
-function placeUpgrade(g: Game, p: number, up: string, k: string, project = false) {
-  g.buildings[k].upgrades.push(up);
-  const b = g.buildings[k];
-  const name = UPGRADES[up].name;
-  log(g, `${pname(p)} adds ${name} to their ${b.type === 'tower' ? 'Tower' : BUILDINGS[b.type].name} at ${k}${project ? ' as a special project' : ''}.`, { k: 'upgrade', p, u: up, name, on: b.type, hex: k, ...(project ? { project } : {}) });
 }
 
 // The upgrades a player may add without the card, as a special project.
@@ -1333,328 +921,12 @@ export function specialProjectCost(kind: 'egg' | 'upgrade', cost: Bundle): Bundl
 
 export const PROJECT_DRAGONS = Object.fromEntries(ELEMENTS.map((e) => [e, Object.keys(DRAGONS).find((k) => DRAGONS[k].base && DRAGONS[k].element === e)!])) as Record<Element, string>;
 
-function hatch(g: Game, p: number, dragonKey: string, project = false) {
-  const mine = g.dragons.filter((d) => d.owner === p).length;
-  if (mine >= dragonCapacity(g, p)) fail(`No room for another dragon (${mine}/${dragonCapacity(g, p)}): build a roost first.`);
-  const d: Dragon = { id: newId(g, 'd'), owner: p, key: dragonKey, stage: 0, growth: 0, damage: 0 };
-  g.dragons.push(d);
-  log(g, `${pname(p)} hatches an egg: ${dragonName(d)} (${d.id}), a ${DRAGONS[dragonKey].element} dragon${project ? ', as a special project' : ''}.`, { k: 'hatch', p, d: d.id, ...(project ? { project } : {}) });
-}
-
-function discardCard(g: Game, p: number, c: Card) {
-  const hand = g.players[p].hand;
-  hand.splice(hand.indexOf(c), 1);
-  g.discards[c.deck].push(c);
-}
-
-function actionCommand(g: Game, p: number, verb: string, args: string[]) {
-  const pl = g.players[p];
-  if (verb === 'accept' || verb === 'decline') {
-    const o = g.offers.find((x) => x.id === args[0]);
-    if (!o || !offerFor(o, p)) fail(`There is no offer "${args[0] ?? ''}" made to you.`);
-    if (verb === 'decline') {
-      // An open offer stays open to the others until all of them decline it.
-      if (o!.to === null) o!.passed = [...(o!.passed ?? []), p];
-      if (o!.to !== null || g.players.every((_, i) => !offerFor(o!, i))) g.offers = g.offers.filter((x) => x !== o);
-      return log(g, `${pname(p)} declines offer ${o!.id}.`, { k: 'decline', p, from: o!.from, give: tradeText(g, o!.give), get: tradeText(g, o!.get) });
-    }
-    const problem = acceptProblem(g, o!, p);
-    if (problem) fail(problem);
-    g.offers = g.offers.filter((x) => x !== o);
-    const giveText = tradeText(g, o!.give), getText = tradeText(g, o!.get);
-    moveTradeSide(g, o!.from, p, o!.give);
-    moveTradeSide(g, p, o!.from, o!.get);
-    return log(g, `${pname(p)} accepts offer ${o!.id}: ${pname(o!.from)} gives ${giveText} for ${getText}.`, { k: 'trade', from: o!.from, to: p, give: giveText, get: getText });
-  }
-  if (verb === 'offer') {
-    // "anyone": an offer every other player may accept, made on your own turn.
-    const to = ['anyone', 'everyone'].includes(args[0]?.toLowerCase() ?? '') ? null : parsePlayer(g, args[0]);
-    if (to === p) fail(`You can't trade with yourself.`);
-    if (p !== g.turn && to !== g.turn) fail(`Out of turn, you can only offer to ${pname(g.turn)}.`);
-    const gi = args.indexOf('give'), ge = args.indexOf('get');
-    if (gi !== 1 || ge < gi) fail(`Use: offer P2 give 2 stone c12 get 1 gold, or offer anyone give ...`);
-    const o: Offer = { id: newId(g, 'o'), from: p, to, give: parseTradeSide(g, args.slice(gi + 1, ge)), get: parseTradeSide(g, args.slice(ge + 1)) };
-    if (tradesNothing(o.give) && tradesNothing(o.get)) fail(`The offer is empty: give or get something.`);
-    if (new Set([...o.give.cards, ...o.get.cards]).size < o.give.cards.length + o.get.cards.length) fail(`Name each card once.`);
-    if (!hasTradeSide(g, p, o.give)) fail(`You don't have ${tradeText(g, o.give)}.`);
-    // Gold is public, so an ask for more than they have is refused here; the
-    // rest of what they hold is hidden, and is checked when they answer.
-    const gold = to === null ? Math.max(...g.players.filter((_, i) => i !== p).map((x) => x.resources.gold)) : g.players[to].resources.gold;
-    if ((o.get.res.gold ?? 0) > gold) fail(to === null ? `No other player has more than ${gold} gold.` : `${pname(to)} has ${gold} gold.`);
-    if (to === null) o.passed = [];
-    g.offers.push(o);
-    return log(g, `${pname(p)} offers ${to === null ? 'anyone' : pname(to)} (${o.id}): ${tradeText(g, o.give)} for ${tradeText(g, o.get)}.`, { k: 'offer', p, to });
-  }
-  if (verb === 'cancel') {
-    const o = g.offers.find((x) => x.id === args[0] && x.from === p);
-    if (!o) fail(`You have no open offer "${args[0] ?? ''}".`);
-    g.offers = g.offers.filter((x) => x !== o);
-    return log(g, `${pname(p)} withdraws offer ${o!.id}.`, { k: 'withdraw', p });
-  }
-  if (p !== g.turn) fail(`It's ${pname(g.turn)}'s turn: out of turn, you can only trade.`);
-  switch (verb) {
-    case 'end': {
-      // An offer made to you gets an answer from you, not from the clock.
-      const open = g.offers.filter((o) => offerFor(o, p));
-      if (open.length) fail(`Answer ${open.map((o) => `${pname(o.from)}'s offer ${o.id}`).join(' and ')} first: accept or decline.`);
-      log(g, `${pname(p)} ends their turn.`, { k: 'end', p });
-      return endTurn(g);
-    }
-    case 'merchants':
-    case 'bank': { // "bank" is the old name, still accepted
-      const give = parseResource(args[0]), get = parseResource(args[1]);
-      const times = args[2] ? Number(args[2]) : 1;
-      if (give === 'gold' || get === 'gold') fail(`The merchants don't trade gold.`);
-      if (give === get) fail(`Trade 2 different resources.`);
-      if (!Number.isInteger(times) || times < 1) fail(`Times must be a whole number.`);
-      const rate = bankRates(g, p)[give as BasicResource];
-      pay(pl, { [give]: rate * times });
-      gain(pl, { [get]: times });
-      return log(g, `${pname(p)} trades ${rate * times} ${give} to the merchants for ${times} ${get}.`, { k: 'bank', p, give: { [give]: rate * times }, get: { [get]: times } });
-    }
-    case 'build': {
-      // A basic building by name, or a building card from hand.
-      const basic = BASIC_BUILDINGS.find((b) => b === args[0]);
-      if (basic) {
-        const k = placeCheck(g, p, basic, args[1]);
-        pay(pl, BUILDINGS[basic].cost);
-        return placeBuilding(g, p, basic, k);
-      }
-      if (!pl.hand.some((c) => c.id === args[0])) fail(`Build a card from your hand (like "build c12 2,-1") or a basic building: ${BASIC_BUILDINGS.join(', ')}.`);
-      const c = handCard(g, p, args[0]);
-      if (cardKind(c) !== 'building') fail(`${cardName(c)} is not a building card.`);
-      const k = placeCheck(g, p, c.key, args[1]);
-      pay(pl, BUILDINGS[c.key].cost);
-      discardCard(g, p, c);
-      return placeBuilding(g, p, c.key, k);
-    }
-    case 'upgrade': {
-      const c = handCard(g, p, args[0]);
-      if (cardKind(c) !== 'upgrade') fail(`${cardName(c)} is not an upgrade card.`);
-      const k = upgradeCheck(g, p, c.key, args[1]);
-      pay(pl, UPGRADES[c.key].cost);
-      discardCard(g, p, c);
-      return placeUpgrade(g, p, c.key, k);
-    }
-    case 'clear': {
-      const coords = parseKey(args[0] ?? '');
-      const k = coords ? key(...coords) : '';
-      if (!g.map[k]?.fauna && !rivalsPerched(g, p, k).length) fail(`Nothing to clear at "${args[0] ?? ''}". Clear: ${huntable(g, p).join(' ') || 'nowhere'}.`);
-      const ids = [...new Set(args.slice(1))];
-      if (!ids.length) fail(`Send at least 1 dragon: clear ${k} d1 d4`);
-      const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!canRaid(d)) fail(`${d.id} isn't raid-ready (hatched, not knocked out, not perched).`);
-      clearHex(g, p, k, ds);
-      return;
-    }
-    case 'autoclear':
-      return autoClear(g, p);
-    case 'perch': {
-      const coords = parseKey(args[0] ?? '');
-      const k = coords ? key(...coords) : '';
-      if (!perchHexes(g, p).includes(k)) fail(`Perch on a rival's building (not a tower), like "perch 2,-1 d3". Rivals' buildings: ${perchHexes(g, p).join(' ') || 'none'}.`);
-      const ids = [...new Set(args.slice(1))];
-      if (!ids.length) fail(`Send at least 1 dragon: perch ${k} d1 d4`);
-      const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!canRaid(d)) fail(`${d.id} isn't raid-ready (hatched, not knocked out, not perched).`);
-      for (const d of ds) d.perch = k;
-      const b = g.buildings[k];
-      return log(g, `${pname(p)}'s ${ids.join(' ')} ${ids.length === 1 ? 'perches' : 'perch'} on ${pname(b.owner)}'s ${BUILDINGS[b.type].name} at ${k}: it's suppressed while they stay.`, { k: 'perch', p, hex: k, ds: ids, on: b.type, owner: b.owner });
-    }
-    case 'recall': {
-      const ids = [...new Set(args)];
-      if (!ids.length) fail(`Name a perched dragon: recall d3`);
-      const ds = ids.map((id) => ownDragon(g, p, id));
-      for (const d of ds) if (!d.perch) fail(`${d.id} isn't perched.`);
-      for (const d of ds) delete d.perch;
-      return log(g, `${pname(p)} recalls ${ids.join(' ')} home.`, { k: 'recall', p, ds: ids });
-    }
-    case 'project': {
-      const what = args[0] ?? '';
-      const el = ELEMENTS.find((e) => e === what);
-      if (el) {
-        const dk = PROJECT_DRAGONS[el];
-        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`No room for another dragon: build a roost first.`);
-        pay(pl, specialProjectCost('egg', DRAGONS[dk].cost));
-        return hatch(g, p, dk, true);
-      }
-      if (UPGRADES[what]?.base) {
-        const k = upgradeCheck(g, p, what, args[1]);
-        pay(pl, specialProjectCost('upgrade', UPGRADES[what].cost));
-        return placeUpgrade(g, p, what, k, true);
-      }
-      return fail(`Use: project <${ELEMENTS.join('|')}>, or ${orList(PROJECT_UPGRADES.map((u) => `project ${u} <hex>`))}.`);
-    }
-    case 'play': {
-      const c = handCard(g, p, args[0]);
-      const kind = cardKind(c);
-      if (kind === 'dragon') {
-        if (g.dragons.filter((d) => d.owner === p).length >= dragonCapacity(g, p)) fail(`No room for another dragon: build a roost first.`);
-        pay(pl, DRAGONS[c.key].cost);
-        discardCard(g, p, c);
-        return hatch(g, p, c.key);
-      }
-      if (kind !== 'action') fail(`${cardName(c)} is played with "${kind === 'building' ? 'build' : 'upgrade'}".`);
-      const def = ACTIONS[c.key];
-      let what = '';
-      const ev: GameEvent = { k: 'play', p, card: c.key, name: def.name };
-      switch (def.effect) {
-        case 'hidden_point':
-          return fail(`${def.name} isn't played; it scores while it stays in your hand.`);
-        case 'gain_resource': {
-          const r = parseResource(args[1]);
-          if (r === 'gold') fail(`${def.name} doesn't gain gold: choose another resource.`);
-          pay(pl, def.cost);
-          gain(pl, { [r]: def.amount });
-          what = `gains ${def.amount} ${r}`;
-          ev.gain = { [r]: def.amount };
-          break;
-        }
-        case 'gain_gold':
-          pay(pl, def.cost);
-          gain(pl, { gold: def.amount });
-          what = `gains ${def.amount} gold`;
-          ev.gain = { gold: def.amount };
-          break;
-        case 'grow_dragon': {
-          const d = ownDragon(g, p, args[1]);
-          if (d.stage === 3) fail(`${d.id} is already an adult.`);
-          pay(pl, def.cost);
-          d.stage++;
-          d.growth = 0;
-          ev.d = d.id;
-          what = `grows ${dragonName(d)} (${d.id}) into ${['an egg', 'a hatchling', 'a young dragon', 'an adult'][d.stage]}`;
-          break;
-        }
-        case 'heal_dragon': {
-          const d = ownDragon(g, p, args[1]);
-          if (d.damage === 0) fail(`${d.id} isn't hurt.`);
-          pay(pl, def.cost);
-          d.damage = 0;
-          ev.d = d.id;
-          what = `heals ${d.id}`;
-          break;
-        }
-        case 'send_fauna': {
-          const coords = parseKey(args[1] ?? '');
-          const k = coords ? key(...coords) : '';
-          if (!faunaHexes(g).includes(k)) fail(`Say where to place the ${FAUNA[def.fauna!].name}: a land hex with no tower or beast, like "play ${c.id} 2,-1".`);
-          pay(pl, def.cost);
-          g.map[k].fauna = def.fauna!;
-          g.map[k].sent = true;
-          ev.hex = k;
-          ev.fauna = def.fauna!;
-          const b = g.buildings[k];
-          what = `places a ${FAUNA[def.fauna!].name} on ${k}${b ? `, on ${pname(b.owner)}'s ${BUILDINGS[b.type].name}` : ''}`;
-          break;
-        }
-        case 'extra_raid':
-          pay(pl, def.cost);
-          g.raidsLeft++;
-          ev.raids = g.raidsLeft;
-          what = `sounds the horn: ${g.raidsLeft} raids this round`;
-          break;
-      }
-      discardCard(g, p, c);
-      return log(g, `${pname(p)} plays ${def.name} and ${what}.`, ev);
-    }
-  }
-  fail(`Unknown action "${verb}". Try: build, upgrade, project, play, clear, autoclear, perch, recall, merchants, offer, accept, decline, cancel, end.`);
-}
-
-function raidCommand(g: Game, p: number, verb: string, args: string[]) {
-  const raid = g.raid!;
-  if (raid.step === 'vote') {
-    if (!canVote(g, p)) fail(NO_VOTE);
-    if (verb !== 'vote') fail(`Vote for the raid target: vote 1..${raid.candidates.length}.`);
-    if (raid.votes[p] !== null) fail(`You already voted.`);
-    const i = Number(args[0]) - 1;
-    if (!(i >= 0 && i < raid.candidates.length)) fail(`Vote 1..${raid.candidates.length}.`);
-    raid.votes[p] = i;
-    log(g, `${pname(p)} votes for ${TARGETS[raid.candidates[i]].name}.`, { k: 'voted', p, t: raid.candidates[i] });
-    if (raid.votes.every((v, q) => v !== null || !canVote(g, q))) resolveVote(g);
-    return;
-  }
-  if (raid.step === 'choose') {
-    if (!raid.sent[p].length) fail(`You aren't in this raid: you had no raid-ready dragon when the vote ended.`);
-    if (raid.choices[p]) fail(`You already chose.`);
-    const mine = raid.sent[p];
-    const usage = `Choose the dragons that fight: "fight" (all of them), "fight ${mine.join(' ')}" (some), or "hold" (none).`;
-    if (verb !== 'fight' && verb !== 'hold') fail(usage);
-    if (verb === 'hold' && args.length) fail(usage);
-    const ids = [...new Set(args)];
-    for (const id of ids) if (!mine.includes(id)) fail(`${id} isn't one of your dragons in this raid (${mine.join(' ')}).`);
-    const fight = verb === 'hold' ? [] : ids.length ? mine.filter((id) => ids.includes(id)) : [...mine];
-    raid.choices[p] = fight;
-    const held = mine.filter((id) => !fight.includes(id));
-    log(g, !fight.length ? 'You hold back.' : held.length ? `You fight with ${fight.join(' ')} and hold back ${held.join(' ')}.` : 'You fight.', { k: 'mine' }, { to: [p] });
-    if (raid.sent.every((c, q) => !c.length || raid.choices[q])) resolveChoices(g);
-  }
-}
-
-function cardsCommand(g: Game, p: number, verb: string, args: string[]) {
-  const pl = g.players[p];
-  if (!pl.choice.length) fail(`You've kept your card: wait for the others.`);
-  if (verb !== 'keep') fail(`Keep 1 of your 2 building cards: keep ${pl.choice.map((c) => c.id).join(' or ')}.`);
-  const c = pl.choice.find((x) => x.id === args[0]) ?? fail(`Keep 1 of ${pl.choice.map((c) => `${cardName(c)} (${c.id})`).join(', ')}.`);
-  keepCard(g, p, c);
-  log(g, `${pname(p)} keeps a building card.`, { k: 'keep', p });
-  if (g.players.every((x) => !x.choice.length)) startActions(g);
-}
-
-function discardCommand(g: Game, p: number, verb: string, args: string[]) {
-  const pl = g.players[p];
-  const over = pl.hand.length - TUNING.handCap;
-  if (over <= 0) fail(`You don't need to discard.`);
-  if (verb !== 'discard') fail(`Discard ${nCards(over)} first, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}".`);
-  const ids = [...new Set(args)];
-  if (ids.length !== over) fail(`You hold ${pl.hand.length} and the hand limit is ${TUNING.handCap}: discard ${nCards(over)}, like "discard ${pl.hand.slice(0, over).map((c) => c.id).join(' ')}".`);
-  const cards = ids.map((id) => handCard(g, p, id));
-  for (const c of cards) discardCard(g, p, c);
-  log(g, `${pname(p)} discards ${nCards(ids.length)}.`, { k: 'discard', p, n: ids.length });
-  maybeEndRound(g);
-}
-
-// Table talk: allowed any time, by anyone, and binds no one (only accepted
-// offers do). "say" is heard by everyone, "tell P2" only by P2.
-const MAX_TALK = 500;
-function talk(g: Game, p: number, verb: string, rest: string) {
-  let to: number[] | undefined;
-  if (verb === 'tell') {
-    const m = /^p(\d+)\s*(.*)$/is.exec(rest);
-    const q = Number(m?.[1]) - 1;
-    if (m && q === p) fail(`You can't tell yourself.`);
-    if (!m || !(q >= 0 && q < g.players.length)) fail(`Name a player to tell, like "tell P2 want my timber?"`);
-    to = [p, q];
-    rest = m![2].trim();
-  }
-  const text = rest.replace(/\s+/g, ' ');
-  if (!text) fail(`Type a message, like "say hello".`);
-  if (text.length > MAX_TALK) fail(`Keep it under ${MAX_TALK} characters.`);
-  log(g, to ? `${pname(p)} to ${pname(to[1])} (private): "${text}"` : `${pname(p)} says: "${text}"`, { k: 'talk' }, { to });
-}
-
+// A refused command changes nothing. The rules are Rust (rust/src/engine.rs).
 export function apply(g: Game, p: number, command: string): void {
-  if (g.phase === 'over') fail(`The game is over.`);
-  if (!(p >= 0 && p < g.players.length)) fail(`No such player.`);
-  const [verb = '', ...args] = command.trim().split(/\s+/);
-  const v = verb.toLowerCase();
-  if (v === 'say' || v === 'tell') return talk(g, p, v, command.trim().slice(verb.length).trim());
-  // A refused command changes nothing. The log only ever grows, so it is cut
-  // back rather than copied: copying it on every command made long games slow.
-  const { log: _, ...rest } = g;
-  const snapshot = structuredClone(rest);
-  const logged = g.log.length;
   try {
-    if (v === 'discard' && g.phase !== 'discard') fail(`Discard at the end of the round, after the raids, if you hold more than ${TUNING.handCap} cards.`);
-    if (g.phase === 'cards') cardsCommand(g, p, v, args);
-    else if (g.phase === 'action') actionCommand(g, p, v, args);
-    else if (g.phase === 'raid') raidCommand(g, p, v, args);
-    else discardCommand(g, p, v, args);
-    updateTitles(g);
+    moved('apply', g, { p, cmd: command });
   } catch (e) {
-    Object.assign(g, snapshot);
-    g.log.length = logged;
+    if (e instanceof Refused) fail(e.message);
     throw e;
   }
 }

@@ -352,3 +352,15 @@ fn list<T: AsRef<str>>(xs: &[T], word: &str) -> String {
         Some((l, h)) => format!("{} {word} {l}", h.join(", ")),
     }
 }
+
+static WIN: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+/// The points that win: the tuning's, unless a test plays to fewer.
+pub fn points_to_win() -> i64 {
+    match WIN.load(std::sync::atomic::Ordering::Relaxed) {
+        0 => DATA.tuning.points_to_win,
+        n => n,
+    }
+}
+pub fn set_points_to_win(n: i64) {
+    WIN.store(n, std::sync::atomic::Ordering::Relaxed);
+}

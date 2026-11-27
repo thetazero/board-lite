@@ -5,7 +5,7 @@ use crate::data::*;
 use crate::map::*;
 use crate::rng::Rng;
 use indexmap::IndexMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::value::RawValue;
 use std::fmt;
 use std::mem;
@@ -20,11 +20,30 @@ macro_rules! ev {
 pub struct Id(pub u8, pub u32);
 impl fmt::Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.0 as char, self.1)
+        match self.0 {
+            0 => f.write_str(odd_ids().get(self.1 as usize).copied().unwrap_or("?")),
+            c => write!(f, "{}{}", c as char, self.1),
+        }
     }
 }
+// Ids the engine didn't make (a test's "cX"), by number.
+static ODD: std::sync::Mutex<Vec<S>> = std::sync::Mutex::new(Vec::new());
+fn odd_ids() -> std::sync::MutexGuard<'static, Vec<S>> {
+    ODD.lock().unwrap_or_else(|e| e.into_inner())
+}
 impl Id {
+    /// The id this names, whatever it looks like: for saved games, not for what players type.
+    fn saved(s: &str) -> Id {
+        Id::parse(s).unwrap_or_else(|| {
+            let mut odd = odd_ids();
+            odd.push(Box::leak(s.to_string().into_boxed_str()));
+            Id(0, odd.len() as u32 - 1)
+        })
+    }
     pub fn parse(s: &str) -> Option<Id> {
+        if let Some(i) = odd_ids().iter().position(|x| *x == s) {
+            return Some(Id(0, i as u32));
+        }
         let (a, n) = (s.as_bytes().first()?, s.get(1..)?);
         if n.is_empty() || (n.len() > 1 && n.starts_with('0')) || !n.bytes().all(|b| b.is_ascii_digit()) {
             return None;
@@ -39,7 +58,7 @@ impl Serialize for Id {
 }
 impl<'de> Deserialize<'de> for Id {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Id, D::Error> {
-        Id::parse(&String::deserialize(d)?).ok_or_else(|| D::Error::custom("not an id"))
+        Ok(Id::saved(&String::deserialize(d)?))
     }
 }
 pub fn ids(ds: &[Id]) -> String {
@@ -556,7 +575,7 @@ impl Game {
             let id = g.id(b'd');
             g.dragons.push(Dragon { id, owner: p, key: project_dragon("fire"), stage: tuning().starting_dragon_stage, growth: 0, damage: 0, perch: None, hungry: false });
         }
-        g.log(format!("A {players}-player game begins. {} goes first. First to {} points wins.", pname(first), tuning().points_to_win), ev! {"k": "begin", "players": players, "first": first});
+        g.log(format!("A {players}-player game begins. {} goes first. First to {} points wins.", pname(first), points_to_win()), ev! {"k": "begin", "players": players, "first": first});
         g.start_round();
         g
     }
@@ -1017,7 +1036,7 @@ impl Game {
         }
         let totals = self.totals();
         let best = *totals.iter().max().unwrap();
-        if best >= tuning().points_to_win {
+        if best >= points_to_win() {
             let w = self.standings()[0].p;
             self.winner = Some(w);
             self.phase = Phase::Over;

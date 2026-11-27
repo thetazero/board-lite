@@ -304,7 +304,7 @@ pub fn build(g: &Game, names: &[String], id: &str, ended: i64) -> Value {
         })
         .collect();
     json!({
-        "v": 1, "id": id, "ended": iso(ended), "rounds": g.round, "pointsToWin": tuning().points_to_win,
+        "v": 1, "id": id, "ended": iso(ended), "rounds": g.round, "pointsToWin": points_to_win(),
         "names": (0..n).map(|p| names.get(p).cloned().unwrap_or_else(|| pname(p))).collect::<Vec<_>>(),
         "race": race, "power": power, "made": made, "standings": standings,
         "moments": moments(g, &evs).iter().map(|m| m.json()).collect::<Vec<_>>(),
