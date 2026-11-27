@@ -234,3 +234,13 @@ test('a room goes on under either server, with its seats', { skip, timeout: 6000
     await s.stop();
   }
 });
+
+test('it opens more files than the usual soft limit, so saving goes on with many streams open', { skip: skip || (process.platform !== 'linux' && 'reads /proc') }, async () => {
+  const child = spawn('sh', ['-c', 'ulimit -S -n 256; exec "$0"', BIN], { env: { ...process.env, PORT: '0', BOARD_LITE_DATA: join(tmp, 'files'), BOARD_LITE_PUBLIC_URL: 'https://dragons.example' }, stdio: ['ignore', 'pipe', 'inherit'] });
+  running.add(child);
+  await once(child.stdout!, 'data');
+  const [, soft, hard] = /Max open files\s+(\d+)\s+(\d+)/.exec(readFileSync(`/proc/${child.pid}/limits`, 'utf8'))!;
+  assert.ok(Number(soft) > 256 && soft === hard, `${soft} of ${hard}`);
+  child.kill('SIGKILL');
+  running.delete(child);
+});

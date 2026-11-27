@@ -25,6 +25,7 @@ http-body-util = "0.1"
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 indexmap = { version = "2", features = ["serde"] }
+libc = "0.2"
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value", "preserve_order"] }

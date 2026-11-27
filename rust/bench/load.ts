@@ -50,6 +50,7 @@ function call(method: string, path: string, body: unknown, ip: string): Promise<
       res.on('error', fail);
     });
     req.on('error', fail);
+    req.setTimeout(20000, () => req.destroy(new Error('no answer in 20 s')));
     req.end(body === undefined ? undefined : JSON.stringify(body));
   });
 }
@@ -196,4 +197,5 @@ async function main() {
   stop.now = true;
   for (const s of streams) s.destroy();
 }
-try { await main(); } finally { closing = true; docker('rm', '-fv', name); process.exit(0); }
+let failed = 0;
+try { await main(); } catch (e) { failed = 1; console.error(e); } finally { closing = true; docker('rm', '-fv', name); process.exit(failed); }

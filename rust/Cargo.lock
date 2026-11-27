@@ -41,6 +41,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "indexmap",
+ "libc",
  "miniz_oxide",
  "serde",
  "serde_json",

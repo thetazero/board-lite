@@ -14,7 +14,21 @@ fn die(why: &str) -> ! {
     std::process::exit(1)
 }
 
+// As many files open as the machine allows: each stream is one, and past the
+// usual soft limit of 1024 games couldn't be saved. (Node does this itself.)
+fn raise_open_files() {
+    let mut l = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: both calls only read or fill `l`.
+    unsafe {
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut l) == 0 && l.rlim_cur < l.rlim_max {
+            l.rlim_cur = l.rlim_max;
+            libc::setrlimit(libc::RLIMIT_NOFILE, &l);
+        }
+    }
+}
+
 fn main() {
+    raise_open_files();
     let port: u16 = env("PORT").map_or(8080, |p| p.parse().unwrap_or_else(|_| die("PORT is a number.")));
     if std::env::args().any(|a| a == "--health") {
         std::process::exit(!healthy(port) as i32);
