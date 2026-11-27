@@ -27,6 +27,24 @@ Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.e
 | `BOARD_LITE_DATA` | where games are kept (`--data`; `/data` in the image) |
 | `PORT` | the port (8080) |
 
+## board.losha.dev
+
+The site itself runs on a machine shared with other projects, set up in `thetazero/box` (private). To put a new version up:
+
+1. Merge to `main` here. CI publishes the image (the `publish` job).
+2. Get its digest:
+
+   ```
+   docker buildx imagetools inspect ghcr.io/thetazero/board-lite:<full commit> --format '{{.Manifest.Digest}}'
+   ```
+3. In `box`, change the digest in `projects/board.yml`, in a PR. CI checks it.
+4. Merge it. The machine pulls `box` every minute, so the new version starts a minute or two later. Games are saved as they go and players reconnect.
+5. Check `https://board.losha.dev/healthz`.
+
+Merging here doesn't deploy by itself. **Roll back:** revert the `box` commit (the code goes back, the games don't). A new version that can't start takes the site down until then.
+
+Asked to "deploy board-lite", Claude does all of this from step 2, merging only that digest PR once its CI passes; if the site isn't healthy after, it says so and asks before rolling back.
+
 ## Claude
 
 The website seats no Claude players and starts none when a saved game continues: the runner isn't in the image, and no request can start one. No model is called and no key is on the machine.
