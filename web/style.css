@@ -1177,6 +1177,40 @@ body:has(.talkbar.open) .viewswitch { display: none; }
 .tvhint .url { color: var(--text); word-break: break-all; }
 .hostline { display: flex; flex-direction: column; gap: .5em; border-top: 1px dashed var(--line); padding-top: 1em; text-align: center; }
 .hostline p { margin: 0; color: var(--muted); }
+/* The home page. On a phone: join, then host on a TV, then, quietly, no TV. */
+.hosthere, .home .hero svg.scene + svg.scene { display: none; }
+.hostline [hidden] { display: none; }
+.hostline .quiet { align-self: center; background: none; box-shadow: none; color: #b9aed0; font-weight: 500; text-decoration: underline; }
+.hostline .url { color: var(--text); word-break: break-all; }
+#hosthow { font-size: 1.1em; }
+/* On a screen that can be the TV (a TV's browser, a desktop; a narrower window
+   counts if it has a mouse), hosting there is the main action, and joining is
+   beside it. */
+@media (min-width: 900px) and (min-height: 480px), (min-width: 600px) and (min-height: 480px) and (hover: hover) and (pointer: fine) {
+  body.phone:has(.joinpage.home) { max-width: none; padding-bottom: 0; font-size: clamp(16px, min(1.5vw, 2.4vh), 40px); }
+  .joinpage.home { display: grid; grid-template: auto 1fr / 1.15fr 1fr; align-items: center; column-gap: 3em; width: min(100%, 68em); min-height: 100vh; margin: 0 auto; }
+  .joinpage.home .hero { grid-column: 1 / -1; height: 42vh; width: 100vw; margin-left: calc(50% - 50vw); }
+  .home .hero svg.scene { display: none; }
+  .home .hero svg.scene + svg.scene { display: block; }
+  .joinpage.home .hero .title { left: 6%; top: 50%; transform: translateY(-50%) rotate(-1.5deg); font-size: 4em; }
+  .hosthere { display: flex; flex-direction: column; gap: 1em; padding: 1.5em 0 1.5em 2em; text-align: center; }
+  .hosthere .button.big { font-size: 1.9em; }
+  .hosthere p { margin: 0; font-size: 1.2em; text-wrap: balance; }
+  .hosthere .subtitle { color: var(--text); font-size: 1.4em; }
+  .home .joinform { padding: 1.5em 2em 1.5em 3em; border-left: 1px dashed var(--line); }
+  .home .joinform .subtitle { display: none; }
+  .home #hosttv, .home #hosthow { display: none; }
+  .home .joinform button.primary { --text: var(--ink); --edge: var(--paper-edge); color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); text-shadow: none; }
+  .home .error { margin: 0; }
+  .home .error:empty { display: none; }
+}
+@media (min-width: 600px) and (max-width: 899px) and (min-height: 480px) and (hover: hover) and (pointer: fine) {
+  .joinpage.home { grid-template: auto auto 1fr / 1fr; align-items: start; width: min(100%, 34em); }
+  .joinpage.home .hero { height: 28vh; }
+  .joinpage.home .hero .title { font-size: 2.6em; }
+  .hosthere { padding: 1.5em 1.2em 1em; }
+  .home .joinform { padding: 1em 1.2em 2em; border-left: 0; border-top: 1px dashed var(--line); }
+}
 /* The join form's saved games (phone.ts): each opens on its seats. */
 .hostline.savedgames ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .4em; }
 .hostline.savedgames a.button { display: flex; flex-direction: column; align-items: flex-start; gap: .1em; text-align: left; text-decoration: none; }
