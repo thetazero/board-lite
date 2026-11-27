@@ -21,7 +21,7 @@ export const ELEMENT_COLORS: Record<string, string> = { fire: '#ff5a36', ice: '#
 // ---------- server ----------
 
 const POST_MS = 15000;
-// The server pings every stream every 15 s (src/server/server.ts, PING_MS). A
+// The server pings every stream every 15 s (rust/src/server.rs, PING_MS). A
 // stream that hears nothing for longer than this is dead without saying so (a
 // server restart or a network change can leave one open on this end), and is
 // opened again: otherwise the page shows an old moment of the game, and a vote

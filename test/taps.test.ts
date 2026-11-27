@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { taps } from '../web/taps.ts';
 import { named } from '../web/common.ts';
-import { Room } from '../src/server/room.ts';
+import { Room } from '../src/host.ts';
 import { RESOURCES } from '../src/data.ts';
 import type { Snapshot } from '../src/state.ts';
 

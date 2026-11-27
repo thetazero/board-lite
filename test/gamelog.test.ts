@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { candidateCommands, playToEnd } from '../src/bot.ts';
 import { newGame, waitingOn } from '../src/engine.ts';
-import { gameLogFile } from '../src/server/gamelog.ts';
-import { Room, RoomError } from '../src/server/room.ts';
+import { gameLogFile } from '../src/host.ts';
+import { Room, RoomError } from '../src/host.ts';
 import { save } from '../src/store.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-gamelog-'));

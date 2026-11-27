@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { benchGame } from '../src/botbench.ts';
 import { newGame } from '../src/engine.ts';
-import { Room } from '../src/server/room.ts';
+import { Room } from '../src/host.ts';
 import { merchantPlan, worth } from '../src/strongbot.ts';
 import { TUNING } from '../src/data.ts';
 

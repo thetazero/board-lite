@@ -11,7 +11,7 @@ import { apply, buildableHexes, canRaid, dragonCapacity, newGame, score, stageSt
 import { PEAK, distance, leviathanWaters, nearBeast, neighbors, parseKey } from '../map.ts';
 import { seatState } from '../state.ts';
 import type { Rng } from '../rng.ts';
-import type { Room } from '../server/room.ts';
+import type { Room } from '../host.ts';
 
 export const NAMES = ['Ada', 'Bram', 'Cora', 'Dax', 'Eve', 'Finn'];
 // The longest names the server takes (12 characters), wide letters included.

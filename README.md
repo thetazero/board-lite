@@ -18,16 +18,17 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 
 ## Code
 
-TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `npm run serve`: the TV's board needs three.js.
+TypeScript, run directly by Node 22.18+, and the rules in Rust: `npm install`, `rustup target add wasm32-unknown-unknown` and `npm run rust:build` first, and the build again after changing the rules: the TV's board needs three.js.
 
 - `src/data.ts`: every card, unit, kingdom and tuning number; `src/datasheet.ts` turns them into `docs/datasheet.md`
-- `src/engine.ts`: the rules; `apply(game, seat, command)` is the only way to change a game
+- `rust/src/engine.rs`: the rules, through `src/engine.ts`; `apply(game, seat, command)` is the only way to change a game
 - `src/view.ts`: a snapshot from `src/state.ts` as text (what the CLI and Claude players print): what one seat sees, and its options; `src/mapimage.ts`: the board as a PNG, which Claude players get beside the text map
 - `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/strongbot.ts`: the strong bot, pure code, a free baseline for playtests and contests ([`docs/strongbot.md`](docs/strongbot.md)); `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude and Codex players (hosting a playtest, or joining a room) and the per-seat MCP server they play through; the eval (`eval.ts`), the leaderboard's rating (`leaderboard.ts`, `rating.ts`) and the live page, a contest's or the whole leaderboard's (`live.ts`, `live.html`)
 - `src/recap.ts`: a finished game's recap, the story the TV plays at the end and the recap page (`web/recap.ts`) shows
-- `src/server/`: the web server and rooms for the TV and phone clients, what a public website adds (`public.ts`) and the MCP endpoint Claude clients join through (`mcp.ts`); `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
+- `rust/src/server.rs`, `room.rs`: the web server and rooms for the TV and phone clients, the limits a public website adds (`limits.rs`) and the MCP endpoint Claude clients join through (`mcp.rs`); `src/host.ts`: how the tests and tools host rooms on it; `src/state.ts`: the JSON the clients receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
 - `src/shots/`: staged screenshots of the clients (`npm run shots`)
+- `rust/`: the rules and bots, and the public website, in Rust ([`docs/rust-server.md`](docs/rust-server.md))
 
 Design rules between tuning numbers (payback, point efficiency) are tests in `test/design/`, with their own [README](test/design/README.md).
 

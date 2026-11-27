@@ -6,8 +6,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # The whole run takes about a minute. Past 5 it is cancelled and fails.
-    timeout-minutes: 5
+    # Building the Rust takes about 2 minutes of it. Past 8 it is cancelled and fails.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,6 +15,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: rustup target add wasm32-unknown-unknown && npm run rust:build
+      - run: cargo test --profile home --features stage --lib --locked --manifest-path rust/Cargo.toml
       - run: npm run typecheck
       # `npm test` takes 30-40 s here (about 8 s on a dev machine). Past
       # TEST_CAP seconds it is stopped and the run fails as too slow. Raise

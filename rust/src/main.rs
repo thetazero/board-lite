@@ -1,0 +1,110 @@
+//! The board-lite server: at home (npm run serve), or with --public a website
+//! (docs/deploy.md).
+//!
+//!   board-lite [--port 8080] [--game <file>] [--data <dir>] [--public https://example.com [--trust-proxy]]
+use board_lite::room::{Opts, Place};
+use board_lite::server::{Server, Site};
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::time::Duration;
+use tokio::signal::unix::{SignalKind, signal};
+
+fn env(k: &str) -> Option<String> {
+    std::env::var(k).ok().filter(|v| !v.is_empty())
+}
+fn die(why: &str) -> ! {
+    eprintln!("{why}");
+    std::process::exit(1)
+}
+
+// As many files open as the machine allows: each stream is one, and past the
+// usual soft limit of 1024 games couldn't be saved. (Node does this itself.)
+fn raise_open_files() {
+    let mut l = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: both calls only read or fill `l`.
+    unsafe {
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut l) == 0 && l.rlim_cur < l.rlim_max {
+            l.rlim_cur = l.rlim_max;
+            libc::setrlimit(libc::RLIMIT_NOFILE, &l);
+        }
+    }
+}
+
+fn main() {
+    raise_open_files();
+    let port: u16 = env("PORT").map_or(8080, |p| p.parse().unwrap_or_else(|_| die("PORT is a number.")));
+    if std::env::args().any(|a| a == "--health") {
+        std::process::exit(!healthy(port) as i32);
+    }
+    let args: Vec<String> = std::env::args().collect();
+    let has = |name: &str| args.iter().any(|a| a == name);
+    let flag = |name: &str| args.iter().position(|a| a == name).map(|i| args.get(i + 1).filter(|v| !v.starts_with("--")).cloned().unwrap_or_else(|| die(&format!("{name} needs a value."))));
+    let port = flag("--port").map_or(port, |p| p.parse().unwrap_or_else(|_| die("--port is a number.")));
+    let site = flag("--public").or(env("BOARD_LITE_PUBLIC_URL")).map(|address| {
+        let origin = address.strip_suffix('/').unwrap_or(&address).to_lowercase();
+        let host = origin.strip_prefix("https://").or_else(|| origin.strip_prefix("http://"));
+        if host.is_none_or(|h| h.is_empty() || h.contains(['/', '?', '#', '@', ' '])) {
+            die(&format!("The public address looks like https://example.com, not {address}"));
+        }
+        Site { origin, trust_proxy: has("--trust-proxy") || env("BOARD_LITE_TRUST_PROXY").as_deref() == Some("1") }
+    });
+    let cache = || std::path::PathBuf::from(env("HOME").unwrap_or_else(|| ".".into())).join(".cache/board-lite");
+    let data = flag("--data").or(env("BOARD_LITE_DATA")).map(|d| std::path::absolute(d).unwrap_or_else(|e| die(&e.to_string())));
+    let place = match data {
+        Some(d) => Place { recaps: d.join("recaps"), rooms: d, home: site.is_none(), opts: Opts::default() },
+        None => Place { rooms: cache().join("rooms"), recaps: cache().join("recaps"), home: site.is_none(), opts: Opts::default() },
+    };
+    let games = flag("--game").map(|g| std::path::absolute(g).unwrap_or_else(|e| die(&e.to_string()))).into_iter().collect();
+    board_lite::room::warm();
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
+    rt.block_on(async {
+        let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await.unwrap_or_else(|e| die(&format!("Port {port}: {e}")));
+        let port = listener.local_addr().map_or(port, |a| a.port());
+        let origin = site.as_ref().map(|s| s.origin.clone());
+        let server = Server::new(site, place, port, games, true).unwrap_or_else(|e| die(&e));
+        match origin {
+            Some(o) => println!("board-lite is running on port {port}, for {o} ({} rooms).", server.count()),
+            None => welcome(&server, port),
+        }
+        let (mut term, mut int) = (signal(SignalKind::terminate()).unwrap(), signal(SignalKind::interrupt()).unwrap());
+        // Every change is already saved, so stopping (a deploy) loses nothing.
+        tokio::select! {
+            _ = server.run(listener) => {}
+            _ = term.recv() => {}
+            _ = int.recv() => {}
+        }
+    });
+    std::process::exit(0);
+}
+
+fn welcome(server: &Server, port: u16) {
+    let (lan, tailscale) = board_lite::addresses::addresses();
+    let mut out = format!("board-lite is running on port {port}.\n");
+    for (code, file) in server.in_use() {
+        out += &format!("  Hosting {} as room {code}: TV http://localhost:{port}/tv?room={code}\n", file.display());
+    }
+    let or = lan.first().map_or(String::new(), |h| format!("   (or http://{h}:{port}/tv)"));
+    out += &format!("  TV:     http://localhost:{port}/tv{or}");
+    for h in &lan {
+        out += &format!("\n  Phones: http://{h}:{port}/");
+    }
+    for h in &tailscale {
+        out += &format!("\n  Phones over Tailscale: http://{h}:{port}/");
+    }
+    if lan.is_empty() && tailscale.is_empty() {
+        out += "\n  No network address found: phones need to be on the same network as this machine.";
+    }
+    println!("{out}");
+}
+
+fn healthy(port: u16) -> bool {
+    let ask = || -> std::io::Result<String> {
+        let mut s = TcpStream::connect(("127.0.0.1", port))?;
+        s.set_read_timeout(Some(Duration::from_secs(4)))?;
+        s.write_all(b"GET /healthz HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n")?;
+        let mut out = String::new();
+        s.read_to_string(&mut out)?;
+        Ok(out)
+    };
+    ask().is_ok_and(|r| r.starts_with("HTTP/1.1 200"))
+}

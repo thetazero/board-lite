@@ -2,13 +2,13 @@
 // for screenshots): bots fast-forward every seat to the given round, then keep
 // playing every seat but the first, which is yours on the printed phone link.
 //
-//   node src/server/demo.ts [--players 3] [--round 3] [--seed 7] [--port 8080] [--all-bots]
+//   node src/demo.ts [--players 3] [--round 3] [--seed 7] [--port 8080] [--all-bots]
 
-import { botMove } from '../bot.ts';
-import { waitingOn } from '../engine.ts';
+import { botMove } from './bot.ts';
+import { waitingOn } from './engine.ts';
 import { join } from 'node:path';
-import { ROOMS_DIR, Room } from './room.ts';
-import { lanAddresses, startServer } from './server.ts';
+import { ROOMS_DIR, Room } from './host.ts';
+import { lanAddresses, startServer } from './host.ts';
 
 function arg(name: string, fallback: number): number {
   const i = process.argv.indexOf(`--${name}`);

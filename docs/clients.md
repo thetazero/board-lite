@@ -8,7 +8,7 @@ Needs Node 22.18 or newer.
 
 ```
 npm install
-npm run serve                  # or: node src/server/server.ts --port 8080
+npm run serve                  # or: npm run serve -- --port 8080
 ```
 
 It prints the addresses to use:
@@ -56,7 +56,7 @@ For development only: players never see it. Every room also writes `~/.cache/boa
 - `refused`: a command the engine turned down, and why.
 - `join`, `bot`, `leave`, `handover` (a seat taken back or claimed mid-game), `quit`, `standIn` (a bot starts playing for someone), `back`, `connect` and `disconnect` (phones' and TVs' live streams), `start`, `save`, `continue`, and `load` (a game file hosted again, with how long its log was then).
 
-Games saved before the log existed still load and play; their old entries just have no time, and a `load` line says from which entry on the log covers the game. `jq -c 'select(.type=="event") | [.t, .by.kind, .by.name, .text]' <code>.log.jsonl` prints the game as it went. The format is documented in `src/server/gamelog.ts`.
+Games saved before the log existed still load and play; their old entries just have no time, and a `load` line says from which entry on the log covers the game. `jq -c 'select(.type=="event") | [.t, .by.kind, .by.name, .text]' <code>.log.jsonl` prints the game as it went. The format is documented in `rust/src/gamelog.rs`.
 
 ## After the game
 
@@ -92,7 +92,7 @@ Everything else is in [`cli.md`](cli.md).
 ## Trying it without a group
 
 ```
-node src/server/demo.ts --players 3 --round 3
+node src/demo.ts --players 3 --round 3
 ```
 
 starts a game already in round 3, bots in every seat but the first, and prints a TV link and a phone link. `--all-bots` lets bots play every seat; `--seed N` picks the game.

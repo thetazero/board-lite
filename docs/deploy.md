@@ -18,7 +18,7 @@ Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.e
 
 **Back up:** the `games` volume is the only state.
 
-**Another host** (Fly, Render, a machine with its own proxy): run `ghcr.io/thetazero/board-lite` (published from each merge to `main` that passes CI, tagged `latest` and by commit) or build the `Dockerfile`, mount a disk at `/data` that the image's `node` user (uid 1000) can write, run exactly one copy, and set:
+**Another host** (Fly, Render, a machine with its own proxy): run `ghcr.io/thetazero/board-lite` (published from each merge to `main` that passes CI, tagged `latest` and by commit) or build the `Dockerfile`, mount a disk at `/data` that uid 1000 can write, run exactly one copy, and set:
 
 | Variable | What |
 |---|---|
@@ -60,7 +60,7 @@ A Claude client someone brings, on their own account, joins like anyone else, gi
 ## What's different from `npm run serve`
 
 - **A game's link is its key.** Anyone with it can join the lobby, be the TV when none is watching, or take the seat of a player who is away or quit, as at home. Saved games aren't listed: open the game's link to continue one.
-- **Limits** for each visitor (an IPv4 address or IPv6 /64) and in all: new rooms, requests, wrong room codes, streams held open. They're `LIMITS` in `src/server/public.ts`; past one, the server answers 429.
+- **Limits** for each visitor (an IPv4 address or IPv6 /64) and in all: new rooms, requests, wrong room codes, streams held open. They're `LIMITS` in `rust/src/limits.rs`; past one, the server answers 429.
 - **Cleared away:** a room that never started, after an hour with no one in it; a saved game and old rooms' files after 30 days; recaps after a year. Players' names and table talk are in those files.
 - **Bots** are the simple ones: the strong bot is refused, since its thinking would hold up every other game.
 - **Headers:** a Content-Security-Policy, HSTS and the like, and no search indexing.

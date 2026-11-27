@@ -1,7 +1,7 @@
 // The TV's scenes: the moments the whole table looks up together (a round's
 // production, a fight replayed, a raid nobody joined). The TV plays them
 // (tv.ts) and the server holds everyone's next decision until they're over
-// (src/server/room.ts), so the TV and the phones are always on the same
+// (rust/src/room.rs), so the TV and the phones are always on the same
 // moment. Both read the scenes and their lengths from here.
 
 import type { GameEvent } from '../src/engine.ts';

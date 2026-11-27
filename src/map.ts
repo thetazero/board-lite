@@ -1,7 +1,8 @@
 // Hex map in axial coordinates (q, r). Keys are "q,r".
 
-import { BASIC_BUILDINGS, BEASTS, BUILDINGS, FAUNA_BY_DISTANCE, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
-import { type Rng, next, shuffle } from './rng.ts';
+import { BASIC_BUILDINGS, BEASTS, BUILDINGS, TERRAIN_WEIGHTS, TUNING, type Terrain } from './data.ts';
+import { ask } from './wasm.ts';
+import type { Rng } from './rng.ts';
 
 export interface Hex {
   q: number;
@@ -75,22 +76,11 @@ export function terrainCounts(players: number): Partial<Record<Terrain, number>>
   return counts;
 }
 
-// Fair starts (#424): roll maps until every start has about as much basic
-// production opportunity as the others, ring by ring (see TUNING.fairStart).
-// Rerolling from the same dice keeps one seed to one map. If no roll passes
-// within MAX_ROLLS, the fairest one seen is used.
-const MAX_ROLLS = 2000;
 
 export function generateMap(rng: Rng, players: number): Record<string, Hex> {
-  let best: Record<string, Hex> | null = null;
-  let bestSpread = Infinity;
-  for (let i = 0; i < MAX_ROLLS; i++) {
-    const hexes = rollMap(rng, players);
-    const spread = startSpread(hexes, players);
-    if (spread <= TUNING.fairStart.tolerance) return hexes;
-    if (spread < bestSpread) [best, bestSpread] = [hexes, spread];
-  }
-  return best!;
+  const r = ask('generateMap', null, { state: rng.state, players });
+  rng.state = r.state;
+  return r.map;
 }
 
 // Terrains a basic building goes on.
@@ -133,53 +123,9 @@ export function startSpread(hexes: Record<string, Hex>, players: number): number
   return worst;
 }
 
-function rollMap(rng: Rng, players: number): Record<string, Hex> {
-  const radius = mapRadius(players);
-  const hexes: Record<string, Hex> = {};
-  for (let q = -radius - 1; q <= radius + 1; q++) {
-    for (let r = Math.max(-radius - 1, -q - radius - 1); r <= Math.min(radius + 1, -q + radius + 1); r++) {
-      hexes[key(q, r)] = { q, r, terrain: distance(q, r) > radius ? 'ocean' : 'desert' };
-    }
-  }
-  // Towers sit on desert hexes; the land around them is as random as the rest, so
-  // players start with different terrain and different things to sell.
-  const towers = new Set(towerSpots(players));
-  // One natural harbor on each of the six coasts, somewhere between its
-  // corners but not touching a tower: a port is something you build towards.
-  const coast = ring(radius);
-  for (let side = 0; side < 6; side++) {
-    const between = coast.slice(side * radius + 1, (side + 1) * radius);
-    const open = between.filter(([q, r]) => !neighbors(key(q, r)).some((n) => towers.has(n)));
-    const [q, r] = (open.length ? open : between)[Math.floor(next(rng) * (open.length || between.length))];
-    hexes[key(q, r)].terrain = 'harbor';
-  }
-  // The rest of the land gets a fixed deck of terrains, shuffled (#434), so
-  // every map for a player count has the same mix.
-  const deck = (Object.entries(terrainCounts(players)) as [Terrain, number][]).flatMap(([t, n]) => Array<Terrain>(n).fill(t));
-  const open = Object.keys(hexes).filter((k) => hexes[k].terrain === 'desert' && !towers.has(k) && k !== PEAK);
-  shuffle(rng, deck).forEach((t, i) => (hexes[open[i]].terrain = t));
-  placeBeasts(rng, hexes, players);
-  placeFauna(rng, hexes, players);
-  return hexes;
-}
-
 // Is hex k held by a great beast: on it, or next to it?
 export function nearBeast(hexes: Record<string, Hex>, k: string): boolean {
   return [k, ...neighbors(k)].some((n) => !!hexes[n]?.fauna && !!BEASTS[hexes[n].fauna!]);
-}
-
-// The great beasts: the Thunderbird on the peak at the centre, and the
-// Leviathan in the ocean beside one coast's harbor, on a random coast.
-function placeBeasts(rng: Rng, hexes: Record<string, Hex>, players: number) {
-  hexes[PEAK].terrain = 'mountain';
-  hexes[PEAK].fauna = 'thunderbird';
-  const harbors = Object.keys(hexes).filter((k) => hexes[k].terrain === 'harbor').sort();
-  const harbor = harbors[Math.floor(next(rng) * harbors.length)];
-  const waters = leviathanWaters(hexes, players);
-  const sea = neighbors(harbor).filter((n) => hexes[n]?.terrain === 'ocean');
-  const clear = sea.filter((n) => waters.includes(n));
-  const pool = clear.length ? clear : sea;
-  hexes[pool[Math.floor(next(rng) * pool.length)]].fauna = 'leviathan';
 }
 
 // Where the Leviathan may be: the ocean hexes whose hold keeps clear of every
@@ -193,15 +139,3 @@ export function leviathanWaters(hexes: Record<string, Hex>, players: number): st
   return clear.length ? clear : sea;
 }
 
-// Aggressive fauna on the starting map: one beast per TUNING.landHexesPerFauna
-// land hexes, on random hexes at least 2 steps from every tower, so each
-// player's first ring is open. The further from the towers, the stronger.
-function placeFauna(rng: Rng, hexes: Record<string, Hex>, players: number) {
-  const towers = towerSpots(players).map((k) => parseKey(k)!);
-  const land = Object.values(hexes).filter((h) => h.terrain !== 'ocean');
-  const away = (h: Hex) => Math.min(...towers.map(([q, r]) => distance(h.q - q, h.r - r)));
-  const open = shuffle(rng, land.filter((h) => away(h) >= 2 && !nearBeast(hexes, key(h.q, h.r))));
-  for (const h of open.slice(0, Math.round(land.length / TUNING.landHexesPerFauna))) {
-    h.fauna = FAUNA_BY_DISTANCE[Math.min(away(h) - 2, FAUNA_BY_DISTANCE.length - 1)];
-  }
-}

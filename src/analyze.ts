@@ -14,7 +14,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Game } from './engine.ts';
 import { gameMarkdown, gameStats } from './playtest/stats.ts';
-import { ROOMS_DIR, claudeRunners, seatsFile } from './server/room.ts';
+import { ROOMS_DIR, claudeRunners, seatsFile } from './host.ts';
 
 type Res = { commit?: string; seats: { name?: string; model: string }[] };
 const readJson = (f: string) => JSON.parse(readFileSync(f, 'utf8'));

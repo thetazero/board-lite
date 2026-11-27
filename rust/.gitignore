@@ -1,0 +1,3 @@
+target/
+generated/
+board_lite.wasm

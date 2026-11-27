@@ -8,9 +8,9 @@ import { after, test } from 'node:test';
 import { promisify } from 'node:util';
 import { candidateCommands, endingTarget, playToEnd } from '../src/bot.ts';
 import { apply, newGame, waitingOn } from '../src/engine.ts';
-import { Room, RoomError, addClaudeRunner, claudeRunners } from '../src/server/room.ts';
+import { Room, RoomError, addClaudeRunner, claudeRunners } from '../src/host.ts';
 import { load, save } from '../src/store.ts';
-import { startServer } from '../src/server/server.ts';
+import { startServer } from '../src/host.ts';
 import type { Rulebook, Snapshot } from '../src/state.ts';
 import { ACTIONS, BEASTS, BUILDINGS, DRAGONS, FAUNA, TARGETS, TUNING, UPGRADES } from '../src/data.ts';
 import { POINTS_TO_WIN } from '../web/common.ts';
@@ -147,41 +147,6 @@ test('a room of bots plays itself to the end', { timeout: 120_000 }, async (t) =
     room.close();
   }
   assert.equal(room.game!.phase, 'over');
-});
-
-// #192: the timer that ends a scene can fire a moment before Date.now() says
-// the scene is over (Node's timers keep their own clock), or the wall clock can
-// step back mid-scene. Either way the bot whose turn is next must still move.
-test('after a scene, the next bot moves even if the clock says the scene is not quite over', { timeout: 30_000 }, async (t) => {
-  const room = new Room('LATE', { botDelayMs: 0, dir });
-  room.addBot();
-  room.addBot();
-  const tvGone = room.connect(null);
-  const realNow = Date.now.bind(Date);
-  let lag = 0;
-  t.mock.method(Date, 'now', () => realNow() - lag);
-  let held = -1; // the log's length when the first scene began
-  let deadline: NodeJS.Timeout | undefined;
-  const moved = new Promise<void>((resolve, reject) => {
-    t.mock.method(console, 'error', (...args: unknown[]) => reject(new Error(args.map(String).join(' '))));
-    room.subscribe(() => {
-      const g = room.game;
-      if (!g) return;
-      if (held < 0 && room.sceneLeft() > 0) {
-        held = g.log.length;
-        lag = 30; // the clock steps back as the scene starts
-        deadline = setTimeout(() => reject(new Error('no bot moved after the scene')), room.sceneLeft() + 5000);
-      } else if (held >= 0 && g.log.length > held) resolve();
-    });
-  });
-  room.start(room.hostToken, 3);
-  try {
-    await moved;
-  } finally {
-    clearTimeout(deadline);
-    tvGone();
-    room.close();
-  }
 });
 
 test("the lobby and the join form name the game's real goal", () => {
@@ -358,6 +323,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post('/api/rooms/ZZZZ/join', { name: 'X' })).status, 400);
     assert.equal((await post(`/api/rooms/${made.code}/start`, { token: ada })).status, 200);
     Object.assign(rooms.get(made.code)!.seats[1], { kind: 'player', connected: 1 }); // a person at their phone, not a bot: keep the game still while we look at it
+    rooms.get(made.code)!.changed();
 
     // Server-sent events: the first message is the current snapshot.
     const ctrl = new AbortController();
@@ -380,6 +346,7 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: `keep ${snap.you!.choice[0].id}` })).status, 200);
     const g = rooms.get(made.code)!.game!;
     apply(g, 1, `keep ${g.players[1].choice[0].id}`);
+    rooms.get(made.code)!.changed();
     assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end' })).status, 200);
     // Mid-game: a bot for someone away (not someone at their phone), and quitting.
     assert.match((await post(`/api/rooms/${made.code}/standin`, { token: ada, seat: 1 })).body.error, /is back/);
@@ -716,20 +683,17 @@ test('saving a game: it stops for everyone, survives a restart however old, and 
   // Long after the rooms' 6 hours, the server restarts: the saved game is still there.
   const long = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
   for (const f of [file, file.replace(/\.json$/, '.seats.json')]) utimesSync(f, long, long);
-  // A Claude runner listed itself beside the game: continuing brings it back.
+  // A Claude runner that is gone by now (test/rust-server.test.ts brings back one that isn't).
   addClaudeRunner(file, '/somewhere/claude-run');
+  assert.deepEqual(claudeRunners(file), ['/somewhere/claude-run']);
   const again = await serve();
   try {
     const back = again.rooms.get(made.code)!;
     assert.ok(back, 'hosted again after the restart');
     assert.ok(back.savedAt, 'still saved');
-    const continued: string[] = [];
-    again.server.on('continue', (r: Room) => continued.push(...claudeRunners(r.file)));
     await again.post(`/api/rooms/${made.code}/continue`, { token: bram });
-    assert.deepEqual(continued, ['/somewhere/claude-run']);
     assert.equal(back.lobby().saved, null);
     await again.post(`/api/rooms/${made.code}/continue`, { token: bram }); // a second tap does nothing
-    assert.equal(continued.length, 1);
     back.command(ada, 'end');
     assert.deepEqual((await (await fetch(`${again.base}/api/saved`)).json()), []);
   } finally {

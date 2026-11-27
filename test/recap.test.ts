@@ -8,8 +8,8 @@ import { botStep, playToEnd } from '../src/bot.ts';
 import { TARGETS, targetPower } from '../src/data.ts';
 import { newGame, score, standings, titleValues } from '../src/engine.ts';
 import { buildRecap } from '../src/recap.ts';
-import { Room } from '../src/server/room.ts';
-import { startServer } from '../src/server/server.ts';
+import { Room } from '../src/host.ts';
+import { startServer } from '../src/host.ts';
 import type { Recap } from '../src/state.ts';
 import { save } from '../src/store.ts';
 
