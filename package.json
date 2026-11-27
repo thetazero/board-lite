@@ -9,7 +9,7 @@
   },
   "scripts": {
     "game": "node src/cli.ts",
-    "serve": "node src/server/server.ts",
+    "serve": "node rust/gen/gen.ts && cargo build --quiet --profile home --locked --bin board-lite --manifest-path rust/Cargo.toml && rust/target/home/board-lite",
     "datasheet": "node src/datasheet.ts",
     "analyze": "node src/analyze.ts",
     "typecheck": "tsc && tsc -p web",

@@ -1,7 +1,7 @@
 //! The website: serves the clients and runs rooms, as src/server/server.ts does with --public.
 use crate::limits::{Hold, Limits, clear_old, is_recap_id, lock, visitor};
 use crate::mcp;
-use crate::room::{Fail, Here, Res, Room, new_code, remove_files};
+use crate::room::{Fail, Here, Place, Res, Room, new_code, remove_files};
 use bytes::Bytes;
 use futures_util::Stream;
 use futures_util::stream::unfold;
@@ -16,6 +16,7 @@ use std::convert::Infallible;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -35,18 +36,20 @@ include!("../generated/assets.rs");
 const MAX_BODY: usize = 4096;
 const MAX_MCP_BODY: usize = 16384;
 const PING: Duration = Duration::from_secs(15); // web/common.ts's STALE_MS allows for a couple missed
-const WAIT_MAX_SECS: f64 = 60.0;
 const ROOM_IDLE: Duration = Duration::from_secs(6 * 60 * 60);
 
+/// A public website's address; a home's server has none.
 pub struct Site {
     pub origin: String,
     pub trust_proxy: bool,
-    pub dir: PathBuf,
 }
 pub struct Server {
-    site: Site,
+    site: Option<Site>,
+    place: Place,
+    port: u16,
+    hosted: Vec<PathBuf>, // game files named at the start: never forgotten
     rooms: Mutex<HashMap<String, Arc<Room>>>,
-    limits: Limits,
+    limits: Option<Limits>,
     headers: HeaderMap,
 }
 
@@ -118,7 +121,7 @@ struct Events {
     queue: VecDeque<Bytes>,
     ping: Interval,
     _here: Here,
-    _hold: Hold,
+    _hold: Option<Hold>,
 }
 impl Events {
     fn send(&mut self) {
@@ -202,24 +205,44 @@ fn room_page(path: &str) -> Option<(&str, bool)> {
 }
 
 impl Server {
-    pub fn new(site: Site) -> Arc<Server> {
+    pub fn new(site: Option<Site>, place: Place, port: u16, hosted: Vec<PathBuf>) -> Result<Arc<Server>, String> {
         let mut headers = HeaderMap::new();
-        let mut put = |k: &'static str, v: &'static str| headers.insert(k, HeaderValue::from_static(v));
-        put("content-security-policy", CSP);
-        put("x-content-type-options", "nosniff");
-        put("referrer-policy", "no-referrer");
-        put("x-robots-tag", "noindex");
-        if site.origin.starts_with("https:") {
-            put("strict-transport-security", "max-age=31536000");
+        if let Some(site) = &site {
+            let mut put = |k: &'static str, v: &'static str| headers.insert(k, HeaderValue::from_static(v));
+            put("content-security-policy", CSP);
+            put("x-content-type-options", "nosniff");
+            put("referrer-policy", "no-referrer");
+            put("x-robots-tag", "noindex");
+            if site.origin.starts_with("https:") {
+                put("strict-transport-security", "max-age=31536000");
+            }
         }
         let mut rooms = HashMap::new();
-        for (code, file) in Room::saved(&site.dir, ROOM_IDLE) {
-            match Room::host(&code, file.clone(), &site.dir, false) {
+        for (code, file) in Room::saved(&place.rooms, ROOM_IDLE).into_iter().filter(|(_, f)| !hosted.contains(f)) {
+            match Room::host(&code, file.clone(), &place, false) {
                 Ok(room) => drop(rooms.insert(code, room)),
                 Err(e) => eprintln!("Could not host room {code} again ({}): {e}", file.display()),
             }
         }
-        Arc::new(Server { site, rooms: Mutex::new(rooms), limits: Limits::default(), headers })
+        // Hosted before, a game file keeps its code and seats; otherwise every seat starts open.
+        for file in &hosted {
+            let was = Room::saved_code(file).filter(|c| !rooms.contains_key(c));
+            let code = was.unwrap_or_else(|| new_code(&place.rooms, |c| rooms.contains_key(c)));
+            let room = Room::host(&code, file.clone(), &place, false)?;
+            rooms.insert(code, room);
+        }
+        let limits = site.is_some().then(Limits::default);
+        Ok(Arc::new(Server { site, place, port, hosted, rooms: Mutex::new(rooms), limits, headers }))
+    }
+    /// The rooms with a game or players, and their files.
+    pub fn in_use(&self) -> Vec<(String, PathBuf)> {
+        lock(&self.rooms).values().filter(|r| r.in_use()).map(|r| (r.code.clone(), r.file.clone())).collect()
+    }
+    fn hold(&self, who: &str) -> Res<Option<Hold>> {
+        self.limits.as_ref().map(|l| l.hold(who)).transpose()
+    }
+    fn max_wait(&self) -> f64 {
+        if self.site.is_some() { 60.0 } else { 3600.0 }
     }
     pub fn count(&self) -> usize {
         lock(&self.rooms).len()
@@ -258,9 +281,11 @@ impl Server {
                 r.rest();
             }
             if n % 60 == 0 {
-                self.limits.sweep();
+                if let Some(l) = &self.limits {
+                    l.sweep();
+                }
                 for r in &rooms {
-                    if let Some(files) = r.forget() {
+                    if let Some(files) = r.forget().filter(|_| !self.hosted.contains(&r.file)) {
                         r.close();
                         lock(&self.rooms).remove(&r.code);
                         if files {
@@ -269,8 +294,8 @@ impl Server {
                     }
                 }
             }
-            if n % 3600 == 0 {
-                clear_old(&self.site.dir, |code| lock(&self.rooms).contains_key(code));
+            if n % 3600 == 0 && self.site.is_some() {
+                clear_old(&self.place.rooms, |code| lock(&self.rooms).contains_key(code));
             }
         }
     }
@@ -292,16 +317,20 @@ impl Server {
     }
     fn who(&self, req: &Request<Incoming>, peer: IpAddr) -> String {
         let last = req.headers().get_all("x-forwarded-for").iter().next_back();
-        visitor(peer, last.filter(|_| self.site.trust_proxy).and_then(|v| v.to_str().ok()))
+        visitor(peer, last.filter(|_| self.site.as_ref().is_some_and(|s| s.trust_proxy)).and_then(|v| v.to_str().ok()))
     }
     // `by` looks it up: the website limits how many wrong codes one visitor tries.
     fn room(&self, code: &str, by: &str) -> Res<Arc<Room>> {
-        self.limits.may_look_up(by)?;
+        if let Some(l) = &self.limits {
+            l.may_look_up(by)?;
+        }
         let code = code.to_uppercase();
         if let Some(r) = lock(&self.rooms).get(&code) {
             return Ok(r.clone());
         }
-        self.limits.wrong_code(by)?;
+        if let Some(l) = &self.limits {
+            l.wrong_code(by)?;
+        }
         Err(Fail::Room(format!("No room with code {code}. Check the code on the TV.")))
     }
 
@@ -317,20 +346,20 @@ impl Server {
             return Ok(ok(json!({"ok": true, "rooms": self.count()})));
         }
         let who = self.who(&req, peer);
-        if first == "api" || first == "mcp" {
-            self.limits.request(&who)?;
+        if let Some(l) = self.limits.as_ref().filter(|_| first == "api" || first == "mcp") {
+            l.request(&who)?;
         }
         if path == "/mcp" {
             return self.mcp(req, &who).await;
         }
         if path == "/llms.txt" {
-            return Ok(self.guide(None));
+            return Ok(self.guide(&req, None));
         }
         let page = room_page(path);
         if let Some((code, md)) = page {
             let accepts = |v: &HeaderValue| v.to_str().is_ok_and(|s| s.split([',', ';']).any(|t| t.trim() == "text/markdown"));
             if md || req.headers().get_all(header::ACCEPT).iter().any(accepts) {
-                return Ok(self.guide(Some(&code.to_uppercase())));
+                return Ok(self.guide(&req, Some(&code.to_uppercase())));
             }
         }
         if first == "api" {
@@ -354,7 +383,7 @@ impl Server {
             r.headers_mut().insert(header::ALLOW, HeaderValue::from_static("POST"));
             return Ok(r);
         }
-        let _hold = self.limits.hold(who)?; // a wait is held open
+        let _hold = self.hold(who)?; // a wait is held open
         let m = body(req, MAX_MCP_BODY).await?;
         Ok(match mcp::rpc(&m, |code| self.room(code, who)).await {
             Some(v) => ok(v),
@@ -365,14 +394,16 @@ impl Server {
             }
         })
     }
-    fn guide(&self, code: Option<&str>) -> Answer {
-        let text = mcp::guide(&self.site.origin, code);
+    fn guide(&self, req: &Request<Incoming>, code: Option<&str>) -> Answer {
+        let host = req.headers().get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or("localhost");
+        let origin = self.site.as_ref().map_or_else(|| format!("http://{host}"), |s| s.origin.clone());
+        let text = mcp::guide(&origin, code);
         let mut r = answer(StatusCode::OK, "text/markdown; charset=utf-8", "no-cache", Body::Whole(Some(text.into())));
         r.headers_mut().insert(header::VARY, HeaderValue::from_static("accept"));
         r
     }
     fn events(&self, room: Arc<Room>, tok: Option<&str>, tv: bool, who: &str) -> Res<Answer> {
-        let hold = self.limits.hold(who)?;
+        let hold = self.hold(who)?;
         let changes = room.watch();
         let here = room.connect(tok, tok.is_none() && tv);
         let mut ping = tokio::time::interval_at(tokio::time::Instant::now() + PING, PING);
@@ -389,21 +420,34 @@ impl Server {
         let post = req.method() == Method::POST;
         let first = parts_.first().copied().unwrap_or("");
         match first {
-            "info" => return Ok(ok(json!({"lan": [], "tailscale": [], "port": 0, "origin": self.site.origin}))),
+            "info" => return Ok(ok(match &self.site {
+                // A public website has one address, and says nothing about its machine.
+                Some(s) => json!({"lan": [], "tailscale": [], "port": 0, "origin": s.origin}),
+                None => {
+                    let (lan, tailscale) = crate::addresses::addresses();
+                    json!({"lan": lan, "tailscale": tailscale, "port": self.port})
+                }
+            })),
             "rulebook" if get => return Ok(ok(crate::state::rulebook())),
             "recaps" if get && parts_.len() == 2 => return Ok(self.recap(parts_[1])),
-            "saved" if get => return Ok(ok(json!([]))), // strangers' games aren't listed: open the room's link
+            "saved" if get => return Ok(ok(self.saved())), // strangers' games aren't listed: open the room's link
             "rooms" => {}
             _ => return Ok(not_found()),
         }
         if parts_.len() == 1 && post {
             let remote = body(req, MAX_BODY).await?.get("remote") == Some(&Value::Bool(true));
-            self.limits.new_room(who, self.count())?;
+            if let Some(l) = &self.limits {
+                l.new_room(who, self.count())?;
+            }
             let mut rooms = lock(&self.rooms);
-            let code = new_code(&self.site.dir, |c| rooms.contains_key(c));
-            let room = Room::new(&code, &self.site.dir, remote).map_err(Fail::Server)?;
+            let code = new_code(&self.place.rooms, |c| rooms.contains_key(c));
+            let room = Room::new(&code, &self.place, remote).map_err(Fail::Server)?;
             let host = room.host.clone();
             rooms.insert(code.clone(), room);
+            if self.site.is_none() {
+                let url = format!("http://localhost:{}/{code}", self.port);
+                println!("Room {code} is open.\n  At a terminal:  node src/cli.ts join {url} <name>\n  Claude players: node src/playtest/run.ts --room {url} --models opus+expected,haiku+expected\n  On a TV, any time: http://localhost:{}/tv?room={code}", self.port);
+            }
             return Ok(ok(json!({"code": code, "hostToken": host})));
         }
         let room = self.room(parts_.get(1).copied().unwrap_or(""), who)?;
@@ -416,14 +460,14 @@ impl Server {
                 "events" => self.events(room, token, q.contains_key("tv"), who),
                 "state" => Ok(parts(room.state(tok)?)),
                 "wait" => {
-                    let _hold = self.limits.hold(who)?;
-                    let (code, s) = room.wait(tok, num("timeout").unwrap_or(60.0).min(WAIT_MAX_SECS)).await?;
+                    let _hold = self.hold(who)?;
+                    let (code, s) = room.wait(tok, num("timeout").unwrap_or(60.0).min(self.max_wait())).await?;
                     Ok(parts(wrap(s, format!(r#"{{"code":{code},"state":"#), "}")))
                 }
                 "listen" => {
-                    let _hold = self.limits.hold(who)?;
+                    let _hold = self.hold(who)?;
                     let heard = room
-                        .listen(tok, num("since").unwrap_or(0.0) as usize, num("timeout").unwrap_or(0.0).min(WAIT_MAX_SECS), |room, h| {
+                        .listen(tok, num("since").unwrap_or(0.0) as usize, num("timeout").unwrap_or(0.0).min(self.max_wait()), |room, h| {
                             let before = format!(r#"{{"events":{},"next":{},"state":"#, json!(h.events()), h.next());
                             wrap(h.snapshot(room), before, "}")
                         })
@@ -447,7 +491,7 @@ impl Server {
                 let (token, p, _) = room.join(str_of(&b, "name"), via(str_of(&b, "via")))?;
                 return Ok(ok(json!({"token": token, "seat": p + 1})));
             }
-            "bot" => room.add_bot(tok)?,
+            "bot" => room.add_bot(tok, b.get("strong") == Some(&Value::Bool(true)))?,
             "leave" => room.leave(tok, seat)?,
             "quit" => room.quit(tok)?,
             "standin" => room.stand_in_for(tok, seat)?,
@@ -455,7 +499,11 @@ impl Server {
             "tv" => return Ok(ok(if room.tv_watching() { json!({}) } else { json!({"hostToken": room.host}) })),
             "start" => room.start(tok)?,
             "save" => room.save(tok)?,
-            "continue" => room.resume(tok)?,
+            "continue" => {
+                if room.resume(tok)? && self.site.is_none() {
+                    self.bring_back_claude(&room);
+                }
+            }
             "do" => {
                 if tok == room.host {
                     return Err(Fail::Room("The TV has no seat.".into()));
@@ -467,8 +515,34 @@ impl Server {
         }
         Ok(ok(json!({})))
     }
+    // Saved games, newest first; strangers' games aren't listed on a public website.
+    fn saved(&self) -> Value {
+        if self.site.is_some() {
+            return json!([]);
+        }
+        let mut all: Vec<(i64, Value)> = lock(&self.rooms).values().filter_map(|r| r.waiting()).collect();
+        all.sort_by_key(|x| -x.0);
+        all.into_iter().map(|x| x.1).collect()
+    }
+    // Continuing a saved game at home brings back the Claude players who were
+    // at it: each of their runners starts again with --resume. Only runners on
+    // this machine that listed themselves are: nothing a phone sends names a folder.
+    fn bring_back_claude(&self, room: &Room) {
+        for dir in room.claude_runners().into_iter().filter(|d| d.exists()) {
+            let Ok(errors) = std::fs::OpenOptions::new().append(true).create(true).open(dir.join("runner.errors.log")) else { continue };
+            let url = format!("http://127.0.0.1:{}/{}", self.port, room.code);
+            let run = tokio::process::Command::new("node").arg("src/playtest/run.ts").arg("--resume").arg(&dir).arg("--room").arg(url).stdin(Stdio::null()).stdout(Stdio::null()).stderr(errors).spawn();
+            match run {
+                Ok(mut child) => {
+                    println!("Room {} continues: bringing back the Claude players in {}.", room.code, dir.display());
+                    tokio::spawn(async move { child.wait().await });
+                }
+                Err(e) => eprintln!("Room {}: could not bring the Claude players in {} back: {e}", room.code, dir.display()),
+            }
+        }
+    }
     fn recap(&self, id: &str) -> Answer {
-        let text = if is_recap_id(id) { std::fs::read(self.site.dir.join("recaps").join(format!("{id}.json"))).ok() } else { None };
+        let text = if is_recap_id(id) { std::fs::read(self.place.recaps.join(format!("{id}.json"))).ok() } else { None };
         match text {
             Some(t) => answer(StatusCode::OK, "application/json", "no-cache", Body::Whole(Some(t.into()))),
             None => wrong(StatusCode::NOT_FOUND, "No recap with that link."),

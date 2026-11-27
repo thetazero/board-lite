@@ -1,3 +1,5 @@
+#[cfg(feature = "server")]
+pub mod addresses;
 pub mod api;
 pub mod bot;
 pub mod data;

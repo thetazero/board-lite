@@ -37,7 +37,7 @@ miniz_oxide = { version = "0.8", default-features = false, features = ["with-all
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
 sha2 = { version = "0.10", optional = true }
-tokio = { optional = true, version = "1", features = ["rt", "net", "time", "sync", "macros", "signal"] }
+tokio = { optional = true, version = "1", features = ["rt", "net", "time", "sync", "macros", "signal", "process"] }
 unicode-general-category = { version = "1", optional = true }
 
 [profile.release]
@@ -50,3 +50,10 @@ strip = true
 inherits = "release"
 opt-level = 3
 panic = "abort"
+
+# npm run serve: quicker to build.
+[profile.home]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true

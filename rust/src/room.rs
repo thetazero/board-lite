@@ -8,6 +8,7 @@ use crate::gamelog::{GameLog, Sender, now_ms};
 use crate::limits::lock;
 use crate::rng::Rng;
 use crate::state::{self, Lobby, LobbySeat};
+use crate::strongbot::{self, Seen, Tune};
 use crate::view::Shown;
 use crate::{recap, scenes, store};
 use bytes::Bytes;
@@ -65,7 +66,7 @@ pub struct Seat {
     seen: i64,
     stand_in: bool,
     left: bool,
-    strong: bool, // set by a server at home; here it's played as any bot is
+    strong: bool, // a bot seat played by the strong bot
     via: Option<&'static str>,
 }
 #[derive(Serialize, Deserialize)]
@@ -153,6 +154,7 @@ struct Inner {
     version: u64,
     done_ids: VecDeque<String>,
     bot_rng: Rng,
+    offers_seen: Seen, // the strong bots' own offers, and since when they've waited
     saved_seats: String,
     screens: usize,
     scene_until: i64,
@@ -165,11 +167,19 @@ struct Inner {
     seen: HashMap<String, usize>, // the events each Claude player has been shown up to (mcp.rs)
 }
 
+/// Where rooms and recaps go, and whether it's a home's server.
+pub struct Place {
+    pub rooms: PathBuf,
+    pub recaps: PathBuf,
+    pub home: bool,
+}
+
 pub struct Room {
     pub code: String,
     pub file: PathBuf,
     pub host: String,
     pub recap_id: String,
+    home: bool, // not a public website: strong bots, and clients are told where the file is
     recaps: PathBuf,
     changes: watch::Sender<u64>,
     inner: Mutex<Inner>,
@@ -279,13 +289,13 @@ fn clear(t: &mut Option<AbortHandle>) {
 }
 
 impl Room {
-    pub fn new(code: &str, dir: &Path, remote: bool) -> Result<Arc<Room>, String> {
-        let file = dir.join(format!("{code}.json"));
-        Room::host(code, file, dir, remote)
+    pub fn new(code: &str, place: &Place, remote: bool) -> Result<Arc<Room>, String> {
+        let file = place.rooms.join(format!("{code}.json"));
+        Room::host(code, file, place, remote)
     }
     /// Hosted again after a restart: the same TV, the same players in the same seats.
-    pub fn host(code: &str, file: PathBuf, dir: &Path, remote: bool) -> Result<Arc<Room>, String> {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    pub fn host(code: &str, file: PathBuf, place: &Place, remote: bool) -> Result<Arc<Room>, String> {
+        std::fs::create_dir_all(file.parent().unwrap_or(&place.rooms)).map_err(|e| e.to_string())?;
         let saved = read_saved(&beside(&file, ".seats.json"));
         let game = if file.exists() { Some(Box::new(store::load(&file)?)) } else { None };
         let host = saved.as_ref().map_or_else(token, |s| s.host_token.clone());
@@ -303,6 +313,7 @@ impl Room {
             version: 0,
             done_ids: VecDeque::new(),
             bot_rng: Rng::new(now_ms()),
+            offers_seen: Seen::new(),
             saved_seats: String::new(),
             screens: 0,
             scene_until: 0,
@@ -331,7 +342,7 @@ impl Room {
             }
         }
         let recap_id = hex(&Sha256::digest(format!("recap:{host}")))[..12].to_string();
-        let room = Arc::new_cyclic(|me| Room { code: code.into(), file, host, recap_id, recaps: dir.join("recaps"), changes: watch::Sender::new(0), inner: Mutex::new(i), me: me.clone() });
+        let room = Arc::new_cyclic(|me| Room { code: code.into(), file, host, recap_id, home: place.home, recaps: place.recaps.clone(), changes: watch::Sender::new(0), inner: Mutex::new(i), me: me.clone() });
         {
             let i = &mut *lock(&room.inner);
             i.recapped = room.recap_file().exists();
@@ -341,6 +352,27 @@ impl Room {
             }
         }
         Ok(room)
+    }
+    /// The code a game file was hosted under before, if its seats were saved.
+    pub fn saved_code(file: &Path) -> Option<String> {
+        read_saved(&beside(file, ".seats.json")).map(|s| s.code)
+    }
+    /// When it was saved, if it's waiting to be continued, with its round and who's at the table.
+    pub fn waiting(&self) -> Option<(i64, Value)> {
+        let i = &*lock(&self.inner);
+        let (at, g) = (i.saved_at?, i.game.as_ref()?);
+        let names: Vec<&str> = i.seats.iter().map(|s| s.name.as_str()).collect();
+        Some((at, json!({"code": self.code, "savedAt": at, "round": g.round, "names": names})))
+    }
+    /// Whether anyone is in it: what the terminal lists at the start.
+    pub fn in_use(&self) -> bool {
+        let i = &*lock(&self.inner);
+        i.game.is_some() || !i.seats.is_empty()
+    }
+    /// The folders of the Claude runners that have played in this game (src/playtest/run.ts lists them).
+    pub fn claude_runners(&self) -> Vec<PathBuf> {
+        let v: Value = std::fs::read_to_string(beside(&self.file, ".claude.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+        v["runners"].as_array().into_iter().flatten().filter_map(|d| d.as_str().map(PathBuf::from)).collect()
     }
     /// Rooms saved in `dir` and active in the last `within`, and every saved game however old.
     pub fn saved(dir: &Path, within: Duration) -> Vec<(String, PathBuf)> {
@@ -489,14 +521,20 @@ impl Room {
         self.changed(i);
         Ok(p)
     }
-    pub fn add_bot(&self, tok: &str) -> Res {
+    pub fn add_bot(&self, tok: &str, strong: bool) -> Res {
         let i = &mut *lock(&self.inner);
         if !self.can_start(i, tok) {
             return no("Only the TV or the first to join can add bots.");
         }
         let free = ["Tick", "Gizmo", "Widget", "Pinion", "Cog", "Ratchet", "Bolt"].into_iter().find(|n| !i.seats.iter().any(|s| s.kind != Kind::Open && s.name.eq_ignore_ascii_case(n)));
         let name = free.map_or_else(|| format!("Cog {}", i.seats.len() + 1), |n| n.into());
-        self.join_as(i, &name, Kind::Bot, None).map(|_| ())
+        let p = self.join_as(i, &name, Kind::Bot, None)?;
+        // On a public website a strong bot's thinking would hold up every other game.
+        if strong && self.home {
+            i.seats[p].strong = true;
+            self.changed(i);
+        }
+        Ok(())
     }
     /// A player leaves the lobby; the TV or first player can remove anyone.
     pub fn leave(&self, tok: &str, seat: Option<usize>) -> Res {
@@ -587,15 +625,16 @@ impl Room {
         self.changed(i);
         Ok(())
     }
-    pub fn resume(&self, tok: &str) -> Res {
+    /// True if it was saved.
+    pub fn resume(&self, tok: &str) -> Res<bool> {
         let i = &mut *lock(&self.inner);
         self.at_table(i, tok)?;
-        let Some(at) = i.saved_at else { return Ok(()) };
+        let Some(at) = i.saved_at else { return Ok(false) };
         let by = self.sender_of(i, tok);
         i.log.write("continue", &by, json!({"savedAt": recap::iso(at)}));
         i.saved_at = None;
         self.changed(i);
-        Ok(())
+        Ok(true)
     }
     fn at_table(&self, i: &mut Inner, tok: &str) -> Res {
         let p = i.seat_of(tok);
@@ -800,13 +839,36 @@ impl Room {
             if i.scene_left() > 0 {
                 return room.schedule_bot(i);
             }
-            let Some(p) = i.game.as_ref().and_then(|g| g.waiting_on().into_iter().find(|p| bot_plays(i, *p))) else { return };
-            let bot = i.seats[p].kind == Kind::Bot;
-            let by = Sender { kind: if bot { "bot" } else { "standIn" }, seat: Some(p), name: Some(i.seats[p].name.clone()) };
-            let done = room.mutate(i, by, |g, rng| if bot { bot::bot_move(g, p, rng) } else { bot::stand_in_move(g, p) }.ok_or_else(|| "no legal move".into()));
-            if let Err(Fail::Room(e) | Fail::Server(e)) = done {
-                eprintln!("Room {}: a bot is stuck: {e}", room.code);
+            // The first bot waited on that moves: a strong bot waiting on answers to its
+            // own offer passes, and is woken again in a few seconds.
+            let waiting: Vec<usize> = i.game.as_ref().map_or(vec![], |g| g.waiting_on().into_iter().filter(|p| bot_plays(i, *p)).collect());
+            for p in waiting {
+                let (bot, strong, name) = (i.seats[p].kind == Kind::Bot, i.seats[p].strong, i.seats[p].name.clone());
+                let by = Sender { kind: if bot { "bot" } else { "standIn" }, seat: Some(p), name: Some(name.clone()) };
+                let mut seen = std::mem::take(&mut i.offers_seen);
+                let player = strongbot::Bot { p, name: Some(&name), now: now_ms(), tune: &Tune::default() };
+                if bot && strong && i.game.as_ref().is_some_and(|g| strongbot::strong_waits(g, &player, &mut seen)) {
+                    i.offers_seen = seen;
+                    continue;
+                }
+                let done = room.mutate(i, by, |g, rng| {
+                    let cmd = match (bot, strong) {
+                        (true, true) => strongbot::strong_move(g, &player, rng, &mut seen)?,
+                        (true, false) => bot::bot_move(g, p, rng),
+                        _ => bot::stand_in_move(g, p),
+                    };
+                    cmd.ok_or_else(|| "no legal move".into())
+                });
+                i.offers_seen = seen;
+                if let Err(Fail::Room(e) | Fail::Server(e)) = done {
+                    eprintln!("Room {}: a bot is stuck: {e}", room.code);
+                }
+                return;
             }
+            i.bot_timer = room.after(3000, |room, i| {
+                i.bot_timer = None;
+                room.schedule_bot(i);
+            });
         });
     }
 
@@ -822,7 +884,7 @@ impl Room {
             seats: i.seats.iter().map(|s| LobbySeat { name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
             min_players: MIN_PLAYERS,
             max_players: MAX_PLAYERS,
-            file: String::new(), // a public website doesn't say where its files are
+            file: if self.home { self.file.display().to_string() } else { String::new() }, // a public website doesn't say where its files are
             remote: !i.has_tv,
         }
     }
@@ -920,10 +982,13 @@ impl Room {
         let i = &*lock(&self.inner);
         let idle = now_ms() - i.last_active;
         if let Some(at) = i.saved_at {
+            if self.home {
+                return None;
+            }
             let keep = crate::limits::SAVED_KEEP.as_millis() as i64;
             return (now_ms() - at > keep && idle > 6 * HOUR).then_some(true);
         }
-        let empty = i.game.is_none() && idle > HOUR && self.changes.receiver_count() == 0;
+        let empty = !self.home && i.game.is_none() && idle > HOUR && self.changes.receiver_count() == 0;
         (idle > 6 * HOUR || empty || (i.abandoned() && idle > 10 * 60 * 1000)).then_some(false)
     }
     pub fn close(&self) {

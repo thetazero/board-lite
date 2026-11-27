@@ -1,19 +1,14 @@
 # The Rust server
 
-`rust/` is the public website ([`deploy.md`](deploy.md)) written again in Rust: the same rules, the same addresses, the same files on disk. It's built by `Dockerfile` into one static binary with the pages inside, on an empty base image. The migration isn't finished: `npm run serve` at home is still the TypeScript server, on the Rust rules.
+`rust/` is the rules, the bots and the server: `npm run serve` at home, and the public website ([`deploy.md`](deploy.md)), built by `Dockerfile` into one static binary with the pages inside, on an empty base image. `npm run serve` builds it first (the pages too: after changing `web/`, run it again), so it needs Rust.
 
 ```
 docker build -t board-lite .
 ```
 
-It takes the same variables (`BOARD_LITE_PUBLIC_URL` is required; there are no flags), and `/data` must be writable by uid 1000. A room one server hosted goes on under the other, on the same folder: stop one before starting the other.
+The flags are `--port`, `--game`, `--data`, `--public` and `--trust-proxy`, and the website's variables are in [`deploy.md`](deploy.md). `/data` must be writable by uid 1000. A room the TypeScript server hosted goes on under this one, on the same folder.
 
-## What's in it, and what isn't
-
-- In: the engine, the simple bot and the stand-in, rooms, saving, `/mcp` with its text and picture, recaps, the limits and clearing.
-- Not in: what only `npm run serve` at home does (strong bots, starting Claude players, network addresses, the list of saved games). The CLI, playtests and contests run on Node.
-
-Where they differ on purpose: changes that come faster than a viewer reads them are sent as one; a wait ends when its client hangs up; nothing takes the game file's `.lock`, so don't point the CLI at a hosted file; a vote like `vote 1.5` is refused, where Node answers 500.
+The TypeScript server (`src/server/`) is still here for the playtest runner, the screenshots, the demo and the room tests, until they move. The two differ on purpose here: changes that come faster than a viewer reads them are sent as one; a wait ends when its client hangs up; nothing takes the game file's `.lock`, so don't point the CLI at a hosted file; a vote like `vote 1.5` is refused, where Node answers 500.
 
 ## Keeping the two alike
 
