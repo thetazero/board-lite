@@ -1,0 +1,28 @@
+# The website and its HTTPS: DOMAIN=dragons.example docker compose -f deploy/compose.yml up -d --build
+services:
+  game:
+    build: ..
+    restart: unless-stopped
+    environment:
+      BOARD_LITE_PUBLIC_URL: https://${DOMAIN:?set DOMAIN to the site's name, like dragons.example}
+      BOARD_LITE_TRUST_PROXY: "1" # only Caddy reaches it: its port isn't published
+    volumes: [games:/data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    logging: { options: { max-size: 10m, max-file: "3" } }
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    logging: { options: { max-size: 10m, max-file: "3" } }
+volumes:
+  games:
+  caddy:

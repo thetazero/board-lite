@@ -17,6 +17,7 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+import { ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../seattools.ts';
 import type { EventView, Snapshot } from '../state.ts';
 import { eventLine, seatStatus, seatView, type ViewOptions } from '../view.ts';
 import { MAP_IMAGE_KEY, mapImage } from '../mapimage.ts';
@@ -76,7 +77,7 @@ const WHY = { type: 'string', description: 'Private: one or two sentences on why
 const TOOLS = [
   {
     name: 'view',
-    description: 'See the game as your seat sees it: scores, your hidden resources and hand, the public board as a text map and as a picture, recent events, and your options when it is your decision.',
+    description: VIEW_HELP,
     inputSchema: { type: 'object', properties: { log: { type: 'number', description: 'How many recent events to include (default 25).' } } },
     run: async (a: { log?: number }): Promise<Content> => {
       const r = await call(`/state${q({ token })}`);
@@ -94,25 +95,25 @@ const TOOLS = [
   },
   {
     name: 'act',
-    description: 'Make a game decision as your seat, e.g. "keep c12", "build c12 2,-1", "build quarry 2,-1", "offer P2 give 2 stone get 1 gold", "offer anyone give 1 crystal get 1 timber", "accept o40", "clear 2,-1 d3", "end", "vote 2", "fight", "fight d3 d5", "hold", "discard c4". Returns what happened and your next options.',
+    description: ACT_HELP,
     inputSchema: { type: 'object', properties: { command: { type: 'string' }, why: WHY }, required: ['command', 'why'] },
     run: (a: { command: string; why?: string }) => act(String(a.command ?? ''), a.why),
   },
   {
     name: 'say',
-    description: 'Talk to the table, any time. With "to" (like "P2"), only that player hears it. Promises bind no one; only accepted offers do.',
+    description: SAY_HELP,
     inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' }, why: WHY }, required: ['message'] },
     run: (a: { message: string; to?: string; why?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`, a.why),
   },
   {
     name: 'wait',
-    description: `Wait (up to ${WAIT_SECS}s) until it is your decision, someone talks to you or the table, or the game ends. On your own turn with an offer out, it waits for an answer. Returns the new events, including talk, and your status.`,
+    description: waitHelp(WAIT_SECS),
     inputSchema: { type: 'object', properties: {} },
     run: () => listen(WAIT_SECS),
   },
   {
     name: 'rules',
-    description: 'The full rules of board-lite.',
+    description: RULES_HELP,
     inputSchema: { type: 'object', properties: {} },
     run: () => readFileSync(fileURLToPath(new URL('../../docs/rules.md', import.meta.url)), 'utf8'),
   },

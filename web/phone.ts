@@ -388,8 +388,8 @@ function renderLobby() {
 
 // A saved game: the table stopped partway through, to continue later. Anyone
 // at it continues it here, on the TV, or on another phone; the Claude players
-// come back by themselves. Leave goes to the join form, where the game is
-// under Saved games.
+// come back by themselves. Leave goes to the join form, which says the
+// game's address (a public website lists no one's saved games).
 function renderSaved() {
   const l = snap!.lobby;
   const me = seatIndex();
@@ -413,7 +413,7 @@ function renderSaved() {
       </div>
     </div>`));
   on('continue', () => call(`/api/rooms/${code}/continue`, { token }));
-  on('leave', () => leaveToJoin('The game is saved. To continue it, open it under Saved games and tap your name.'));
+  on('leave', () => leaveToJoin(`The game is saved. To continue it, open ${location.host}/${l.code} and tap your name.`));
 }
 
 // A game with no TV: the others join from this phone's screen, at the address

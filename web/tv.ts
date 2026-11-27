@@ -34,7 +34,8 @@ let hostToken = '';
 let isHost = false;
 let snap: Snapshot | null = null;
 let names: string[] = [];
-let lan: { lan: string[]; tailscale: string[]; port: number } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
+// `origin`: a public website's one address
+let lan: { lan: string[]; tailscale: string[]; port: number; origin?: string } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
 let seenLog = -1; // highest log index already animated
 let savedGames: SavedGame[] = []; // the server's saved games, offered in a new room's lobby
 // The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
@@ -154,9 +155,16 @@ function seatNews(before: Snapshot, now: Snapshot) {
 
 // ---------- lobby ----------
 
+// Where phones reach this server, as it's shown to be typed, and the scheme its QR codes add.
+function siteHost(host = lan.lan[0] ?? lan.tailscale[0] ?? location.hostname): string {
+  if (lan.origin) return new URL(lan.origin).host;
+  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}`;
+}
+const scheme = () => (lan.origin ? new URL(lan.origin).protocol : 'http:');
+
 // The room's address: phones open it, and CLI players use it as the game.
-function joinUrl(host = lan.lan[0] ?? lan.tailscale[0] ?? location.hostname): string {
-  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}/${code}`;
+function joinUrl(host?: string): string {
+  return `${siteHost(host)}/${code}`;
 }
 
 // Phones on the same tailnet reach this machine from anywhere at its Tailscale address.
@@ -227,7 +235,7 @@ const nameplate = () => `<div class="nameplate"><h1 class="title">board-lite</h1
 // How to join: the room's QR code, address and code.
 function joinBox(step: string): string {
   return `<div class="join-box">
-          ${qrSvg(`http://${joinUrl()}`, 'the room\'s address')}
+          ${qrSvg(`${scheme()}//${joinUrl()}`, 'the room\'s address')}
           <div class="join-text">
             <div class="step">${step}</div>
             <div class="how">Point its camera at the code, or open</div>
@@ -1202,13 +1210,12 @@ function summaryStep() {
 
 // The recap page's address, as phones reach this machine.
 function recapUrl(id: string): string {
-  const host = lan.lan[0] ?? lan.tailscale[0] ?? location.hostname;
-  return `${host}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}/recap/${id}`;
+  return `${siteHost()}/recap/${id}`;
 }
 
 function showFinal(g: PublicState) {
   const w = g.standings![0].p;
-  const qr = remote ? '' : recap ? `<div class="recapqr">${qrSvg(`http://${recapUrl(recap.id)}`, "the game's recap")}
+  const qr = remote ? '' : recap ? `<div class="recapqr">${qrSvg(`${scheme()}//${recapUrl(recap.id)}`, "the game's recap")}
       <div class="step">Scan for the recap</div><div class="url">${esc(recapUrl(recap.id)).replace('/recap/', '/<wbr>recap/')}</div></div>` : '';
   showOverlay('end', 'end', `<div class="endbox${qr ? ' with-recap' : ''}" data-step="final" style="--pc:${PLAYER_COLORS[w]}">${winnerScene(PLAYER_COLORS[w], g.players.map((_, i) => PLAYER_COLORS[i]), 340, 100)}
       <h1>${playerTag(w, names)} wins!</h1>${tiebreakNote(g) ? `<p class="tiebreak">${tiebreakNote(g)}</p>` : ''}
