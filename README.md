@@ -9,6 +9,7 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 - Play with no TV, phones only (one phone and bots works too): tap **New game** on the join form; see [`docs/clients.md`](docs/clients.md#playing-with-no-tv)
 - Screenshots of the TV and phones in staged situations, for look tuning: `npm run shots -- --only <name>`, the screens a change touched ([`docs/clients.md`](docs/clients.md#staged-screenshots-for-look-tuning))
 - Play from the command line: [`docs/cli.md`](docs/cli.md)
+- Put it up as a public website, where a Claude client joins from a game's link: [`docs/deploy.md`](docs/deploy.md)
 - Play against Claude, at the same table as phone players: [`docs/play-vs-claude.md`](docs/play-vs-claude.md)
 - Tuning datasheet, generated from the code: [`docs/datasheet.md`](docs/datasheet.md): the raw rules: every cost, output, stat and point, with nothing simulated. Read it before and after changing any number; `npm run datasheet` regenerates it.
 - Analyze any finished game, a room people played in included (points by round, what each seat did, trade surplus, production): `npm run analyze -- <room code>`; see [`docs/analyze.md`](docs/analyze.md)
@@ -25,7 +26,7 @@ TypeScript, run directly by Node 22.18+ (no build step). `npm install` before `n
 - `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/strongbot.ts`: the strong bot, pure code, a free baseline for playtests and contests ([`docs/strongbot.md`](docs/strongbot.md)); `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude and Codex players (hosting a playtest, or joining a room) and the per-seat MCP server they play through; the eval (`eval.ts`), the leaderboard's rating (`leaderboard.ts`, `rating.ts`) and the live page, a contest's or the whole leaderboard's (`live.ts`, `live.html`)
 - `src/recap.ts`: a finished game's recap, the story the TV plays at the end and the recap page (`web/recap.ts`) shows
-- `src/server/`: the web server and rooms for the TV and phone clients; `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
+- `src/server/`: the web server and rooms for the TV and phone clients, what a public website adds (`public.ts`) and the MCP endpoint Claude clients join through (`mcp.ts`); `src/state.ts`: the JSON they receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
 - `src/shots/`: staged screenshots of the clients (`npm run shots`)
 
 Design rules between tuning numbers (payback, point efficiency) are tests in `test/design/`, with their own [README](test/design/README.md).

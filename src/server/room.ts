@@ -81,6 +81,7 @@ const MAX_TIMEOUT_MS = 2 ** 31 - 1; // the longest delay setTimeout keeps
 export interface RoomOptions {
   file?: string; // the game file; defaults to <dir>/<code>.json
   dir?: string; // defaults to ROOMS_DIR
+  hideFile?: boolean; // don't tell clients where the game file is (a public website)
   botDelayMs?: number; // pause before a bot moves, so the TV can show it
   awayMs?: number; // defaults to AWAY_MS (tests shorten it)
   remote?: boolean; // made with no TV (from a phone or the CLI); whether there's a TV changes as TVs come and go (Room.hasTv)
@@ -705,7 +706,7 @@ export class Room {
       seats: this.seats.map((s) => ({ name: s.name, kind: s.kind, connected: this.here(s), standIn: s.standIn, left: s.left, ...(s.strong ? { strong: true } : {}) })),
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
-      file: this.file,
+      file: this.opts.hideFile ? '' : this.file,
       remote: !this.hasTv,
     };
   }
@@ -722,6 +723,11 @@ export class Room {
       recap: g?.phase === 'over' && existsSync(this.recapFile) ? this.recapId : null,
       you: g && p >= 0 && this.seats[p].kind === 'player' ? { ...seatState(g, p), name: this.seats[p].name } : null,
     };
+  }
+
+  /** How many clients are watching or waiting on the room. */
+  get watchers(): number {
+    return this.listeners.size;
   }
 
   subscribe(fn: () => void): () => void {

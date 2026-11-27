@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!src
+# The website runs no Claude players: the runner that starts them isn't in the image.
+src/playtest/*
+!src/playtest/stats.ts
+src/shots
+!web
+!docs/rules.md

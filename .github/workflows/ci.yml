@@ -34,3 +34,16 @@ jobs:
             echo "::error title=Tests too slow::npm test ran past its ${TEST_CAP}s cap and was stopped. It usually takes 30-40s on CI. Find what made it slower, or raise TEST_CAP in .github/workflows/ci.yml on purpose and say why in the PR."
           fi
           exit "$code"
+  # The public website's container (docs/deploy.md) builds, starts, and answers.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t board-lite .
+      - run: |
+          docker run -d --name site -p 8080:8080 --read-only -v games:/data -e BOARD_LITE_PUBLIC_URL=https://dragons.example board-lite
+          for i in $(seq 20); do curl -fsS localhost:8080/healthz && break; sleep 1; done
+          curl -fsS -X POST localhost:8080/api/rooms | grep hostToken
+          curl -fsS localhost:8080/vendor/three/three.module.js -o /dev/null
+          curl -fsS localhost:8080/llms.txt | grep https://dragons.example/mcp
