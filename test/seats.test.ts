@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { newGame } from '../src/engine.ts';
-import { startServer } from '../src/host.ts';
+import { Room, startServer } from '../src/host.ts';
 import type { Lobby } from '../src/state.ts';
 import { save } from '../src/store.ts';
 
@@ -123,6 +123,56 @@ test('two people removing the same player at once remove only that player', asyn
   } finally { s.close(); }
 });
 
+test('a removed player whose wait is woken by talk is refused, without a crash', async () => {
+  const s = await host();
+  try {
+    const t = await table(s, 'Ada', 'Bram', 'Cora');
+    const asked = s.tool('wait', { game: t.code, token: t.tokens[2] }).then((r) => r.text, (e) => `no answer: ${e}`);
+    await t.held(t.tokens[2]);
+    t.remove(2);
+    await t.start();
+    await s.post(`${t.at}/do`, { token: t.tokens[0], command: 'say hello' });
+    assert.match(await soon(asked), REFUSED);
+  } finally { s.close(); }
+});
+
+test('whoever had a seat before does not count as its player being here', () => {
+  const room = new Room('HERE', { dir: join(tmp, 'here'), botDelayMs: 60000, awayMs: 50 });
+  try {
+    room.join('Ada');
+    const bram = room.join('Bram');
+    room.start(room.hostToken, 3);
+    const away = room.connect(bram.token);
+    room.quit(bram.token);
+    const again = room.join('Bram'); // back, with the stream from before still open
+    const p = room.seatOf(again.token);
+    assert.equal(p, 1);
+    assert.equal(room.seats[p].connected, 0);
+    const here = room.connect(again.token);
+    assert.equal(room.seats[p].connected, 1);
+    away(); // the old stream closing is not the new player leaving
+    assert.equal(room.seats[p].connected, 1);
+    here();
+    assert.equal(room.seats[p].connected, 0);
+  } finally { room.close(); }
+});
+
+test('a seat keeps its id when the server restarts, and no id is given twice', () => {
+  const opts = { dir: join(tmp, 'again') };
+  const first = new Room('AGIN', opts);
+  for (const name of ['Ada', 'Bram', 'Cora']) first.join(name);
+  const ids = first.lobby().seats.map((x) => x.id);
+  first.leave(2);
+  const file = first.file;
+  first.close();
+  const room = new Room('AGIN', { ...opts, file });
+  try {
+    assert.deepEqual(room.lobby().seats.map((x) => x.id), ids.slice(0, 2));
+    room.join('Dov');
+    assert.ok(!ids.includes(room.lobby().seats[2].id), "a removed player's id is no one else's");
+  } finally { room.close(); }
+});
+
 test('removing a player again does not remove whoever took the seat they left open', async () => {
   const file = join(tmp, 'saved.json');
   save(file, newGame(2, 7));
@@ -132,9 +182,9 @@ test('removing a player again does not remove whoever took the seat they left op
     const at = `/api/rooms/${room.code}`;
     await s.post(`${at}/join`, { name: 'Bram' });
     const player = room.lobby().seats[0].id;
-    assert.equal((await s.post(`${at}/leave`, { token: room.hostToken, player })).status, 200);
+    assert.equal((await s.post(`${at}/leave`, { token: room.hostToken, player, seat: 0 })).status, 200);
     await s.post(`${at}/join`, { name: 'Cora' });
-    assert.equal((await s.post(`${at}/leave`, { token: room.hostToken, player })).status, 400);
+    assert.equal((await s.post(`${at}/leave`, { token: room.hostToken, player, seat: 0 })).status, 400);
     assert.equal(room.lobby().seats[0].name, 'Cora');
   } finally { s.close(); }
 });

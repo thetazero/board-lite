@@ -13,7 +13,7 @@ import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } f
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { askKey, PhoneView, type View } from './view.ts';
-import { taps } from './taps.ts';
+import { steady, taps } from './taps.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -379,8 +379,10 @@ function leaveToJoin(msg: string) {
 // The lobby: who's at the table. The first player starts the game and adds or
 // removes bots (as the TV does); everyone else waits for them. A saved game
 // hosted again comes back here until every seat is taken.
+const seatList = steady();
 function renderLobby() {
   const l = snap!.lobby;
+  seatList.drawn(l.seats.map((s) => s.id));
   const me = seatIndex();
   const host = me === 0;
   const pc = PLAYER_COLORS[me] ?? '#888';
@@ -412,7 +414,7 @@ function renderLobby() {
   if (host) {
     on('bot', () => call(`/api/rooms/${code}/bot`, { token }));
     if (!l.seating) on('start', () => call(`/api/rooms/${code}/start`, { token }));
-    bind('[data-remove]', (b) => call(`/api/rooms/${code}/leave`, { token, player: Number(b.dataset.remove) }));
+    bind('[data-remove]', (b) => seatList.still && call(`/api/rooms/${code}/leave`, { token, player: Number(b.dataset.remove) }));
   }
   on('leave', async () => {
     await call(`/api/rooms/${code}/leave`, { token });

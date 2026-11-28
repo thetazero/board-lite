@@ -63,7 +63,7 @@ impl Kind {
 }
 #[derive(Clone)]
 pub struct Seat {
-    uid: u64, // which seat a stream or a removal is on, as seats come and go in the lobby
+    uid: u64, // which seat a stream or a removal is on, as seats come and go in the lobby: new with each token
     pub name: String,
     pub token: String,
     pub kind: Kind,
@@ -77,6 +77,8 @@ pub struct Seat {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SavedSeat {
+    #[serde(default)]
+    id: u64,
     name: String,
     token: String,
     kind: Kind,
@@ -96,6 +98,8 @@ struct SavedRoom {
     remote: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     saved_at: Option<i64>,
+    #[serde(default)]
+    last_id: u64, // the last seat id given: none is given twice
     seats: Vec<SavedSeat>,
 }
 fn read_saved(file: &Path) -> Option<SavedRoom> {
@@ -309,6 +313,13 @@ impl Inner {
         self.next_uid += 1;
         Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, seen: 0, stand_in: false, left: false, strong: false, via: None }
     }
+    /// The seat's token is no longer the one it was, and whoever held that is
+    /// not here: their streams and waits still open count for no one.
+    fn new_hands(&mut self, p: usize) {
+        self.next_uid += 1;
+        let s = &mut self.seats[p];
+        (s.uid, s.token, s.connected) = (self.next_uid, token(), 0);
+    }
     /// Whether the game waits on seat p now.
     fn waits_on(&self, p: usize) -> bool {
         self.game.as_ref().is_some_and(|g| g.waiting_on().contains(&p)) && self.scene_left() == 0 && !self.seating() && self.saved_at.is_none()
@@ -339,7 +350,7 @@ impl Room {
         let host = saved.as_ref().map_or_else(token, |s| s.host_token.clone());
         let mut i = Inner {
             seats: vec![],
-            next_uid: u32::from_ne_bytes(random()) as u64, // a page from before a restart names no seat of now
+            next_uid: saved.as_ref().map_or(0, |s| s.last_id),
             last_active: now_ms(),
             saved_at: saved.as_ref().and_then(|s| s.saved_at),
             game,
@@ -367,7 +378,8 @@ impl Room {
         let again = saved.is_some();
         for s in saved.into_iter().flat_map(|s| s.seats) {
             let seat = i.new_seat(s.name, s.kind);
-            i.seats.push(Seat { token: s.token, stand_in: s.stand_in, left: s.left, strong: s.strong, ..seat });
+            let uid = if s.id == 0 { seat.uid } else { s.id }; // (saved before seats had ids)
+            i.seats.push(Seat { uid, token: s.token, stand_in: s.stand_in, left: s.left, strong: s.strong, ..seat });
         }
         if let Some(g) = &i.game {
             let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left})).collect();
@@ -442,7 +454,8 @@ impl Room {
             host_token: self.host.clone(),
             remote: !i.has_tv,
             saved_at: i.saved_at,
-            seats: i.seats.iter().map(|s| SavedSeat { name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            last_id: i.next_uid,
+            seats: i.seats.iter().map(|s| SavedSeat { id: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
         };
         let text = json!(saved).to_string();
         if text == i.saved_seats {
@@ -572,8 +585,9 @@ impl Room {
                 }
                 let was = (s.stand_in, s.left);
                 self.change(i, |i| {
+                    i.new_hands(p);
                     let s = &mut i.seats[p];
-                    (s.token, s.stand_in, s.left, s.seen, s.via) = (token(), false, false, now, via);
+                    (s.stand_in, s.left, s.seen, s.via) = (false, false, now, via);
                 })?;
                 let by = i.sender(p);
                 i.log.write("handover", &by, json!({"seat": p, "back": true, "standIn": was.0, "left": was.1}));
@@ -584,8 +598,9 @@ impl Room {
             let Some(p) = i.seats.iter().position(|s| s.kind == Kind::Open) else { return no("The game has started and every seat is taken.") };
             let was = i.seats[p].name.clone();
             self.change(i, |i| {
+                i.new_hands(p);
                 let s = &mut i.seats[p];
-                (s.name, s.kind, s.token, s.via, s.strong) = (clean, kind, token(), via, strong);
+                (s.name, s.kind, s.via, s.strong) = (clean, kind, via, strong);
             })?;
             let by = i.sender(p);
             i.log.write("handover", &by, json!({"seat": p, "was": was}));
@@ -658,8 +673,9 @@ impl Room {
         }
         let name = i.seats[p].name.clone();
         self.change(i, |i| {
+            i.new_hands(p);
             let s = &mut i.seats[p];
-            (s.token, s.stand_in, s.left) = (token(), true, true);
+            (s.stand_in, s.left) = (true, true);
         })?;
         i.log.write("quit", &by, json!({"seat": p}));
         i.log.write("standIn", &Sender::GAME, json!({"seat": p, "name": name, "why": "quit"}));
@@ -822,6 +838,13 @@ impl Room {
         i.seats[p].stand_in = false;
         self.changed(i);
     }
+    // All a wait knows of its seat between wakes is its token: the number holds
+    // only inside `look`, with the room locked.
+    fn seated<T>(&self, tok: &str, look: impl FnOnce(&mut Inner, usize) -> T) -> Res<T> {
+        let i = &mut *lock(&self.inner);
+        let p = i.player_of(tok)?;
+        Ok(look(i, p))
+    }
     fn holding(&self, i: &mut Inner, p: usize) -> Here {
         i.seats[p].connected += 1;
         Here { room: self.me.upgrade().expect("a room in use"), who: Who::Seat { uid: i.seats[p].uid, stream: false } }
@@ -844,12 +867,8 @@ impl Room {
             (self.holding(i, p), self.changes.subscribe())
         };
         let code = loop {
-            {
-                let i = &*lock(&self.inner);
-                let p = i.player_of(tok)?;
-                if i.phase() == Some(Phase::Over) || i.waits_on(p) {
-                    break 0;
-                }
+            if self.seated(tok, |i, p| i.phase() == Some(Phase::Over) || i.waits_on(p))? {
+                break 0;
             }
             tokio::select! {
                 _ = rx.changed() => {}
@@ -857,9 +876,7 @@ impl Room {
             }
         };
         drop(here);
-        let i = &mut *lock(&self.inner);
-        i.player_of(tok)?;
-        Ok((code, self.snapshot_of(i, Some(tok))))
+        self.seated(tok, |i, _| (code, self.snapshot_of(i, Some(tok))))
     }
     /// Every event this seat can see from `since` on, the index to ask from
     /// next, and what `then` makes of them. With a time, waits first until it's
@@ -877,16 +894,15 @@ impl Room {
                 _ = rx.changed() => {}
                 _ = tokio::time::sleep_until(end) => break,
             }
-            let i = &*lock(&self.inner);
-            if ready(i, i.player_of(tok)?, since) {
+            if self.seated(tok, |i, p| ready(i, p, since))? {
                 break;
             }
         }
         drop(here);
-        let i = &mut *lock(&self.inner);
-        let p = i.player_of(tok)?;
-        i.seats[p].seen = now_ms();
-        Ok(then(self, &mut Heard { i, p, since, tok }))
+        self.seated(tok, |i, p| {
+            i.seats[p].seen = now_ms();
+            then(self, &mut Heard { i, p, since, tok })
+        })
     }
     /// For a Claude player: what it has been shown so far, if anything.
     pub fn shown(&self, tok: &str) -> Option<usize> {

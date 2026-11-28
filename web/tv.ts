@@ -7,6 +7,7 @@
 // while the server holds the table for it; the phone, not this page, decides
 // when to show it (view.ts).
 
+import { steady } from './taps.ts';
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
   ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
@@ -198,8 +199,10 @@ function theBoard(): Board3D | null {
   return board3d;
 }
 
+const seatList = steady();
 function renderLobby() {
   const l = snap!.lobby;
+  seatList.drawn(l.seats.map((s) => s.id));
   if (l.saved) return renderSaved();
   const seated = l.seats.map((_, i) => PLAYER_COLORS[i]);
   const open = l.seats.filter((s) => s.kind === 'open').length;
@@ -247,7 +250,7 @@ function renderLobby() {
   app.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => location.assign(`/tv?room=${b.dataset.open}`)));
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
   if (!l.seating) $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
-  app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, player: Number(b.dataset.remove) }).catch(toast)));
+  app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => seatList.still && post(`/api/rooms/${code}/leave`, { token: hostToken, player: Number(b.dataset.remove) }).catch(toast)));
 }
 
 const nameplate = (goal = true) => `<div class="nameplate"><h1 class="title">board-lite</h1>${goal ? `<p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>` : ''}</div>`;
