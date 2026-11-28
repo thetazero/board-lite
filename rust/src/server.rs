@@ -583,6 +583,7 @@ impl Server {
             "standin" => room.stand_in_for(tok, seat)?,
             // A TV opening the room while no other TV watches it becomes the room's TV, with its buttons.
             "tv" => return Ok(ok(if room.tv_watching() { json!({}) } else { json!({"hostToken": room.host}) })),
+            "shown" => room.final_shown(),
             "here" => room.answer(tok)?,
             "start" => room.start(tok)?,
             "save" => room.save(tok)?,

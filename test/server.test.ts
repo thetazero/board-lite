@@ -605,6 +605,89 @@ test('a TV can come and go at any time: opening one gives the table a TV, and it
   room.close();
 });
 
+// The game ends on the next change to it.
+function endGame(room: Room) {
+  room.mutate((g) => {
+    g.phase = 'over';
+    g.winner = 0;
+    g.log.push({ round: g.round, text: 'P1 wins with 20 points!', ev: { k: 'final', totals: g.players.map(() => 0), winner: 0 } });
+  });
+}
+
+test("with a TV, phones wait for its summary when the game ends, however the TV fares (#557)", async () => {
+  const game = (code: string, opts: object = {}) => {
+    const room = new Room(code, { dir, remote: true, tvGoneMs: 60, endingMs: 60_000, botDelayMs: 60_000, ...opts });
+    const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+    return { room, ending: () => room.snapshot(seats[0].token).ending!, start: () => room.start(seats[0].token, 3) };
+  };
+  // No TV: nothing to wait for.
+  const none = game('ENDA');
+  none.start();
+  endGame(none.room);
+  assert.equal(none.ending(), 0);
+  // A TV that closes: they go on once it's gone.
+  const closes = game('ENDB');
+  const tv = closes.room.connect(null, true);
+  closes.start();
+  assert.equal(closes.ending(), 0, 'nothing to wait for mid-game');
+  endGame(closes.room);
+  assert.ok(closes.ending() > 50_000);
+  tv();
+  assert.ok(closes.ending() > 0, 'it may be reloading');
+  const again = closes.room.connect(null, true);
+  await sleep(120);
+  assert.ok(closes.ending() > 0, 'a reload is no end to the wait: the TV says so once it shows the scores');
+  again();
+  await sleep(120);
+  assert.equal(closes.ending(), 0);
+  // A TV reloading as the game ends still tells it.
+  const reloads = game('ENDC', { tvGoneMs: 60_000 });
+  const was = reloads.room.connect(null, true);
+  reloads.start();
+  was();
+  endGame(reloads.room);
+  assert.ok(reloads.ending() > 0);
+  // A TV that stays and never says: they wait so long and no longer, and hear of it.
+  const stuck = game('ENDD', { endingMs: 60 });
+  const stays = stuck.room.connect(null, true);
+  stuck.start();
+  endGame(stuck.room);
+  const heard = stuck.room.snapshot(null).v!;
+  await sleep(150);
+  assert.equal(stuck.ending(), 0);
+  assert.ok(stuck.room.snapshot(null).v! > heard);
+  stays();
+  for (const t of [none, closes, reloads, stuck]) t.room.close();
+});
+
+test("the TV showing the final scores ends the phones' wait (#557)", async () => {
+  const { server, rooms } = startServer(0, { dir });
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const ctrl = new AbortController();
+  try {
+    const { code } = (await (await fetch(`${base}/api/rooms`, { method: 'POST', body: '{}' })).json()) as { code: string };
+    const room = rooms.get(code)!;
+    const ada = room.join('Ada');
+    room.join('Bram');
+    const es = await fetch(`${base}/api/rooms/${code}/events?tv`, { signal: ctrl.signal });
+    await es.body!.getReader().read();
+    room.start(ada.token, 3);
+    endGame(room);
+    const before = room.snapshot(ada.token);
+    assert.ok(before.ending! > 0);
+    assert.equal((await fetch(`${base}/api/rooms/${code}/shown`, { method: 'POST', body: '{}' })).status, 200);
+    const now = room.snapshot(ada.token);
+    assert.equal(now.ending, 0);
+    assert.ok(now.v! > before.v!, 'the phones are told');
+  } finally {
+    ctrl.abort();
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
 test('a TV opened on a room with no TV watching becomes its TV, with its buttons', async () => {
   const { server, rooms } = startServer(0, { dir });
   await new Promise((r) => server.once('listening', r));

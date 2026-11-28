@@ -115,6 +115,7 @@ export interface RoomOptions {
   openMs?: number;
   remote?: boolean;
   tvGoneMs?: number;
+  endingMs?: number;
   idleMs?: number;
   recaps?: string;
   now?: () => number; // the clock a recap is dated by

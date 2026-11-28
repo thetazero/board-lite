@@ -285,7 +285,7 @@ let buzzed = ''; // the decision the phone last buzzed for
 function showGame() {
   const s = snap;
   if (!s?.game || !s.you || s.lobby.seating || s.lobby.saved) return;
-  if (table.sceneOn()) {
+  if (table.waits()) {
     renderWatch(s.you);
     renderTalk();
     return;
@@ -505,7 +505,7 @@ const table = (() => {
     document.body.classList.toggle('table-on', on);
     sw?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
       b.setAttribute('aria-pressed', String((b.dataset.view === 'table') === on));
-      if (b.dataset.view === 'you') b.disabled = view.youOff(now);
+      b.disabled = b.dataset.view === 'you' ? view.youOff(now) : view.tableOff(now);
     });
     wrap.setAttribute('aria-hidden', String(!on));
   };
@@ -538,6 +538,17 @@ const table = (() => {
     document.body.append(wrap, sw);
     document.body.classList.add('has-table');
   };
+  // A scene, or the wait for the TV's summary, ends on this phone's clock if no snapshot says so first.
+  const wake = () => {
+    clearTimeout(timer);
+    const now = Date.now();
+    const at = view.nextEnd(now);
+    if (at) timer = window.setTimeout(() => {
+      draw();
+      showGame();
+      wake();
+    }, at - now + 20);
+  };
   return {
     // Every snapshot of the game.
     snapshot(c: string, s: Snapshot) {
@@ -553,18 +564,14 @@ const table = (() => {
       if (remote) frame();
       document.body.classList.toggle('remote', remote);
       const now = Date.now();
-      view.snapshot(now, { remote, scene: s.scene, ask: askKey(s.game, s.you?.deciding), over: s.game?.phase === 'over' }, !!wrap!.firstChild);
+      view.snapshot(now, { remote, scene: s.scene, ending: s.ending, ask: askKey(s.game, s.you?.deciding), over: s.game?.phase === 'over' }, !!wrap!.firstChild);
       draw();
-      // The scene ends on this phone's clock if no snapshot says so first.
-      clearTimeout(timer);
-      if (view.scene(now)) timer = window.setTimeout(() => {
-        draw();
-        showGame();
-      }, view.sceneEndsAt() - now + 20);
+      wake();
     },
-    // The server holds the table for a scene: the phone's own screen waits.
-    sceneOn(): boolean {
-      return view.scene(Date.now());
+    // The server holds the table for a scene, or the TV plays the game's summary: the phone's own screen waits.
+    waits(): boolean {
+      const now = Date.now();
+      return view.scene(now) || view.ending(now);
     },
     hide() {
       clearTimeout(timer);
