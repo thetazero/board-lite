@@ -5,16 +5,25 @@
 // What it says and when is in explain-steps.ts.
 
 import type { DragonView, HexView, PublicState, Rulebook } from '../src/state.ts';
-import type { Board3D, FightStage } from './board3d.ts';
-import { PLAYER_COLORS, buildingIcon, dieFace, esc, gainChips, icon, mapSvg, resChips } from './common.ts';
+import type { Board3D, FightStage, Portrait, portraits } from './board3d.ts';
+import { PLAYER_COLORS, POINTS_TO_WIN, TITLE_ICON, buildingIcon, dieFace, esc, gainChips, icon, mapSvg, playerTag, resChips } from './common.ts';
 import { kingdomCard, lootLine } from './kingdom.ts';
 import { cardArt, frameColor, kindIcon } from './art.ts';
 import { backdrop, dragonFigure, unitFigure } from './arena.ts';
-import { BUILT, DRAWN, HEXES, KINGDOMS, RAIDED, ROUND, SCORES, STEPS, type Show } from './explain-steps.ts';
+import { BUILT, DRAWN, HEXES, KINGDOMS, RAIDED, ROUND, STEPS, TITLES, TITLE_POINTS, BEAST_POINTS, BUILDING_POINTS, MONUMENT_POINTS, type Show } from './explain-steps.ts';
 
 type Board = Pick<PublicState, 'map' | 'dragons'>;
 type Act = [at: number, run: () => void];
 
+// What scores, drawn by the board's models. The Largest Hoard has none: its icon stands in.
+const PORTRAITS: Record<string, Portrait> = {
+  army: { terrain: 'desert', dragon: { element: 'fire', stage: 3 } },
+  tower: { terrain: 'desert', building: 'tower', floors: 4 },
+  thunderbird: { terrain: 'mountain', beast: 'thunderbird' },
+  leviathan: { terrain: 'ocean', beast: 'leviathan' },
+  quarry: { terrain: 'mountain', building: 'quarry' },
+  monument: { terrain: 'meadow', building: 'monument' },
+};
 const NAMES = ['Ada', 'Bram'];
 const ELEMENTS = ['fire', 'fire']; // everyone starts with a Fire Dragon egg
 
@@ -38,7 +47,7 @@ export interface Explainer { title: (html: string) => void }
 
 // Plays in `el` until it's taken off the page. `title` is its first scene,
 // drawn by the lobby (it shows who has joined).
-export function explain(el: HTMLElement, title: string, board: Board3D | null, stage3d: { FightStage: typeof FightStage } | null): Explainer {
+export function explain(el: HTMLElement, title: string, board: Board3D | null, stage3d: { FightStage: typeof FightStage; portraits: typeof portraits } | null): Explainer {
   el.innerHTML = `<div class="xboard"></div><div class="xfight"></div><div class="xtitle">${title}</div><div class="xshow"></div>
     <ol class="xphases">${ROUND.map((p) => `<li>${p}</li>`).join('')}</ol><p class="xtext"></p>`;
   const part = (c: string) => el.querySelector<HTMLElement>(`.${c}`)!;
@@ -46,6 +55,7 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
   if (board) boardBox.append(board.el);
   let book: Rulebook | null = null;
   let timers: number[] = [];
+  const pics = new Map<string, string>();
 
   function put(n: number) {
     const g = boardAt(n);
@@ -58,6 +68,12 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
     const c = book!.buildings.find((x) => x.key === key)!;
     return `<div class="card k-building" style="--kc:${frameColor('building')}"><div class="cart">${cardArt('building', c.key, undefined, c.cls)}<span class="ckind">${kindIcon('building')}</span></div>
       <b class="cname">${esc(c.name)}</b><div class="ccost">${resChips(c.cost)}</div></div>`;
+  }
+
+  // What scores, each a picture, its points and, for a title, who holds it.
+  function prizes(list: { pic: string; name?: string; points: number; holder?: number }[]) {
+    showBox.innerHTML = `<div class="xprizes">${list.map((p) => `<div class="xprize">${pics.has(p.pic) ? `<img src="${pics.get(p.pic)}" alt="">` : `<span class="xpic">${PORTRAITS[p.pic]?.building ? buildingIcon(p.pic, 90, '#8d8f96') : icon(TITLE_ICON[p.pic] ?? p.pic, 5)}</span>`}
+      ${p.name ? `<b>${esc(p.name)}</b>` : ''}<span class="xworth">${p.points}${icon('points', 1.2)}${p.holder === undefined ? '' : playerTag(p.holder, NAMES)}</span></div>`).join('')}</div>`;
   }
 
   // What each step shows over the board, and what happens during it.
@@ -76,15 +92,15 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
       showBox.innerHTML = `<div class="xcards"><div class="card k-action" style="--kc:${frameColor('action')}"><div class="cart">${cardArt('action', action.key)}<span class="ckind">${kindIcon('action')}</span></div>
         <b class="cname">${esc(action.name)}</b><div class="ccost">${resChips(action.cost) || '<span class="chip free">Free</span>'}</div></div><i></i>${DRAWN.map(card).join('')}</div>`;
       const [kept, other] = showBox.querySelectorAll('.k-building');
-      return [[4200, () => { kept.classList.add('kept'); other.classList.add('gone'); }]];
+      return [[3400, () => { kept.classList.add('kept'); other.classList.add('gone'); }]];
     },
     actions: () => {
       put(0);
-      return [[1000, () => put(1)], [3600, () => put(2)]];
+      return [[1000, () => put(1)], [2900, () => put(2)]];
     },
     grow: () => {
       put(3);
-      return [[900, () => put(4)], [2700, () => put(5)], [4500, () => put(6)]];
+      return [[600, () => put(4)], [1900, () => put(5)], [3200, () => put(6)]];
     },
     vote: () => {
       put(6);
@@ -93,7 +109,7 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
       const votes: (number | null)[] = [null, null];
       const draw = () => { showBox.innerHTML = `<div class="xkingdoms">${ts.map((t, i) => kingdomCard(t, i, ts.length, votes, power, NAMES)).join('')}</div>`; };
       draw();
-      return [[2000, () => { votes[0] = RAIDED; draw(); }], [3600, () => { votes[1] = RAIDED; draw(); }]];
+      return [[1300, () => { votes[0] = RAIDED; draw(); }], [2500, () => { votes[1] = RAIDED; draw(); }]];
     },
     fight: () => {
       const t = book!.kingdoms.find((x) => x.key === KINGDOMS[RAIDED])!;
@@ -116,16 +132,33 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
       }
       const acts: Act[] = [];
       t.units.forEach((_, i) => {
-        acts.push([1000 + i * 1000, () => hit(`d${i % 2}`, `u${i}`, true)]);
-        if (i + 1 < t.units.length) acts.push([1500 + i * 1000, () => hit(`u${i + 1}`, `d${i % 2}`, false)]);
+        acts.push([700 + i * 750, () => hit(`d${i % 2}`, `u${i}`, true)]);
+        if (i + 1 < t.units.length) acts.push([1050 + i * 750, () => hit(`u${i + 1}`, `d${i % 2}`, false)]);
       });
-      acts.push([1400 + t.units.length * 1000, () => { showBox.innerHTML = `<div class="xsheet"><h2>${esc(t.name)} <span class="ok">falls</span></h2>${lootLine(t.loot, 1.6)}</div>`; }]);
+      acts.push([700 + t.units.length * 750, () => { showBox.innerHTML = `<div class="xsheet"><h2>${esc(t.name)} <span class="ok">falls</span></h2>${lootLine(t.loot, 1.6)}</div>`; }]);
       return acts;
     },
-    points: () => {
-      put(6);
-      showBox.innerHTML = `<div class="xsheet xscores">${SCORES.map((s) => `<span>${esc(s.name)} <b>${s.points}${icon('points', 1.4)}</b></span>`).join('')}</div>`;
-      return [[800, () => put(7)]];
+    goal: () => {
+      put(7);
+      showBox.innerHTML = `<div class="xgoal">${POINTS_TO_WIN}${icon('points', 1)}</div>`;
+      return [];
+    },
+    titles: () => {
+      put(7);
+      const hold = [0, 0, 1]; // who holds each title
+      const draw = () => prizes(TITLES.map((t, i) => ({ pic: t.key, name: t.name, points: TITLE_POINTS, holder: hold[i] })));
+      draw();
+      return [[4500, () => { hold[0] = 1; draw(); }]]; // Bram takes it
+    },
+    beasts: () => {
+      put(7);
+      prizes(book!.greatBeasts.map((b) => ({ pic: b.key, name: b.name, points: b.points ?? BEAST_POINTS })));
+      return [];
+    },
+    buildings: () => {
+      put(7);
+      prizes([{ pic: 'quarry', points: BUILDING_POINTS }, { pic: 'monument', points: MONUMENT_POINTS }]);
+      return [];
     },
   };
 
@@ -145,8 +178,10 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
     later(s.ms, () => play(book ? (i + 1) % STEPS.length : 0));
   }
   play(0);
+  const keys = Object.keys(PORTRAITS);
+  const drawn = stage3d?.portraits(keys.map((k) => PORTRAITS[k]), 420, 336).then((urls) => keys.forEach((k, i) => urls[i] && pics.set(k, urls[i]))).catch(() => {});
   const loaded = fetch('/api/rulebook').then((r) => (r.ok ? r.json() : null)).then((b: Rulebook | null) => { book = b; }).catch(() => {});
   // For screenshots: a step as it ends (or after `n` of what happens in it), held.
-  Object.assign(window, { explainAt: async (show: Show, n = Infinity) => { await loaded; play(STEPS.findIndex((s) => s.show === show), n); } });
+  Object.assign(window, { explainAt: async (show: Show, n = Infinity) => { await loaded; await drawn; play(STEPS.findIndex((s) => s.show === show), n); } });
   return { title: (html) => { const t = part('xtitle'); if (t.innerHTML !== html) t.innerHTML = html; } };
 }

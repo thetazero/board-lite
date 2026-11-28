@@ -1184,7 +1184,7 @@ export const SCENES: Scene[] = [
     shots: () => [
       { file: 'tv-lobby-empty', caption: 'TV lobby: a new room, nobody yet', client: 'tv' },
       { file: 'tv-lobby-explain-fighting', caption: 'TV lobby: the explanation, partway through the fight', client: 'tv', run: `window.explainAt('fight', 2).then(() => { window.boardClock = 60; })`, waitMs: 800 },
-      ...STEPS.slice(1).map((s) => ({ file: `tv-lobby-explain-${s.show}`, caption: `TV lobby: the explanation, ${s.show}`, client: 'tv' as const, run: `window.explainAt('${s.show}').then(() => { window.boardClock = 60; })`, waitMs: 800, sizes: s.show === 'cards' || s.show === 'vote' || s.show === 'production' })),
+      ...STEPS.slice(1).map((s) => ({ file: `tv-lobby-explain-${s.show}`, caption: `TV lobby: the explanation, ${s.show}`, client: 'tv' as const, run: `window.explainAt('${s.show}').then(() => { window.boardClock = 60; })`, waitMs: 800, sizes: s.show === 'cards' || s.show === 'vote' || s.show === 'production' || s.show === 'titles' })),
     ],
   },
   {

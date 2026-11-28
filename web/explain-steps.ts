@@ -3,7 +3,10 @@
 // can hold them against the rules.
 import { POINTS_TO_WIN } from './common.ts';
 
-export type Show = 'title' | 'production' | 'cards' | 'actions' | 'grow' | 'vote' | 'fight' | 'points';
+export const TITLE_POINTS = 7, BEAST_POINTS = 4, BUILDING_POINTS = 1, MONUMENT_POINTS = 2;
+export const TITLES = [{ key: 'army', name: 'Strongest Dragon Army' }, { key: 'tower', name: 'Tallest Tower' }, { key: 'hoard', name: 'Largest Hoard' }];
+
+export type Show = 'title' | 'production' | 'cards' | 'actions' | 'grow' | 'vote' | 'fight' | 'goal' | 'titles' | 'beasts' | 'buildings';
 // `phase` is the round's phase it shows, lit on the track; the title and the
 // points belong to no phase.
 export interface Step { show: Show; phase: string | null; text: string; ms: number }
@@ -11,22 +14,18 @@ export interface Step { show: Show; phase: string | null; text: string; ms: numb
 export const ROUND = ['Production', 'Cards', 'Actions', 'Raid'];
 
 export const STEPS: Step[] = [
-  { show: 'title', phase: null, text: `Build, raise dragons and raid kingdoms. First to ${POINTS_TO_WIN} points wins.`, ms: 6000 },
-  { show: 'production', phase: 'Production', text: 'Each round, your tower and buildings make resources.', ms: 7000 },
-  { show: 'cards', phase: 'Cards', text: 'Draw 1 action card and 2 building cards. Keep 1 of the building cards.', ms: 8000 },
-  { show: 'actions', phase: 'Actions', text: 'On your turn, spend resources to build adjacent to your buildings and play cards.', ms: 7500 },
-  { show: 'grow', phase: 'Production', text: 'Your egg hatches. Each round, your dragons eat livestock and grow.', ms: 6500 },
-  { show: 'vote', phase: 'Raid', text: 'Vote for the kingdom to raid together.', ms: 6500 },
-  { show: 'fight', phase: 'Raid', text: "If the kingdom falls, split the loot by your dragons' power.", ms: 7500 },
-  { show: 'points', phase: null, text: `First to ${POINTS_TO_WIN} points wins.`, ms: 7000 },
-];
-
-// Most of what scores, with its points.
-export const SCORES = [
-  { name: 'Production building', points: 1 },
-  { name: 'Monument', points: 2 },
-  { name: 'Slay a great beast', points: 4 },
-  { name: 'Most dragon power, tower floors or gold', points: 7 },
+  { show: 'title', phase: null, text: `Build, raise dragons and raid kingdoms. First to ${POINTS_TO_WIN} points wins.`, ms: 4000 },
+  { show: 'production', phase: 'Production', text: 'Each round, your tower and buildings make resources.', ms: 5000 },
+  { show: 'cards', phase: 'Cards', text: 'Draw 1 action card and 2 building cards. Keep 1 of the building cards.', ms: 6500 },
+  { show: 'actions', phase: 'Actions', text: 'On your turn, spend resources to build adjacent to your buildings and play cards.', ms: 5500 },
+  { show: 'grow', phase: 'Production', text: 'Your egg hatches. Each round, your dragons eat livestock and grow.', ms: 5000 },
+  { show: 'vote', phase: 'Raid', text: 'Vote for the kingdom to raid together.', ms: 5000 },
+  { show: 'fight', phase: 'Raid', text: "If the kingdom falls, split the loot by your dragons' power.", ms: 5500 },
+  // Scoring, the most important first.
+  { show: 'goal', phase: null, text: `First to ${POINTS_TO_WIN} points wins.`, ms: 3000 },
+  { show: 'titles', phase: null, text: `Hold a title for ${TITLE_POINTS} points. A rival can take it.`, ms: 8500 },
+  { show: 'beasts', phase: null, text: `Slay a great beast for ${BEAST_POINTS} points.`, ms: 6000 },
+  { show: 'buildings', phase: null, text: `Production buildings score ${BUILDING_POINTS}, monuments ${MONUMENT_POINTS}.`, ms: 5500 },
 ];
 
 // The building cards drawn, the first kept and then built; the kingdoms voted on; the one raided.
