@@ -1385,6 +1385,20 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // The header at its fullest: the longest names, points in two digits and
+    // Secret Hoards in the hand beside them (#554).
+    name: 'hoard-3p',
+    players: 3,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      giveHand(g, g.turn, ['secret_hoard', 'secret_hoard', 'secret_hoard', 'secret_hoard', 'windfall']);
+      pointsToWin(g, g.turn);
+    },
+    shots: (g) => [{ file: 'phone-hoard-3p', caption: 'Phone: Secret Hoards in hand, counted beside the points', client: 'phone', seat: g!.turn, sizes: true }],
+  },
+  {
     // Dragons that went hungry at this round's production (#362): each seat
     // has more dragons than livestock.
     name: 'hungry-2p',

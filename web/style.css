@@ -839,9 +839,10 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 .seatlist .tag { font-size: .7em; font-weight: 700; color: #6b5a6e; border: 1px solid #b8a9a0; border-radius: 4px; padding: 0 .3em; }
 /* your header: a sheet with your colour folded over its top, your resources on the strip below */
 .mehead { position: sticky; top: 0; z-index: 5; background: var(--sheet); box-shadow: 0 .12em 0 var(--paper-edge), 0 4px 10px #0009; }
-.me { display: flex; align-items: center; padding: .55em 1em .45em; border-top: .35em solid var(--pc); }
-.me .pname { font-size: 1.3em; }
-.me .pts { font-weight: 800; font-size: 1.3em; margin-left: auto; display: inline-flex; align-items: center; gap: .25em; }
+.me { display: flex; align-items: center; white-space: nowrap; padding: .55em 1em .45em; border-top: .35em solid var(--pc); }
+.me .pname { font-size: 1.3em; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.me > :not(.pname) { flex: none; }
+.me .pts { font-weight: 800; font-size: 1.3em; margin-left: auto; display: inline-flex; align-items: center; gap: .25em; padding-left: .4em; }
 .resbar { display: grid; grid-template-columns: repeat(5, 1fr); background: #0000000d; border-top: 1px dashed var(--paper-edge); padding: .4em .3em; text-align: center; }
 .res { display: flex; align-items: center; justify-content: center; gap: .2em; }
 .res { flex-direction: column; gap: 0; }
@@ -1104,6 +1105,10 @@ button.on:disabled { opacity: 1; }
 .status .over, .status .tag { display: inline-flex; align-items: center; gap: .15em; margin-left: .4em; font-size: .85em; }
 .status .over { color: var(--bad); }
 .pts .hiddenpts { display: inline-flex; align-items: center; gap: .1em; margin-left: .5em; font-size: .7em; background: #0001; border-radius: 6px; padding: .05em .35em; color: var(--text); }
+@media (max-width: 480px) { /* the points in hand go under the total: the name and the buttons keep their room */
+  .me .pts:has(.hiddenpts) { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; align-items: center; line-height: 1.15; }
+  .me .pts .hiddenpts { grid-column: 1 / -1; justify-self: end; margin-left: 0; }
+}
 .panel.offers ul { list-style: none; padding: 0; }
 .panel.offers li { display: flex; align-items: center; gap: .3em; }
 .pover .hero { height: 14em; }

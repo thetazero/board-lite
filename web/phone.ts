@@ -17,6 +17,7 @@ import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { askKey, PhoneView, type View } from './view.ts';
 import { steady, taps } from './taps.ts';
+import { Heard, said } from './heard.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -380,12 +381,13 @@ function seatIndex(): number {
 }
 
 function leaveToJoin(msg: string) {
-  talk.el.remove();
+  closeTalk();
   table.hide();
   seenHand = null;
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
+  menu = false;
   bookTab = null;
   document.body.classList.remove('has-hand', 'hand-below', 'hand-tucked');
   document.body.style.removeProperty('--hs');
@@ -763,10 +765,9 @@ function raidStep(g: PublicState): string {
 
 // The menu under your name: quitting is there, out of the way of the game.
 function menuSheet(): string {
-  const saving = snap!.game?.phase !== 'over';
-  return `<div class="menuback" id="menuclose"></div><div class="menu">${saving ? `<h3>Save game</h3>
+  return `<div class="menuback" id="menuclose"></div><div class="menu"><h3>Save game</h3>
     <p>The game stops here for everyone, to continue later from the TV or any phone.</p>
-    <div class="row"><button id="save" class="primary">Save game</button></div>` : ''}<h3>Quit game</h3>
+    <div class="row"><button id="save" class="primary">Save game</button></div><h3>Quit game</h3>
     <p>A bot plays your seat for the rest of the game, as little as it can. To come back, open the room's address and tap your name.</p>
     <div class="row"><button id="quit" class="danger">Quit game</button><button id="menucancel">Cancel</button></div></div>`;
 }
@@ -807,6 +808,7 @@ function away(g: PublicState, me: Me): string {
 function render() {
   const g = snap!.game!;
   const me = snap!.you!;
+  if (g.phase === 'over') menu = false; // it was open as the game ended: the final screen has no menu, nor does the next game open on it
   if (!me.myTurn || g.phase !== 'action') endAsk = null; // a turn that ends drops its confirm
   let body = '';
   // Choosing a hex or the dragons to send is a choice of its own: the hand steps aside for it.
@@ -1590,7 +1592,7 @@ const talk = (() => {
       <form><select aria-label="To"></select><input maxlength="300" placeholder="Say something…" autocomplete="off" enterkeyhint="send"><button class="primary">Send</button></form>
     </div>`;
   const q = <T extends Element>(sel: string) => el.querySelector(sel) as T;
-  return { el, latest: q<HTMLElement>('.latest span'), unread: q<HTMLElement>('.unread'), list: q<HTMLUListElement>('ul'), to: q<HTMLSelectElement>('select'), input: q<HTMLInputElement>('input'), form: q<HTMLFormElement>('form'), open: false, read: -1, toKey: '' };
+  return { el, latest: q<HTMLElement>('.latest span'), unread: q<HTMLElement>('.unread'), list: q<HTMLUListElement>('ul'), to: q<HTMLSelectElement>('select'), input: q<HTMLInputElement>('input'), form: q<HTMLFormElement>('form'), open: false, heard: new Heard(), toKey: '' };
 })();
 
 talk.el.querySelector<HTMLElement>('.latest')!.onclick = () => {
@@ -1615,6 +1617,15 @@ talk.form.onsubmit = (e) => {
     .then((ok) => ok && (talk.input.value = '')));
 };
 
+// Off the page as the phone leaves this game: the next game's talk starts unheard, its sheet closed.
+function closeTalk() {
+  talk.el.remove();
+  talk.open = false;
+  talk.el.classList.remove('open');
+  talk.heard.forget();
+  delete talk.el.dataset.last;
+}
+
 function talkHtml(text: string, g: PublicState): string {
   const pub = /^(P\d) says: "(.*)"$/.exec(text);
   if (pub) return `${named(pub[1], names)} <q>${esc(pub[2])}</q>`;
@@ -1637,13 +1648,12 @@ function renderTalk() {
     talk.toKey = key;
   }
   const lines = me.talk;
-  const mine = (text: string) => text.startsWith(`P${me.seat + 1} `);
+  const mine = (text: string) => said(text, me.seat);
   const atBottom = talk.list.scrollHeight - talk.list.scrollTop - talk.list.clientHeight < 40;
   talk.list.innerHTML = lines.map((e) => `<li class="${e.private ? 'private' : ''}${mine(e.text) ? ' mine' : ''}">${talkHtml(e.text, g)}</li>`).join('') || '<li><small>No messages yet. Players not in the room (like Claude) only see what\'s sent here.</small></li>';
   if (atBottom) talk.list.scrollTop = talk.list.scrollHeight;
   const last = lines.at(-1);
-  if ((talk.open || talk.read < 0) && last) talk.read = last.i; // opening the page counts as having heard what came before
-  const unread = lines.filter((e) => e.i > talk.read && !mine(e.text)).length;
+  const unread = talk.heard.unread(lines, me.seat, talk.open);
   talk.latest.innerHTML = `${icon('talk', 1.3)} ${last ? talkHtml(last.text, g) : '<span class="none">Table talk</span>'}`;
   talk.unread.hidden = !unread;
   talk.unread.textContent = String(unread);
