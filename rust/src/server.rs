@@ -540,6 +540,8 @@ impl Server {
             "bot" => room.add_bot(tok, b.get("strong") == Some(&Value::Bool(true)))?,
             "leave" => room.leave(tok, player)?,
             "quit" => room.quit(tok)?,
+            "open" => room.open(tok, seat)?,
+            "back" => room.return_to(tok)?,
             "standin" => room.stand_in_for(tok, seat)?,
             // A TV opening the room while no other TV watches it becomes the room's TV, with its buttons.
             "tv" => return Ok(ok(if room.tv_watching() { json!({}) } else { json!({"hostToken": room.host}) })),

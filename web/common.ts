@@ -550,6 +550,9 @@ export function mapSvg(map: HexView[], opts: MapOptions = {}): string {
   return `<svg class="map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">${cells.join('')}</svg>`;
 }
 
+/** Mid-game, whether someone else may take a seat: its player is away, or the first player opened it, and no bot plays it. */
+export const openSeat = (s: Snapshot['lobby']['seats'][number]): boolean => s.kind === 'player' && !s.left && !s.standIn && (!s.connected || !!s.opened);
+
 // ---------- the final standings ----------
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th'];

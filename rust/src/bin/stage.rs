@@ -133,6 +133,8 @@ impl Stage {
             }
             "leave" => json!(room.stage_leave(int("seat").max(0) as usize)?),
             "quit" => json!(room.quit(tok)?),
+            "open" => json!(room.open(tok, usize::try_from(int("seat")).ok())?),
+            "back" => json!(room.return_to(tok)?),
             "standInFor" => json!(room.stand_in_for(tok, usize::try_from(int("seat")).ok())?),
             "save" => json!(room.save(tok)?),
             "continue" => json!(room.resume(tok)?),

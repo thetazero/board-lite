@@ -36,7 +36,8 @@ board-lite is running on port 8080.
 - **Rules:** **Rules** at the top of the phone opens a small rulebook over whatever screen you are on: every hex, border, building, beast, dragon, element, kingdom and action card, each building, beast and dragon drawn as the TV draws it. **Close** goes back to where you were. The TV carries no labels for these; the rulebook is where you look them up.
 - **Save:** to stop partway through and pick the game up another day, **⋯** next to your name → **Save game**, or **Save game** in the TV's top corner (it shows while the mouse moves). The game stops for everyone; see [Saving a game](#saving-a-game).
 - **Quit:** **⋯** next to your name → **Quit game**. A bot plays your seat; tap your name at the room's address to come back.
-- **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The phone's page answers the server's pings, so one that loses its Wi-Fi counts as gone a minute after it last answered; after a server restart, everyone has a minute to reconnect. The seat goes back to them when their phone returns.
+- **Away:** a minute after a player's phone is gone, their seat is open: someone new can join it at the room's address. When the table waits on it, the first player (the first in seat order who is here, as in the lobby) can tap **Let a bot play**, or leave it open. If they don't for 3 minutes, anyone can. The phone's page answers the server's pings, so one that loses its Wi-Fi counts as gone a minute after it last answered; after a server restart, everyone has a minute to reconnect. The seat goes back to them when their phone returns, unless someone joined it. A seat a bot plays is kept for its player.
+- **Not at their phone:** when the game has waited 3 minutes on someone whose phone is still connected, the first player (the next one here, if it's their own seat) can tap **Open seat**: it's then open, as above. Only that player's own move, or **Take your seat back** on their phone, closes it again.
 
 The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for the game to go on.
 
@@ -56,7 +57,7 @@ For development only: players never see it. Every room also writes `~/.cache/boa
 
 - `event`: an entry of the game's log, with its index `i` there, its round, text and typed `ev`, and the `command` behind it: JSON, as in [`cli.md`](cli.md#decision-commands) (text in logs from before typed commands). Dice, new rounds, fights and titles are the game's, with `cause` saying whose command set them off.
 - `refused`: a command the engine turned down, and why.
-- `join`, `bot`, `leave`, `handover` (a seat taken back or claimed mid-game), `quit`, `standIn` (a bot starts playing for someone), `back`, `connect` and `disconnect` (phones' and TVs' live streams), `start`, `save`, `continue`, and `load` (a game file hosted again, with how long its log was then).
+- `join`, `bot`, `leave`, `handover` (a seat taken back or claimed mid-game), `quit`, `open` (the first player opens a seat whose phone is here), `standIn` (a bot starts playing for someone), `back`, `connect` and `disconnect` (phones' and TVs' live streams), `start`, `save`, `continue`, and `load` (a game file hosted again, with how long its log was then).
 
 Games saved before the log existed still load and play; their old entries just have no time, and a `load` line says from which entry on the log covers the game. `jq -c 'select(.type=="event") | [.t, .by.kind, .by.name, .text]' <code>.log.jsonl` prints the game as it went. The format is documented in `rust/src/gamelog.rs`.
 

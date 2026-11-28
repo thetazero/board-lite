@@ -9,7 +9,7 @@ import type { Command, Side } from '../src/command.ts';
 import type { Resource } from '../src/data.ts';
 import type { CardView, DragonStageView, DragonView, PublicState, SavedGame, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, starterName, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, savedWhen, standingsHtml, tiebreakNote, watch,
+  ELEMENT_COLORS, PLAYER_COLORS, fadeAway, starterName, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, openSeat, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, savedWhen, standingsHtml, tiebreakNote, watch,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { qrSvg } from './qr.ts';
@@ -200,12 +200,12 @@ async function join(c: string, name: string, typed: string) {
 
 // A game that has started: tap your name to take your seat back (after closing
 // the tab, on another phone, or after quitting). A seat with someone at it
-// isn't offered. A saved game hosted again also has open seats: join those
-// with a name. Anyone with no seat here can go to the home page.
+// isn't offered. Someone with a name of their own takes an open seat: one of a
+// saved game hosted again, or one whose player left mid-game. Anyone with no seat here can go to the home page.
 function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '') {
-  const free = l.seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'player' && (s.left || !s.connected));
-  const open = l.seats.some((s) => s.kind === 'open');
-  const seats = free.map(({ s, i }) => `<button class="seatbtn" data-seat="${esc(s.name)}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span><span class="tag">${s.left ? 'Quit' : 'Away'}</span></button>`).join('');
+  const free = l.seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'player' && (s.left || !s.connected || s.opened));
+  const open = l.seats.some((s) => s.kind === 'open' || (!l.saved && openSeat(s)));
+  const seats = free.map(({ s, i }) => `<button class="seatbtn" data-seat="${esc(s.name)}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span><span class="tag">${s.left ? 'Quit' : s.connected ? 'Open seat' : 'Away'}</span></button>`).join('');
   app.innerHTML = `
     <div class="joinpage">
       <div class="hero">${tableScene(l.seats.map((_, i) => PLAYER_COLORS[i]), 360, 200)}<h1 class="title">board-lite</h1></div>
@@ -678,10 +678,10 @@ function status(g: PublicState, me: Me): string {
     else if (g.phase === 'discard') { const n = me.hand.length - me.handCap; what = `Discard ${n} card${n === 1 ? '' : 's'}`; }
     else if (g.phase === 'cards') what = 'Keep 1 card';
     else what = raidStep(g);
-    return `<div class="status you"><span>${what}</span></div>`;
+    return `<div class="status you"><span>${what}</span></div>${away(g, me)}`;
   }
-  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>${away(g)}`;
-  return `<div class="status"><span>${waitText(g)}</span></div>${away(g)}`;
+  if (g.phase === 'action') return `<div class="status"><span>${playerTag(g.turn, names)}'s turn</span></div>${away(g, me)}`;
+  return `<div class="status"><span>${waitText(g)}</span></div>${away(g, me)}`;
 }
 
 // Who the table waits on, and for what: "Waiting for Bram and Cora to discard."
@@ -720,19 +720,29 @@ function wheelMark(g: PublicState): string {
   return `<svg viewBox="-10 -10 20 20" aria-hidden="true"><circle r="6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>${dots}</svg>`;
 }
 
-// The table waits on someone whose phone is gone (closed, asleep, out of
-// Wi-Fi): anyone may let a bot play for them, so the game doesn't stall. Their
-// phone coming back hands the seat back to them.
 // Once someone has the points to win, every phone says this round is the last.
 function lastRound(g: PublicState, me: Me): string {
   const text = lastRoundHtml(g, names, { seat: me.seat, total: me.totalPoints });
   return text ? `<div class="lastround">${text}</div>` : '';
 }
 
-function away(g: PublicState): string {
+// The table waits on someone who left: their seat is open, and the first player
+// lets a bot play it or leaves it for someone to join. Someone whose phone is
+// still here is only said to be gone once the table has waited a while, and
+// only to the first player, who may open their seat. A phone whose seat was
+// opened takes it back with a tap (the server says who decides: deciders).
+function away(g: PublicState, me: Me): string {
   const seats = snap!.lobby.seats;
-  return g.waitingOn.filter((p) => seats[p]?.kind === 'player' && !seats[p].connected && !seats[p].standIn)
-    .map((p) => `<div class="awayline"><span>${playerTag(p, names)} is away.</span><button class="small" data-standin="${p}">Let a bot play</button></div>`).join('');
+  const mine = seats[me.seat]?.opened ? `<div class="awayline"><span>Your seat is open.</span><button class="small" id="seatback">Take your seat back</button></div>` : '';
+  return mine + g.waitingOn.map((p) => {
+    const s = seats[p], who = s?.deciders ?? [];
+    if (!who.length || p === me.seat) return '';
+    const mayI = who.includes(me.seat);
+    if (openSeat(s)) {
+      return `<div class="awayline"><span>${playerTag(p, names)}'s seat is open${mayI ? '' : `: ${playerTag(who[0], names)} may let a bot play`}.${mayI ? ` <small>To join, open ${esc(inviteHost())}/${esc(code)}</small>` : ''}</span>${mayI ? `<button class="small" data-standin="${p}">Let a bot play</button>` : ''}</div>`;
+    }
+    return mayI ? `<div class="awayline"><span>The game waits on ${playerTag(p, names)}.</span><button class="small" data-openseat="${p}">Open seat</button></div>` : '';
+  }).join('');
 }
 
 function render() {
@@ -1873,6 +1883,8 @@ function wire(g: PublicState, me: Me) {
     menu = false;
     await call(`/api/rooms/${code}/save`, { token });
   });
+  on('seatback', () => call(`/api/rooms/${code}/back`, { token }));
+  bind('[data-openseat]', (el) => call(`/api/rooms/${code}/open`, { token, seat: Number(el.dataset.openseat) }));
   bind('[data-standin]', (el) => call(`/api/rooms/${code}/standin`, { token, seat: Number(el.dataset.standin) }));
 }
 
