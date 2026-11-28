@@ -761,7 +761,7 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 /* phone: joining and the lobby, under a strip of the papercraft scene */
 .phone .hero { position: relative; flex: none; height: 11em; overflow: hidden; }
 .phone .hero svg.scene { width: 100%; height: 100%; display: block; }
-.joinpage .hero .title { position: absolute; left: 50%; top: .5em; transform: translateX(-50%) rotate(-1.5deg); font-size: 2.3em; color: #2a1d33; background: var(--sheet); padding: .05em .6em .15em; white-space: nowrap;
+.joinpage .hero .title { position: absolute; left: 50%; top: .5em; transform: translateX(-50%) rotate(-1.5deg); font-size: min(2.3em, 8.8vw); color: #2a1d33; background: var(--sheet); padding: .05em .6em .15em; white-space: nowrap;
   clip-path: polygon(0 8%, 4% 0, 96% 3%, 100% 14%, 98% 92%, 93% 100%, 3% 97%, 0 86%); filter: drop-shadow(0 .2em .3em #0008); }
 .joinform { display: flex; flex-direction: column; gap: 1em; padding: 1.2em 1.2em 2em; }
 .joinform .subtitle { text-align: center; font-size: 1.05em; }
@@ -771,7 +771,8 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 #code { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; }
 /* The placeholder is a hint, not a code: plain, so it can't be read as one. */
 #code::placeholder { text-transform: none; letter-spacing: normal; font-weight: 400; font-style: italic; }
-.error { color: #ff8f8f; font-weight: 700; min-height: 1.2em; }
+.error { color: #ff8f8f; font-weight: 700; margin: 0; }
+.error:empty { display: none; }
 .plobby { padding: 0 0 1.5em; display: flex; flex-direction: column; gap: .8em; text-align: center; }
 .plobby .lobbybody { padding: 0 1.2em; display: flex; flex-direction: column; gap: .8em; }
 .plobby h1 { color: var(--pc); margin: .1em 0 0; }
@@ -995,6 +996,7 @@ button.allpick, button.allpick.on { flex: none; white-space: nowrap; display: fl
 
 /* Table talk on the phone: the latest line under everything, tap for the whole conversation. */
 body.phone { height: auto; min-height: 100%; padding-bottom: 3.6em; } /* not 100% tall, or the padding sits at the first screen's bottom, not after the page */
+body.phone:has(.joinpage, .plobby) { padding-bottom: 0; } /* no talk before the game */
 .talkbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--sheet); box-shadow: 0 -.12em 0 var(--paper-edge), 0 -4px 12px #0008; }
 .talkbar > .latest { display: flex; align-items: center; gap: .5em; width: 100%; background: none; border: 0; border-radius: 0; box-shadow: none; padding: .75em .9em; text-align: left; color: var(--text); font: inherit; transform: none; }
 .talkbar > .latest span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1053,7 +1055,8 @@ button.on:disabled { opacity: 1; }
 .panel.offers ul { list-style: none; padding: 0; }
 .panel.offers li { display: flex; align-items: center; gap: .3em; }
 .pover .hero { height: 14em; }
-.joinpage .hero { height: 15em; }
+.joinpage .hero { height: auto; aspect-ratio: 360 / 200; } /* the picture's own shape: nothing is cropped */
+.plobby.notv .hero { height: auto; aspect-ratio: 480 / 124; } /* a shorter picture: room for the invite */
 .plobby button { width: auto; }
 
 /* Phone raid: the target drawn above the choice, who else is going */
@@ -1189,7 +1192,7 @@ body:has(.talkbar.open) .viewswitch { display: none; }
 @media (min-width: 900px) and (min-height: 480px), (min-width: 600px) and (min-height: 480px) and (hover: hover) and (pointer: fine) {
   body.phone:has(.joinpage.home) { max-width: none; padding-bottom: 0; font-size: clamp(16px, min(1.5vw, 2.4vh), 40px); }
   .joinpage.home { display: grid; grid-template: auto 1fr / 1.15fr 1fr; align-items: center; column-gap: 3em; width: min(100%, 68em); min-height: 100vh; margin: 0 auto; }
-  .joinpage.home .hero { grid-column: 1 / -1; height: 42vh; width: 100vw; margin-left: calc(50% - 50vw); }
+  .joinpage.home .hero { grid-column: 1 / -1; aspect-ratio: auto; height: 42vh; width: 100vw; margin-left: calc(50% - 50vw); }
   .home .hero svg.scene { display: none; }
   .home .hero svg.scene + svg.scene { display: block; }
   .joinpage.home .hero .title { left: 6%; top: 50%; transform: translateY(-50%) rotate(-1.5deg); font-size: 4em; }
@@ -1201,8 +1204,6 @@ body:has(.talkbar.open) .viewswitch { display: none; }
   .home .joinform .subtitle { display: none; }
   .home #hosttv, .home #hosthow { display: none; }
   .home .joinform button.primary { --text: var(--ink); --edge: var(--paper-edge); color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); text-shadow: none; }
-  .home .error { margin: 0; }
-  .home .error:empty { display: none; }
 }
 @media (min-width: 600px) and (max-width: 899px) and (min-height: 480px) and (hover: hover) and (pointer: fine) {
   .joinpage.home { grid-template: auto auto 1fr / 1fr; align-items: start; width: min(100%, 34em); }
@@ -1210,6 +1211,23 @@ body:has(.talkbar.open) .viewswitch { display: none; }
   .joinpage.home .hero .title { font-size: 2.6em; }
   .hosthere { padding: 1.5em 1.2em 1em; }
   .home .joinform { padding: 1em 1.2em 2em; border-left: 0; border-top: 1px dashed var(--line); }
+}
+/* A phone on its side: the picture on the left, the form beside it. */
+@media (min-width: 600px) and (max-height: 479px) {
+  body.phone:has(.joinpage) { max-width: none; }
+  .joinpage { display: grid; grid-template-columns: 2fr 3fr; align-items: center; min-height: 100vh; }
+  .joinpage .hero { position: sticky; top: 0; aspect-ratio: auto; height: 100vh; background: #2b2452; }
+  .joinpage .hero svg.scene { position: absolute; left: 0; bottom: 0; height: auto; aspect-ratio: 360 / 200; }
+  .joinpage .hero .title { font-size: 2em; }
+  .joinpage > .joinform { padding: .8em 1.2em; gap: .7em; width: 100%; max-width: 34em; margin: 0 auto; }
+  .joinform.inner { gap: .7em; }
+  .joinform input { font-size: 1.2em; padding: .4em .5em; }
+  .joinform .big { padding: .6em 1em; }
+  .joinform .subtitle { font-size: 1em; }
+  .home .joinform { display: grid; grid-template-columns: 1fr 1fr; }
+  .home .joinform > :not(label) { grid-column: 1 / -1; }
+  .home .joinform input { min-width: 0; width: 100%; }
+  .home .hostline { padding-top: .7em; }
 }
 /* The join form's saved games (phone.ts): each opens on its seats. */
 .hostline.savedgames ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .4em; }

@@ -94,6 +94,7 @@ test('a public website says nothing of its machine or of other games, and limits
     await s.post(`/api/rooms/${code}/start`, { token: hostToken });
     await s.post(`/api/rooms/${code}/save`, { token: hostToken });
     assert.deepEqual(await (await fetch(`${s.url}/api/saved`)).json(), [], 'saved games are not listed');
+    assert.deepEqual(await (await fetch(`${s.url}/api/rooms/ZZZZ`, { headers: { 'x-forwarded-for': '203.0.113.3' } })).json(), { error: 'No room with code ZZZZ: check the code.' });
 
     await s.post('/api/rooms', {}, a);
     assert.equal((await s.post('/api/rooms', {}, a)).status, 429);
