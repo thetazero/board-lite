@@ -11,9 +11,9 @@ export const ACT_HELP = 'Make a game decision as your seat: "do" says which, and
 const text = (description: string) => ({ type: 'string', description });
 const list = (description: string) => ({ type: 'array', items: { type: 'string' }, description });
 const count = { type: 'integer', minimum: 0 };
-const side = (description: string) => ({
+const side = (description: string, cards: object) => ({
   type: 'object', description,
-  properties: { stone: count, timber: count, crystal: count, livestock: count, gold: count, cards: { type: 'array', items: { type: 'string' } } },
+  properties: { stone: count, timber: count, crystal: count, livestock: count, gold: count, ...cards },
 });
 export const DO = [
   'keep', 'build', 'build_basic', 'upgrade', 'play', 'clear', 'auto_clear', 'perch', 'recall', 'project_egg', 'project_upgrade', 'merchants', 'end',
@@ -34,8 +34,8 @@ export const ACT_FIELDS = {
   gain: text('merchants: the resource you gain.'),
   times: { type: 'integer', minimum: 1, description: 'merchants: how many to gain (1 if left out).' },
   to: text('offer: a player like "P2", or "anyone". tell: a player.'),
-  give: side('offer: what you give, like {"stone":2,"cards":["c12"]}.'),
-  get: side('offer: what you get.'),
+  give: side('offer: what you give, like {"stone":2,"cards":["c12"]}. The cards are shown to everyone.', { cards: { type: 'array', items: { type: 'string' } } }),
+  get: side('offer: the resources you get.', {}),
   offer: text('accept, decline, cancel: an offer, like "o40".'),
   target: text('vote: a kingdom, as your options list them.'),
   message: text('say, tell: your words.'),

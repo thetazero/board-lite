@@ -342,7 +342,7 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
         out.push(format!("{{\"do\":\"project_upgrade\",\"upgrade\":\"{}\",\"hex\":\"<hex>\"}}   ({}, no card, cost {}: {} On: {}){}", u.key, u.name, res_text(&u.cost), u.text, keys(&u.hexes), afford(u.affordable)));
     }
     out.push(format!("{{\"do\":\"merchants\",\"pay\":\"<resource>\",\"gain\":\"<resource>\",\"times\":1}}   (not gold; {})", rate_text(&you.bank_rates)));
-    out.push("{\"do\":\"offer\",\"to\":\"<player|anyone>\",\"give\":{\"stone\":2},\"get\":{\"gold\":1,\"cards\":[\"c12\"]}}   (resources, cards or both; to anyone: the first to accept trades)".into());
+    out.push("{\"do\":\"offer\",\"to\":\"<player|anyone>\",\"give\":{\"stone\":2,\"cards\":[\"c12\"]},\"get\":{\"gold\":1}}   (give resources, cards or both, for resources; to anyone: the first to accept trades)".into());
     out.extend(g.offers.iter().filter(|o| o.from == you.seat).map(|o| format!("{{\"do\":\"cancel\",\"offer\":\"{}\"}}", o.id)));
     out.push(if g.offers.iter().any(|o| o.to == Some(you.seat)) { "{\"do\":\"end\"}   (after answering the offers to you)".into() } else { "{\"do\":\"end\"}".into() });
     out

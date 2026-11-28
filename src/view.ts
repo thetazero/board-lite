@@ -169,7 +169,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
       if (u.hexes.length) out.push(`{"do":"project_upgrade","upgrade":"${u.key}","hex":"<hex>"}   (${u.name}, no card, cost ${resText(u.cost)}: ${u.text} On: ${u.hexes.join(' ')})${afford(u)}`);
     }
     out.push(`{"do":"merchants","pay":"<resource>","gain":"<resource>","times":1}   (not gold; ${rateText(you.bankRates)})`);
-    out.push(`{"do":"offer","to":"<player|anyone>","give":{"stone":2},"get":{"gold":1,"cards":["c12"]}}   (resources, cards or both; to anyone: the first to accept trades)`);
+    out.push(`{"do":"offer","to":"<player|anyone>","give":{"stone":2,"cards":["c12"]},"get":{"gold":1}}   (give resources, cards or both, for resources; to anyone: the first to accept trades)`);
     for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`{"do":"cancel","offer":"${o.id}"}`);
     out.push(g.offers.some((o) => o.to === you.seat) ? '{"do":"end"}   (after answering the offers to you)' : '{"do":"end"}');
     return out;

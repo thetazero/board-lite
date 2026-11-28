@@ -1015,7 +1015,7 @@ impl Game {
     }
     fn end_turn(&mut self) {
         for o in mem::take(&mut self.offers) {
-            let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+            let (give, get) = (self.trade_text(&o.give, false), self.trade_text(&o.get, false));
             self.close(&o, Closed::Expired, None);
             self.log(format!("Offer {} expires.", o.id), ev! {"k": "expire", "from": o.from, "to": o.to, "give": give, "get": get});
         }
@@ -1466,22 +1466,23 @@ impl Game {
         }
         Ok(ds)
     }
-    pub fn trade_text(&self, s: &TradeSide) -> String {
+    /// A side of an offer, as the log says it, or (for players' screens) without the cards' ids.
+    /// Its cards are named wherever they are now: an offer shows the cards it gives to everyone.
+    pub fn trade_text(&self, s: &TradeSide, ids: bool) -> String {
         let mut parts = vec![];
         if s.res.0.iter().any(|n| n.unwrap_or(0) != 0) {
             parts.push(s.res.text());
         }
         for id in &s.cards {
-            parts.push(match self.any_card(id) {
-                Some(c) => format!("{} card ({id})", c.name()),
-                None => format!("card {id}"),
-            });
+            let name = self.shown_card(id).map_or("A".into(), |c| c.name().to_string());
+            parts.push(if ids { format!("{name} card ({id})") } else { format!("{name} card") });
         }
         if parts.is_empty() { "nothing".into() } else { parts.join(", ") }
     }
-    pub fn any_card(&self, id: &str) -> Option<&Card> {
+    fn shown_card(&self, id: &str) -> Option<&Card> {
         let want = Id::parse(id)?;
-        self.players.iter().flat_map(|p| &p.hand).find(|c| c.id == want)
+        let piles = [&self.decks.building, &self.decks.action, &self.discards.building, &self.discards.action];
+        self.players.iter().map(|p| &p.hand).chain(piles).flatten().find(|c| c.id == want)
     }
     fn has_side(&self, p: usize, s: &TradeSide) -> bool {
         self.players[p].can_afford(&s.res) && s.cards.iter().all(|id| Id::parse(id).is_some_and(|id| self.hand_card(p, id).is_ok()))
@@ -1490,7 +1491,7 @@ impl Game {
         if !self.has_side(o.from, &o.give) {
             return Some(format!("{} no longer has what they offered.", pname(o.from)));
         }
-        (!self.has_side(p, &o.get)).then(|| format!("You don't have {}.", self.trade_text(&o.get)))
+        (!self.has_side(p, &o.get)).then(|| format!("You don't have {}.", self.trade_text(&o.get, false)))
     }
     fn move_side(&mut self, from: usize, to: usize, s: &TradeSide) -> Rule {
         self.players[from].pay(&s.res)?;
@@ -1638,7 +1639,7 @@ impl Game {
         }
         let o = self.offers.remove(i);
         self.close(&o, Closed::Accepted, Some(p));
-        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        let (give, get) = (self.trade_text(&o.give, false), self.trade_text(&o.get, false));
         self.move_side(o.from, p, &o.give)?;
         self.move_side(p, o.from, &o.get)?;
         self.log(format!("{} accepts offer {}: {} gives {give} for {get}.", pname(p), o.id, pname(o.from)), ev! {"k": "trade", "from": o.from, "to": p, "give": give, "get": get});
@@ -1654,7 +1655,7 @@ impl Game {
             self.offers.remove(i);
             self.close(&o, Closed::Declined, None);
         }
-        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        let (give, get) = (self.trade_text(&o.give, false), self.trade_text(&o.get, false));
         self.log(format!("{} declines offer {}.", pname(p), o.id), ev! {"k": "decline", "p": p, "from": o.from, "give": give, "get": get});
         Ok(())
     }
@@ -1676,18 +1677,23 @@ impl Game {
         if p != self.turn && to != Some(self.turn) {
             return fail(format!("Out of turn, you can only offer to {}.", pname(self.turn)));
         }
+        if !get.cards.is_empty() {
+            return fail("You can't ask for cards: ask for resources.");
+        }
         let id = self.id(b'o');
         let side = |s: &command::Side| TradeSide { res: s.bundle(), cards: s.cards.iter().map(|c| c.to_string()).collect() };
         let o = Offer { id, from: p, to, passed: to.is_none().then(Vec::new), give: side(give), get: side(get) };
         if o.give.nothing() && o.get.nothing() {
             return fail("The offer is empty: give or get something.");
         }
-        let all: Vec<Id> = give.cards.iter().chain(&get.cards).copied().collect();
-        if unique(&all).len() < all.len() {
+        if unique(&give.cards).len() < give.cards.len() {
             return fail("Name each card once.");
         }
+        for c in &give.cards {
+            self.hand_card(p, *c)?;
+        }
         if !self.has_side(p, &o.give) {
-            return fail(format!("You don't have {}.", self.trade_text(&o.give)));
+            return fail(format!("You don't have {}.", o.give.res.text()));
         }
         let gold = match to {
             None => (0..self.n()).filter(|q| *q != p).map(|q| self.players[q].gold()).max().unwrap(),
@@ -1696,7 +1702,7 @@ impl Game {
         if o.get.res.get(GOLD) > gold {
             return fail(to.map_or(format!("No other player has more than {gold} gold."), |q| format!("{} has {gold} gold.", pname(q))));
         }
-        let text = format!("{} offers {} ({id}): {} for {}.", pname(p), to.map_or("anyone".into(), pname), self.trade_text(&o.give), self.trade_text(&o.get));
+        let text = format!("{} offers {} ({id}): {} for {}.", pname(p), to.map_or("anyone".into(), pname), self.trade_text(&o.give, true), self.trade_text(&o.get, true));
         self.offers.push(o);
         self.log(text, ev! {"k": "offer", "p": p, "to": to});
         Ok(())
