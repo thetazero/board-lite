@@ -13,7 +13,8 @@ use crate::rng::Rng;
 use crate::state::{self, Lobby, LobbySeat};
 use crate::strongbot::{self, Seen, Tune};
 use crate::view::Shown;
-use crate::{recap, scenes, store};
+use crate::scenes::{self, Scene};
+use crate::{recap, store};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -191,6 +192,7 @@ struct Inner {
     behind: bool, // the seats or the recap couldn't be saved when they changed
     screens: usize,
     scene_until: i64,
+    held: Vec<Scene>, // the scenes the phones are held for now
     tvs: usize,
     has_tv: bool,
     recapped: bool,
@@ -247,7 +249,7 @@ pub struct Here {
 enum Who {
     Nobody,
     Seat { uid: u64, stream: bool, answers: bool },
-    Screen { tv: bool },
+    Screen { tv: Option<String> }, // a TV's page id, "" from one that doesn't say
 }
 impl Drop for Here {
     fn drop(&mut self) {
@@ -255,15 +257,15 @@ impl Drop for Here {
         let i = &mut *lock(&room.inner);
         match self.who {
             Who::Nobody => {}
-            Who::Screen { tv } => {
+            Who::Screen { ref tv } => {
                 i.screens -= 1;
-                if tv {
+                if tv.is_some() {
                     i.tvs -= 1;
                     if i.tvs == 0 {
                         room.tv_gone(i);
                     }
                 }
-                i.log.write("disconnect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
+                i.log.write("disconnect", if tv.is_some() { &Sender::TV } else { &Sender::GAME }, screen_fields(tv.as_deref()));
             }
             Who::Seat { uid, stream, answers } => {
                 let Some(p) = i.seats.iter().position(|s| s.uid == uid) else { return };
@@ -408,6 +410,7 @@ impl Room {
             behind: false,
             screens: 0,
             scene_until: 0,
+            held: vec![],
             tvs: 0,
             has_tv: saved.as_ref().map_or(!remote, |s| !s.remote),
             recapped: false,
@@ -598,23 +601,33 @@ impl Room {
         i.log.events(&g.log, before, &by, Some(&command));
         i.public = None;
         i.game_rev += 1;
-        let ms = scenes::ms(&g.log[before..]);
-        self.hold_for(i, ms);
+        let scenes = scenes::of(&g.log, before);
+        self.hold_for(i, scenes);
         self.changed(i);
         Ok(())
     }
-    fn hold_for(&self, i: &mut Inner, ms: f64) {
+    fn hold_for(&self, i: &mut Inner, scenes: Vec<Scene>) {
+        let ms: f64 = scenes.iter().map(|s| s.ms).sum();
         if ms <= 0.0 || !i.watched() {
             return;
         }
         i.scene_until = now_ms().max(i.scene_until) + ms.ceil() as i64;
+        i.log.write("hold", &Sender::GAME, json!({"scenes": scenes, "until": i.scene_until}));
+        i.held.extend(scenes);
         self.wake_after_scene(i);
     }
     fn wake_after_scene(&self, i: &mut Inner) {
         clear(&mut i.scene_timer);
         i.scene_timer = self.after(i.scene_left() + 1, |room, i| {
             i.scene_timer = None;
-            if i.scene_left() > 0 { room.wake_after_scene(i) } else { room.changed(i) }
+            if i.scene_left() > 0 {
+                return room.wake_after_scene(i);
+            }
+            let held: Vec<Value> = std::mem::take(&mut i.held).iter().map(|s| json!({"kind": s.kind, "i": s.i})).collect();
+            if !held.is_empty() {
+                i.log.write("release", &Sender::GAME, json!({"scenes": held}));
+            }
+            room.changed(i)
         });
     }
 
@@ -915,11 +928,11 @@ impl Room {
         let by = self.sender_of(i, tok);
         i.log.write("start", &by, json!({"code": self.code, "seed": seed, "seats": seats}));
         i.log.events(&g.log, 0, &Sender::GAME, None);
-        let ms = scenes::ms(&g.log);
+        let scenes = scenes::of(&g.log, 0);
         i.game = Some(g);
         i.game_rev += 1;
         if !i.has_tv {
-            self.hold_for(i, ms);
+            self.hold_for(i, scenes);
         }
         self.changed(i);
         Ok(())
@@ -1254,13 +1267,14 @@ impl Room {
         }
         Ok(())
     }
-    /// A stream with no seat is a screen; `tv` says it's a TV page, `answers` that a seat's page answers pings.
-    pub fn connect(&self, tok: Option<&str>, tv: bool, answers: bool) -> Here {
+    /// A stream with no seat is a screen; `tv` says it's a TV page, and which, `answers` that a seat's page answers pings.
+    pub fn connect(&self, tok: Option<&str>, tv: Option<&str>, answers: bool) -> Here {
+        let tv = tv.map(page_id);
         let room = self.me.upgrade().expect("a room in use");
         let i = &mut *lock(&self.inner);
         let Some(tok) = tok else {
             i.screens += 1;
-            if tv {
+            if tv.is_some() {
                 i.tvs += 1;
                 clear(&mut i.tv_timer);
                 if !i.has_tv {
@@ -1269,8 +1283,8 @@ impl Room {
                 }
                 self.schedule_bot(i); // after a restart, a game of only bots has no one else to wake it
             }
-            i.log.write("connect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
-            return Here { room, who: Who::Screen { tv } };
+            i.log.write("connect", if tv.is_some() { &Sender::TV } else { &Sender::GAME }, screen_fields(tv));
+            return Here { room, who: Who::Screen { tv: tv.map(|t| t.into()) } };
         };
         let Some(p) = i.seats.iter().position(|s| s.token == tok) else { return Here { room, who: Who::Nobody } };
         let s = &mut i.seats[p];
@@ -1286,6 +1300,17 @@ impl Room {
         self.back(i, p);
         self.changed(i);
         Here { room, who: Who::Seat { uid, stream: true, answers } }
+    }
+    /// A TV says it starts or ends the scene of the game's log entry `at`; `cut` if it left it unfinished. For the game log only.
+    pub fn scene_played(&self, page: &str, at: usize, ends: bool, cut: bool) -> Res {
+        let i = &mut *lock(&self.inner);
+        let Some(kind) = i.game.as_ref().and_then(|g| g.log.get(at)).and_then(scenes::kind) else { return no("There is no such scene.") };
+        let mut v = json!({"tv": page_id(page), "kind": kind, "i": at});
+        if ends && cut {
+            v["cut"] = true.into();
+        }
+        i.log.write(if ends { "sceneEnd" } else { "sceneStart" }, &Sender::TV, v);
+        Ok(())
     }
     pub fn tv_watching(&self) -> bool {
         lock(&self.inner).tvs > 0
@@ -1342,6 +1367,18 @@ impl Room {
     }
 }
 
+// What a TV page calls itself, as much of it as the log keeps.
+fn page_id(s: &str) -> &str {
+    let ok = s.len() <= 16 && s.bytes().all(|b| b.is_ascii_alphanumeric());
+    if ok { s } else { "" }
+}
+fn screen_fields(tv: Option<&str>) -> Value {
+    match tv {
+        None => json!({"what": "screen"}),
+        Some("") => json!({"what": "tv"}),
+        Some(page) => json!({"what": "tv", "tv": page}),
+    }
+}
 fn bot_plays(i: &Inner, p: usize) -> bool {
     i.seats.get(p).is_some_and(|s| s.kind == Kind::Bot || s.stand_in)
 }
@@ -1470,8 +1507,8 @@ pub mod stage {
             let Some(g) = i.game.as_ref() else { return no("The game hasn't started.") };
             i.log.events(&g.log, before, &Sender::GAME, None);
             let saved = store::save(&self.file, &**g);
-            let ms = scenes::ms(&g.log[before.min(g.log.len())..]);
-            self.hold_for(i, ms);
+            let scenes = scenes::of(&g.log, before);
+            self.hold_for(i, scenes);
             self.changed(i);
             saved.map_err(|e| Fail::Server(e.to_string()))
         }

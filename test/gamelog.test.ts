@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { candidateCommands, playToEnd } from '../src/bot.ts';
 import { newGame, waitingOn } from '../src/engine.ts';
 import { gameLogFile } from '../src/host.ts';
-import { Room, RoomError } from '../src/host.ts';
+import { Room, RoomError, startServer } from '../src/host.ts';
 import { save } from '../src/store.ts';
+import { SceneLog } from '../web/scenelog.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'board-lite-gamelog-'));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -117,4 +120,105 @@ test('a game log from when commands were text still opens, and the game goes on 
   assert.deepEqual(log.slice(0, old.length).map((l) => l.command), old.map((l) => l.command), 'the old lines are as they were');
   assert.deepEqual(log.at(-1).command.do, 'keep');
   room.close();
+});
+
+// A round in which no one makes anything: the shortest scene there is.
+const scene = (room: Room) => room.mutate((g) => void g.log.push({ round: g.round, text: 'A round', ev: { k: 'round', n: g.round } } as any));
+const released = async (...rooms: Room[]) => {
+  for (let n = 0; n < 500 && !rooms.every((r) => lines(r).some((l) => l.type === 'release')); n++) await sleep(20);
+};
+const ofScenes = (room: Room) => lines(room).filter((l) => /^(hold|release|scene)/.test(l.type));
+
+test('scenes: when the phones are held and released, with a TV or with none', async () => {
+  const made = (code: string, remote: boolean) => {
+    const room = new Room(code, { dir, remote, botDelayMs: 60000 });
+    const seats = [room.join('Ada', 'player', 'phone'), room.join('Bram', 'player', 'phone')];
+    room.start(seats[0].token, 3);
+    return { room, seats };
+  };
+  const tv = made('GSTV', false), none = made('GSNO', true), unwatched = made('GSUN', false);
+  tv.room.connect(null, true);
+  none.room.connect(none.seats[0].token);
+  const from = (tv.room.game!.log).length;
+  for (const r of [tv.room, none.room, unwatched.room]) scene(r);
+  scene(tv.room); // during the first
+  assert.equal(ofScenes(tv.room).at(-1).type, 'hold');
+  await released(tv.room, none.room);
+  const [a, b, c] = ofScenes(tv.room);
+  assert.deepEqual([a, b, c].map((l) => [l.type, l.by.kind]), [['hold', 'game'], ['hold', 'game'], ['release', 'game']]);
+  assert.deepEqual(a.scenes, [{ kind: 'roll', i: from, ms: 2200 }]);
+  assert.equal(lines(tv.room).find((l) => l.type === 'event' && l.i === from).ev.k, 'round', 'i is the event the scene is for');
+  assert.ok(b.until >= a.until + 2200, 'the second adds to the first');
+  assert.deepEqual(c.scenes, [{ kind: 'roll', i: from }, { kind: 'roll', i: from + 1 }], 'one release for both');
+  assert.ok(c.ms >= b.until && c.ms < b.until + 1500, 'at the time the hold said');
+  assert.deepEqual(ofScenes(none.room).map((l) => l.type), ['hold', 'release'], 'no TV: the phones are still held');
+  assert.deepEqual(ofScenes(unwatched.room), [], 'no one watching: no one held');
+  for (const r of [tv.room, none.room, unwatched.room]) r.close();
+});
+
+test('scenes: when the TV starts and ends each, and one that reloads in the middle of one', async (t) => {
+  const { server, rooms } = startServer(0, { dir: join(dir, 'tv'), botDelayMs: 60000 }, [], '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const real = globalThis.fetch;
+  const sent: Promise<Response>[] = [];
+  t.mock.method(globalThis, 'fetch', (path: string, init?: RequestInit) => {
+    const r = real(base + path, init);
+    sent.push(r);
+    return r;
+  });
+  const said = () => Promise.all(sent);
+  const streams: AbortController[] = [];
+  try {
+    const code = ((await (await fetch('/api/rooms', { method: 'POST', body: '{}' })).json()) as any).code;
+    const room = rooms.get(code)!;
+    const ada = room.join('Ada', 'player', 'phone');
+    room.join('Bram', 'player', 'phone');
+    room.start(ada.token, 3);
+    const open = async (log: SceneLog) => {
+      const stop = new AbortController();
+      streams.push(stop);
+      await (await real(`${base}/api/rooms/${code}/events?tv=${log.page}`, { signal: stop.signal })).body!.getReader().read();
+      return stop;
+    };
+    const first = new SceneLog();
+    const stream = await open(first);
+    const at = room.game!.log.findIndex((e) => (e.ev as any)?.k === 'round');
+    first.start(code, at);
+    await said();
+    first.end();
+    first.end(); // told once
+    await said();
+    first.start(code, at);
+    await said();
+    stream.abort(); // reloaded
+    for (let n = 0; n < 200 && !lines(room).some((l) => l.type === 'disconnect'); n++) await sleep(10);
+    const second = new SceneLog();
+    await open(second);
+    second.start(code, at);
+    await said();
+    second.end(true);
+    await said();
+    const log = lines(room).filter((l) => l.by.kind === 'tv');
+    const scene = { kind: 'roll', i: at };
+    const is = (type: string, tv: SceneLog, more = {}) => ({ type, tv: tv.page, ...more });
+    assert.deepEqual(log.map(({ t: _t, ms: _ms, by: _by, what: _what, ...l }) => l), [
+      is('connect', first),
+      is('sceneStart', first, scene),
+      is('sceneEnd', first, scene),
+      is('sceneStart', first, scene),
+      is('disconnect', first),
+      is('connect', second),
+      is('sceneStart', second, scene),
+      is('sceneEnd', second, { ...scene, cut: true }),
+    ]);
+    const count = lines(room).length;
+    for (const i of [0, 99999, -1, 'x']) assert.equal((await fetch(`/api/rooms/${code}/scene`, { method: 'POST', body: JSON.stringify({ i }) })).status, 400, `${i} is no scene`);
+    assert.equal(lines(room).length, count, 'and nothing is logged');
+  } finally {
+    for (const s of streams) s.abort();
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
 });

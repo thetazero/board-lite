@@ -25,6 +25,7 @@ import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-
 import type { Recap } from '../src/state.ts';
 import type { Side } from '../src/engine.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
+import { SceneLog } from './scenelog.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -93,7 +94,7 @@ async function boot() {
   savedGames = await fetch('/api/saved').then((r) => r.json()).catch(() => []);
   // A room the server no longer has (forgotten after hours idle): open a new one.
   // As a TV: while it watches, the table plays with a TV.
-  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), true);
+  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), sceneLog.page);
 }
 
 function onSnapshot(s: Snapshot) {
@@ -106,6 +107,7 @@ function onSnapshot(s: Snapshot) {
   // while the game is saved, the TV shows the lobby.
   if (!s.game || s.lobby.seating || s.lobby.saved) {
     clearOverlay();
+    sceneLog.end(true); // the lobby takes over: saved in the middle of a scene, say
     if (remote) return void (app.innerHTML = '');
     if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
     dropTitleToasts();
@@ -616,13 +618,15 @@ function renderRaid(g: PublicState) {
 // and the final scores show whenever no banner is up.
 // top: what the top bar says while it's up (the board under it is held as it
 // was, so its own round and phase may have moved on).
-interface Banner { html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
+// i: the scene's entry in the game's log.
+interface Banner { i?: number; html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
 let bannerTop: Banner['top'] | null = null;
 const banners: Banner[] = [];
 let bannerUp = false;
+const sceneLog = new SceneLog();
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
-  for (const sc of scenesOf(fresh)) banners.push(banner(g, sc, fresh));
+  for (const sc of scenesOf(fresh)) banners.push({ ...banner(g, sc, fresh), i: fresh[sc.at].i });
 }
 
 function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
@@ -1277,6 +1281,7 @@ let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
   bannerUp = true;
+  if (!remote && b.i !== undefined) sceneLog.start(code, b.i);
   cutTitleToasts();
   bannerTop = b.top ?? null;
   const key = `banner ${++bannerN}`;
@@ -1299,6 +1304,7 @@ function showBanner(b: Banner) {
 
 function endBanner() {
   bannerTimers.forEach(clearTimeout);
+  sceneLog.end();
   bannerUp = false;
   bannerTop = null;
   if (!snap?.game) return;

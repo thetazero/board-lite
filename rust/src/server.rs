@@ -480,10 +480,10 @@ impl Server {
         r.headers_mut().insert(header::VARY, HeaderValue::from_static("accept"));
         r
     }
-    fn events(&self, room: Arc<Room>, tok: Option<&str>, tv: bool, answers: bool, who: &str) -> Res<Answer> {
+    fn events(&self, room: Arc<Room>, tok: Option<&str>, tv: Option<&str>, answers: bool, who: &str) -> Res<Answer> {
         let hold = self.hold(who)?;
         let changes = room.watch();
-        let here = room.connect(tok, tok.is_none() && tv, answers);
+        let here = room.connect(tok, tv.filter(|_| tok.is_none()), answers);
         let mut ping = tokio::time::interval_at(tokio::time::Instant::now() + PING, PING);
         ping.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut e = Events { room, tok: tok.map(|t| t.into()), changes, queue: VecDeque::new(), ping, _here: here, _hold: hold };
@@ -535,7 +535,7 @@ impl Server {
         let num = |k: &str| q.get(k).and_then(|s| s.trim().parse::<f64>().ok()).filter(|n| n.is_finite() && *n > 0.0);
         if get {
             return match action {
-                "events" => self.events(room, token, q.contains_key("tv"), q.contains_key("answers"), who),
+                "events" => self.events(room, token, q.get("tv").map(|s| s.as_str()), q.contains_key("answers"), who),
                 "state" => Ok(parts(room.state(tok)?)),
                 "wait" => {
                     let _hold = self.hold(who)?;
@@ -583,6 +583,11 @@ impl Server {
             "standin" => room.stand_in_for(tok, seat)?,
             // A TV opening the room while no other TV watches it becomes the room's TV, with its buttons.
             "tv" => return Ok(ok(if room.tv_watching() { json!({}) } else { json!({"hostToken": room.host}) })),
+            // A TV's scene starts or ends, for the game log.
+            "scene" => {
+                let at = b.get("i").and_then(|v| v.as_u64()).map_or(usize::MAX, |n| n as usize);
+                room.scene_played(str_of(&b, "tv"), at, b.get("ends") == Some(&Value::Bool(true)), b.get("cut") == Some(&Value::Bool(true)))?
+            }
             "here" => room.answer(tok)?,
             "start" => room.start(tok)?,
             "save" => room.save(tok)?,
