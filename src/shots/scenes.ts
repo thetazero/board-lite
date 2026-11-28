@@ -1690,6 +1690,26 @@ export const SCENES: Scene[] = [
       { file: 'tv-title-in-scene-3p', caption: 'TV: a title changed in this scene: nothing yet', client: 'tv', waitMs: 3200, then: (room) => room.mutate((g) => { huntPeak(g); g.titles.tower = g.turn; }) },
     ],
   },
+  // A title that changes as the game ends (#551): told on the board first, then the recap.
+  ...(['toast', 'recap'] as const).map((step): Scene => ({
+    name: `title-end-${step}-4p`,
+    players: 4,
+    seed: 1,
+    until: (g) => g.phase === 'over',
+    setup: (g) => {
+      g.titles.tower = (g.winner! + 1) % 4;
+      g.phase = 'action';
+    },
+    shots: (g) => [{
+      file: `tv-title-end-${step}-4p`, client: 'tv', hold: true,
+      caption: step === 'toast' ? 'TV: the title that ends the game, before the recap' : 'TV: then the recap or the scores, the toast gone',
+      waitFor: step === 'toast' ? '.title-toast' : '.summary, .endbox',
+      then: (room) => room.mutate((g2) => {
+        g2.titles.tower = g!.winner;
+        g2.phase = 'over';
+      }),
+    }],
+  })),
   {
     // A title that changed in the raid before: told over this raid's vote.
     name: 'title-vote-5p',

@@ -109,6 +109,7 @@ function onSnapshot(s: Snapshot) {
     if (remote) return void (app.innerHTML = '');
     if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
     dropTitleToasts();
+    dropEndHold();
     if (s.game) titleNews.skip(s.game);
     return renderLobby();
   }
@@ -1243,7 +1244,6 @@ function showFinal(g: PublicState) {
         ? recap ? `<div class="endactions"><button id="replay">Watch again</button><a class="button primary" href="/recap/${recap.id}" target="_blank" rel="noopener">Open the recap</a></div>` : ''
         : `<div class="endactions">${recap ? '<button id="replay">Watch again</button>' : ''}<button class="primary" id="again">New game</button></div>`}</div>`);
   if (recap) $('replay').onclick = () => playSummary();
-  tellTitles();
   if (remote) return;
   $('again').onclick = () => (location.href = '/tv');
 }
@@ -1255,7 +1255,8 @@ function updateOverlay(g: PublicState) {
   if (bannerUp) return;
   const next = banners.shift();
   if (next) return showBanner(next);
-  if (g.phase === 'over') return showEnd(g);
+  if (g.phase === 'over') return endHeld(g) ? undefined : showEnd(g);
+  dropEndHold();
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
   hideOverlay();
 }
@@ -1380,7 +1381,6 @@ let titleToasts: { change: TitleChange; el: HTMLElement; since: number; timer: n
 function tellTitles() {
   const g = snap?.game;
   if (remote || !g || bannerUp || banners.length || summary) return;
-  if (g.phase === 'over' && overlayKey !== 'end') return; // the recap is about to play
   for (const change of titleNews.next(g)) {
     const { key, name, from, to } = change;
     const pts = (sign: string) => `<span class="tpts">${sign}${iconText(`${g.titlePoints} points`)}</span>`;
@@ -1397,6 +1397,35 @@ function tellTitles() {
     }, TITLE_TOAST_MS);
     titleToasts.push(t);
   }
+}
+
+// A title that changes as the game ends is why it ends: the board shows it, for
+// as long as any toast is up, before the recap and the scores (which hold no one).
+let endTimer = 0;
+let endTold = false;
+
+function endHeld(g: PublicState): boolean {
+  if (endTimer) return true;
+  if (endTold || remote) return false;
+  endTold = true;
+  tellTitles();
+  const left = Math.max(0, ...titleToasts.map((t) => TITLE_TOAST_MS - (performance.now() - t.since)));
+  if (!left) return false;
+  hideOverlay();
+  renderGame(g);
+  endTimer = window.setTimeout(() => {
+    endTimer = 0;
+    dropTitleToasts();
+    if (snap?.game) updateOverlay(snap.game);
+  }, left);
+  return true;
+}
+
+// The game goes on after all (a move undone), or the room is back in its lobby.
+function dropEndHold() {
+  clearTimeout(endTimer);
+  endTimer = 0;
+  endTold = false;
 }
 
 // renderGame keeps it under the turn order and any open trade offers.
