@@ -57,7 +57,7 @@ Action phase, on your turn:
 | `{"do":"project_egg","element":"fire"}` | special project: a base dragon egg of that element, no card, double cost |
 | `{"do":"project_upgrade","upgrade":"workshop","hex":"2,-1"}` | special project: a Workshop on that building of yours, no card, at the special project cost |
 | `{"do":"merchants","pay":"stone","gain":"timber","times":2}` | pay 2× your merchants' rate in stone for 2 timber (the merchants don't trade gold; `times` is 1 if left out) |
-| `{"do":"offer","to":"P2","give":{"stone":2,"cards":["c12"]},"get":{"gold":1}}` | propose a trade: resources, cards or both on either side |
+| `{"do":"offer","to":"P2","give":{"stone":2,"cards":["c12"]},"get":{"gold":1}}` | propose a trade: give resources, cards or both (everyone sees which cards), for resources: you can't ask for cards |
 | `{"do":"offer","to":"anyone","give":{"stone":2},"get":{"timber":1}}` | propose a trade to every other player at once; the first to accept trades |
 | `{"do":"cancel","offer":"o40"}` | withdraw your offer |
 | `{"do":"end"}` | end your turn |

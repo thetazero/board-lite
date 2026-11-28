@@ -2,7 +2,7 @@
 // (rust/src/command.rs reads it, and refuses anything else).
 import type { Resource } from './data.ts';
 
-// One side of a trade: { stone: 2, cards: ['c12'] }.
+// What an offer gives: { stone: 2, cards: ['c12'] }. It asks for resources only.
 export type Side = Partial<Record<Resource, number>> & { cards?: string[] };
 
 export type Command =
@@ -19,7 +19,7 @@ export type Command =
   | { do: 'project_upgrade'; upgrade: string; hex: string }
   | { do: 'merchants'; pay: Resource; gain: Resource; times?: number }
   | { do: 'end' }
-  | { do: 'offer'; to: string; give?: Side; get?: Side } // to 'P2', or 'anyone'
+  | { do: 'offer'; to: string; give?: Side; get?: Partial<Record<Resource, number>> } // to 'P2', or 'anyone'
   | { do: 'accept' | 'decline' | 'cancel'; offer: string }
   | { do: 'vote'; target: string } // a kingdom
   | { do: 'fight'; dragons?: string[] } // all of yours in the raid, if it names none

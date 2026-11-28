@@ -336,7 +336,6 @@ pub struct SeatState<'a> {
     pub perchable: Vec<K>,
     pub perched: Vec<Id>,
     pub cant_accept: Pairs<Id, String>,
-    pub asked: Pairs<Id, String>,
     pub my_vote: Option<usize>,
     pub why_no_vote: Option<S>,
     pub my_fight: Option<&'a [Id]>,
@@ -427,11 +426,6 @@ fn target_view(g: &Game, key: S, hp: Option<&[RaidUnit]>) -> TargetView {
 fn fauna_view(key: S, loot: Bundle) -> FaunaView {
     let x = fauna_def(key);
     FaunaView { key, unit: unit_view(x, x.hp), loot: loot.nonzero(), points: is_beast(key).then_some(x.points) }
-}
-fn side_text(g: &Game, s: &TradeSide, holder: Option<usize>) -> String {
-    let mut parts: Vec<String> = (0..5).filter(|r| s.res.get(*r) > 0).map(|r| format!("{} {}", s.res.get(r), RESOURCES[r])).collect();
-    parts.extend(s.cards.iter().map(|id| g.held_card(holder, id).map_or(format!("card {id}"), |c| format!("{} card", c.name()))));
-    if parts.is_empty() { "nothing".into() } else { parts.join(", ") }
 }
 pub fn is_talk(text: &str) -> bool {
     text.contains(" says: \"") || text.contains(" (private): \"")
@@ -591,7 +585,7 @@ pub fn public_state_with(g: &Game, lines: usize) -> PublicState<'_> {
             })
             .collect(),
         dragons: g.dragons.iter().map(dragon_view).collect(),
-        offers: g.offers.iter().map(|o| OfferView { id: o.id, from: o.from, to: o.to, passed: o.passed(), give: side_text(g, &o.give, Some(o.from)), get: side_text(g, &o.get, None) }).collect(),
+        offers: g.offers.iter().map(|o| OfferView { id: o.id, from: o.from, to: o.to, passed: o.passed(), give: g.trade_text(&o.give, false), get: g.trade_text(&o.get, false) }).collect(),
         raid: g.raid.as_ref().map(|r| RaidView {
             step: r.step,
             candidates: r.candidates.iter().map(|t| target_view(g, t.0, None)).collect(),
@@ -790,7 +784,6 @@ pub fn seat_state_with(g: &Game, p: usize, lines: usize) -> SeatState<'_> {
         perchable: g.perch_hexes(p),
         perched: g.dragons_of(p).filter(|d| d.perch.is_some()).map(|d| d.id).collect(),
         cant_accept: Pairs(g.offers.iter().filter(|o| o.waits_on(p)).filter_map(|o| g.accept_problem(o, p).map(|why| (o.id, why))).collect()),
-        asked: Pairs(g.offers.iter().filter(|o| o.waits_on(p) && !o.get.cards.is_empty()).map(|o| (o.id, side_text(g, &o.get, Some(p)))).collect()),
         my_vote: raid.and_then(|r| r.votes[p]),
         why_no_vote: raid.filter(|r| r.step == Step::Vote && !g.can_vote(p)).map(|_| NO_VOTE),
         my_fight: raid.and_then(|r| r.choices[p].as_deref()),

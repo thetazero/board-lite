@@ -191,7 +191,6 @@ export interface SeatState {
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
   perched: string[]; // my perched dragons, to recall
   cantAccept: Record<string, string>; // offers to me I can't accept now, by id: why
-  asked: Record<string, string>; // offers to me that ask for cards, by id: what they ask for, with the cards I hold named (`get` never names a card)
   myVote: number | null;
   whyNoVote: string | null; // why you don't vote on the raid target, when you don't
   myFight: string[] | null; // the dragons I chose to fight with in this raid ([]: I hold back), once chosen

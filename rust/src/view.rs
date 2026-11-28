@@ -275,9 +275,8 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
             continue;
         }
         let why = you.cant_accept.0.iter().find(|x| x.0 == o.id).map(|x| &x.1);
-        let get = you.asked.0.iter().find(|x| x.0 == o.id).map_or(&o.get, |x| &x.1);
         let accept = if why.is_some() { String::new() } else { format!("{{\"do\":\"accept\",\"offer\":\"{}\"}}  |  ", o.id) };
-        out.push(format!("{accept}{{\"do\":\"decline\",\"offer\":\"{}\"}}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
+        out.push(format!("{accept}{{\"do\":\"decline\",\"offer\":\"{}\"}}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, o.get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
     }
     if !you.my_turn {
         out.push(format!("{{\"do\":\"offer\",\"to\":\"{0}\",\"give\":{{...}},\"get\":{{...}}}}   (out of turn, only with {0})", pname(g.turn)));
@@ -343,7 +342,7 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
         out.push(format!("{{\"do\":\"project_upgrade\",\"upgrade\":\"{}\",\"hex\":\"<hex>\"}}   ({}, no card, cost {}: {} On: {}){}", u.key, u.name, res_text(&u.cost), u.text, keys(&u.hexes), afford(u.affordable)));
     }
     out.push(format!("{{\"do\":\"merchants\",\"pay\":\"<resource>\",\"gain\":\"<resource>\",\"times\":1}}   (not gold; {})", rate_text(&you.bank_rates)));
-    out.push("{\"do\":\"offer\",\"to\":\"<player|anyone>\",\"give\":{\"stone\":2},\"get\":{\"gold\":1,\"cards\":[\"c12\"]}}   (resources, cards or both; to anyone: the first to accept trades)".into());
+    out.push("{\"do\":\"offer\",\"to\":\"<player|anyone>\",\"give\":{\"stone\":2,\"cards\":[\"c12\"]},\"get\":{\"gold\":1}}   (give resources, cards or both, for resources; to anyone: the first to accept trades)".into());
     out.extend(g.offers.iter().filter(|o| o.from == you.seat).map(|o| format!("{{\"do\":\"cancel\",\"offer\":\"{}\"}}", o.id)));
     out.push(if g.offers.iter().any(|o| o.to == Some(you.seat)) { "{\"do\":\"end\"}   (after answering the offers to you)".into() } else { "{\"do\":\"end\"}".into() });
     out

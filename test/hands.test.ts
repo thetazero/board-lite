@@ -56,7 +56,7 @@ function junk(g: Game, p: number, rng: Rng): Command {
   const offer = g.offers.length ? pick(rng, g.offers).id : 'o1';
   return pick<any>(rng, [
     { do: 'offer', to: 'anyone', give: { stone: 1 }, get: { cards: [...new Set(many())] } }, { do: 'offer', to, give: { gold: 0 }, get: { cards: [card()] } },
-    { do: 'offer', to, give: { cards: many() }, get: { stone: 1 } }, { do: 'offer', to, give: { cards: [card()] }, get: { cards: [card()] } }, { do: 'offer', to, give: { cards: [mine()] }, get: { cards: [card()] } }, { do: 'offer', to: 'anyone', give: { cards: [mine()] }, get: {} },
+    { do: 'offer', to, give: { cards: many() }, get: { stone: 1 } }, { do: 'offer', to, give: { cards: [card()] }, get: { cards: [card()] } }, { do: 'offer', to, give: { cards: [mine()] }, get: { stone: 1 } }, { do: 'offer', to: 'anyone', give: { cards: [mine()] }, get: {} },
     { do: 'accept', offer }, { do: 'accept', offer }, { do: 'decline', offer }, { do: 'cancel', offer },
     { do: 'build', card: card(), hex: hex() }, { do: 'upgrade', card: card(), hex: hex() }, { do: 'play', card: card() }, { do: 'play', card: card(), dragon: dragon(), hex: hex() }, { do: 'play', card: card(), resource: 'stone' },
     { do: 'keep', card: card() }, { do: 'discard', cards: many() }, { do: 'tell', to, message: 'hello' }, { do: 'fight', dragons: [dragon()] }, { do: 'hold' }, { do: 'end' },
@@ -78,7 +78,7 @@ test('a refused command and an accepted one say nothing of hands the player cann
       if (next(rng) < 0.6) {
         let p = Math.floor(next(rng) * players);
         let cmd = junk(g, p, rng);
-        const o = g.offers.find((x) => x.get.cards.length) ?? g.offers[0];
+        const o = g.offers[0];
         if (o && next(rng) < 0.6) {
           p = o.to ?? pick(rng, [...g.players.keys()].filter((q) => q !== o.from));
           cmd = { do: 'accept', offer: o.id };
@@ -118,19 +118,17 @@ test('a refused command and an accepted one say nothing of hands the player cann
   assert.ok(did.refused > 100 && did.offered > 20 && did.traded > 0, JSON.stringify(did));
 });
 
-test('an offer names the cards it gives, and a card it asks for only to the player who holds it', () => {
+test('an offer shows the cards it gives, and no one can ask for a card', () => {
   const g = newGame(3, 5, 0);
   while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, { do: 'keep', card: g.players[p].choice[0].id });
   const [mine, theirs] = [g.players[0].hand[0], g.players[1].hand[0]];
-  const name = (p: number, id: string) => seatState(g, p).hand.find((c) => c.id === id)!.name;
-  const [mineName, theirsName] = [name(0, mine.id), name(1, theirs.id)];
-  assert.throws(() => apply(g, 0, { do: 'offer', to: 'P2', give: { cards: [theirs.id] }, get: { stone: 1 } }), (e: Error) => e.message === `You don't have card ${theirs.id}.`);
-  apply(g, 0, { do: 'offer', to: 'anyone', give: { cards: [mine.id] }, get: { cards: [theirs.id] } });
-  const o = publicState(g).offers[0];
-  assert.deepEqual([o.give, o.get], [`${mineName} card`, `card ${theirs.id}`]);
-  assert.deepEqual(seatState(g, 1).asked, { [o.id]: `${theirsName} card` });
-  assert.deepEqual(seatState(g, 2).asked, { [o.id]: `card ${theirs.id}` });
-  assert.equal(seatState(g, 2).cantAccept[o.id], `You don't have card ${theirs.id}.`);
-  apply(g, 1, { do: 'accept', offer: o.id });
-  assert.match(g.log.at(-1)!.text, new RegExp(`gives ${mineName} card \\(${mine.id}\\) for card ${theirs.id}\\.$`));
+  const name = seatState(g, 0).hand.find((c) => c.id === mine.id)!.name;
+  const refuses = (cmd: any, why: string) => assert.throws(() => apply(g, 0, cmd), (e: Error) => e.message === why);
+  refuses({ do: 'offer', to: 'P2', give: { cards: [theirs.id] }, get: { stone: 1 } }, `You have no card ${theirs.id} in hand.`);
+  for (const to of ['P2', 'anyone']) refuses({ do: 'offer', to, give: { stone: 1 }, get: { cards: [theirs.id] } }, "You can't ask for cards: ask for resources.");
+  apply(g, 0, { do: 'offer', to: 'P2', give: { cards: [mine.id] }, get: { stone: 1 } });
+  assert.equal(publicState(g).offers[0].give, `${name} card`);
+  assert.match(g.log.at(-1)!.text, new RegExp(`${name} card \\(${mine.id}\\) for 1 stone`));
+  apply(g, 1, { do: 'accept', offer: g.offers[0].id });
+  assert.equal((g.log.at(-1)!.ev as any).give, `${name} card`);
 });
