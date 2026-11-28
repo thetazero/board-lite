@@ -370,7 +370,7 @@ const until = async (done: () => boolean, ms: number) => {
 };
 
 test('a phone that loses Wi-Fi with its stream still open is away once it stops answering pings', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 60_000, awayMs: 400 }, [], '127.0.0.1');
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 60_000, awayMs: 1000 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, string>;
@@ -381,10 +381,10 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     const bram = (await post(`/api/rooms/${code}/join`, { name: 'Bram' })).token;
     await post(`/api/rooms/${code}/start`, { token: ada });
     const room = rooms.get(code)!;
-    await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
+    const stream = await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
     assert.ok(room.here(room.seats[1]), 'not at once');
     // The table plays on: being sent it doesn't make Bram here.
-    const end = Date.now() + 2000;
+    const end = Date.now() + 5000;
     while (room.here(room.seats[1]) && Date.now() < end) {
       room.command(ada, { do: 'say', message: 'hello' });
       await sleep(20);
@@ -397,16 +397,22 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     assert.ok(room.here(room.seats[1]) && !room.seats[1].standIn);
     // Answering, it stays, and the table isn't told anything new.
     const version = room.snapshot(null).v;
-    for (let i = 0; i < 16; i++) {
+    const quiet = Date.now() + 5000;
+    while (room.here(room.seats[0]) && Date.now() < quiet) {
       await sleep(50);
       await post(`/api/rooms/${code}/here`, { token: bram });
       assert.ok(room.here(room.seats[1]));
     }
+    // (Ada has sent nothing since the bot sat in, so Ada goes away first.)
+    assert.ok(!room.here(room.seats[0]), 'Ada goes away');
+    assert.equal(room.seats[1].connected, 1, 'on the same stream');
     assert.ok(room.snapshot(null).v! <= version! + 1, 'at most Ada going quiet');
     // Its stream ending long after the phone went doesn't bring it back.
-    assert.ok(await until(() => !room.here(room.seats[1]), 2000));
+    assert.ok(await until(() => !room.here(room.seats[1]), 5000));
+    // A response nothing refers to is garbage-collected, and its stream closed: this keeps it until here.
+    assert.equal(stream.status, 200);
     ctrl.abort();
-    assert.ok(await until(() => room.seats[1].connected === 0, 2000));
+    assert.ok(await until(() => room.seats[1].connected === 0, 5000));
     assert.ok(!room.here(room.seats[1]));
   } finally {
     ctrl.abort();

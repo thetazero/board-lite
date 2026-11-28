@@ -102,8 +102,9 @@ test('a public website says nothing of its machine or of other games, and limits
     for (const status of [400, 400, 429]) assert.equal((await fetch(`${s.url}/api/rooms/QQQQ`, { headers: a })).status, status);
     assert.equal((await fetch(`${s.url}/api/rooms/${code}`, { headers: b })).status, 200);
     const stop = new AbortController();
-    assert.equal((await fetch(`${s.url}/api/rooms/${code}/events`, { headers: b, signal: stop.signal })).status, 200);
+    const stream = await fetch(`${s.url}/api/rooms/${code}/events`, { headers: b, signal: stop.signal });
     assert.equal((await fetch(`${s.url}/api/rooms/${code}/events`, { headers: b })).status, 429);
+    assert.equal(stream.status, 200); // (kept until now: a response nothing refers to is garbage-collected, and its stream closed)
     stop.abort();
 
     const page = await fetch(`${s.url}/`);
