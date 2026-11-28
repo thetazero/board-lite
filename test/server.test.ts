@@ -244,6 +244,86 @@ test('a player who is away: the table lets a bot play for them, and their phone 
   room.close();
 });
 
+// A started room with everyone here, and the game waiting on `turn`.
+function table(code: string, opts: object = {}, names = ['Ada', 'Bram', 'Cora']) {
+  const room = new Room(code, { dir, botDelayMs: 60_000, ...opts });
+  const seats = names.map((n) => room.join(n));
+  room.start(seats[0].token, 7);
+  for (const s of seats) room.connect(s.token);
+  return { room, seats };
+}
+const deciders = (room: Room, p: number) => room.lobby().seats[p].deciders ?? [];
+
+test('a seat whose phone is gone is open: the first player decides, or someone new joins it', () => {
+  const { room, seats: [ada, bram, cora] } = table('OPNA');
+  assert.throws(() => room.join('Zed'), /every seat is taken/);
+  goQuiet(room, 1);
+  assert.deepEqual(deciders(room, 1), [0]);
+  assert.throws(() => room.standInFor(cora.token, 1), /Only Ada can do that/);
+  room.standInFor(ada.token, 1);
+  assert.throws(() => room.join('Zed'), /every seat is taken/, "a seat a bot plays is kept for its player");
+  room.state(bram.token);
+  assert.ok(!room.seats[1].standIn);
+  goQuiet(room, 1);
+  const old = bram.token;
+  assert.equal(room.join('Zed'), room.seats[1]);
+  assert.equal(room.seats[1].name, 'Zed');
+  assert.throws(() => room.state(old), /not in this game/);
+  room.command(room.seats[1].token, 'say hello');
+  room.close();
+});
+
+test('when the first player is the one who left, the next player here decides', () => {
+  const { room, seats: [ada, bram, cora] } = table('OPNB');
+  goQuiet(room, 0);
+  assert.deepEqual(deciders(room, 0), [1]);
+  assert.throws(() => room.standInFor(cora.token, 0), /Only Bram/);
+  room.standInFor(bram.token, 0);
+  assert.ok(ada.standIn);
+  room.close();
+});
+
+test('when the first player does not decide about a seat whose phone is gone, in time anyone does', async () => {
+  const { room, seats: [, , cora] } = table('OPNC', { openMs: 50 });
+  goQuiet(room, 1);
+  room.changed();
+  assert.ok(await until(() => deciders(room, 1).length === 2, 2000));
+  room.standInFor(cora.token, 1);
+  room.close();
+});
+
+test('a seat whose phone is here is opened only by the first player, after a wait, and taken back only by a tap', async () => {
+  const { room, seats: [ada, bram, cora] } = table('OPND', { openMs: 300 });
+  assert.throws(() => room.open(ada.token, 1), /Bram is playing/);
+  assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
+  assert.deepEqual(deciders(room, 1), [0]);
+  assert.deepEqual(deciders(room, 0), [1], 'never themselves');
+  assert.ok(!room.seats[1].opened, 'never on its own');
+  assert.throws(() => room.open(cora.token, 1), /Only Ada/);
+  room.command(bram.token, 'say wait');
+  assert.throws(() => room.open(ada.token, 1), /Bram is playing/, 'a word from Bram starts the wait over');
+  assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
+  room.open(ada.token, 1);
+  room.standInFor(ada.token, 1);
+  room.state(bram.token);
+  room.connect(bram.token);
+  assert.ok(room.seats[1].opened && room.seats[1].standIn, 'the phone answering is no one back');
+  room.back(bram.token);
+  assert.ok(!room.seats[1].opened && !room.seats[1].standIn);
+  assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
+  room.open(ada.token, 1);
+  room.command(bram.token, 'say here');
+  assert.ok(!room.seats[1].opened, 'so does a move');
+  assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
+  room.open(ada.token, 1);
+  room.close();
+  const again = new Room('OPND', { dir, file: room.file, botDelayMs: 60_000 });
+  assert.ok(again.seats[1].opened, 'kept over a restart');
+  again.join('Zed');
+  assert.ok(again.seats[1].name === 'Zed' && !again.seats[1].opened);
+  again.close();
+});
+
 test('the stand-in keeps the game moving to the end without spending anything', async () => {
   const room = new Room('STND', { dir, botDelayMs: 0 });
   const seats = ['Ada', 'Bram'].map((n) => room.join(n));

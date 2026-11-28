@@ -54,6 +54,7 @@ export interface Scene {
   names?: string[]; // seat names (default NAMES)
   bots?: number[]; // in a game: seats the server plays (they never move while staged)
   away?: number[]; // seats whose player has gone quiet (shown "(away)")
+  openMs?: number; // how long the game waits on someone before their seat can be opened
   resume?: boolean; // a saved game hosted again: every seat open until a phone claims it
   remote?: boolean; // a game with no TV: made from a phone, each phone shows the table
   saved?: boolean; // someone at the table saved the game, an hour and a half ago
@@ -1848,7 +1849,7 @@ export const SCENES: Scene[] = [
     away: [1],
     until: (g) => g.round === 2 && g.phase === 'action' && g.turn === 1,
     shots: () => [
-      { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: let a bot play for them', client: 'phone', seat: 0, sizes: true },
+      { file: 'phone-away-3p', caption: 'Phone: the table waits on someone whose phone is gone: the first player lets a bot play, or leaves the seat open', client: 'phone', seat: 0, sizes: true },
       { file: 'tv-standin-3p', caption: 'TV: a phone let a bot play for someone away', client: 'tv', then: (room) => room.standInFor(room.seats[0].token, 1) },
       { file: 'phone-menu-3p', caption: 'Phone: the menu under your name, with Save game and Quit game', client: 'phone', seat: 2, clicks: ['#menu'], sizes: true },
       { file: 'phone-wheel-3p', caption: 'Phone: the rulebook at its elements tab: the element wheel, opened from the ring of dots by your points', client: 'phone', seat: 2, clicks: ['#wheel'], waitFor: '.bookpage .wheel', sizes: true },
@@ -1864,6 +1865,23 @@ export const SCENES: Scene[] = [
       { file: 'phone-join-seats-3p', caption: "Phone: the room's address mid-game: tap your name to take your seat back", client: 'phone', waitFor: '.seats', sizes: true },
       { file: 'phone-seat-back-3p', caption: 'Phone: a seat taken back (by tapping its name)', client: 'phone', clicks: ['[data-seat]'], waitFor: '.mehead' },
       { file: 'tv-back-3p', caption: 'TV: a player a bot was playing for is back', client: 'tv', then: (room) => { room.join('Bram'); } },
+    ],
+  },
+  {
+    // A phone still here with no one at it. Each shot changes the room, in this order.
+    name: 'open-seat-3p',
+    players: 3,
+    seed: 1,
+    openMs: 0,
+    until: (g) => g.round === 2 && g.phase === 'action' && g.turn === 1,
+    shots: () => [
+      { file: 'phone-stalled-3p', caption: 'Phone: the game has waited 3 minutes on someone whose phone is here: the first player may open the seat', client: 'phone', seat: 0 },
+      { file: 'tv-opened-3p', caption: "TV: the first player opens the seat", client: 'tv', then: (room) => room.open(room.seats[0].token, 1) },
+      { file: 'phone-opened-first-3p', caption: 'Phone: the first player decides about the open seat', client: 'phone', seat: 0 },
+      { file: 'phone-opened-other-3p', caption: 'Phone: another player, while the first player decides', client: 'phone', seat: 2 },
+      { file: 'phone-opened-own-3p', caption: 'Phone: the one whose seat was opened', client: 'phone', seat: 1 },
+      { file: 'phone-join-opened-3p', caption: "Phone: the room's address: take the open seat", client: 'phone', waitFor: '.seats' },
+      { file: 'tv-taken-3p', caption: 'TV: someone else takes the open seat', client: 'tv', then: (room) => { room.join('Zed'); } },
     ],
   },
   // ---------- a game with no TV (remote mode) ----------

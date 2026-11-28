@@ -353,6 +353,10 @@ pub struct LobbySeat {
     pub stand_in: bool,
     pub left: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub opened: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deciders: Vec<usize>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub strong: bool,
 }
 #[derive(Serialize, Deserialize)]

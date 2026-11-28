@@ -28,6 +28,7 @@ use unicode_general_category::{GeneralCategory as Cat, get_general_category};
 const MIN_PLAYERS: usize = 2;
 const MAX_PLAYERS: usize = 6;
 const AWAY_MS: i64 = 60_000;
+const OPEN_MS: i64 = 180_000;
 const TV_GONE_MS: i64 = 20_000;
 const BOT_DELAY_MS: i64 = 700;
 const CACHE_MS: i64 = 500; // how long a quiet room keeps the JSON it last sent
@@ -72,6 +73,7 @@ pub struct Seat {
     seen: i64,        // when it was last heard from
     stand_in: bool,
     left: bool,
+    opened: bool, // the first player opened it, though its phone is still here: only its player's own tap takes it back
     strong: bool, // a bot seat played by the strong bot
     via: Option<&'static str>,
 }
@@ -87,6 +89,8 @@ struct SavedSeat {
     stand_in: bool,
     #[serde(default)]
     left: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    opened: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     strong: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -161,6 +165,8 @@ struct Inner {
     log: GameLog,
     bot_timer: Option<AbortHandle>,
     away_timer: Option<AbortHandle>,
+    open_timer: Option<AbortHandle>,
+    waited: HashMap<u64, i64>, // since when the game has waited on each seat, without a word from it
     scene_timer: Option<AbortHandle>,
     tv_timer: Option<AbortHandle>,
     version: u64,
@@ -187,6 +193,7 @@ struct Inner {
 pub struct Opts {
     pub bot_delay_ms: i64, // a pause before a bot moves, so the TV can show it
     pub away_ms: i64,
+    pub open_ms: i64, // how long the game waits on someone who is here before their seat can be opened
     pub tv_gone_ms: i64,
     pub first_seat: Option<usize>,
     pub recap_id: Option<String>,
@@ -194,7 +201,7 @@ pub struct Opts {
 }
 impl Default for Opts {
     fn default() -> Opts {
-        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, tv_gone_ms: TV_GONE_MS, first_seat: None, recap_id: None, ended: None }
+        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, first_seat: None, recap_id: None, ended: None }
     }
 }
 /// Where rooms and recaps go, and whether it's a home's server.
@@ -275,6 +282,10 @@ impl Seat {
     fn here(&self, now: i64, away: i64) -> bool {
         self.kind == Kind::Bot || (!self.left && (self.held() || now - self.seen < away))
     }
+    /// Whether the first player may let a bot play it, and its name on another phone takes it back.
+    fn vacant(&self, now: i64, away: i64) -> bool {
+        self.kind == Kind::Player && (self.opened || !self.here(now, away))
+    }
 }
 
 impl Inner {
@@ -324,7 +335,7 @@ impl Inner {
     }
     fn new_seat(&mut self, name: String, kind: Kind) -> Seat {
         self.next_uid += 1;
-        Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, answering: 0, seen: 0, stand_in: false, left: false, strong: false, via: None }
+        Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, answering: 0, seen: 0, stand_in: false, left: false, opened: false, strong: false, via: None }
     }
     /// The seat's token is no longer the one it was, and whoever held that is
     /// not here: their streams and waits still open count for no one.
@@ -370,6 +381,8 @@ impl Room {
             log: GameLog::new(beside(&file, ".log.jsonl")),
             bot_timer: None,
             away_timer: None,
+            open_timer: None,
+            waited: HashMap::new(),
             scene_timer: None,
             tv_timer: None,
             version: 0,
@@ -393,10 +406,10 @@ impl Room {
             let seat = i.new_seat(s.name, s.kind);
             let uid = if s.id == 0 { seat.uid } else { s.id }; // (saved before seats had ids)
             // Everyone has as long to come back as if their phone had just dropped.
-            i.seats.push(Seat { uid, token: s.token, seen: now_ms(), stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.claude.then_some("claude"), ..seat });
+            i.seats.push(Seat { uid, token: s.token, seen: now_ms(), stand_in: s.stand_in, left: s.left, opened: s.opened, strong: s.strong, via: s.claude.then_some("claude"), ..seat });
         }
         if let Some(g) = &i.game {
-            let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left})).collect();
+            let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left, "opened": s.opened})).collect();
             i.log.write("load", &Sender::GAME, json!({"code": code, "entries": g.log.len(), "round": g.round, "phase": g.phase, "saved": i.saved_at.is_some(), "seats": seats}));
             let n = g.players.len();
             if i.seats.len() != n {
@@ -470,7 +483,7 @@ impl Room {
             remote: !i.has_tv,
             saved_at: i.saved_at,
             last_id: i.next_uid,
-            seats: i.seats.iter().map(|s| SavedSeat { id: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong, claude: s.via == Some("claude") }).collect(),
+            seats: i.seats.iter().map(|s| SavedSeat { id: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, opened: s.opened, strong: s.strong, claude: s.via == Some("claude") }).collect(),
         };
         let text = json!(saved).to_string();
         if text == i.saved_seats {
@@ -574,6 +587,7 @@ impl Room {
     fn changed(&self, i: &mut Inner) {
         i.version += 1;
         i.last_active = now_ms();
+        self.watch_waits(i);
         self.save_rest(i);
         self.schedule_bot(i);
         self.watch_away(i);
@@ -595,14 +609,14 @@ impl Room {
             let own = i.seats.iter().position(|s| s.kind == Kind::Player && s.name.to_lowercase() == typed);
             if let Some(p) = own.filter(|_| kind == Kind::Player) {
                 let s = &i.seats[p];
-                if s.here(now, self.opts.away_ms) {
+                if !s.vacant(now, self.opts.away_ms) {
                     return no(format!("{} is playing on another phone.", s.name));
                 }
                 let was = (s.stand_in, s.left);
                 self.change(i, |i| {
                     i.new_hands(p);
                     let s = &mut i.seats[p];
-                    (s.stand_in, s.left, s.seen, s.via) = (false, false, now, via);
+                    (s.stand_in, s.left, s.opened, s.seen, s.via) = (false, false, false, now, via);
                 })?;
                 let by = i.sender(p);
                 i.log.write("handover", &by, json!({"seat": p, "back": true, "standIn": was.0, "left": was.1}));
@@ -610,12 +624,15 @@ impl Room {
                 return Ok(p);
             }
             let clean = i.clean_name(name)?;
-            let Some(p) = i.seats.iter().position(|s| s.kind == Kind::Open) else { return no("The game has started and every seat is taken.") };
+            let Some(p) = i.seats.iter().position(|s| s.kind == Kind::Open).or_else(|| self.open_seat(i).filter(|_| kind == Kind::Player)) else {
+                return no("The game has started and every seat is taken.");
+            };
             let was = i.seats[p].name.clone();
             self.change(i, |i| {
                 i.new_hands(p);
                 let s = &mut i.seats[p];
                 (s.name, s.kind, s.via, s.strong) = (clean, kind, via, strong);
+                (s.opened, s.seen) = (false, now);
             })?;
             let by = i.sender(p);
             i.log.write("handover", &by, json!({"seat": p, "was": was}));
@@ -691,29 +708,93 @@ impl Room {
         self.change(i, |i| {
             i.new_hands(p);
             let s = &mut i.seats[p];
-            (s.stand_in, s.left) = (true, true);
+            (s.stand_in, s.left, s.opened) = (true, true, false);
         })?;
         i.log.write("quit", &by, json!({"seat": p}));
         i.log.write("standIn", &Sender::GAME, json!({"seat": p, "name": name, "why": "quit"}));
         self.changed(i);
         Ok(())
     }
-    /// Anyone at the table lets a bot play for a player who is away.
-    pub fn stand_in_for(&self, tok: &str, seat: Option<usize>) -> Res {
-        let i = &mut *lock(&self.inner);
-        self.player_seat(i, tok)?;
-        if i.game.is_none() || i.phase() == Some(Phase::Over) {
+    /// The seat someone with a name of their own takes mid-game: one the first
+    /// player opened, then one the game waits on, then whoever is gone longest.
+    /// A seat a bot plays is kept for its player.
+    fn open_seat(&self, i: &Inner) -> Option<usize> {
+        let now = now_ms();
+        if i.saved_at.is_some() || i.phase() == Some(Phase::Over) {
+            return None;
+        }
+        let open = (0..i.seats.len()).filter(|p| i.seats[*p].vacant(now, self.opts.away_ms) && !i.seats[*p].stand_in);
+        open.min_by_key(|p| (!i.seats[*p].opened, !i.waits_on(*p), i.seats[*p].seen))
+    }
+    fn waited_long(&self, i: &Inner, p: usize) -> bool {
+        i.waits_on(p) && i.waited.get(&i.seats[p].uid).is_some_and(|at| now_ms() - at >= self.opts.open_ms)
+    }
+    /// Who decides about seat p: the first player who is here, as in the lobby,
+    /// never p itself. If that player's phone is here with no one at it, a seat
+    /// whose phone is gone would hold the game up forever: after as long as it
+    /// takes to open a seat, anyone decides about it.
+    fn deciders(&self, i: &Inner, p: usize) -> Vec<usize> {
+        let now = now_ms();
+        let able = |q: &usize| {
+            let s = &i.seats[*q];
+            *q != p && s.kind == Kind::Player && !s.left && !s.stand_in && !s.opened
+        };
+        let players = (0..i.seats.len()).filter(able);
+        if !i.seats[p].here(now, self.opts.away_ms) && self.waited_long(i, p) {
+            return players.collect();
+        }
+        players.min_by_key(|q| (i.seats[*q].via == Some("claude"), !i.seats[*q].here(now, self.opts.away_ms))).into_iter().collect()
+    }
+    fn decides(&self, i: &mut Inner, tok: &str, seat: Option<usize>) -> Res<usize> {
+        let me = self.player_seat(i, tok)?;
+        if i.game.is_none() || i.seating() || i.phase() == Some(Phase::Over) {
             return no("The game is not running.");
         }
         let Some(p) = seat.filter(|p| i.seats.get(*p).is_some_and(|s| s.kind == Kind::Player)) else { return no("No such player.") };
+        let who = self.deciders(i, p);
+        if !who.contains(&me) {
+            return no(who.first().map_or("No one can decide that.".into(), |q| format!("Only {} can do that.", i.seats[*q].name)));
+        }
+        Ok(p)
+    }
+    /// The first player opens the seat of someone whose phone is here, once the
+    /// game has waited on them long enough.
+    pub fn open(&self, tok: &str, seat: Option<usize>) -> Res {
+        let i = &mut *lock(&self.inner);
+        let p = self.decides(i, tok, seat)?;
+        let s = &i.seats[p];
+        if s.vacant(now_ms(), self.opts.away_ms) {
+            return Ok(());
+        }
+        if !self.waited_long(i, p) {
+            return no(format!("{} is playing.", s.name));
+        }
+        let fields = json!({"seat": p, "name": s.name});
+        let by = self.sender_of(i, tok);
+        self.change(i, |i| i.seats[p].opened = true)?;
+        i.log.write("open", &by, fields);
+        self.changed(i);
+        Ok(())
+    }
+    /// The player of an opened seat is at their phone after all.
+    pub fn return_to(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        let p = self.player_seat(i, tok)?;
+        self.take_back(i, p);
+        Ok(())
+    }
+    /// The first player lets a bot play an open seat.
+    pub fn stand_in_for(&self, tok: &str, seat: Option<usize>) -> Res {
+        let i = &mut *lock(&self.inner);
+        let p = self.decides(i, tok, seat)?;
         let s = &i.seats[p];
         if s.stand_in {
             return Ok(());
         }
-        if s.here(now_ms(), self.opts.away_ms) {
+        if !s.vacant(now_ms(), self.opts.away_ms) {
             return no(format!("{} is back.", s.name));
         }
-        let fields = json!({"seat": p, "name": s.name, "why": "away", "seen": Some(s.seen).filter(|n| *n != 0)});
+        let fields = json!({"seat": p, "name": s.name, "why": if s.opened { "opened" } else { "away" }, "seen": Some(s.seen).filter(|n| *n != 0)});
         let by = self.sender_of(i, tok);
         self.change(i, |i| i.seats[p].stand_in = true)?;
         i.log.write("standIn", &by, fields);
@@ -823,6 +904,11 @@ impl Room {
         if via.is_some() {
             i.seats[p].via = via;
         }
+        self.take_back(i, p);
+        let uid = i.seats[p].uid;
+        if let Some(at) = i.waited.get_mut(&uid) {
+            *at = now_ms(); // whatever it says, someone is there
+        }
         let key = (!id.is_empty()).then(|| format!("{p} {id}"));
         if key.as_ref().is_some_and(|k| i.done_ids.contains(k)) {
             return Ok(());
@@ -861,12 +947,21 @@ impl Room {
     }
     // A player a bot was playing for while they were away is back.
     fn back(&self, i: &mut Inner, p: usize) {
-        if !i.seats[p].stand_in || i.seats[p].left {
+        // (A phone still here with no one at it answers pings: that's no one back.)
+        if i.seats[p].stand_in && !i.seats[p].opened {
+            self.take_back(i, p);
+        }
+    }
+    fn take_back(&self, i: &mut Inner, p: usize) {
+        let s = &mut i.seats[p];
+        if s.left || !(s.stand_in || s.opened) {
             return;
         }
+        (s.stand_in, s.opened) = (false, false);
+        let uid = s.uid;
+        i.waited.remove(&uid);
         let by = i.sender(p);
         i.log.write("back", &by, json!({"seat": p}));
-        i.seats[p].stand_in = false;
         self.changed(i);
     }
     // All a wait knows of its seat between wakes is its token: the number holds
@@ -944,6 +1039,23 @@ impl Room {
     }
 
     // ---- timers ----
+
+    // Since when the game waits on whom, and the table hears when that's long enough to open a seat.
+    fn watch_waits(&self, i: &mut Inner) {
+        clear(&mut i.open_timer);
+        let now = now_ms();
+        let on: Vec<u64> = (0..i.seats.len()).filter(|p| i.waits_on(*p) && !bot_plays(i, *p)).map(|p| i.seats[p].uid).collect();
+        i.waited.retain(|uid, _| on.contains(uid));
+        for uid in on {
+            i.waited.entry(uid).or_insert(now);
+        }
+        if let Some(at) = i.waited.values().map(|at| at + self.opts.open_ms).filter(|at| *at > now).min() {
+            i.open_timer = self.after(at - now + 10, |room, i| {
+                i.open_timer = None;
+                room.changed(i);
+            });
+        }
+    }
 
     fn watch_away(&self, i: &mut Inner) {
         clear(&mut i.away_timer);
@@ -1035,7 +1147,17 @@ impl Room {
             started: i.game.is_some(),
             seating: i.seating(),
             saved: i.saved_at,
-            seats: i.seats.iter().map(|s| LobbySeat { id: s.uid, name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            seats: i
+                .seats
+                .iter()
+                .enumerate()
+                .map(|(p, s)| {
+                    // Only while there's something to decide: the game waits on a seat that's open, or could be.
+                    let due = i.phase() != Some(Phase::Over) && i.waits_on(p) && !s.stand_in && s.kind == Kind::Player && (s.vacant(now, self.opts.away_ms) || self.waited_long(i, p));
+                    let deciders = if due { self.deciders(i, p) } else { vec![] };
+                    LobbySeat { id: s.uid, name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, opened: s.opened, deciders, strong: s.strong }
+                })
+                .collect(),
             min_players: MIN_PLAYERS,
             max_players: MAX_PLAYERS,
             starter: self.starter(i),
@@ -1163,7 +1285,7 @@ impl Room {
     pub fn close(&self) {
         let i = &mut *lock(&self.inner);
         i.closed = true;
-        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.scene_timer, &mut i.tv_timer] {
+        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer] {
             clear(t);
         }
     }
@@ -1246,6 +1368,8 @@ pub mod stage {
         seen: i64,
         stand_in: bool,
         left: bool,
+        #[serde(default)]
+        opened: bool,
         strong: bool,
         via: Option<String>,
     }
@@ -1256,7 +1380,7 @@ pub mod stage {
         /// What a driver keeps of the room, past the log it has and the game it's seen.
         pub fn stage_state(&self, seen: i64, logged: usize) -> Value {
             let i = &*lock(&self.inner);
-            let seats: Vec<SeatNow> = i.seats.iter().map(|s| SeatNow { uid: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, connected: Some(s.connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.via.map(|v| v.into()) }).collect();
+            let seats: Vec<SeatNow> = i.seats.iter().map(|s| SeatNow { uid: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, connected: Some(s.connected), seen: s.seen, stand_in: s.stand_in, left: s.left, opened: s.opened, strong: s.strong, via: s.via.map(|v| v.into()) }).collect();
             let mut v = json!({"seats": seats, "savedAt": i.saved_at, "version": i.version, "lastActive": i.last_active, "abandoned": i.abandoned(), "sceneLeft": i.scene_left(), "gameRev": i.game_rev});
             if let Some(g) = i.game.as_ref().filter(|_| seen != i.game_rev as i64) {
                 v["game"] = json!(g.clone_without_log());
@@ -1272,7 +1396,7 @@ pub mod stage {
             for s in seats {
                 let (connected, answering) = old.iter().find(|o| o.uid == s.uid).map_or((0, 0), |o| (o.connected, o.answering));
                 let connected = s.connected.unwrap_or(connected);
-                i.seats.push(Seat { uid: s.uid, name: s.name, token: s.token, kind: s.kind, connected, answering: answering.min(connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: via(s.via) });
+                i.seats.push(Seat { uid: s.uid, name: s.name, token: s.token, kind: s.kind, connected, answering: answering.min(connected), seen: s.seen, stand_in: s.stand_in, left: s.left, opened: s.opened, strong: s.strong, via: via(s.via) });
             }
             old.clear();
             i.saved_at = saved_at;
