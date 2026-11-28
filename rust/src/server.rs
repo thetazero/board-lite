@@ -594,6 +594,7 @@ impl Server {
                 room.scene_played(str_of(&b, "tv"), at, b.get("ends") == Some(&Value::Bool(true)), b.get("cut") == Some(&Value::Bool(true)))?
             }
             "shown" => room.final_shown(),
+            "skip" => room.skip_scene(tok, b.get("seen").and_then(Value::as_u64).map_or(0, |n| n as usize))?,
             "here" => room.answer(tok)?,
             "start" => room.start(tok)?,
             "save" => room.save(tok)?,
