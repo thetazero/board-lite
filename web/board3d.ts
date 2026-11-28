@@ -3498,12 +3498,14 @@ export class FightStage {
 
   private upright: boolean;
   private safe: { top: number; bottom: number };
+  private strip: boolean; // a wide, low stage: each side in one rank, seen from nearer
   private left: Standing[] = [];
   private foes: Standing[] = [];
   private boss: Standing | null = null;
 
-  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }) {
+  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }, strip = false) {
     this.upright = upright;
+    this.strip = strip;
     this.safe = safe;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -3650,7 +3652,7 @@ export class FightStage {
   // across the columns, each as far in front of the one behind as its
   // tallest figure needs to leave that one, its plate and crown showing.
   private layout(fs: Standing[], side: 1 | -1) {
-    const per = this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
+    const per = this.strip ? 1 : this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
     const cols: Standing[][] = [];
     for (let i = 0; i < fs.length; i += per) cols.push(fs.slice(i, i + per));
     if (!cols.length) return;
@@ -3763,7 +3765,7 @@ export class FightStage {
       if (fits(mid)) hi = mid;
       else lo = mid;
     }
-    const d = Math.max(hi, 22);
+    const d = Math.max(hi, this.strip ? 14 : 22);
     // Then moved up or down the screen so what's drawn sits in the middle of the clear band.
     const e = extent(d);
     this.camera.setViewOffset(w, h, 0, (((top + bottom) - (e.hi + e.lo)) / 2) * (h / 2), w, h);

@@ -11,11 +11,11 @@ export interface Step { show: Show; phase: string | null; text: string; ms: numb
 export const ROUND = ['Production', 'Cards', 'Actions', 'Raid'];
 
 export const STEPS: Step[] = [
-  { show: 'title', phase: null, text: '', ms: 5000 },
+  { show: 'title', phase: null, text: `Build, raise dragons and raid kingdoms. First to ${POINTS_TO_WIN} points wins.`, ms: 6000 },
   { show: 'production', phase: 'Production', text: 'Each round, your tower and buildings make resources.', ms: 7000 },
-  { show: 'cards', phase: 'Cards', text: 'Keep 1 of 2 building cards. Building it costs the resources on it.', ms: 8000 },
-  { show: 'actions', phase: 'Actions', text: 'On your turn, build adjacent to your buildings and hatch dragon eggs.', ms: 8500 },
-  { show: 'grow', phase: 'Production', text: 'Each round, your dragons eat livestock and grow.', ms: 6500 },
+  { show: 'cards', phase: 'Cards', text: 'Draw 1 action card and 2 building cards. Keep 1 of the building cards.', ms: 8000 },
+  { show: 'actions', phase: 'Actions', text: 'On your turn, spend resources to build adjacent to your buildings and play cards.', ms: 7500 },
+  { show: 'grow', phase: 'Production', text: 'Your egg hatches. Each round, your dragons eat livestock and grow.', ms: 6500 },
   { show: 'vote', phase: 'Raid', text: 'Vote for the kingdom to raid together.', ms: 6500 },
   { show: 'fight', phase: 'Raid', text: "If the kingdom falls, split the loot by your dragons' power.", ms: 7500 },
   { show: 'points', phase: null, text: `First to ${POINTS_TO_WIN} points wins.`, ms: 7000 },
@@ -24,9 +24,9 @@ export const STEPS: Step[] = [
 // Most of what scores, with its points.
 export const SCORES = [
   { name: 'Production building', points: 1 },
-  { name: 'Monument card', points: 2 },
-  { name: 'Great beast', points: 4 },
-  { name: 'Title', points: 7 },
+  { name: 'Monument', points: 2 },
+  { name: 'Slay a great beast', points: 4 },
+  { name: 'Most dragon power, tower floors or gold', points: 7 },
 ];
 
 // The building cards drawn, the first kept and then built; the kingdoms voted on; the one raided.

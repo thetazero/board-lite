@@ -187,7 +187,9 @@ svg.token { flex: none; }
 .explain .xphases { position: absolute; top: 0; left: 0; right: 0; list-style: none; margin: 0; padding: .4em 0; display: flex; justify-content: center; align-items: center; gap: 1.4em; height: 2.4em; box-sizing: border-box; font-size: 1.25em; font-weight: 600; color: #f3ead7a0; background: #1d1934c8; }
 .explain .xphases li.phase { color: var(--accent); font-family: var(--serif); font-size: 1.3em; font-weight: 800; }
 .explain .xtext { position: absolute; bottom: 0; left: 0; right: 0; margin: 0; padding: .4em 1em .5em; text-align: center; font-size: 1.7em; font-weight: 700; color: var(--text); background: #1d1934d8; }
-.explain[data-show="title"] :is(.xphases, .xtext) { display: none; }
+.explain[data-show="title"] .xphases { display: none; }
+/* Twice the size, shown at half: the room kept for plates and crowns, in pixels, halves. */
+.explain .xstage { position: absolute; left: 0; top: 0; width: 200%; height: 200%; transform: scale(.5); transform-origin: 0 0; }
 .explain .xshow { top: 3em; bottom: 4.4em; display: flex; align-items: center; justify-content: center; }
 .explain:is([data-show="cards"], [data-show="vote"]) .xboard { filter: brightness(.5); }
 .explain .xsheet { background: var(--sheet); color: var(--ink); border-radius: 2px; box-shadow: var(--lift); padding: .6em 1.4em; font-size: 1.15em; animation: enter .5s both; }
@@ -198,6 +200,8 @@ svg.token { flex: none; }
 .explain .xdie { display: inline-flex; align-items: center; gap: .8em; }
 .explain:is([data-show="production"], [data-show="fight"], [data-show="points"]) .xshow { justify-content: flex-end; padding-right: 2%; }
 .explain[data-show="fight"] .xsheet { font-size: 1em; }
+.explain .xscores span { max-width: 14em; }
+.explain .xscores b { white-space: nowrap; }
 .explain .xscores { display: flex; flex-direction: column; gap: .4em; font-size: 1.45em; }
 .explain .xscores span { display: flex; justify-content: space-between; align-items: center; gap: 1.5em; }
 .explain .xcards { display: flex; align-items: center; gap: 1.6em; }

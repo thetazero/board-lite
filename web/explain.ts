@@ -16,10 +16,10 @@ type Board = Pick<PublicState, 'map' | 'dragons'>;
 type Act = [at: number, run: () => void];
 
 const NAMES = ['Ada', 'Bram'];
-const ELEMENTS = ['fire', 'ice'];
+const ELEMENTS = ['fire', 'fire']; // everyone starts with a Fire Dragon egg
 
-// The board as it stands at `n`: the buildings so far, and Ada's dragon, an
-// egg from 3, a stage older at each of 4, 5 and 6 (when Bram's is too).
+// The board as it stands at `n`: the buildings so far, and each player's
+// Fire Dragon, an egg until 3, a stage older at each of 4, 5 and 6.
 function boardAt(n: number): Board {
   const map = HEXES.map(({ q, r, terrain }): HexView => {
     const b = BUILT.find((x) => x.at === `${q},${r}` && x.from <= n);
@@ -31,7 +31,7 @@ function boardAt(n: number): Board {
   const dragon = (owner: number, stage: number) => ({
     id: `x${owner}`, owner, name: '', element: ELEMENTS[owner], stage, perch: null, status: stage ? 'ready' : 'egg', canRaid: stage > 0, hp: 1, maxHp: 1,
   }) as DragonView;
-  return { map, dragons: n < 3 ? [] : [dragon(0, Math.min(3, n - 3)), ...(n >= 6 ? [dragon(1, 3)] : [])] };
+  return { map, dragons: [0, 1].map((p) => dragon(p, Math.min(3, Math.max(0, n - 3)))) };
 }
 
 export interface Explainer { title: (html: string) => void }
@@ -67,7 +67,8 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
       put(0);
       const rows = [`<div class="xrow">${buildingIcon('tower', 46, PLAYER_COLORS[0])}${gainChips(book!.tower.makes, 1.6)}</div>`, `<div class="xrow">${buildingIcon('quarry', 46, '#8d8f96')}<span class="xdie">${dieFace(4, 3, 'rolling')}</span></div>`];
       showBox.innerHTML = `<div class="xsheet">${rows.join('')}</div>`;
-      return [[2200, () => { showBox.querySelector('.xdie')!.innerHTML = `${dieFace(4, 3)}${gainChips({ stone: 3 }, 1.6)}`; }]];
+      const rolls: Act[] = [1, 4, 2, 4, 1, 2, 4, 1, 2, 4].map((n, i) => [(i + 1) * 180, () => { showBox.querySelector('.xdie b')!.textContent = String(n); }]);
+      return [...rolls, [2200, () => { showBox.querySelector('.xdie')!.innerHTML = `${dieFace(4, 3)}${gainChips({ stone: 3 }, 1.6)}`; }]];
     },
     cards: () => {
       put(0);
@@ -79,7 +80,7 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
     },
     actions: () => {
       put(0);
-      return [[1000, () => put(1)], [3200, () => put(2)], [5400, () => put(3)]];
+      return [[1000, () => put(1)], [3600, () => put(2)]];
     },
     grow: () => {
       put(3);
@@ -103,8 +104,11 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
       if (stage3d) {
         const stage = new stage3d.FightStage(t.key,
           ELEMENTS.map((element, i) => ({ key: `d${i}`, fighter: { dragon: { element, stage: 3 } }, maxHp: hps[i], label })),
-          t.units.map((u, i) => ({ key: `u${i}`, fighter: { foe: unit(u.name) }, maxHp: u.maxHp, label })), false, { top: 0.1, bottom: 0.22 });
-        stage.mount(fightBox);
+          t.units.map((u, i) => ({ key: `u${i}`, fighter: { foe: unit(u.name) }, maxHp: u.maxHp, label })), false, { top: 0.18, bottom: 0.2 }, true);
+        const box = document.createElement('div');
+        box.className = 'xstage';
+        fightBox.append(box);
+        stage.mount(box);
         hit = (from, to, falls) => { stage.strike(from); stage.hit(to); if (falls) stage.fall(to); };
       } else {
         fightBox.innerHTML = `${backdrop(t.key)}<div class="xflat"><div>${ELEMENTS.map((e, i) => `<span data-f="d${i}">${dragonFigure(e)}</span>`).join('')}</div><div>${t.units.map((u, i) => `<span data-f="u${i}">${unitFigure(unit(u.name))}</span>`).join('')}</div></div>`;

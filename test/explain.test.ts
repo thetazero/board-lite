@@ -21,9 +21,9 @@ test("its phases are the rules', and it shows each", () => {
 test("its numbers are the game's", () => {
   assert.ok(STEPS.at(-1)!.text.includes(`${TUNING.pointsToWin} points`));
   const worth = (name: string) => SCORES.find((s) => s.name === name)!.points;
-  assert.equal(worth('Title'), TUNING.titlePoints);
-  for (const b of Object.values(BEASTS)) assert.equal(worth('Great beast'), b.points);
-  assert.ok(rules.includes(`Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): ${worth('Monument card')} each`));
+  assert.equal(worth('Most dragon power, tower floors or gold'), TUNING.titlePoints);
+  for (const b of Object.values(BEASTS)) assert.equal(worth('Slay a great beast'), b.points);
+  assert.ok(rules.includes(`Monument cards (Monument, Standing Stones, Lighthouse, Guildhall): ${worth('Monument')} each`));
   assert.ok(rules.includes(`Production buildings: ${worth('Production building')} each`));
   assert.ok(rules.includes('Draw 1 action card and 2 building cards; keep 1 of the building cards'));
 });
