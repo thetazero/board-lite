@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { taps } from '../web/taps.ts';
+import { steady, taps } from '../web/taps.ts';
 import { named } from '../web/common.ts';
 import { Room } from '../src/host.ts';
 import { RESOURCES } from '../src/data.ts';
@@ -241,4 +241,19 @@ test('errors a stale tap can meet are said in words, not ids', () => {
   assert.equal(named('There is no offer "o3" made to you.', names), 'There is no offer made to you.');
   assert.equal(named('You have no open offer "o3".', names), 'You have no open offer.');
   assert.equal(named('You have no card "c12" in hand.', names), "That card isn't in your hand any more.");
+});
+
+test('a second tap on a remove button does not remove whoever moved up under it', () => {
+  let t = 1000;
+  const list = steady(600, () => t);
+  list.drawn([1, 2, 3]);
+  assert.ok(list.still);
+  list.drawn([1, 2, 3, 4]); // someone joining moves no one
+  assert.ok(list.still);
+  list.drawn([1, 3, 4]);
+  t += 300;
+  assert.ok(!list.still);
+  list.drawn([1, 3, 4]); // drawn again, unchanged
+  t += 300;
+  assert.ok(list.still);
 });

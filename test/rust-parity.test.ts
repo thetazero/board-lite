@@ -60,7 +60,7 @@ function junk(g: Game, rng: Rng): string {
   ]);
 }
 
-const lobby: Lobby = { code: 'ABCD', started: true, seating: false, saved: null, seats: [{ name: 'Ada', kind: 'player', connected: true, standIn: false, left: false }, { name: 'Tick', kind: 'bot', connected: true, standIn: false, left: false }], minPlayers: 2, maxPlayers: 6, file: '', remote: true };
+const lobby: Lobby = { code: 'ABCD', started: true, seating: false, saved: null, seats: [{ id: 1, name: 'Ada', kind: 'player', connected: true, standIn: false, left: false }, { id: 2, name: 'Tick', kind: 'bot', connected: true, standIn: false, left: false }], minPlayers: 2, maxPlayers: 6, file: '', remote: true };
 
 test('the Rust engine plays every game as this one does', { skip, timeout: 110000 }, async () => {
   const r = rust();

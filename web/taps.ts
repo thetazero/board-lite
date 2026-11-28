@@ -133,6 +133,22 @@ export function taps(opts: {
   return { tap, send, call, seen };
 }
 
+// A list whose items each have a remove button. When one goes, the next moves
+// up under the finger: for a moment after that a tap is the last one's second
+// (or meant for what was there), and removes no one. `drawn` is told the list
+// each time it's drawn.
+export function steady(ms = 600, now: () => number = Date.now) {
+  let was: number[] = [];
+  let moved = -Infinity;
+  return {
+    drawn(ids: number[]) {
+      if (was.some((id) => !ids.includes(id))) moved = now();
+      was = ids;
+    },
+    get still() { return now() - moved >= ms; },
+  };
+}
+
 // Unique enough for one phone's commands. (crypto.randomUUID needs https,
 // and a table on Wi-Fi is usually plain http.)
 function newId(): string {

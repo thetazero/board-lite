@@ -220,7 +220,8 @@ export interface Lobby {
   saved: number | null; // when someone at the table saved the game (ms epoch): it waits until someone continues it
   // standIn: a bot makes this player's moves (they quit: left, or they're away).
   // strong: a bot seat played by the strong bot (src/strongbot.ts).
-  seats: { name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean; strong?: boolean }[];
+  // id: the seat's own, which stays with it when its number changes: what removing a player names.
+  seats: { id: number; name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean; strong?: boolean }[];
   minPlayers: number;
   maxPlayers: number;
   file: string; // where the server saves the game

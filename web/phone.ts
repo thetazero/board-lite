@@ -13,7 +13,7 @@ import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } f
 import { qrSvg } from './qr.ts';
 import { morph } from './morph.ts';
 import { askKey, PhoneView, type View } from './view.ts';
-import { taps } from './taps.ts';
+import { steady, taps } from './taps.ts';
 import { bookSheet, loadBook, wheelAt, wheelOrder, type BookTab } from './book.ts';
 import { ART_DEFS, cardArt, frameColor, kindIcon, stageFigure, tableScene, towerToken, winnerScene } from './art.ts';
 
@@ -379,8 +379,10 @@ function leaveToJoin(msg: string) {
 // The lobby: who's at the table. The first player starts the game and adds or
 // removes bots (as the TV does); everyone else waits for them. A saved game
 // hosted again comes back here until every seat is taken.
+const seatList = steady();
 function renderLobby() {
   const l = snap!.lobby;
+  seatList.drawn(l.seats.map((s) => s.id));
   const me = seatIndex();
   const host = me === 0;
   const pc = PLAYER_COLORS[me] ?? '#888';
@@ -389,7 +391,7 @@ function renderLobby() {
   const seat = (s: Snapshot['lobby']['seats'][number], i: number) => s.kind === 'open'
     ? `<li class="open" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>Open seat</span></li>`
     : `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
-      ${host && i !== me ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
+      ${host && i !== me ? `<button class="x" data-remove="${s.id}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
   const hint = l.seating ? `The game goes on once every seat is taken.`
     : host ? '' : `${first ? esc(first) : 'The first to join'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
@@ -412,7 +414,7 @@ function renderLobby() {
   if (host) {
     on('bot', () => call(`/api/rooms/${code}/bot`, { token }));
     if (!l.seating) on('start', () => call(`/api/rooms/${code}/start`, { token }));
-    bind('[data-remove]', (b) => call(`/api/rooms/${code}/leave`, { token, seat: Number(b.dataset.remove) }));
+    bind('[data-remove]', (b) => seatList.still && call(`/api/rooms/${code}/leave`, { token, player: Number(b.dataset.remove) }));
   }
   on('leave', async () => {
     await call(`/api/rooms/${code}/leave`, { token });

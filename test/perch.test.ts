@@ -143,7 +143,7 @@ test('a suppressed roost houses no dragons, and too many dragons only stops hatc
   assert.equal(g.dragons.filter((x) => x.owner === 0).length, room);
   const me = seatState(g, 0);
   assert.ok(me.dragonsHoused > me.dragonCapacity);
-  const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
+  const seats = g.players.map((_, q) => ({ id: q, name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...me, name: 'P1' } }, 10);
   assert.match(view, /2 over, no hatching until there.s room/);
 });
@@ -246,7 +246,7 @@ test('a beast and perched dragons on one building fight together', () => {
 
 test("the CLI offers perch, recall and clearing a rival's perched dragons", () => {
   const { g, pasture } = perchGame();
-  const seats = g.players.map((_, q) => ({ name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
+  const seats = g.players.map((_, q) => ({ id: q, name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = (p: number) => seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: p, game: publicState(g, 100), scene: 0, you: { ...seatState(g, p, 100), name: `P${p + 1}` } }, 10);
   const d = addDragon(g, 1, 2);
   apply(g, 0, 'end');
