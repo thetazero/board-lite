@@ -269,7 +269,7 @@ test('a seat whose phone is gone is open: the first player decides, or someone n
   assert.equal(room.join('Zed'), room.seats[1]);
   assert.equal(room.seats[1].name, 'Zed');
   assert.throws(() => room.state(old), /not in this game/);
-  room.command(room.seats[1].token, 'say hello');
+  room.command(room.seats[1].token, { do: 'say', message: 'hello' });
   room.close();
 });
 
@@ -300,7 +300,7 @@ test('a seat whose phone is here is opened only by the first player, after a wai
   assert.deepEqual(deciders(room, 0), [1], 'never themselves');
   assert.ok(!room.seats[1].opened, 'never on its own');
   assert.throws(() => room.open(cora.token, 1), /Only Ada/);
-  room.command(bram.token, 'say wait');
+  room.command(bram.token, { do: 'say', message: 'wait' });
   assert.throws(() => room.open(ada.token, 1), /Bram is playing/, 'a word from Bram starts the wait over');
   assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
   room.open(ada.token, 1);
@@ -312,7 +312,7 @@ test('a seat whose phone is here is opened only by the first player, after a wai
   assert.ok(!room.seats[1].opened && !room.seats[1].standIn);
   assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
   room.open(ada.token, 1);
-  room.command(bram.token, 'say here');
+  room.command(bram.token, { do: 'say', message: 'here' });
   assert.ok(!room.seats[1].opened, 'so does a move');
   assert.ok(await until(() => deciders(room, 1).length > 0, 3000));
   room.open(ada.token, 1);
