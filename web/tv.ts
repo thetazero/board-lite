@@ -338,7 +338,8 @@ function doing(g: PublicState, p: number): string {
 // whether it went hungry this round.
 function tvDragon(d: DragonView, all: DragonView[], roomy: boolean, round: number): string {
   const grow = roomy && d.stage < 3 ? ` <span class="grow">${'●'.repeat(d.growth)}${'○'.repeat(Math.max(0, d.growthTime - d.growth))}</span>` : '';
-  return `<div class="tvdragon${d.status === 'out' ? ' out' : ''}">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}${d.hungry ? ` ${hungerTags(d)}` : ''}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''} ${dragonState(d, round)}</span></div></div>`;
+  const state = dragonState(d, round);
+  return `<div class="tvdragon${d.status === 'out' ? ' out' : ''}">${dragonBadge(d, 44)}<div><b>${esc(dragonLabel(d, all))}${d.hungry ? ` ${hungerTags(d)}` : ''}</b><span>${STAGE_LABEL[d.stage]}${grow}${d.stage ? ` ${powerTag(d.power)}` : ''}${state ? ` <span class="tvstate">${state}</span>` : ''}</span></div></div>`;
 }
 
 // A player's dragons in brief, for a board too crowded for the list (#406):
@@ -510,7 +511,13 @@ function fitSide() {
   };
   fit(Math.max(min, start * BRIEF_BELOW));
   if (!over()) return;
-  if (!tall()) return fit(min);
+  if (!tall()) {
+    fit(min);
+    if (!over()) return;
+    // Still too wide: a dragon's tag and health bar go on a line of their own.
+    for (const s of sides) s.classList.add('wrapstate');
+    if (!tall()) return;
+  }
   // In brief, a card is mostly pictures and a few numbers: it may go a little smaller.
   for (const s of sides) s.classList.add('brief');
   fit(min * 0.85);
@@ -590,7 +597,7 @@ function renderRaid(g: PublicState) {
   if (raid.step === 'vote') {
     body = `<h1>${icon('raid', 1.1)} Vote ${raidPips(g)}</h1>
       <div class="candidates vote" style="--cols:${raid.candidates.length <= 3 ? raid.candidates.length : Math.ceil(raid.candidates.length / 2)}">${raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names)).join('')}</div>
-      <div class="status">${names.flatMap((_, p) => (raid.voters[p] ? [`${voterTag(p, raid.votePower[p], names)} ${check(raid.votes[p] !== null)}`] : [])).join(' ')}</div>`;
+      <div class="status votes">${names.flatMap((_, p) => (raid.voters[p] ? [`<span class="votemark">${voterTag(p, raid.votePower[p], names)} ${check(raid.votes[p] !== null)}</span>`] : [])).join(' ')}</div>`;
   } else if (raid.step === 'choose') {
     // Who's in (everyone with a raid-ready dragon, all of them), with what,
     // and whether they've chosen (never what they chose):
@@ -981,7 +988,7 @@ function battle(g: PublicState, place: string, head: string, dragons: DragonView
     ? `<div class="bside bl">${lcols.map((c) => col(leftFigs, c)).join('')}</div><div class="bside br${boss ? ' bossed' : ''}">${boss ? `<div class="boss" style="--a:${right[boss.i].aspect.toFixed(2)}">${foeFigs[boss.i]}</div><div class="bcols">${rcols.map((c) => col(foeFigs, c)).join('')}</div>` : rcols.map((c) => col(foeFigs, c)).join('')}</div>`
     : `<div class="bside bl">${side}</div><div class="bside br">${foes}</div>`;
   const html = `<div class="fightscene">${live ? '<div class="stagebox"></div>' : backdrop(place)}
-      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Combat round</small><b class="cround"></b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first.word)}</b></div></header>
+      <header class="fhead"><h2>${head}</h2><div class="bvs"><small>Combat round</small><b class="cround">1</b></div><div class="bvs bfirst"><small>Strikes first</small><b>${esc(first.word)}</b></div></header>
       ${coinFlip(first)}
       <div class="outcome">${outcome}</div>
       ${live ? `<div class="battle live">${side}${foes}</div>` : `<div class="battle ${fit}>${sides}</div>`}
