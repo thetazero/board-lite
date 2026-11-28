@@ -703,8 +703,9 @@ fn card_view(g: &Game, p: usize, c: &Card) -> CardView {
                 "gain_resource" => v.needs = "resource",
                 "grow_dragon" => {
                     v.needs = "dragon";
-                    v.dragons = g.dragons_of(p).filter(|d| d.stage < 3).map(|d| d.id).collect();
-                    v.blocked = v.dragons.is_empty().then(|| "All your dragons are adults.".into());
+                    v.dragons = g.dragons_of(p).filter(|d| d.stage < 3 && d.damage == 0).map(|d| d.id).collect();
+                    let grown = g.dragons_of(p).all(|d| d.stage == 3);
+                    v.blocked = v.dragons.is_empty().then(|| if grown { "All your dragons are adults." } else { "All your dragons that can grow are hurt: heal one first." }.into());
                 }
                 "heal_dragon" => {
                     v.needs = "dragon";

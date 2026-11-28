@@ -25,7 +25,7 @@ let picsFor = -1; // the seat the pictures were drawn for (their buildings are i
 const pics = new Map<string, string>();
 
 const TERRAIN_NOUN: Record<string, string> = { mountain: 'mountain hex', forest: 'forest hex', ley: 'crystal field hex', meadow: 'meadow hex', desert: 'desert hex', harbor: 'harbor hex', ocean: 'ocean hex' };
-const CLASS_HEAD: Record<string, string> = { quarry: 'Stone buildings', lumber: 'Timber buildings', mine: 'Crystal buildings', pasture: 'Livestock buildings', dragon: 'Dragon buildings', trade: 'Trade buildings', monument: 'Monuments' };
+const CLASS_HEAD: Record<string, string> = { quarry: 'Stone buildings', lumber: 'Timber buildings', mine: 'Crystal buildings', pasture: 'Livestock buildings', market: 'Gold buildings', dragon: 'Dragon buildings', trade: 'Trade buildings', monument: 'Monuments' };
 // What each upgrade is shown on: a building of its class.
 const UPGRADE_ON: Record<string, { building: string; terrain: string }> = { workshop: { building: 'quarry', terrain: 'mountain' }, nesting_grounds: { building: 'roost', terrain: 'desert' } };
 const ELEMENTS = ['fire', 'ice', 'lightning', 'air', 'water'];
@@ -187,7 +187,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
     return `${wheel(b.elementBeats)}<p class="wheelrule">Double damage where the arrow points.</p>`;
   },
   kingdoms(b) {
-    return `<p class="bintro">After each raid, each kingdom that didn’t fall adds 1 gold to its loot.</p>
+    return `<p class="bintro">Each round, each kingdom that didn’t fall adds 1 gold to its loot, even with no raid.</p>
       ${b.kingdoms.map((t) => `<section class="ptarget bking" data-key="b king ${t.key}"><h3 class="tname">${esc(t.name)}</h3>${powerTag(t.power, 'big')}${foeStack(t.units, 1.6)}${lootLine(t.loot, 1.2)}${pointsLine(t, 1.2)}</section>`).join('')}`;
   },
   cards(b) {

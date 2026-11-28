@@ -623,7 +623,7 @@ const ACTIONS: Record<string, () => string> = {
 
 // The picture for one card. `element` is a dragon's element.
 // Until a building has its own picture it borrows its class's.
-const CLASS_ART: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', dragon: 'roost', monument: 'monument', trade: 'port' };
+const CLASS_ART: Record<string, string> = { quarry: 'quarry', lumber: 'lumber_camp', mine: 'crystal_mine', pasture: 'pasture', market: 'market', dragon: 'roost', monument: 'monument', trade: 'port' };
 
 export function cardArt(kind: string, key: string, element?: string, cls?: string): string {
   const draw = kind === 'building' ? BUILDINGS[key] ?? BUILDINGS[CLASS_ART[cls ?? ''] ?? ''] : kind === 'upgrade' ? UPGRADES[key] : kind === 'action' ? ACTIONS[key] : null;

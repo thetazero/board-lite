@@ -285,7 +285,7 @@ export function seatView(s: Snapshot, logLines = 25, opts: ViewOptions = {}): st
   const peak = g.map.find((h) => h.peak)?.k;
   const slain = g.beasts.filter((b) => b.slainBy !== null).map((b) => `${b.name} by ${P(b.slainBy!)}`);
   out.push(`Great beasts slain: ${slain.join(', ') || 'none'}. Once the Thunderbird is slain, production buildings on or adjacent to the peak${peak ? ` (${peak})` : ''} make ${g.peakBonus} more each round.`);
-  out.push(`Kingdoms (loot now; +1 gold after each raid it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (Power ${t.power}) ${resText(t.loot)}${t.points ? `, ${plural(t.points, 'point')}` : ''}`).join('; ')}.`);
+  out.push(`Kingdoms (loot now; +1 gold each round it doesn't fall in): ${g.kingdoms.map((t) => `${t.name} (Power ${t.power}) ${resText(t.loot)}${t.points ? `, ${plural(t.points, 'point')}` : ''}`).join('; ')}.`);
   if (g.raid) {
     out.push('');
     out.push(...raidText(g, you));
