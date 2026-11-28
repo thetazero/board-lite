@@ -117,10 +117,10 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
   }
 }
 
-// The first player to join, who can start the game from their phone (with
-// the TV), by name; null if the first seat isn't a person's.
-export function firstPlayer(l: Snapshot['lobby']): string | null {
-  return l.seats[0]?.kind === 'player' ? l.seats[0].name : null;
+// The player who can start the game from their phone (with the TV), by name;
+// null if no one's in it.
+export function starterName(l: Snapshot['lobby']): string | null {
+  return l.seats[l.starter ?? -1]?.name ?? null;
 }
 
 // ---------- small DOM helpers ----------

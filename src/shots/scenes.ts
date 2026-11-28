@@ -1878,6 +1878,17 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    name: 'remote-lobby-left',
+    players: 2,
+    seed: 1,
+    lobby: { bots: 1 },
+    remote: true,
+    shots: () => [
+      { file: 'phone-remote-lobby-left', caption: 'No TV: the first player leaves the lobby; the next can start', client: 'phone', fill: { name: 'Bram' }, clicks: ['#join button[type=submit]'], waitFor: '.plobby', then: (room) => room.leave(0) },
+      { file: 'tv-wrong-code', caption: 'TV: an address with a wrong code', client: 'tv', path: '/tv?room=ZZZZ', waitFor: '#newroom' },
+    ],
+  },
+  {
     name: 'remote-lobby-3p',
     players: 3,
     seed: 1,

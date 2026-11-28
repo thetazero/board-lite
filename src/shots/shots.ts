@@ -534,7 +534,8 @@ async function main() {
             if (shot.table) {
               url = `${base}/tv?room=${code}&remote&n=${n++}`;
             } else if (shot.client === 'tv' && shot.path) {
-              url = `${base}${typeof shot.path === 'function' ? shot.path(room) : shot.path}?n=${n++}`;
+              const path = typeof shot.path === 'function' ? shot.path(room) : shot.path;
+              url = `${base}${path}${path.includes('?') ? '&' : '?'}n=${n++}`;
               tab.info = LAN;
             } else if (shot.client === 'tv') {
               url = `${base}/tv?room=${code}&n=${n++}`;
