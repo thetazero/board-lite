@@ -68,7 +68,8 @@ pub struct Seat {
     pub token: String,
     pub kind: Kind,
     connected: usize,
-    seen: i64,
+    answering: usize, // the connected streams whose pages answer pings: no sign of anyone by themselves
+    seen: i64,        // when it was last heard from
     stand_in: bool,
     left: bool,
     strong: bool, // a bot seat played by the strong bot
@@ -224,7 +225,7 @@ pub struct Here {
 }
 enum Who {
     Nobody,
-    Seat { uid: u64, stream: bool },
+    Seat { uid: u64, stream: bool, answers: bool },
     Screen { tv: bool },
 }
 impl Drop for Here {
@@ -243,16 +244,22 @@ impl Drop for Here {
                 }
                 i.log.write("disconnect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
             }
-            Who::Seat { uid, stream } => {
+            Who::Seat { uid, stream, answers } => {
                 let Some(p) = i.seats.iter().position(|s| s.uid == uid) else { return };
-                i.seats[p].connected -= 1;
+                let s = &mut i.seats[p];
+                s.connected -= 1;
+                // A page that answers was last there when it last answered: its stream can end long after it's gone.
+                if answers {
+                    s.answering = s.answering.saturating_sub(1);
+                } else {
+                    s.seen = now_ms();
+                }
                 if stream {
                     let streams = i.seats[p].connected;
                     let by = i.sender(p);
                     i.log.write("disconnect", &by, json!({"seat": p, "streams": streams}));
                     room.changed(i);
                 } else {
-                    i.seats[p].seen = now_ms();
                     room.watch_away(i);
                 }
             }
@@ -261,8 +268,12 @@ impl Drop for Here {
 }
 
 impl Seat {
+    /// Whether it counts as here however long it says nothing.
+    fn held(&self) -> bool {
+        self.connected > self.answering
+    }
     fn here(&self, now: i64, away: i64) -> bool {
-        self.kind == Kind::Bot || (!self.left && (self.connected > 0 || now - self.seen < away))
+        self.kind == Kind::Bot || (!self.left && (self.held() || now - self.seen < away))
     }
 }
 
@@ -313,14 +324,14 @@ impl Inner {
     }
     fn new_seat(&mut self, name: String, kind: Kind) -> Seat {
         self.next_uid += 1;
-        Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, seen: 0, stand_in: false, left: false, strong: false, via: None }
+        Seat { uid: self.next_uid, name, token: token(), kind, connected: 0, answering: 0, seen: 0, stand_in: false, left: false, strong: false, via: None }
     }
     /// The seat's token is no longer the one it was, and whoever held that is
     /// not here: their streams and waits still open count for no one.
     fn new_hands(&mut self, p: usize) {
         self.next_uid += 1;
         let s = &mut self.seats[p];
-        (s.uid, s.token, s.connected) = (self.next_uid, token(), 0);
+        (s.uid, s.token, s.connected, s.answering) = (self.next_uid, token(), 0, 0);
     }
     /// Whether the game waits on seat p now.
     fn waits_on(&self, p: usize) -> bool {
@@ -381,7 +392,8 @@ impl Room {
         for s in saved.into_iter().flat_map(|s| s.seats) {
             let seat = i.new_seat(s.name, s.kind);
             let uid = if s.id == 0 { seat.uid } else { s.id }; // (saved before seats had ids)
-            i.seats.push(Seat { uid, token: s.token, stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.claude.then_some("claude"), ..seat });
+            // Everyone has as long to come back as if their phone had just dropped.
+            i.seats.push(Seat { uid, token: s.token, seen: now_ms(), stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.claude.then_some("claude"), ..seat });
         }
         if let Some(g) = &i.game {
             let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left})).collect();
@@ -404,6 +416,7 @@ impl Room {
                 i.behind = true;
                 eprintln!("{e}");
             }
+            room.watch_away(i);
             if again && i.has_tv {
                 room.tv_gone(i);
             }
@@ -865,7 +878,7 @@ impl Room {
     }
     fn holding(&self, i: &mut Inner, p: usize) -> Here {
         i.seats[p].connected += 1;
-        Here { room: self.me.upgrade().expect("a room in use"), who: Who::Seat { uid: i.seats[p].uid, stream: false } }
+        Here { room: self.me.upgrade().expect("a room in use"), who: Who::Seat { uid: i.seats[p].uid, stream: false, answers: false } }
     }
 
     /// What a client that holds no stream open asks for: the snapshot a phone gets.
@@ -935,12 +948,16 @@ impl Room {
     fn watch_away(&self, i: &mut Inner) {
         clear(&mut i.away_timer);
         let now = now_ms();
-        let ends = i.seats.iter().filter(|s| s.kind == Kind::Player && !s.left && s.connected == 0 && s.here(now, self.opts.away_ms)).map(|s| s.seen + self.opts.away_ms).min();
+        let due: Vec<(u64, i64)> = i.seats.iter().filter(|s| s.kind == Kind::Player && !s.left && !s.held() && s.here(now, self.opts.away_ms)).map(|s| (s.uid, s.seen + self.opts.away_ms)).collect();
+        let ends = due.iter().map(|d| d.1).min();
         // (The screenshots mark everyone here for good: no timer for that.)
         if let Some(at) = ends.filter(|at| at - now < i32::MAX as i64) {
-            i.away_timer = self.after(at - now + 10, |room, i| {
+            i.away_timer = self.after(at - now + 10, move |room, i| {
                 i.away_timer = None;
-                room.changed(i);
+                // Heard from since then, they're still here, and nothing has changed.
+                let now = now_ms();
+                let gone = i.seats.iter().any(|s| due.iter().any(|d| d.0 == s.uid) && !s.here(now, room.opts.away_ms));
+                if gone { room.changed(i) } else { room.watch_away(i) }
             });
         }
     }
@@ -1037,7 +1054,8 @@ impl Room {
     }
     /// The snapshot's JSON, in pieces: the game's are shared by everyone who gets them.
     fn snapshot_of(&self, i: &mut Inner, tok: Option<&str>) -> Vec<Bytes> {
-        let p = tok.and_then(|t| i.seat_of(t));
+        // (Not seat_of: being sent a snapshot is no sign that anyone is there.)
+        let p = tok.and_then(|t| i.seats.iter().position(|s| s.token == t));
         let lobby = json!(self.lobby_of(i));
         let seat = p.map_or(-1, |p| p as i64);
         let mut out = vec![Bytes::from(format!(r#"{{"lobby":{lobby},"seat":{seat},"game":"#))];
@@ -1061,8 +1079,18 @@ impl Room {
     pub fn watch(&self) -> watch::Receiver<u64> {
         self.changes.subscribe()
     }
-    /// A stream with no seat is a screen; `tv` says it's a TV page.
-    pub fn connect(&self, tok: Option<&str>, tv: bool) -> Here {
+    /// A page answers its stream's ping: its player is here.
+    pub fn answer(&self, tok: &str) -> Res {
+        let i = &mut *lock(&self.inner);
+        let was: Vec<bool> = i.seats.iter().map(|s| s.here(now_ms(), self.opts.away_ms)).collect();
+        let p = self.player_seat(i, tok)?;
+        if !was[p] {
+            self.changed(i);
+        }
+        Ok(())
+    }
+    /// A stream with no seat is a screen; `tv` says it's a TV page, `answers` that a seat's page answers pings.
+    pub fn connect(&self, tok: Option<&str>, tv: bool, answers: bool) -> Here {
         let room = self.me.upgrade().expect("a room in use");
         let i = &mut *lock(&self.inner);
         let Some(tok) = tok else {
@@ -1085,12 +1113,14 @@ impl Room {
             s.via = Some("phone");
         }
         s.connected += 1;
+        s.answering += answers as usize;
+        s.seen = s.seen.max(now_ms());
         let (uid, streams) = (s.uid, s.connected);
         let by = i.sender(p);
         i.log.write("connect", &by, json!({"seat": p, "streams": streams}));
         self.back(i, p);
         self.changed(i);
-        Here { room, who: Who::Seat { uid, stream: true } }
+        Here { room, who: Who::Seat { uid, stream: true, answers } }
     }
     pub fn tv_watching(&self) -> bool {
         lock(&self.inner).tvs > 0
@@ -1240,8 +1270,9 @@ pub mod stage {
             let i = &mut *lock(&self.inner);
             let mut old: Vec<Seat> = std::mem::take(&mut i.seats);
             for s in seats {
-                let connected = old.iter().find(|o| o.uid == s.uid).map_or(0, |o| o.connected);
-                i.seats.push(Seat { uid: s.uid, name: s.name, token: s.token, kind: s.kind, connected: s.connected.unwrap_or(connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: via(s.via) });
+                let (connected, answering) = old.iter().find(|o| o.uid == s.uid).map_or((0, 0), |o| (o.connected, o.answering));
+                let connected = s.connected.unwrap_or(connected);
+                i.seats.push(Seat { uid: s.uid, name: s.name, token: s.token, kind: s.kind, connected, answering: answering.min(connected), seen: s.seen, stand_in: s.stand_in, left: s.left, strong: s.strong, via: via(s.via) });
             }
             old.clear();
             i.saved_at = saved_at;

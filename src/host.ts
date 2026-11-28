@@ -98,7 +98,7 @@ export interface Seat {
   token: string;
   kind: SeatKind;
   connected: number; // open event streams
-  seen: number; // last request from this seat (ms epoch)
+  seen: number; // when this seat was last heard from (ms epoch)
   standIn: boolean;
   left: boolean;
   strong?: boolean;
@@ -264,8 +264,8 @@ export class Room {
     this.sync();
     return this.left;
   }
-  connect(tok: string | null, tv = false): () => void {
-    const here = this.ask('connect', { tok, tv });
+  connect(tok: string | null, tv = false, answers = false): () => void {
+    const here = this.ask('connect', { tok, tv, answers });
     return () => this.ask('disconnect', { here });
   }
   async wait(tok: string, ms: number): Promise<{ code: number; state: Snapshot }> {
