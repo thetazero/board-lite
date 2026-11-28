@@ -39,7 +39,10 @@ class FakeSource {
 test('a stream that goes quiet is opened again; one that pings stays', async () => {
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
   const g = globalThis as Record<string, unknown>;
+  const answered: string[] = [];
+  const fetched = g.fetch;
   Object.assign(g, {
+    fetch: async (url: string, o?: { body?: string }) => (answered.push(`${url} ${o?.body}`), new Response('{}')),
     EventSource: FakeSource,
     document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
     addEventListener() {},
@@ -52,7 +55,7 @@ test('a stream that goes quiet is opened again; one that pings stays', async () 
     const stop = watch('ABCD', 'tok', (s) => got.push(s), (ok) => status.push(ok));
     assert.equal(FakeSource.made.length, 1);
     const first = FakeSource.made[0];
-    assert.match(first.url, /\/api\/rooms\/ABCD\/events\?token=tok/);
+    assert.match(first.url, /\/api\/rooms\/ABCD\/events\?token=tok&answers/);
     first.snapshot({ n: 1 });
 
     // Pinged every 15 s, it's alive: no new stream, however long it lasts.
@@ -61,6 +64,7 @@ test('a stream that goes quiet is opened again; one that pings stays', async () 
       first.ping();
     }
     assert.equal(FakeSource.made.length, 1, 'a pinging stream is kept');
+    assert.deepEqual(answered, Array(8).fill('/api/rooms/ABCD/here {"token":"tok"}'), 'every ping is answered (#520)');
 
     // Then nothing at all, and no error: dead. It's opened again, and the
     // phone says it's reconnecting until the new one sends the game.
@@ -83,6 +87,7 @@ test('a stream that goes quiet is opened again; one that pings stays', async () 
     assert.equal(FakeSource.made.length, 4, 'nothing once stopped');
   } finally {
     mock.timers.reset();
+    g.fetch = fetched;
     for (const k of ['EventSource', 'document', 'addEventListener', 'removeEventListener']) delete g[k];
   }
 });

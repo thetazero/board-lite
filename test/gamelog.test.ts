@@ -70,9 +70,10 @@ test('bots, stand-ins, connects, saves, loads and handovers are logged too', asy
 
   // Hosted again: the load is logged, the old entries aren't again, and the player taking the seat back is a handover.
   const before = room.game!.log.length;
-  const again = new Room('GLOB', { dir, file: room.file });
+  const again = new Room('GLOB', { dir, file: room.file, awayMs: 1 });
   const loaded = lines(again).filter((l) => l.type === 'load');
   assert.equal(loaded.at(-1).entries, before);
+  await sleep(5); // not while Ada could still be on the way back
   again.join('Ada', 'player', 'phone');
   assert.equal(lines(again).at(-1).type, 'handover');
   again.close();

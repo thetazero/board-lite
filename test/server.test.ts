@@ -282,6 +282,98 @@ test("a phone that closes on its turn: once it counts as away, the others hear s
   room.close();
 });
 
+// Three ways a phone drops, each away after about `awayMs`: not at once, and not much later (#520).
+const until = async (done: () => boolean, ms: number) => {
+  const end = Date.now() + ms;
+  while (!done() && Date.now() < end) await sleep(5);
+  return done();
+};
+
+test('a phone that loses Wi-Fi with its stream still open is away once it stops answering pings', async () => {
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 60_000, awayMs: 400 }, [], '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, string>;
+  const ctrl = new AbortController();
+  try {
+    const { code } = await post('/api/rooms', {});
+    const ada = (await post(`/api/rooms/${code}/join`, { name: 'Ada' })).token;
+    const bram = (await post(`/api/rooms/${code}/join`, { name: 'Bram' })).token;
+    await post(`/api/rooms/${code}/start`, { token: ada });
+    const room = rooms.get(code)!;
+    await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
+    assert.ok(room.here(room.seats[1]), 'not at once');
+    // The table plays on: being sent it doesn't make Bram here.
+    const end = Date.now() + 2000;
+    while (room.here(room.seats[1]) && Date.now() < end) {
+      room.command(ada, 'say hello');
+      await sleep(20);
+    }
+    assert.equal(room.seats[1].connected, 1, 'the stream never closed');
+    assert.ok(!room.here(room.seats[1]), 'away all the same');
+    room.standInFor(ada, 1);
+    // Back on Wi-Fi, the page answers on the same stream, and gets its seat back.
+    assert.deepEqual(await post(`/api/rooms/${code}/here`, { token: bram }), {});
+    assert.ok(room.here(room.seats[1]) && !room.seats[1].standIn);
+    // Answering, it stays, and the table isn't told anything new.
+    const version = room.snapshot(null).v;
+    for (let i = 0; i < 16; i++) {
+      await sleep(50);
+      await post(`/api/rooms/${code}/here`, { token: bram });
+      assert.ok(room.here(room.seats[1]));
+    }
+    assert.ok(room.snapshot(null).v! <= version! + 1, 'at most Ada going quiet');
+    // Its stream ending long after the phone went doesn't bring it back.
+    assert.ok(await until(() => !room.here(room.seats[1]), 2000));
+    ctrl.abort();
+    assert.ok(await until(() => room.seats[1].connected === 0, 2000));
+    assert.ok(!room.here(room.seats[1]));
+  } finally {
+    ctrl.abort();
+    for (const r of rooms.values()) r.close();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
+test('a phone that reloads in a quiet game keeps its seat for a moment', async () => {
+  for (const answers of [false, true]) {
+    const room = new Room(answers ? 'RELA' : 'RELO', { dir, botDelayMs: 60_000, awayMs: 400 });
+    const [ada, bram] = ['Ada', 'Bram'].map((n) => room.join(n));
+    room.start(ada.token, 7);
+    const close = room.connect(bram.token, false, answers);
+    if (answers) {
+      await sleep(250); // it answered its last ping a while ago
+      room.state(bram.token);
+    } else await sleep(500); // nothing for longer than it takes to be away
+    close();
+    assert.ok(room.here(bram));
+    assert.throws(() => room.join('Bram'), /playing on another phone/);
+    assert.throws(() => room.standInFor(ada.token, 1), /is back/);
+    assert.ok(await until(() => !room.here(bram), 2000), 'then away');
+    room.close();
+  }
+});
+
+test('after a server restart, no seat can be taken until its player has had time to reconnect', async () => {
+  const roomsDir = mkdtempSync(join(dir, 'minute-'));
+  const opts = { dir: roomsDir, botDelayMs: 60_000, awayMs: 500 };
+  const first = new Room('MINU', opts);
+  const [ada, bram] = ['Ada', 'Bram'].map((n) => first.join(n));
+  first.start(ada.token, 7);
+  const tokens = [ada.token, bram.token];
+  first.close();
+  const room = new Room('MINU', opts);
+  assert.throws(() => room.join('Bram'), /playing on another phone/);
+  assert.throws(() => room.standInFor(tokens[0], 1), /is back/);
+  let updates = 0;
+  room.subscribe(() => updates++);
+  assert.ok(await until(() => !room.here(room.seats[1]), 2000), 'away after that');
+  assert.ok(await until(() => updates > 0, 1000), 'and the table hears so');
+  room.standInFor(tokens[0], 1);
+  room.close();
+});
+
 test('a game every player quits ends: the bots stop, nothing is saved again, and the server forgets the room', async () => {
   const room = new Room('GONE', { dir, botDelayMs: 0 });
   const seats = ['Ada', 'Bram'].map((n) => room.join(n));

@@ -66,7 +66,7 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
     clearTimeout(retry);
     es?.close();
     heard = Date.now();
-    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}` : tv ? '?tv' : ''}`));
+    const mine = (es = new EventSource(`/api/rooms/${code}/events${token ? `?token=${token}&answers` : tv ? '?tv' : ''}`));
     let first = true; // a new stream starts over: its first snapshot may come from a restarted server
     mine.onmessage = (e) => {
       heard = Date.now();
@@ -74,7 +74,12 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
       onSnapshot(JSON.parse(e.data), first);
       first = false;
     };
-    mine.addEventListener('ping', () => void (heard = Date.now()));
+    mine.addEventListener('ping', () => {
+      heard = Date.now();
+      // A seat's page says it's still here: a phone that lost its network can't, and counts as away after a minute
+      // (the server can't tell from the stream, above all behind a proxy).
+      if (token) post(`/api/rooms/${code}/here`, { token }).catch(() => {});
+    });
     mine.onerror = async () => {
       if (es !== mine) return; // a stream already replaced
       onStatus(false);

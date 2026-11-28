@@ -34,7 +34,7 @@ board-lite is running on port 8080.
 - **Rules:** **Rules** at the top of the phone opens a small rulebook over whatever screen you are on: every hex, border, building, beast, dragon, element, kingdom and action card, each building, beast and dragon drawn as the TV draws it. **Close** goes back to where you were. The TV carries no labels for these; the rulebook is where you look them up.
 - **Save:** to stop partway through and pick the game up another day, **⋯** next to your name → **Save game**, or **Save game** in the TV's top corner (it shows while the mouse moves). The game stops for everyone; see [Saving a game](#saving-a-game).
 - **Quit:** **⋯** next to your name → **Quit game**. A bot plays your seat; tap your name at the room's address to come back.
-- **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The seat goes back to them when their phone returns.
+- **Away:** when the table waits on someone whose phone is gone, the others get **Let a bot play** after a minute. The phone's page answers the server's pings, so one that loses its Wi-Fi counts as gone a minute after it last answered; after a server restart, everyone has a minute to reconnect. The seat goes back to them when their phone returns.
 
 The stand-in bot (`standInMove` in `src/bot.ts`) only makes the moves needed for the game to go on.
 
