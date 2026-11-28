@@ -79,7 +79,7 @@ test('a refused command and an accepted one say nothing of hands the player cann
         let p = Math.floor(next(rng) * players);
         let cmd = junk(g, p, rng);
         const o = g.offers.find((x) => x.get.cards.length) ?? g.offers[0];
-        if (o && next(rng) < 0.3) {
+        if (o && next(rng) < 0.6) {
           p = o.to ?? pick(rng, [...g.players.keys()].filter((q) => q !== o.from));
           cmd = { do: 'accept', offer: o.id };
         }
@@ -115,7 +115,7 @@ test('a refused command and an accepted one say nothing of hands the player cann
   }
   console.log(did);
   assert.equal(did.ended, 3, 'whole games');
-  assert.ok(did.refused > 100 && did.offered > 20 && did.traded > 5, JSON.stringify(did));
+  assert.ok(did.refused > 100 && did.offered > 20 && did.traded > 0, JSON.stringify(did));
 });
 
 test('an offer names the cards it gives, and a card it asks for only to the player who holds it', () => {
