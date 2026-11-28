@@ -12,7 +12,7 @@ node src/cli.ts join <room-url> <name>                       take a seat; prints
 node src/cli.ts bot <room-url> <token>                       add a bot to the room (first player only)
 node src/cli.ts start <room-url> <token>                     start the game (first player only)
 node src/cli.ts view <room-url> <token> [--log N]            what your seat sees, and its options
-node src/cli.ts do <room-url> <token> <command...>           make a decision
+node src/cli.ts do <room-url> <token> '<command>'            make a decision (JSON)
 node src/cli.ts wait <room-url> <token> [--timeout SECS]     block until you have a decision to make
 node src/cli.ts status <room-url>                            public summary: phase, who we're waiting on
 node src/cli.ts rules                                        print docs/rules.md
@@ -30,7 +30,7 @@ node src/cli.ts join http://localhost:8080/ABCD Ada        # prints Ada's token
 node src/cli.ts bot http://localhost:8080/ABCD <token>     # a bot takes seat 2
 node src/cli.ts start http://localhost:8080/ABCD <token>
 node src/cli.ts view http://localhost:8080/ABCD <token>    # read your view and options
-node src/cli.ts do http://localhost:8080/ABCD <token> keep c49
+node src/cli.ts do http://localhost:8080/ABCD <token> '{"do":"keep","card":"c49"}'
 node src/cli.ts wait http://localhost:8080/ABCD <token>    # until it's your decision again
 ```
 
@@ -38,35 +38,37 @@ Repeat: `wait`, `view`, `do`. To play several seats yourself, `join` once per se
 
 ## Decision commands
 
-Cards phase, at the start of each round (everyone at once): `keep c12` keeps one of the two building cards you drew; the other is discarded.
+A command is a JSON object: `do` says which, and each takes only the fields below. The phones, the bots and Claude players send the same ones (`src/command.ts`, `rust/src/command.rs`). Cards, dragons and offers are named by their ids (`"c12"`, `"d3"`, `"o40"`), hexes as `"2,-1"`, players as `"P2"`. Anything else is refused: `No such command: ...`.
+
+Cards phase, at the start of each round (everyone at once): `{"do":"keep","card":"c12"}` keeps one of the two building cards you drew; the other is discarded.
 
 Action phase, on your turn:
 
 | Command | Does |
 |---|---|
-| `build c12 2,-1` | build the building card c12 on hex 2,-1 |
-| `build quarry 2,-1` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost`; `build tower_floor` adds a floor to your tower (no hex) |
-| `upgrade c7 2,-1` | put upgrade card c7 on your building at 2,-1 |
-| `play c30` / `play c30 stone` / `play c30 d4` | play an action card (some need a resource or a dragon id), or hatch a dragon card |
-| `play c40 2,-1` | play a fauna card (Rouse the Bear, Wake the Basilisk): put its beast on hex 2,-1 |
-| `clear 2,-1 d3 d7` | send your raid-ready dragons d3 and d7 against what holds 2,-1 (its beast and every rival dragon perched there, together; a coin flip says which side strikes first); the hits they take stay on them. Dragons not knocked out can clear again this turn, and still raid |
-| `perch 2,-1 d3` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it's suppressed (counts as if it weren't there) while d3 stays, and d3 doesn't raid. Dragons perched on one building fight together when it's cleared |
-| `recall d3` | bring your perched dragon d3 home |
-| `project fire` | special project: a base dragon egg of that element, no card, double cost |
-| `project workshop 2,-1` | special project: a Workshop on that building of yours, no card, double cost |
-| `merchants stone timber 2` | pay 2× your merchants' rate in stone for 2 timber (the merchants don't trade gold) |
-| `offer P2 give 2 stone c12 get 1 gold` | propose a trade; items are `<n> <resource>` and card ids |
-| `offer anyone give 2 stone get 1 timber` | propose a trade to every other player at once; the first to accept trades |
-| `cancel o40` | withdraw your offer |
-| `end` | end your turn |
+| `{"do":"build","card":"c12","hex":"2,-1"}` | build the building card c12 on hex 2,-1 (a card for your tower takes no hex) |
+| `{"do":"build_basic","building":"quarry","hex":"2,-1"}` | build a basic building, no card: `quarry`, `lumber_camp`, `crystal_mine`, `pasture` or `roost`; `tower_floor` adds a floor to your tower (no hex) |
+| `{"do":"upgrade","card":"c7","hex":"2,-1"}` | put upgrade card c7 on your building at 2,-1 |
+| `{"do":"play","card":"c30"}` | play an action card, or hatch a dragon card. Some action cards need a `"resource":"stone"` or a `"dragon":"d4"`; a fauna card (Rouse the Bear, Wake the Basilisk) needs the `"hex"` its beast goes on |
+| `{"do":"clear","hex":"2,-1","dragons":["d3","d7"]}` | send your raid-ready dragons d3 and d7 against what holds 2,-1 (its beast and every rival dragon perched there, together; a coin flip says which side strikes first); the hits they take stay on them. Dragons not knocked out can clear again this turn, and still raid |
+| `{"do":"auto_clear"}` | clear your own held buildings, weakest first, with all your raid-ready dragons, until one fight is lost |
+| `{"do":"perch","hex":"2,-1","dragons":["d3"]}` | perch your raid-ready dragon d3 on a rival's building at 2,-1 (not a tower): it's suppressed (counts as if it weren't there) while d3 stays, and d3 doesn't raid. Dragons perched on one building fight together when it's cleared |
+| `{"do":"recall","dragons":["d3"]}` | bring your perched dragon d3 home |
+| `{"do":"project_egg","element":"fire"}` | special project: a base dragon egg of that element, no card, double cost |
+| `{"do":"project_upgrade","upgrade":"workshop","hex":"2,-1"}` | special project: a Workshop on that building of yours, no card, at the special project cost |
+| `{"do":"merchants","pay":"stone","gain":"timber","times":2}` | pay 2× your merchants' rate in stone for 2 timber (the merchants don't trade gold; `times` is 1 if left out) |
+| `{"do":"offer","to":"P2","give":{"stone":2,"cards":["c12"]},"get":{"gold":1}}` | propose a trade: resources, cards or both on either side |
+| `{"do":"offer","to":"anyone","give":{"stone":2},"get":{"timber":1}}` | propose a trade to every other player at once; the first to accept trades |
+| `{"do":"cancel","offer":"o40"}` | withdraw your offer |
+| `{"do":"end"}` | end your turn |
 
-Any time in the action phase: `accept o40` / `decline o40` for an offer made to you or open to anyone, and, out of turn, `offer` to the acting player.
+Any time in the action phase: `{"do":"accept","offer":"o40"}` or `{"do":"decline","offer":"o40"}` for an offer made to you or open to anyone, and, out of turn, `offer` to the acting player. A late answer hears what became of the offer, whatever the phase.
 
-Any time, any phase, anyone: `say <message>` talks to the table and `tell P2 <message>` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
+Any time, any phase, anyone: `{"do":"say","message":"..."}` talks to the table and `{"do":"tell","to":"P2","message":"..."}` to one player only. Talk binds no one and changes nothing; it shows up in the log like other events.
 
-Raid phase: `vote 2`; then, if you have a raid-ready dragon (all of them are in the raid), `fight` (all your dragons in it fight), `fight d3 d7` (those fight, the rest hold back) or `hold` (all hold back). The fight then plays out to the end with no further choices.
+Raid phase: `{"do":"vote","target":"frostpeak"}` (your options list the kingdoms); then, if you have a raid-ready dragon (all of them are in the raid), `{"do":"fight"}` (all your dragons in it fight), `{"do":"fight","dragons":["d3","d7"]}` (those fight, the rest hold back) or `{"do":"hold"}` (all hold back). The fight then plays out to the end with no further choices.
 
-End of round, if over 7 cards: `discard c4 c9`.
+End of round, if over 7 cards: `{"do":"discard","cards":["c4","c9"]}`.
 
 ## Hex coordinates
 

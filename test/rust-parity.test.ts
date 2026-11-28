@@ -2,6 +2,7 @@
 // the same seeds and commands, bots' moves and junk alike, give the same games
 // and JSON. The text view, the picture and scene lengths still have TypeScript
 // versions, and are compared with those. Skipped until it's built: npm run rust:build. CI builds it.
+import type { Command } from '../src/command.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -41,22 +42,26 @@ const pixels = (png: Buffer) => {
   return Buffer.concat([png.subarray(16, 29), inflateSync(png.subarray(41, 41 + len))]);
 };
 
-// Commands a player might type, right and wrong.
-function junk(g: Game, rng: Rng): string {
+// Commands a client might send, right and wrong.
+function junk(g: Game, rng: Rng): Command {
   const n = g.players.length;
   const p = `P${1 + Math.floor(next(rng) * (n + 1))}`;
   const card = () => pick(rng, g.players.flatMap((pl) => [...pl.hand, ...pl.choice].map((c) => c.id)).concat('c9999'));
   const dragon = () => pick(rng, g.dragons.map((d) => d.id).concat('d999'));
   const hex = () => pick(rng, [...Object.keys(g.map), '99,9', 'x', '-0,1', '+1,1']);
-  const res = () => pick(rng, ['stone', 'timber', 'CRYSTAL', 'livestock', 'gold', 'mud']);
-  const some = () => `${Math.floor(next(rng) * 4)} ${res()}${next(rng) < 0.3 ? `, ${card()}` : ''}`;
-  const offer = g.offers.length ? pick(rng, g.offers).id : 'o1';
-  return pick(rng, [
-    `offer ${p} give ${some()} get ${some()}`, `offer anyone give ${some()} get ${some()}`, `offer Anyone give get ${card()}`, `offer ${p}`, `offer P1 get 1 stone give 1 gold`,
-    `accept ${offer}`, `decline ${offer}`, `cancel ${offer}`, `tell ${p} hello there`, `tell p1`, 'say', `say  hé  ${'x'.repeat(Math.floor(next(rng) * 600))}`,
-    `build ${card()} ${hex()}`, `build roost ${hex()}`, `build quarry ${hex()}`, 'build tower_floor', `upgrade ${card()} ${hex()}`, `play ${card()} ${dragon()}`, `play ${card()} ${hex()}`, `play ${card()} ${res()}`,
-    `clear ${hex()} ${dragon()} ${dragon()}`, `clear ${hex()}`, 'autoclear', `perch ${hex()} ${dragon()}`, `recall ${dragon()}`, 'recall', `project ${pick(rng, ['fire', 'ice', 'workshop', 'mud'])} ${hex()}`,
-    `merchants ${res()} ${res()} ${pick(rng, ['', '1', '2', '1e1', '0', '1.5', 'x'])}`, `keep ${card()}`, `discard ${card()} ${card()}`, 'discard', 'end', 'END', '', 'nonsense', `vote ${pick(rng, ['1', '9', '0', 'x'])}`, `fight ${dragon()}`, 'hold', 'hold d1',
+  const res = (): any => pick(rng, ['stone', 'timber', 'CRYSTAL', 'crystal', 'livestock', 'gold', 'mud']);
+  const some = () => ({ [res()]: Math.floor(next(rng) * 4), ...(next(rng) < 0.3 && { cards: [card()] }) });
+  const offer = g.offers.length ? pick(rng, g.offers).id : pick(rng, (g.closedOffers ?? []).map((o) => o.id).concat('o1'));
+  return pick<any>(rng, [
+    { do: 'offer', to: p, give: some(), get: some() }, { do: 'offer', to: 'anyone', give: some(), get: some() }, { do: 'offer', to: 'anyone', get: { cards: [card()] } }, { do: 'offer', to: p }, { do: 'offer', give: { stone: 1 } },
+    { do: 'accept', offer }, { do: 'decline', offer }, { do: 'cancel', offer }, { do: 'tell', to: p, message: 'hello there' }, { do: 'tell', to: 'p1', message: '' }, { do: 'say' }, { do: 'say', message: ` hé  ${'x'.repeat(Math.floor(next(rng) * 600))}` },
+    { do: 'build', card: card(), hex: hex() }, { do: 'build_basic', building: 'roost', hex: hex() }, { do: 'build_basic', building: 'quarry', hex: hex() }, { do: 'build_basic', building: 'tower_floor' }, { do: 'build_basic', building: 'quarry' },
+    { do: 'upgrade', card: card(), hex: hex() }, { do: 'play', card: card(), dragon: dragon() }, { do: 'play', card: card(), hex: hex() }, { do: 'play', card: card(), resource: res() }, { do: 'play', card: card() },
+    { do: 'clear', hex: hex(), dragons: [dragon(), dragon()] }, { do: 'clear', hex: hex(), dragons: [] }, { do: 'auto_clear' }, { do: 'perch', hex: hex(), dragons: [dragon()] }, { do: 'recall', dragons: [dragon()] }, { do: 'recall', dragons: [] },
+    { do: 'project_egg', element: pick(rng, ['fire', 'ice', 'mud']) }, { do: 'project_upgrade', upgrade: pick(rng, ['workshop', 'mud']), hex: hex() },
+    { do: 'merchants', pay: res(), gain: res(), ...pick(rng, [{}, { times: 1 }, { times: 2 }, { times: 0 }, { times: 1.5 }, { times: 'x' }, { times: 4294967295 }]) },
+    { do: 'keep', card: card() }, { do: 'discard', cards: [card(), card()] }, { do: 'discard', cards: [] }, { do: 'end' }, { do: 'END' }, {}, 'end', null,
+    { do: 'vote', target: pick(rng, [...(g.raid?.candidates ?? []), 'x']) }, { do: 'fight', dragons: [dragon()] }, { do: 'fight', dragons: [] }, { do: 'hold' }, { do: 'hold', dragons: ['d1'] },
   ]);
 }
 
@@ -81,12 +86,12 @@ test('the Rust engine plays every game as this one does', { skip, timeout: 11000
             let error: string | null = null;
             try { apply(g, p, cmd); } catch (e) { if (!(e instanceof RuleError)) throw e; error = e.message; }
             error === null ? obeyed++ : refused++;
-            assert.equal(await r.ask('apply', { p, cmd }), error, `${where}, step ${step}: P${p + 1} ${cmd}`);
+            assert.equal(await r.ask('apply', { p, cmd }), error, `${where}, step ${step}: P${p + 1} ${JSON.stringify(cmd)}`);
             if (g.phase as string === 'over') break;
           }
           const p = pick(rng, waitingOn(g));
           const before = g.log.length;
-          if (next(rng) < 0.02) assert.equal(await r.ask('standin', { p }), standInMove(g, p), where);
+          if (next(rng) < 0.02) assert.deepEqual(await r.ask('standin', { p }), standInMove(g, p), where);
           else {
             const state = rng.state;
             const cmd = botMove(g, p, rng);

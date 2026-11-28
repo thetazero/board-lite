@@ -5,6 +5,7 @@ import {
   BUILDINGS, CLASS_NAMES, DRAGONS, RESOURCES, TERRAIN_NOUN, TOWER_CLASSES, TUNING, combatPower,
   type BasicResource, type BuildingClass, type Bundle, type Counted, type DragonStage, type Resource,
 } from './data.ts';
+import type { Command } from './command.ts';
 import { type Hex } from './map.ts';
 import { Refused, ask, moved } from './wasm.ts';
 import { type Rng } from './rng.ts';
@@ -55,6 +56,14 @@ export interface Offer {
   passed?: number[]; // an open offer: the players who have declined it
   give: TradeSide; // what `from` gives
   get: TradeSide; // what `from` receives
+}
+
+export interface ClosedOffer {
+  id: string;
+  from: number;
+  to: number | null;
+  how: 'expired' | 'withdrawn' | 'declined' | 'accepted';
+  by?: number; // who accepted it
 }
 
 export interface Raid {
@@ -168,6 +177,7 @@ export interface Game {
   decks: { building: Card[]; action: Card[] };
   discards: { building: Card[]; action: Card[] };
   offers: Offer[];
+  closedOffers?: ClosedOffer[]; // the latest no longer open, so a late answer to one hears why
   raidsLeft: number;
   raid: Raid | null;
   // Gold each kingdom has added to its printed loot: 1 after every raid it
@@ -341,7 +351,7 @@ export function specialProjectCost(kind: 'egg' | 'upgrade', cost: Bundle): Bundl
 }
 
 // A refused command changes nothing. The rules are Rust (rust/src/engine.rs).
-export function apply(g: Game, p: number, command: string): void {
+export function apply(g: Game, p: number, command: Command): void {
   try {
     moved('apply', g, { p, cmd: command });
   } catch (e) {

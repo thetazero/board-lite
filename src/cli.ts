@@ -22,7 +22,7 @@ Every game is hosted by a board-lite server (npm run serve; the TV shows its roo
   board-lite bot <room-url> <token>                       add a bot to the room (first to join only)
   board-lite start <room-url> <token>                     start the game (first to join only)
   board-lite view <room-url> <token> [--log N]            what your seat sees, and its options
-  board-lite do <room-url> <token> <command...>           make a decision
+  board-lite do <room-url> <token> <command>              make a decision: JSON, like '{"do":"end"}'
   board-lite wait <room-url> <token> [--timeout SECS]     block until you have a decision to make
   board-lite status <room-url>                            public summary: phase, who we're waiting on
   board-lite rules                                        print the rules
@@ -97,8 +97,10 @@ async function main(argv: string[]): Promise<number> {
       console.log(statusText((await call(`${roomApi(room)}/state`)) as Snapshot));
       return 0;
     case 'do': {
+      let command: unknown;
+      try { command = JSON.parse(args.slice(2).join(' ')); } catch { throw new Error(`A command is JSON, like '{"do":"end"}': see docs/cli.md.`); }
       const since = nextIndex(await state());
-      const r = await call(`${roomApi(room)}/do`, { token, command: args.slice(2).join(' '), via: 'cli' });
+      const r = await call(`${roomApi(room)}/do`, { token, command, via: 'cli' });
       console.log(afterMove(r.state as Snapshot, since));
       return 0;
     }

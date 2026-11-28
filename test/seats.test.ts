@@ -131,7 +131,7 @@ test('a removed player whose wait is woken by talk is refused, without a crash',
     await t.held(t.tokens[2]);
     t.remove(2);
     await t.start();
-    await s.post(`${t.at}/do`, { token: t.tokens[0], command: 'say hello' });
+    await s.post(`${t.at}/do`, { token: t.tokens[0], command: { do: 'say', message: 'hello' } });
     assert.match(await soon(asked), REFUSED);
   } finally { s.close(); }
 });

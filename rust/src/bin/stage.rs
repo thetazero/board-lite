@@ -141,7 +141,7 @@ impl Stage {
                 Some(n) => room.start_seeded(tok, n)?,
                 None => room.start(tok)?,
             }),
-            "command" => json!(room.command(tok, s(q, "cmd"), ["phone", "cli", "claude"].into_iter().find(|v| *v == s(q, "via")), s(q, "id"))?),
+            "command" => json!(room.command(tok, &q["cmd"], ["phone", "cli", "claude"].into_iter().find(|v| *v == s(q, "via")), s(q, "id"))?),
             "state" => whole(room.state(tok)?),
             "snapshot" => whole(room.snapshot(q["tok"].as_str())),
             "lobby" => room.about("")["lobby"].clone(),

@@ -148,7 +148,7 @@ function toVote(g: Game) {
 const byPower = (g: Game) => [...g.raid!.candidates].sort((a, b) => targetPower(a) - targetPower(b));
 // Seats in `who` vote for target t (all who haven't voted and have a vote, by default).
 function vote(g: Game, t: string, who = g.players.map((_, p) => p)) {
-  for (const p of who) if (g.raid?.step === 'vote' && waitingOn(g).includes(p)) apply(g, p, `vote ${g.raid.candidates.indexOf(t) + 1}`);
+  for (const p of who) if (g.raid?.step === 'vote' && waitingOn(g).includes(p)) apply(g, p, { do: 'vote', target: t });
 }
 // The vote over, the raid is at fight or hold back: every raid-ready dragon is in.
 function toChoice(g: Game) {
@@ -425,7 +425,7 @@ export const SCENES: Scene[] = [
     setup: canBuild,
     live: (g) => {
       const c = placeableCard(g, g.turn)!;
-      apply(g, g.turn, `build ${c.id} ${c.hexes[0]}`);
+      apply(g, g.turn, { do: 'build', card: c.id, hex: c.hexes[0] });
     },
     liveEnd: (g) => / builds a /.test(g.log.at(-1)?.text ?? ''),
     shots: () => [{ file: 'tv-build-3p', caption: 'TV: a new building pops up from the page', client: 'tv', live: true, frames: [0, 0.15, 0.3, 0.45, 0.7, 1.2] }],
@@ -560,8 +560,8 @@ export const SCENES: Scene[] = [
     // The acting player offers the next seat a trade, and the seat after offers them one.
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4, b = (t + 2) % 4;
-      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
-      apply(g, b, `offer P${t + 1} give 1 ${most(g, b)} get 1 ${most(g, t, most(g, b))}`);
+      apply(g, t, { do: 'offer', to: `P${a + 1}`, give: { [most(g, t)]: 1 }, get: { [most(g, a, most(g, t))]: 1 } });
+      apply(g, b, { do: 'offer', to: `P${t + 1}`, give: { [most(g, b)]: 1 }, get: { [most(g, t, most(g, b))]: 1 } });
     },
     shots: (g) => [
       { file: 'tv-trade-4p', caption: 'TV, mid game (4 players): two open trade offers', client: 'tv' },
@@ -575,7 +575,7 @@ export const SCENES: Scene[] = [
       {
         // It changes the room: the acting player accepts the offer made to them.
         file: 'phone-trade-accepted-4p', caption: 'Phone: the player you offered accepts', client: 'phone', seat: (g!.turn + 2) % 4,
-        then: (room) => room.mutate((g2) => apply(g2, g2.turn, `accept ${g2.offers.find((o) => o.to === g2.turn)!.id}`)), waitFor: '.notices .toast',
+        then: (room) => room.mutate((g2) => apply(g2, g2.turn, { do: 'accept', offer: g2.offers.find((o) => o.to === g2.turn)!.id })), waitFor: '.notices .toast',
       },
       {
         // Last: it changes the room. The offerer has spent what they offered, so Accept is off and says why.
@@ -592,8 +592,8 @@ export const SCENES: Scene[] = [
     // The acting player offers anyone a trade, and the next seat declines it.
     setup: (g) => {
       const t = g.turn;
-      apply(g, t, `offer anyone give 1 ${most(g, t)} get 1 ${most(g, (t + 2) % 4, most(g, t))}`);
-      apply(g, (t + 1) % 4, `decline ${g.offers[0].id}`);
+      apply(g, t, { do: 'offer', to: 'anyone', give: { [most(g, t)]: 1 }, get: { [most(g, (t + 2) % 4, most(g, t))]: 1 } });
+      apply(g, (t + 1) % 4, { do: 'decline', offer: g.offers[0].id });
     },
     shots: (g) => [
       { file: 'tv-trade-anyone-4p', caption: 'TV: an offer to anyone', client: 'tv' },
@@ -700,7 +700,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, 'cinderkeep');
       toChoice(g);
-      apply(g, b, 'fight');
+      apply(g, b, { do: 'fight' });
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
@@ -721,7 +721,7 @@ export const SCENES: Scene[] = [
       vote(g, 'cinderkeep');
       const all = [...g.players.keys()];
       toChoice(g);
-      for (const p of all.slice(1)) apply(g, p, 'fight');
+      for (const p of all.slice(1)) apply(g, p, { do: 'fight' });
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\./.test(raidOutcome(g)),
@@ -739,7 +739,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, 'cinderkeep');
       toChoice(g);
-      apply(g, b, 'fight');
+      apply(g, b, { do: 'fight' });
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
@@ -795,7 +795,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, t, 'fight');
+      apply(g, t, { do: 'fight' });
     },
     shots: (g) => [
       { file: 'tv-raid-choose-3p', caption: 'TV, fight or hold back (3 players): one has chosen', client: 'tv' },
@@ -816,8 +816,8 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g).at(-1)!);
       toChoice(g);
-      apply(g, raiders[0], 'fight');
-      apply(g, raiders[2], 'hold');
+      apply(g, raiders[0], { do: 'fight' });
+      apply(g, raiders[2], { do: 'hold' });
     },
     shots: () => [{ file: 'tv-raid-choose-5p', caption: 'TV, fight or hold back (5 players): two have chosen, two are choosing', client: 'tv', sizes: true }],
   },
@@ -839,7 +839,7 @@ export const SCENES: Scene[] = [
       const hurt = g.dragons.filter((d) => d.stage === 3);
       hurt[2].damage = 3;
       hurt[9].damage = 8;
-      apply(g, t, 'fight');
+      apply(g, t, { do: 'fight' });
     },
     shots: () => [{ file: 'tv-raid-choose-many-3p', caption: 'TV, fight or hold back: 8 dragons each for two raiders, on Cinderkeep', client: 'tv', sizes: true }],
   },
@@ -855,7 +855,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, t, 'fight');
+      apply(g, t, { do: 'fight' });
     },
     shots: () => [{ file: 'tv-remote-choose-3p', caption: 'No TV: fight or hold back on the table view', client: 'tv', table: true, sizes: true }],
   },
@@ -916,8 +916,8 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, a, 'hold');
-      apply(g, b, `fight ${g.raid!.sent[b][0]}`);
+      apply(g, a, { do: 'hold' });
+      apply(g, b, { do: 'fight', dragons: [g.raid!.sent[b][0]] });
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)), // the rest fought
@@ -1266,8 +1266,8 @@ export const SCENES: Scene[] = [
     until: (g) => g.round >= 4 && g.phase === 'action' && g.turn < 4,
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4;
-      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
-      apply(g, a, 'say Only if you leave Knightsgate to me.');
+      apply(g, t, { do: 'offer', to: `P${a + 1}`, give: { [most(g, t)]: 1 }, get: { [most(g, a, most(g, t))]: 1 } });
+      apply(g, a, { do: 'say', message: 'Only if you leave Knightsgate to me.' });
     },
     shots: (g) => [
       { file: 'tv-names-6p', caption: 'TV (6 players): long names, two bots, one away, an offer and talk', client: 'tv', sizes: true },
@@ -1413,7 +1413,7 @@ export const SCENES: Scene[] = [
       for (const p of g.players.keys()) arm(g, p, [2]);
       pl.hand.push({ id: 'c899', deck: 'action', key: 'war_horn' });
       pl.resources.crystal = Math.max(pl.resources.crystal, ACTIONS.war_horn.cost.crystal ?? 0);
-      apply(g, g.turn, 'play c899');
+      apply(g, g.turn, { do: 'play', card: 'c899' });
       toVote(g);
     },
     shots: () => [{ file: 'tv-two-raids-4p', caption: 'TV: a round with two raids (War Horn), the first vote', client: 'tv' }],
@@ -1429,7 +1429,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, t, `fight ${g.raid!.sent[t][0]}`);
+      apply(g, t, { do: 'fight', dragons: [g.raid!.sent[t][0]] });
     },
     shots: (g) => [
       { file: 'phone-raid-not-in-4p', caption: "Phone, fight or hold back: you're not in this raid", client: 'phone', seat: seatWhere(g!, (p) => !g!.raid!.sent[p].length) },
@@ -1448,7 +1448,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g).at(-1)!);
       toChoice(g);
-      apply(g, (t + 1) % 3, 'fight');
+      apply(g, (t + 1) % 3, { do: 'fight' });
     },
     live: bots(raidOver),
     liveEnd: (g) => /holds\./.test(raidOutcome(g)),
@@ -1465,9 +1465,9 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, 0, 'hold');
+      apply(g, 0, { do: 'hold' });
     },
-    live: (g) => apply(g, 1, 'hold'),
+    live: (g) => apply(g, 1, { do: 'hold' }),
     liveEnd: (g) => /Everyone holds back/.test(raidOutcome(g)),
     shots: () => [{ file: 'tv-raid-held-2p', caption: 'TV: everyone held back (2 players)', client: 'tv', live: true, waitFor: '#overlay.banner', waitMs: 400 }],
   },
@@ -1495,7 +1495,7 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, (t + 1) % 3, 'fight');
+      apply(g, (t + 1) % 3, { do: 'fight' });
     },
     live: bots((g) => g.phase === 'action'),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
@@ -1510,10 +1510,10 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4, b = (t + 2) % 4;
-      apply(g, a, 'say Anyone want timber? I have far too much of it.');
-      apply(g, t, 'say Maybe. What do you want for 2?');
-      apply(g, b, `tell P${t + 1} Don't trade with them, they're one roost from winning.`);
-      apply(g, a, 'say A crystal each, and I stay out of the next raid.');
+      apply(g, a, { do: 'say', message: 'Anyone want timber? I have far too much of it.' });
+      apply(g, t, { do: 'say', message: 'Maybe. What do you want for 2?' });
+      apply(g, b, { do: 'tell', to: `P${t + 1}`, message: "Don't trade with them, they're one roost from winning." });
+      apply(g, a, { do: 'say', message: 'A crystal each, and I stay out of the next raid.' });
     },
     shots: (g) => {
       const t = g!.turn, a = (t + 1) % 4, b = (t + 2) % 4;
@@ -1524,8 +1524,8 @@ export const SCENES: Scene[] = [
           // Last: it adds to the talk. What was said before the page opened counts as heard.
           file: 'phone-talk-unread-4p', caption: 'Phone: the talk bar with unread messages', client: 'phone', seat: t,
           then: (room) => room.mutate((g2) => {
-            apply(g2, b, 'say Deal or not, the raid is next.');
-            apply(g2, a, `tell P${t + 1} Two crystal then. Final offer.`);
+            apply(g2, b, { do: 'say', message: 'Deal or not, the raid is next.' });
+            apply(g2, a, { do: 'tell', to: `P${t + 1}`, message: 'Two crystal then. Final offer.' });
           }),
         },
       ];
@@ -1539,7 +1539,7 @@ export const SCENES: Scene[] = [
     seed: 1,
     until: (g) => g.round === 3 && g.phase === 'action',
     setup: (g) => {
-      apply(g, (g.turn + 1) % 3, `say ${'I really need crystal for the dragon. '.repeat(7).trim()}`);
+      apply(g, (g.turn + 1) % 3, { do: 'say', message: 'I really need crystal for the dragon. '.repeat(7).trim() });
     },
     shots: () => [{ file: 'tv-talk-long-3p', caption: 'TV: a message near the length limit, cut short at its end', client: 'tv', sizes: true }],
   },
@@ -1653,7 +1653,7 @@ export const SCENES: Scene[] = [
     until: (g) => g.round === 4 && g.phase === 'action',
     setup: (g) => {
       const t = g.turn, a = (t + 1) % 4;
-      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
+      apply(g, t, { do: 'offer', to: `P${a + 1}`, give: { [most(g, t)]: 1 }, get: { [most(g, a, most(g, t))]: 1 } });
       g.titles.tower = a;
       g.titles.army = null;
     },
@@ -1860,7 +1860,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-perch-clear-3p', caption: 'Phone: sending dragons against the dragons perched on your Pasture', client: 'phone', seat: g!.turn, clicks: ['#hunt', `[data-hex="${perchedPasture(g!)}"]`, '[data-hunter]'] },
       { file: 'phone-perch-other-3p', caption: "Phone: a rival's view, their dragon perched on someone else's Pasture", client: 'phone', seat: (g!.turn + 1) % 3 },
       // Last: the fight changes the game.
-      { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2800, then: (room) => room.mutate((g2) => apply(g2, g2.turn, `clear ${perchedPasture(g2)} ${g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id).join(' ')}`)) },
+      { file: 'tv-perch-fight-3p', caption: 'TV: three adults against two perched dragons, mid-replay', client: 'tv', waitMs: 2800, then: (room) => room.mutate((g2) => apply(g2, g2.turn, { do: 'clear', hex: perchedPasture(g2), dragons: g2.dragons.filter((d) => d.owner === g2.turn && canRaid(d)).map((d) => d.id) })) },
     ],
   },
   {
@@ -2091,9 +2091,9 @@ export const SCENES: Scene[] = [
       toVote(g);
       vote(g, byPower(g)[0]);
       toChoice(g);
-      apply(g, a, 'hold');
-      apply(g, b, `fight ${g.raid!.sent[b][0]}`);
-      apply(g, c, 'hold');
+      apply(g, a, { do: 'hold' });
+      apply(g, b, { do: 'fight', dragons: [g.raid!.sent[b][0]] });
+      apply(g, c, { do: 'hold' });
     },
     live: bots(raidOver),
     liveEnd: (g) => /falls\.|holds\./.test(raidOutcome(g)),
@@ -2157,7 +2157,7 @@ function wonRaid(g: Game) {
   toChoice(g);
   // One raider's dragon comes in hurt, so the replay starts its bar short (#311).
   g.dragons.find((d) => d.id === g.raid!.sent[a][0])!.damage = 8;
-  apply(g, b, 'fight');
+  apply(g, b, { do: 'fight' });
 }
 
 // Dragons for production's dragon step (#442), set up just before it: each
@@ -2243,7 +2243,7 @@ function perchedPasture(g: Game): string {
 // The acting player sends every ready dragon against the Thunderbird.
 function huntPeak(g: Game) {
   const ids = g.dragons.filter((d) => d.owner === g.turn && ready(d)).map((d) => d.id);
-  apply(g, g.turn, `clear ${PEAK} ${ids.join(' ')}`);
+  apply(g, g.turn, { do: 'clear', hex: PEAK, dragons: ids });
 }
 
 // A Cave Bear on an open hex beside the acting player's tower, and two
@@ -2260,5 +2260,5 @@ function bearHunters(g: Game) {
 function huntBear(g: Game) {
   const k = Object.keys(g.map).find((x) => g.map[x].fauna === 'cave_bear' && neighbors(g.towers[g.turn]).includes(x))!;
   const ids = g.dragons.filter((d) => d.owner === g.turn && ready(d)).map((d) => d.id);
-  apply(g, g.turn, `clear ${k} ${ids.join(' ')}`);
+  apply(g, g.turn, { do: 'clear', hex: k, dragons: ids });
 }

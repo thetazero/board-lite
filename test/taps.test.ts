@@ -2,6 +2,7 @@
 // button several times before the screen catches up does what one tap does:
 // no errors, no repeated actions. Taps on different buttons all count (#131).
 
+import type { Command } from '../src/command.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -65,7 +66,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
     const [ada, bram] = ['Ada', 'Bram'].map((n) => room.join(n));
     room.start(ada.token, 3);
     const g = room.game!;
-    for (const s of [ada, bram]) room.command(s.token, `keep ${g.players[room.seatOf(s.token)].choice[0].id}`);
+    for (const s of [ada, bram]) room.command(s.token, { do: 'keep', card: g.players[room.seatOf(s.token)].choice[0].id });
     assert.equal(g.phase, 'action');
     const me = g.turn;
     const tok = [ada, bram][me].token;
@@ -79,8 +80,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
     const fresh = () => ({ to: -1 as number | null, give: {} as Record<string, number> });
     let form = { to: 1 - me as number | null, give: { [have]: 1 } as Record<string, number> };
     const sendOffer = () => {
-      const give = Object.entries(form.give).map(([r, n]) => `${n} ${r}`).join(' ');
-      const cmd = `offer ${form.to === null ? 'anyone' : `P${form.to + 1}`} give ${give} get `;
+      const cmd: Command = { do: 'offer', to: form.to === null ? 'anyone' : `P${form.to + 1}`, give: form.give };
       form = fresh();
       return phone.send(cmd);
     };
@@ -93,7 +93,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
 
     // Withdraw, tapped again and again: withdrawn once, no "no open offer" error.
     const id = g.offers[0].id;
-    await tapping(4, 15, () => phone.tap(`[data-cancel] {"cancel":"${id}"}`, () => phone.send(`cancel ${id}`)));
+    await tapping(4, 15, () => phone.tap(`[data-cancel] {"cancel":"${id}"}`, () => phone.send({ do: 'cancel', offer: id })));
     await sleep(200);
     assert.deepEqual(errors, []);
     assert.equal(g.offers.length, 0);
@@ -102,7 +102,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
     // "it's their turn" error from the taps after it.
     const ends = () => g.log.filter((e) => e.ev?.k === 'end').length;
     const before = ends();
-    await tapping(4, 15, () => phone.tap('#endyes', () => phone.send('end')));
+    await tapping(4, 15, () => phone.tap('#endyes', () => phone.send({ do: 'end' })));
     await sleep(200);
     assert.deepEqual(errors, []);
     assert.equal(ends(), before + 1, 'the turn ends once');
@@ -112,19 +112,19 @@ test('on a slow connection, tapping a button again and again does what one tap d
     // phone says to try again; sent again, it's still said once.
     const said = () => g.log.filter((e) => / says: "/.test(e.text)).length;
     const talked = said();
-    await tapping(4, 15, () => phone.tap('talk', () => phone.send('say good luck')));
+    await tapping(4, 15, () => phone.tap('talk', () => phone.send({ do: 'say', message: 'good luck' })));
     await sleep(200);
     assert.deepEqual(errors, []);
     assert.equal(said(), talked + 1, 'said once, however many taps');
     loseAnswer();
-    phone.tap('talk', () => phone.send('say well played'));
+    phone.tap('talk', () => phone.send({ do: 'say', message: 'well played' }));
     await sleep(200);
     assert.deepEqual(errors, ["The server didn't answer: try again."]);
     assert.equal(said(), talked + 2, 'the server heard it');
-    phone.tap('talk', () => phone.send('say well played'));
+    phone.tap('talk', () => phone.send({ do: 'say', message: 'well played' }));
     await sleep(200);
     assert.equal(said(), talked + 2, 'sent again after "try again": not said twice');
-    phone.tap('talk', () => phone.send('say well played'));
+    phone.tap('talk', () => phone.send({ do: 'say', message: 'well played' }));
     await sleep(200);
     assert.equal(said(), talked + 3, 'and once that went through, saying it again is a new message');
   } finally {
@@ -134,7 +134,7 @@ test('on a slow connection, tapping a button again and again does what one tap d
 
 // A server of our own, answering when told to.
 function fakeServer() {
-  const sent: string[] = [];
+  const sent: Command[] = [];
   const waiting: { ok: (r: unknown) => void; no: (e: Error) => void }[] = [];
   const errors: string[] = [];
   let fresh = true; // whether the next answer brings a newer snapshot
@@ -163,41 +163,41 @@ function fakeServer() {
 
 test('taps on different buttons all count, and go in the order tapped', async () => {
   const s = fakeServer();
-  s.phone.tap('a', () => s.phone.send('vote 1'));
-  s.phone.tap('b', () => s.phone.send('fight d1'));
-  s.phone.tap('a', () => s.phone.send('vote 1')); // the first still on its way: dropped
+  s.phone.tap('a', () => s.phone.send({ do: 'vote', target: 'brindle' }));
+  s.phone.tap('b', () => s.phone.send({ do: 'fight', dragons: ['d1'] }));
+  s.phone.tap('a', () => s.phone.send({ do: 'vote', target: 'brindle' })); // the first still on its way: dropped
   await s.answer();
   await s.answer();
-  assert.deepEqual(s.sent, ['vote 1', 'fight d1']);
+  assert.deepEqual(s.sent, [{ do: 'vote', target: 'brindle' }, { do: 'fight', dragons: ['d1'] }]);
   // Answered and on screen: the button can be tapped again.
-  s.phone.tap('a', () => s.phone.send('vote 2'));
+  s.phone.tap('a', () => s.phone.send({ do: 'vote', target: 'frostpeak' }));
   await s.answer();
-  assert.deepEqual(s.sent, ['vote 1', 'fight d1', 'vote 2']);
+  assert.deepEqual(s.sent, [{ do: 'vote', target: 'brindle' }, { do: 'fight', dragons: ['d1'] }, { do: 'vote', target: 'frostpeak' }]);
 });
 
 test('a button stays put until the screen shows its answer', async () => {
   const s = fakeServer();
   s.stale(); // the answer comes back with nothing newer: the push is still on its way
-  s.phone.tap('a', () => s.phone.send('end'));
+  s.phone.tap('a', () => s.phone.send({ do: 'end' }));
   await s.answer();
-  s.phone.tap('a', () => s.phone.send('end'));
-  assert.deepEqual(s.sent, ['end'], 'the screen still shows End turn: a tap on it is a repeat');
+  s.phone.tap('a', () => s.phone.send({ do: 'end' }));
+  assert.deepEqual(s.sent, [{ do: 'end' }], 'the screen still shows End turn: a tap on it is a repeat');
   s.phone.seen(); // the push arrives
   await sleep(0);
-  s.phone.tap('a', () => s.phone.send('end'));
-  assert.deepEqual(s.sent, ['end', 'end']);
+  s.phone.tap('a', () => s.phone.send({ do: 'end' }));
+  assert.deepEqual(s.sent, [{ do: 'end' }, { do: 'end' }]);
 });
 
 test('a refused command drops what was tapped after it, and says so once', async () => {
   const s = fakeServer();
-  s.phone.tap('a', () => s.phone.send('build c1 0,1'));
-  s.phone.tap('b', () => s.phone.send('end'));
+  s.phone.tap('a', () => s.phone.send({ do: 'build', card: 'c1', hex: '0,1' }));
+  s.phone.tap('b', () => s.phone.send({ do: 'end' }));
   await s.refuse("You can't afford 2 stone.");
-  assert.deepEqual(s.sent, ['build c1 0,1']);
+  assert.deepEqual(s.sent, [{ do: 'build', card: 'c1', hex: '0,1' }]);
   assert.deepEqual(s.errors, ["You can't afford 2 stone."]);
   // The button is free again at once: nothing changed to wait for.
-  s.phone.tap('a', () => s.phone.send('build c1 0,1'));
-  assert.deepEqual(s.sent, ['build c1 0,1', 'build c1 0,1']);
+  s.phone.tap('a', () => s.phone.send({ do: 'build', card: 'c1', hex: '0,1' }));
+  assert.deepEqual(s.sent, [{ do: 'build', card: 'c1', hex: '0,1' }, { do: 'build', card: 'c1', hex: '0,1' }]);
 });
 
 test('a command whose answer was lost goes again under the same id; anything else gets a new one', async () => {
@@ -212,16 +212,16 @@ test('a command whose answer was lost goes again under the same id; anything els
     answer: () => true,
     fail: () => {},
   });
-  await phone.send('say hi');
+  await phone.send({ do: 'say', message: 'hi' });
   lose = false;
-  await phone.send('say hi');
+  await phone.send({ do: 'say', message: 'hi' });
   assert.equal(ids[1], ids[0], 'the retry is the same sending');
-  await phone.send('say hi');
+  await phone.send({ do: 'say', message: 'hi' });
   assert.notEqual(ids[2], ids[1], 'once it went through, the same words again are new');
   lose = true;
-  await phone.send('say hi');
+  await phone.send({ do: 'say', message: 'hi' });
   lose = false;
-  await phone.send('end');
+  await phone.send({ do: 'end' });
   assert.notEqual(ids[4], ids[3], 'another command after a lost one is its own');
 });
 

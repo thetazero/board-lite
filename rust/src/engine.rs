@@ -1,5 +1,6 @@
 //! The rules engine. `apply` is the only way to change a game; its dice and log
 //! are in the game, so a saved one goes on the same.
+use crate::command::{self, Command, Seat, To};
 use crate::data::*;
 use crate::map::*;
 use crate::rng::Rng;
@@ -31,7 +32,7 @@ fn odd_ids() -> std::sync::MutexGuard<'static, Vec<S>> {
     ODD.lock().unwrap_or_else(|e| e.into_inner())
 }
 impl Id {
-    /// The id this names, whatever it looks like: for saved games, not for what players type.
+    /// The id this names, whatever it looks like: for saved games, not for what players send.
     fn saved(s: &str) -> Id {
         Id::parse(s).unwrap_or_else(|| {
             let mut odd = odd_ids();
@@ -195,6 +196,25 @@ pub struct Offer {
     pub give: TradeSide,
     pub get: TradeSide,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Closed {
+    Expired,
+    Withdrawn,
+    Declined,
+    Accepted,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClosedOffer {
+    pub id: Id,
+    pub from: usize,
+    pub to: Option<usize>,
+    pub how: Closed,
+    /// Who accepted it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<usize>,
+}
+const CLOSED_KEPT: usize = 60;
 impl Offer {
     pub fn passed(&self) -> &[usize] {
         self.passed.as_deref().unwrap_or(&[])
@@ -313,6 +333,9 @@ pub struct Game {
     pub decks: Decks,
     pub discards: Decks,
     pub offers: Vec<Offer>,
+    /// The latest offers no longer open, so a late answer to one hears why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closed_offers: Vec<ClosedOffer>,
     pub raids_left: i64,
     pub raid: Option<Raid>,
     #[serde(default)]
@@ -350,30 +373,10 @@ fn points_text(n: i64) -> String {
 }
 const STAGE_INTO: [S; 4] = ["an egg", "a hatchling", "a young dragon", "an adult"];
 
-// What JavaScript's \s and trim() take as a space.
+// What JavaScript's \s takes as a space.
 pub fn js_space(c: char) -> bool {
     (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
 }
-pub fn js_trim(s: &str) -> &str {
-    s.trim_matches(js_space)
-}
-/// A number as JavaScript's Number() reads it, if it's a whole one.
-fn js_int(s: &str) -> Option<i64> {
-    let s = js_trim(s);
-    let radix = |p: &str, r| s.get(..2).filter(|x| x.eq_ignore_ascii_case(p)).and_then(|_| i64::from_str_radix(&s[2..], r).ok().filter(|n| *n >= 0 && !s[2..].starts_with('+')));
-    if s.is_empty() {
-        return Some(0);
-    }
-    if let Some(n) = radix("0x", 16).or_else(|| radix("0o", 8)).or_else(|| radix("0b", 2)) {
-        return Some(n);
-    }
-    if !s.bytes().all(|b| b.is_ascii_digit() || b"+-.eE".contains(&b)) {
-        return None;
-    }
-    let n: f64 = s.parse().ok()?;
-    (n.fract() == 0.0 && n.abs() < 1e15).then_some(n as i64)
-}
-
 impl Card {
     pub fn kind(&self) -> S {
         let k = self.key.0;
@@ -550,6 +553,7 @@ impl Game {
             decks: Decks::default(),
             discards: Decks::default(),
             offers: vec![],
+            closed_offers: vec![],
             raids_left: 0,
             raid: None,
             hoard: DATA.targets.keys().map(|t| (Key::of(t), 0)).collect(),
@@ -593,6 +597,7 @@ impl Game {
             decks: self.decks.clone(),
             discards: self.discards.clone(),
             offers: self.offers.clone(),
+            closed_offers: self.closed_offers.clone(),
             raids_left: self.raids_left,
             raid: self.raid.clone(),
             hoard: self.hoard.clone(),
@@ -984,6 +989,7 @@ impl Game {
     fn end_turn(&mut self) {
         for o in mem::take(&mut self.offers) {
             let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+            self.close(&o, Closed::Expired, None);
             self.log(format!("Offer {} expires.", o.id), ev! {"k": "expire", "from": o.from, "to": o.to, "give": give, "get": get});
         }
         let next = (self.turn + 1) % self.n();
@@ -1422,27 +1428,26 @@ impl Game {
 
     // ---------- commands ----------
 
-    fn parse_player(&self, s: &str) -> Rule<usize> {
-        let d = s.strip_prefix(['p', 'P']).unwrap_or(s);
-        let n = if !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()) { d.parse::<usize>().unwrap_or(0) } else { 0 };
-        if n < 1 || n > self.n() {
-            return fail(format!("Unknown player \"{s}\". Players are P1..P{}.", self.n()));
+    fn seat(&self, s: Seat) -> Rule<usize> {
+        if s.0 >= self.n() {
+            return fail(format!("There is no {}: players are P1 to P{}.", pname(s.0), self.n()));
         }
-        Ok(n - 1)
+        Ok(s.0)
     }
-    fn hand_card(&self, p: usize, id: &str) -> Rule<Card> {
-        let want = Id::parse(id);
-        self.players[p].hand.iter().find(|c| Some(c.id) == want).copied().ok_or_else(|| format!("You have no card \"{id}\" in hand."))
+    fn hand_card(&self, p: usize, id: Id) -> Rule<Card> {
+        self.players[p].hand.iter().find(|c| c.id == id).copied().ok_or_else(|| format!("You have no card {id} in hand."))
     }
-    fn own_dragon(&self, p: usize, id: &str) -> Rule<Id> {
-        let want = Id::parse(id);
-        self.dragons_of(p).find(|d| Some(d.id) == want).map(|d| d.id).ok_or_else(|| format!("You have no dragon \"{id}\"."))
+    fn own_dragon(&self, p: usize, id: Id) -> Rule<Id> {
+        self.dragons_of(p).find(|d| d.id == id).map(|d| d.id).ok_or_else(|| format!("You have no dragon {id}."))
     }
-    fn own_dragons(&self, p: usize, args: &[&str]) -> Rule<Vec<Id>> {
-        unique(args).into_iter().map(|d| self.own_dragon(p, d)).collect()
+    fn own_dragons(&self, p: usize, ids: &[Id]) -> Rule<Vec<Id>> {
+        unique(ids).into_iter().map(|d| self.own_dragon(p, d)).collect()
     }
-    fn ready_dragons(&self, p: usize, args: &[&str]) -> Rule<Vec<Id>> {
-        let ds = self.own_dragons(p, args)?;
+    fn ready_dragons(&self, p: usize, ids: &[Id]) -> Rule<Vec<Id>> {
+        if ids.is_empty() {
+            return fail("Send at least 1 dragon.");
+        }
+        let ds = self.own_dragons(p, ids)?;
         for d in &ds {
             if !self.dragon(*d).ready() {
                 return fail(format!("{d} isn't raid-ready (hatched, not knocked out, not perched)."));
@@ -1468,7 +1473,7 @@ impl Game {
         self.players.iter().flat_map(|p| &p.hand).find(|c| c.id == want)
     }
     fn has_side(&self, p: usize, s: &TradeSide) -> bool {
-        self.players[p].can_afford(&s.res) && s.cards.iter().all(|id| self.hand_card(p, id).is_ok())
+        self.players[p].can_afford(&s.res) && s.cards.iter().all(|id| Id::parse(id).is_some_and(|id| self.hand_card(p, id).is_ok()))
     }
     pub fn accept_problem(&self, o: &Offer, p: usize) -> Option<String> {
         if !self.has_side(o.from, &o.give) {
@@ -1480,18 +1485,18 @@ impl Game {
         self.players[from].pay(&s.res)?;
         self.players[to].gain(&s.res);
         for id in &s.cards {
-            let c = self.hand_card(from, id)?;
+            let c = Id::parse(id).map_or_else(|| fail("No such card."), |id| self.hand_card(from, id))?;
             self.players[from].hand.retain(|x| x.id != c.id);
             self.players[to].hand.push(c);
         }
         Ok(())
     }
-    fn place_check(&self, p: usize, key: &str, typed: &str) -> Rule<K> {
+    fn place_check(&self, p: usize, key: &str, hex: Option<K>) -> Rule<K> {
         let def = &DATA.buildings[key];
         if def.on_tower {
             return Ok(self.towers[p]);
         }
-        let Some(k) = K::parse(typed) else { return fail("Say where to build, as a hex like \"2,-1\".") };
+        let Some(k) = hex else { return fail("Choose a hex to build on, like \"2,-1\".") };
         let Some(hex) = self.map.get(&k) else { return fail(format!("{k} is not on the map.")) };
         let noun = |t: &str| DATA.terrain_noun[t];
         if hex.ocean() {
@@ -1554,9 +1559,9 @@ impl Game {
         let on = &DATA.upgrades[up].applies_to;
         sorted(self.owned(p).filter(|(_, b)| building_class(b).iter().any(|c| on.contains(c))).map(|(k, _)| k))
     }
-    fn upgrade_check(&self, p: usize, up: &str, typed: &str) -> Rule<K> {
+    fn upgrade_check(&self, p: usize, up: &str, k: K) -> Rule<K> {
         let ok = self.upgrade_targets(p, up);
-        K::parse(typed).filter(|k| ok.contains(k)).ok_or_else(|| format!("{} can go on: {}.", DATA.upgrades[up].name, keys_or(&ok, "none of your buildings")))
+        Some(k).filter(|k| ok.contains(k)).ok_or_else(|| format!("{} can go on: {}.", DATA.upgrades[up].name, keys_or(&ok, "none of your buildings")))
     }
     fn place_upgrade(&mut self, p: usize, up: Key, k: K, project: bool) {
         let b = &mut self.buildings[&k];
@@ -1587,82 +1592,115 @@ impl Game {
         self.discards.of(c.deck).push(c);
     }
 
-    fn action_command(&mut self, p: usize, verb: &str, args: &[&str]) -> Rule {
-        let me = pname(p);
-        let arg = |i: usize| args.get(i).copied().unwrap_or("");
-        let find_offer = |g: &Game, id: &str| Id::parse(id).and_then(|id| g.offers.iter().position(|o| o.id == id));
-        match verb {
-            "accept" | "decline" => {
-                let Some(i) = find_offer(self, arg(0)).filter(|i| self.offers[*i].waits_on(p)) else { return fail(format!("There is no offer \"{}\" made to you.", arg(0))) };
-                if verb == "decline" {
-                    if self.offers[i].to.is_none() {
-                        self.offers[i].passed.get_or_insert_default().push(p);
-                    }
-                    let o = self.offers[i].clone();
-                    if o.to.is_some() || (0..self.n()).all(|q| !o.waits_on(q)) {
-                        self.offers.remove(i);
-                    }
-                    let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
-                    self.log(format!("{me} declines offer {}.", o.id), ev! {"k": "decline", "p": p, "from": o.from, "give": give, "get": get});
-                    return Ok(());
-                }
-                if let Some(why) = self.accept_problem(&self.offers[i], p) {
-                    return fail(why);
-                }
-                let o = self.offers.remove(i);
-                let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
-                self.move_side(o.from, p, &o.give)?;
-                self.move_side(p, o.from, &o.get)?;
-                self.log(format!("{me} accepts offer {}: {} gives {give} for {get}.", o.id, pname(o.from)), ev! {"k": "trade", "from": o.from, "to": p, "give": give, "get": get});
-                return Ok(());
-            }
-            "offer" => {
-                let to = if ["anyone", "everyone"].contains(&arg(0).to_lowercase().as_str()) { None } else { Some(self.parse_player(arg(0))?) };
-                if to == Some(p) {
-                    return fail("You can't trade with yourself.");
-                }
-                if p != self.turn && to != Some(self.turn) {
-                    return fail(format!("Out of turn, you can only offer to {}.", pname(self.turn)));
-                }
-                let at = |w: &str| args.iter().position(|a| *a == w);
-                let (Some(1), Some(ge)) = (at("give"), at("get").filter(|i| *i >= 1)) else { return fail("Use: offer P2 give 2 stone c12 get 1 gold, or offer anyone give ...") };
-                let id = self.id(b'o');
-                let o = Offer { id, from: p, to, passed: to.is_none().then(Vec::new), give: parse_side(&args[2..ge])?, get: parse_side(&args[ge + 1..])? };
-                if o.give.nothing() && o.get.nothing() {
-                    return fail("The offer is empty: give or get something.");
-                }
-                let all: Vec<&str> = o.give.cards.iter().chain(&o.get.cards).map(|s| s.as_str()).collect();
-                if unique(&all).len() < all.len() {
-                    return fail("Name each card once.");
-                }
-                if !self.has_side(p, &o.give) {
-                    return fail(format!("You don't have {}.", self.trade_text(&o.give)));
-                }
-                let gold = match to {
-                    None => (0..self.n()).filter(|q| *q != p).map(|q| self.players[q].gold()).max().unwrap(),
-                    Some(q) => self.players[q].gold(),
-                };
-                if o.get.res.get(GOLD) > gold {
-                    return fail(to.map_or(format!("No other player has more than {gold} gold."), |q| format!("{} has {gold} gold.", pname(q))));
-                }
-                let text = format!("{me} offers {} ({id}): {} for {}.", to.map_or("anyone".into(), pname), self.trade_text(&o.give), self.trade_text(&o.get));
-                self.offers.push(o);
-                self.log(text, ev! {"k": "offer", "p": p, "to": to});
-                return Ok(());
-            }
-            "cancel" => {
-                let Some(i) = find_offer(self, arg(0)).filter(|i| self.offers[*i].from == p) else { return fail(format!("You have no open offer \"{}\".", arg(0))) };
-                let o = self.offers.remove(i);
-                self.log(format!("{me} withdraws offer {}.", o.id), ev! {"k": "withdraw", "p": p});
-                return Ok(());
-            }
-            _ => {}
+    /// Takes note of how an offer closed, for a late answer to it.
+    fn close(&mut self, o: &Offer, how: Closed, by: Option<usize>) {
+        self.closed_offers.push(ClosedOffer { id: o.id, from: o.from, to: o.to, how, by });
+        let old = self.closed_offers.len().saturating_sub(CLOSED_KEPT);
+        self.closed_offers.drain(..old);
+    }
+    // Why p can't answer an offer (or withdraw one of their own) that isn't open to it.
+    fn no_offer(&self, p: usize, id: Id, own: bool) -> String {
+        if !own && self.offers.iter().any(|o| o.id == id && o.passed().contains(&p)) {
+            return "You've already declined that offer.".into();
         }
+        let theirs = |o: &ClosedOffer| if own { o.from == p } else { o.from != p && o.to.is_none_or(|q| q == p) };
+        match self.closed_offers.iter().find(|o| o.id == id && theirs(o)) {
+            Some(o) => match (o.how, o.by) {
+                (Closed::Expired, _) => "That offer has expired.".into(),
+                (Closed::Withdrawn, _) => if own { "You've already withdrawn that offer.".into() } else { format!("{} has withdrawn that offer.", pname(o.from)) },
+                (Closed::Declined, _) => if own { "That offer has been declined.".into() } else { "You've already declined that offer.".into() },
+                (Closed::Accepted, Some(q)) if q != p => format!("{} has already accepted that offer.", pname(q)),
+                (Closed::Accepted, _) => "You've already accepted that offer.".into(),
+            },
+            None if own => format!("You have no open offer {id}."),
+            None => format!("There is no offer {id} made to you."),
+        }
+    }
+    // Answers to offers: what's true of the offer, whatever the game has moved on to.
+    fn open_offer(&self, p: usize, id: Id, own: bool) -> Rule<usize> {
+        self.offers.iter().position(|o| o.id == id && if own { o.from == p } else { o.waits_on(p) }).ok_or_else(|| self.no_offer(p, id, own))
+    }
+    fn accept(&mut self, p: usize, id: Id) -> Rule {
+        let i = self.open_offer(p, id, false)?;
+        if let Some(why) = self.accept_problem(&self.offers[i], p) {
+            return fail(why);
+        }
+        let o = self.offers.remove(i);
+        self.close(&o, Closed::Accepted, Some(p));
+        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        self.move_side(o.from, p, &o.give)?;
+        self.move_side(p, o.from, &o.get)?;
+        self.log(format!("{} accepts offer {}: {} gives {give} for {get}.", pname(p), o.id, pname(o.from)), ev! {"k": "trade", "from": o.from, "to": p, "give": give, "get": get});
+        Ok(())
+    }
+    fn decline(&mut self, p: usize, id: Id) -> Rule {
+        let i = self.open_offer(p, id, false)?;
+        if self.offers[i].to.is_none() {
+            self.offers[i].passed.get_or_insert_default().push(p);
+        }
+        let o = self.offers[i].clone();
+        if o.to.is_some() || (0..self.n()).all(|q| !o.waits_on(q)) {
+            self.offers.remove(i);
+            self.close(&o, Closed::Declined, None);
+        }
+        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        self.log(format!("{} declines offer {}.", pname(p), o.id), ev! {"k": "decline", "p": p, "from": o.from, "give": give, "get": get});
+        Ok(())
+    }
+    fn cancel(&mut self, p: usize, id: Id) -> Rule {
+        let i = self.open_offer(p, id, true)?;
+        let o = self.offers.remove(i);
+        self.close(&o, Closed::Withdrawn, None);
+        self.log(format!("{} withdraws offer {}.", pname(p), o.id), ev! {"k": "withdraw", "p": p});
+        Ok(())
+    }
+    fn offer(&mut self, p: usize, to: To, give: &command::Side, get: &command::Side) -> Rule {
+        let to = match to {
+            To::Anyone => None,
+            To::Player(s) => Some(self.seat(s)?),
+        };
+        if to == Some(p) {
+            return fail("You can't trade with yourself.");
+        }
+        if p != self.turn && to != Some(self.turn) {
+            return fail(format!("Out of turn, you can only offer to {}.", pname(self.turn)));
+        }
+        let id = self.id(b'o');
+        let side = |s: &command::Side| TradeSide { res: s.bundle(), cards: s.cards.iter().map(|c| c.to_string()).collect() };
+        let o = Offer { id, from: p, to, passed: to.is_none().then(Vec::new), give: side(give), get: side(get) };
+        if o.give.nothing() && o.get.nothing() {
+            return fail("The offer is empty: give or get something.");
+        }
+        let all: Vec<Id> = give.cards.iter().chain(&get.cards).copied().collect();
+        if unique(&all).len() < all.len() {
+            return fail("Name each card once.");
+        }
+        if !self.has_side(p, &o.give) {
+            return fail(format!("You don't have {}.", self.trade_text(&o.give)));
+        }
+        let gold = match to {
+            None => (0..self.n()).filter(|q| *q != p).map(|q| self.players[q].gold()).max().unwrap(),
+            Some(q) => self.players[q].gold(),
+        };
+        if o.get.res.get(GOLD) > gold {
+            return fail(to.map_or(format!("No other player has more than {gold} gold."), |q| format!("{} has {gold} gold.", pname(q))));
+        }
+        let text = format!("{} offers {} ({id}): {} for {}.", pname(p), to.map_or("anyone".into(), pname), self.trade_text(&o.give), self.trade_text(&o.get));
+        self.offers.push(o);
+        self.log(text, ev! {"k": "offer", "p": p, "to": to});
+        Ok(())
+    }
+
+    fn action_command(&mut self, p: usize, cmd: &Command) -> Rule {
+        if let Command::Offer { to, give, get } = cmd {
+            return self.offer(p, *to, give, get);
+        }
+        let me = pname(p);
         if p != self.turn {
             return fail(format!("It's {}'s turn: out of turn, you can only trade.", pname(self.turn)));
         }
-        match verb {
-            "end" => {
+        match cmd {
+            Command::End {} => {
                 let open: Vec<String> = self.offers.iter().filter(|o| o.waits_on(p)).map(|o| format!("{}'s offer {}", pname(o.from), o.id)).collect();
                 if !open.is_empty() {
                     return fail(format!("Answer {} first: accept or decline.", open.join(" and ")));
@@ -1671,67 +1709,67 @@ impl Game {
                 self.end_turn();
                 Ok(())
             }
-            "merchants" | "bank" => {
-                let (give, get) = (parse_resource(arg(0))?, parse_resource(arg(1))?);
+            Command::Merchants { pay, gain, times } => {
+                let (give, get, times) = (*pay as usize, *gain as usize, i64::from(*times));
                 if give == GOLD || get == GOLD {
                     return fail("The merchants don't trade gold.");
                 }
                 if give == get {
                     return fail("Trade 2 different resources.");
                 }
-                let Some(times) = (if arg(2).is_empty() { Some(1) } else { js_int(arg(2)) }).filter(|n| *n >= 1) else { return fail("Times must be a whole number.") };
+                if times < 1 {
+                    return fail("Trade at least once.");
+                }
                 let (g, t) = (Bundle::one(give, self.bank_rates(p)[give] * times), Bundle::one(get, times));
                 self.players[p].pay(&g)?;
                 self.players[p].gain(&t);
                 self.log(format!("{me} trades {} to the merchants for {}.", g.text(), t.text()), ev! {"k": "bank", "p": p, "give": g, "get": t});
                 Ok(())
             }
-            "build" => {
-                if let Some(basic) = DATA.basic_buildings.iter().find(|b| **b == arg(0)) {
-                    let k = self.place_check(p, basic, arg(1))?;
-                    self.players[p].pay(&DATA.buildings[basic].cost)?;
-                    self.place_building(p, Key::of(basic), k);
-                    return Ok(());
-                }
-                let Ok(c) = self.hand_card(p, arg(0)) else { return fail(format!("Build a card from your hand (like \"build c12 2,-1\") or a basic building: {}.", DATA.basic_buildings.join(", "))) };
+            Command::BuildBasic { building, hex } => {
+                let k = self.place_check(p, building.0, *hex)?;
+                self.players[p].pay(&DATA.buildings[building.0].cost)?;
+                self.place_building(p, *building, k);
+                Ok(())
+            }
+            Command::Build { card, hex } => {
+                let c = self.hand_card(p, *card)?;
                 if c.kind() != "building" {
                     return fail(format!("{} is not a building card.", c.name()));
                 }
-                let k = self.place_check(p, c.key.0, arg(1))?;
+                let k = self.place_check(p, c.key.0, *hex)?;
                 self.players[p].pay(c.cost())?;
                 self.discard(p, c);
                 self.place_building(p, c.key, k);
                 Ok(())
             }
-            "upgrade" => {
-                let c = self.hand_card(p, arg(0))?;
+            Command::Upgrade { card, hex } => {
+                let c = self.hand_card(p, *card)?;
                 if c.kind() != "upgrade" {
                     return fail(format!("{} is not an upgrade card.", c.name()));
                 }
-                let k = self.upgrade_check(p, c.key.0, arg(1))?;
+                let k = self.upgrade_check(p, c.key.0, *hex)?;
                 self.players[p].pay(c.cost())?;
                 self.discard(p, c);
                 self.place_upgrade(p, c.key, k, false);
                 Ok(())
             }
-            "clear" => {
-                let k = K::parse(arg(0)).filter(|k| self.map.get(k).is_some_and(|h| h.fauna.is_some()) || !self.rivals_perched(p, *k).is_empty());
-                let Some(k) = k else { return fail(format!("Nothing to clear at \"{}\". Clear: {}.", arg(0), keys_or(&self.huntable(p), "nowhere"))) };
-                if args.len() < 2 {
-                    return fail(format!("Send at least 1 dragon: clear {k} d1 d4"));
+            Command::Clear { hex, dragons } => {
+                let k = *hex;
+                if self.map.get(&k).is_none_or(|h| h.fauna.is_none()) && self.rivals_perched(p, k).is_empty() {
+                    return fail(format!("Nothing to clear at {k}. Clear: {}.", keys_or(&self.huntable(p), "nowhere")));
                 }
-                let ds = self.ready_dragons(p, &args[1..])?;
+                let ds = self.ready_dragons(p, dragons)?;
                 self.clear_hex(p, k, &ds)?;
                 Ok(())
             }
-            "autoclear" => self.auto_clear(p),
-            "perch" => {
-                let ok = self.perch_hexes(p);
-                let Some(k) = K::parse(arg(0)).filter(|k| ok.contains(k)) else { return fail(format!("Perch on a rival's building (not a tower), like \"perch 2,-1 d3\". Rivals' buildings: {}.", keys_or(&ok, "none"))) };
-                if args.len() < 2 {
-                    return fail(format!("Send at least 1 dragon: perch {k} d1 d4"));
+            Command::AutoClear {} => self.auto_clear(p),
+            Command::Perch { hex, dragons } => {
+                let (k, ok) = (*hex, self.perch_hexes(p));
+                if !ok.contains(&k) {
+                    return fail(format!("Perch on a rival's building (not a tower). Rivals' buildings: {}.", keys_or(&ok, "none")));
                 }
-                let ds = self.ready_dragons(p, &args[1..])?;
+                let ds = self.ready_dragons(p, dragons)?;
                 for d in &ds {
                     self.dragon_mut(*d).perch = Some(k);
                 }
@@ -1741,11 +1779,11 @@ impl Game {
                 self.log(text, ev);
                 Ok(())
             }
-            "recall" => {
-                if args.is_empty() {
-                    return fail("Name a perched dragon: recall d3");
+            Command::Recall { dragons } => {
+                if dragons.is_empty() {
+                    return fail("Choose a perched dragon to recall.");
                 }
-                let ds = self.own_dragons(p, args)?;
+                let ds = self.own_dragons(p, dragons)?;
                 for d in &ds {
                     if self.dragon(*d).perch.is_none() {
                         return fail(format!("{d} isn't perched."));
@@ -1757,31 +1795,27 @@ impl Game {
                 self.log(format!("{me} recalls {} home.", ids(&ds)), ev! {"k": "recall", "p": p, "ds": ds});
                 Ok(())
             }
-            "project" => {
-                let what = arg(0);
-                if ELEMENTS.contains(&what) {
-                    self.room_for_dragon(p)?;
-                    let key = project_dragon(what);
-                    self.players[p].pay(&egg_cost(key.0))?;
-                    return self.hatch(p, key, true);
-                }
-                if DATA.upgrades.get(what).is_some_and(|u| u.base) {
-                    let k = self.upgrade_check(p, what, arg(1))?;
-                    self.players[p].pay(&upgrade_project_cost(what))?;
-                    self.place_upgrade(p, Key::of(what), k, true);
-                    return Ok(());
-                }
-                let ups: Vec<String> = project_upgrades().map(|u| format!("project {u} <hex>")).collect();
-                fail(format!("Use: project <{}>, or {}.", ELEMENTS.join("|"), or_list(&ups)))
+            Command::ProjectEgg { element } => {
+                self.room_for_dragon(p)?;
+                let key = project_dragon(element.0);
+                self.players[p].pay(&egg_cost(key.0))?;
+                self.hatch(p, key, true)
             }
-            "play" => self.play(p, args),
-            _ => fail(format!("Unknown action \"{verb}\". Try: build, upgrade, project, play, clear, autoclear, perch, recall, merchants, offer, accept, decline, cancel, end.")),
+            Command::ProjectUpgrade { upgrade, hex } => {
+                let k = self.upgrade_check(p, upgrade.0, *hex)?;
+                self.players[p].pay(&upgrade_project_cost(upgrade.0))?;
+                self.place_upgrade(p, *upgrade, k, true);
+                Ok(())
+            }
+            Command::Play { .. } => self.play(p, cmd),
+            _ => fail(self.not_now(p, cmd)),
         }
     }
 
-    fn play(&mut self, p: usize, args: &[&str]) -> Rule {
-        let arg = |i: usize| args.get(i).copied().unwrap_or("");
-        let c = self.hand_card(p, arg(0))?;
+    fn play(&mut self, p: usize, cmd: &Command) -> Rule {
+        let Command::Play { card, resource, dragon, hex } = cmd else { return fail(self.not_now(p, cmd)) };
+        let c = self.hand_card(p, *card)?;
+        let on_dragon = |name: S| dragon.ok_or_else(|| format!("Choose a dragon for the {name}."));
         match c.kind() {
             "dragon" => {
                 self.room_for_dragon(p)?;
@@ -1790,14 +1824,19 @@ impl Game {
                 return self.hatch(p, c.key, false);
             }
             "action" => {}
-            kind => return fail(format!("{} is played with \"{}\".", c.name(), if kind == "building" { "build" } else { "upgrade" })),
+            "building" => return fail(format!("{} is a building card: build it.", c.name())),
+            _ => return fail(format!("{} is an upgrade card: upgrade a building with it.", c.name())),
         }
         let def = &DATA.actions[c.key.0];
         let mut ev = serde_json::json!({"k": "play", "p": p, "card": c.key, "name": def.name});
         let what = match def.effect {
             "hidden_point" => return fail(format!("{} isn't played; it scores while it stays in your hand.", def.name)),
             "gain_resource" | "gain_gold" => {
-                let r = if def.effect == "gain_gold" { GOLD } else { parse_resource(arg(1))? };
+                let r = match resource {
+                    _ if def.effect == "gain_gold" => GOLD,
+                    Some(r) => *r as usize,
+                    None => return fail("Choose a resource to gain."),
+                };
                 if def.effect == "gain_resource" && r == GOLD {
                     return fail(format!("{} doesn't gain gold: choose another resource.", def.name));
                 }
@@ -1808,7 +1847,7 @@ impl Game {
                 format!("gains {} {}", def.amount, RESOURCES[r])
             }
             "grow_dragon" => {
-                let id = self.own_dragon(p, arg(1))?;
+                let id = self.own_dragon(p, on_dragon(def.name)?)?;
                 if self.dragon(id).stage == 3 {
                     return fail(format!("{id} is already an adult."));
                 }
@@ -1820,7 +1859,7 @@ impl Game {
                 format!("grows {} ({id}) into {}", d.name(), STAGE_INTO[d.stage])
             }
             "heal_dragon" => {
-                let id = self.own_dragon(p, arg(1))?;
+                let id = self.own_dragon(p, on_dragon(def.name)?)?;
                 if self.dragon(id).damage == 0 {
                     return fail(format!("{id} isn't hurt."));
                 }
@@ -1833,7 +1872,7 @@ impl Game {
                 let f = def.fauna.unwrap();
                 let name = DATA.fauna[f].name;
                 let ok = self.fauna_hexes();
-                let Some(k) = K::parse(arg(1)).filter(|k| ok.contains(k)) else { return fail(format!("Say where to place the {name}: a land hex with no tower or beast, like \"play {} 2,-1\".", c.id)) };
+                let Some(k) = hex.filter(|k| ok.contains(k)) else { return fail(format!("Choose a hex for the {name}: land, with no tower or beast.")) };
                 self.players[p].pay(&def.cost)?;
                 let h = &mut self.map[&k];
                 h.fauna = Some(Key::of(f));
@@ -1855,29 +1894,26 @@ impl Game {
         Ok(())
     }
 
-    fn raid_command(&mut self, p: usize, verb: &str, args: &[&str]) -> Rule {
+    fn vote(&mut self, p: usize, t: Key) -> Rule {
         let raid = self.raid.as_ref().unwrap();
-        if raid.step == Step::Vote {
-            let n = raid.candidates.len();
-            if !self.can_vote(p) {
-                return fail(NO_VOTE);
-            }
-            if verb != "vote" {
-                return fail(format!("Vote for the raid target: vote 1..{n}."));
-            }
-            if raid.votes[p].is_some() {
-                return fail("You already voted.");
-            }
-            let Some(i) = args.first().and_then(|a| js_int(a)).filter(|i| *i >= 1 && *i <= n as i64).map(|i| i as usize - 1) else { return fail(format!("Vote 1..{n}.")) };
-            let t = raid.candidates[i];
-            self.raid.as_mut().unwrap().votes[p] = Some(i);
-            self.log(format!("{} votes for {}.", pname(p), DATA.targets[t.0].name), ev! {"k": "voted", "p": p, "t": t});
-            let votes = &self.raid.as_ref().unwrap().votes;
-            if votes.iter().enumerate().all(|(q, v)| v.is_some() || !self.can_vote(q)) {
-                self.resolve_vote();
-            }
-            return Ok(());
+        if !self.can_vote(p) {
+            return fail(NO_VOTE);
         }
+        if raid.votes[p].is_some() {
+            return fail("You already voted.");
+        }
+        let Some(i) = raid.candidates.iter().position(|c| *c == t) else { return fail(format!("{} isn't in this vote.", DATA.targets[t.0].name)) };
+        self.raid.as_mut().unwrap().votes[p] = Some(i);
+        self.log(format!("{} votes for {}.", pname(p), DATA.targets[t.0].name), ev! {"k": "voted", "p": p, "t": t});
+        let votes = &self.raid.as_ref().unwrap().votes;
+        if votes.iter().enumerate().all(|(q, v)| v.is_some() || !self.can_vote(q)) {
+            self.resolve_vote();
+        }
+        Ok(())
+    }
+    /// The dragons that fight: all of them when it names none, or (None) all hold back.
+    fn choose(&mut self, p: usize, named: Option<Option<&[Id]>>) -> Rule {
+        let raid = self.raid.as_ref().unwrap();
         let mine = &raid.sent[p];
         if mine.is_empty() {
             return fail("You aren't in this raid: you had no raid-ready dragon when the vote ended.");
@@ -1885,15 +1921,17 @@ impl Game {
         if raid.choices[p].is_some() {
             return fail("You already chose.");
         }
-        if (verb != "fight" && verb != "hold") || (verb == "hold" && !args.is_empty()) {
-            return fail(format!("Choose the dragons that fight: \"fight\" (all of them), \"fight {}\" (some), or \"hold\" (none).", ids(mine)));
-        }
-        let mut named = vec![];
-        for a in unique(args) {
-            let Some(d) = Id::parse(a).filter(|d| mine.contains(d)) else { return fail(format!("{a} isn't one of your dragons in this raid ({}).", ids(mine))) };
-            named.push(d);
-        }
-        let fight: Vec<Id> = mine.iter().copied().filter(|d| verb == "fight" && (named.is_empty() || named.contains(d))).collect();
+        let fight: Vec<Id> = match named {
+            None => vec![],
+            Some(None) => mine.clone(),
+            Some(Some([])) => return fail("Choose dragons to fight, or hold back."),
+            Some(Some(ds)) => {
+                if let Some(d) = ds.iter().find(|d| !mine.contains(d)) {
+                    return fail(format!("{d} isn't one of your dragons in this raid ({}).", ids(mine)));
+                }
+                mine.iter().copied().filter(|d| ds.contains(d)).collect()
+            }
+        };
         let held: Vec<Id> = mine.iter().copied().filter(|d| !fight.contains(d)).collect();
         let text = if fight.is_empty() {
             "You hold back.".into()
@@ -1910,16 +1948,12 @@ impl Game {
         }
         Ok(())
     }
-    fn cards_command(&mut self, p: usize, verb: &str, args: &[&str]) -> Rule {
+    fn keep_command(&mut self, p: usize, card: Id) -> Rule {
         let choice = &self.players[p].choice;
         if choice.is_empty() {
             return fail("You've kept your card: wait for the others.");
         }
-        if verb != "keep" {
-            return fail(format!("Keep 1 of your 2 building cards: keep {}.", choice.iter().map(|c| c.id.to_string()).collect::<Vec<_>>().join(" or ")));
-        }
-        let want = args.first().and_then(|a| Id::parse(a));
-        let Some(c) = choice.iter().find(|c| Some(c.id) == want).copied() else { return fail(format!("Keep 1 of {}.", choice.iter().map(|c| c.named()).collect::<Vec<_>>().join(", "))) };
+        let Some(c) = choice.iter().find(|c| c.id == card).copied() else { return fail(format!("Keep 1 of {}.", choice.iter().map(|c| c.named()).collect::<Vec<_>>().join(", "))) };
         self.keep(p, c);
         self.log(format!("{} keeps a building card.", pname(p)), ev! {"k": "keep", "p": p});
         if self.players.iter().all(|x| x.choice.is_empty()) {
@@ -1927,20 +1961,16 @@ impl Game {
         }
         Ok(())
     }
-    fn discard_command(&mut self, p: usize, verb: &str, args: &[&str]) -> Rule {
+    fn discard_command(&mut self, p: usize, cards: &[Id]) -> Rule {
         let hand = &self.players[p].hand;
         let cap = tuning().hand_cap;
         if hand.len() <= cap {
             return fail("You don't need to discard.");
         }
         let over = hand.len() - cap;
-        let like = format!("like \"discard {}\"", hand[..over].iter().map(|c| c.id.to_string()).collect::<Vec<_>>().join(" "));
-        if verb != "discard" {
-            return fail(format!("Discard {} first, {like}.", n_cards(over)));
-        }
-        let named = unique(args);
+        let named = unique(cards);
         if named.len() != over {
-            return fail(format!("You hold {} and the hand limit is {cap}: discard {}, {like}.", hand.len(), n_cards(over)));
+            return fail(format!("You hold {} and the hand limit is {cap}: discard {}.", hand.len(), n_cards(over)));
         }
         let cards = named.into_iter().map(|id| self.hand_card(p, id)).collect::<Rule<Vec<Card>>>()?;
         for c in &cards {
@@ -1950,59 +1980,77 @@ impl Game {
         self.maybe_end_round();
         Ok(())
     }
-    fn talk(&mut self, p: usize, verb: &str, rest: &str) -> Rule {
-        let mut rest = rest;
-        let mut to = None;
-        if verb == "tell" {
-            let digits = rest.strip_prefix(['p', 'P']).unwrap_or("");
-            let end = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
-            let q = digits[..end].parse::<usize>().ok().and_then(|n| n.checked_sub(1));
-            if q == Some(p) {
-                return fail("You can't tell yourself.");
-            }
-            let Some(q) = q.filter(|q| *q < self.n()) else { return fail("Name a player to tell, like \"tell P2 want my timber?\"") };
-            to = Some(vec![p, q]);
-            rest = js_trim(&digits[end..]);
+    fn talk(&mut self, p: usize, to: Option<Seat>, message: &str) -> Rule {
+        let to = to.map(|s| self.seat(s)).transpose()?;
+        if to == Some(p) {
+            return fail("You can't tell yourself.");
         }
-        let text = rest.split(js_space).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+        let text = message.split(js_space).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
         if text.is_empty() {
-            return fail("Type a message, like \"say hello\".");
+            return fail("Type a message.");
         }
         if text.encode_utf16().count() > 500 {
             return fail("Keep it under 500 characters.");
         }
-        let line = match &to {
-            Some(t) => format!("{} to {} (private): \"{text}\"", pname(p), pname(t[1])),
+        let line = match to {
+            Some(q) => format!("{} to {} (private): \"{text}\"", pname(p), pname(q)),
             None => format!("{} says: \"{text}\"", pname(p)),
         };
-        self.log_to(line, ev! {"k": "talk"}, to, None);
+        self.log_to(line, ev! {"k": "talk"}, to.map(|q| vec![p, q]), None);
         Ok(())
     }
 
-    /// A player's command. A refused one changes nothing.
-    pub fn apply(&mut self, p: usize, command: &str) -> Rule {
-        if self.phase == Phase::Over {
-            return fail("The game is over.");
+    // Why p can't do this in the phase the game is in: what's true of the command, not what the phase wants.
+    fn not_now(&self, p: usize, cmd: &Command) -> String {
+        let voting = self.raid.as_ref().is_some_and(|r| r.step == Step::Vote);
+        match cmd {
+            Command::Keep { .. } => "Keep a building card at the start of the round.".into(),
+            Command::Discard { .. } => format!("Discard at the end of the round, after the raids, if you hold more than {} cards.", tuning().hand_cap),
+            Command::Vote { .. } if self.phase == Phase::Raid => "The vote is over.".into(),
+            Command::Vote { .. } => "Vote for a target in the raid, after everyone's turn.".into(),
+            Command::Fight { .. } | Command::Hold {} if voting => "Fight or hold back after the vote.".into(),
+            Command::Fight { .. } | Command::Hold {} => "Fight or hold back in the raid, after everyone's turn.".into(),
+            _ if self.phase == Phase::Cards && self.players[p].choice.is_empty() => "Turns start once everyone has kept a card: wait for the others.".into(),
+            _ if self.phase == Phase::Cards => "Turns start once everyone has kept a card: keep 1 of your 2 building cards.".into(),
+            Command::Offer { .. } => "Turns are over for this round: make offers during the next round's turns.".into(),
+            _ => "Turns are over for this round: do it on your next turn.".into(),
         }
+    }
+
+    /// A player's command. A refused one changes nothing.
+    pub fn apply(&mut self, p: usize, cmd: &Command) -> Rule {
         if p >= self.n() {
             return fail("No such player.");
         }
-        let command = js_trim(command);
-        let mut words = command.split(js_space).filter(|w| !w.is_empty());
-        let verb = words.next().unwrap_or("");
-        let args: Vec<&str> = words.collect();
-        let v = verb.to_lowercase();
-        if v == "say" || v == "tell" {
-            return self.talk(p, &v, js_trim(&command[verb.len()..]));
+        // Answering an offer that's gone is about the offer, even once the game is over.
+        match cmd {
+            Command::Accept { offer } | Command::Decline { offer } => self.open_offer(p, *offer, false).map(|_| ())?,
+            Command::Cancel { offer } => self.open_offer(p, *offer, true).map(|_| ())?,
+            _ => {}
+        }
+        if self.phase == Phase::Over {
+            return fail("The game is over.");
+        }
+        match cmd {
+            Command::Say { message } => return self.talk(p, None, message),
+            Command::Tell { to, message } => return self.talk(p, Some(*to), message),
+            _ => {}
         }
         let logged = self.log.len();
         let before = self.clone_without_log();
-        let done = match self.phase {
-            Phase::Discard => self.discard_command(p, &v, &args),
-            _ if v == "discard" => fail(format!("Discard at the end of the round, after the raids, if you hold more than {} cards.", tuning().hand_cap)),
-            Phase::Cards => self.cards_command(p, &v, &args),
-            Phase::Action => self.action_command(p, &v, &args),
-            _ => self.raid_command(p, &v, &args),
+        let step = self.raid.as_ref().map(|r| r.step);
+        let done = match (self.phase, cmd) {
+            (_, Command::Accept { offer }) => self.accept(p, *offer),
+            (_, Command::Decline { offer }) => self.decline(p, *offer),
+            (_, Command::Cancel { offer }) => self.cancel(p, *offer),
+            (Phase::Cards, Command::Keep { card }) => self.keep_command(p, *card),
+            (Phase::Discard, Command::Discard { cards }) => self.discard_command(p, cards),
+            (Phase::Raid, Command::Vote { target }) if step == Some(Step::Vote) => self.vote(p, *target),
+            (Phase::Raid, Command::Fight { dragons }) if step == Some(Step::Choose) => self.choose(p, Some(dragons.as_deref())),
+            (Phase::Raid, Command::Hold {}) if step == Some(Step::Choose) => self.choose(p, None),
+            (Phase::Action, Command::Keep { .. } | Command::Discard { .. } | Command::Vote { .. } | Command::Fight { .. } | Command::Hold {}) => fail(self.not_now(p, cmd)),
+            (Phase::Action, _) => self.action_command(p, cmd),
+            _ => fail(self.not_now(p, cmd)),
         };
         match done {
             Ok(()) => self.update_titles(),
@@ -2052,37 +2100,12 @@ fn sorted(ks: impl Iterator<Item = K>) -> Vec<K> {
 pub fn keys_or(ks: &[K], none: &str) -> String {
     if ks.is_empty() { none.into() } else { ks.iter().map(|k| k.to_string()).collect::<Vec<_>>().join(" ") }
 }
-fn unique<'a>(xs: &[&'a str]) -> Vec<&'a str> {
-    let mut out: Vec<&str> = vec![];
+fn unique(xs: &[Id]) -> Vec<Id> {
+    let mut out: Vec<Id> = vec![];
     for x in xs {
         if !out.contains(x) {
-            out.push(x);
+            out.push(*x);
         }
     }
     out
-}
-fn parse_resource(s: &str) -> Rule<usize> {
-    resource(&s.to_lowercase()).ok_or_else(|| format!("Unknown resource \"{s}\". Resources: {}.", RESOURCES.join(", ")))
-}
-fn parse_side(tokens: &[&str]) -> Rule<TradeSide> {
-    let mut side = TradeSide::default();
-    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
-    let bare = |s: &'_ str| -> String { s.strip_suffix(',').unwrap_or(s).to_string() };
-    let mut i = 0;
-    while i < tokens.len() {
-        let t = bare(tokens[i]);
-        if t.is_empty() {
-        } else if t.strip_prefix('c').is_some_and(digits) {
-            side.cards.push(t);
-        } else if digits(&t) {
-            i += 1;
-            let r = parse_resource(&bare(tokens.get(i).copied().unwrap_or("")))?;
-            let n = t.parse::<i64>().unwrap_or(i64::MAX).min(1_000_000_000_000);
-            side.res.0[r] = Some(side.res.get(r).saturating_add(n));
-        } else {
-            return fail(format!("Can't read \"{t}\" in a trade. Use amounts like \"2 stone\" and card ids like \"c12\"."));
-        }
-        i += 1;
-    }
-    Ok(side)
 }

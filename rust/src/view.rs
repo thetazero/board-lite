@@ -249,18 +249,18 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
         Phase::Action => {}
         Phase::Cards => {
             let all: Vec<String> = you.choice.iter().map(|c| c.id.to_string()).collect();
-            out.push(format!("keep <{}>   (the other is discarded)", all.join("|")));
+            out.push(format!("{{\"do\":\"keep\",\"card\":\"<{}>\"}}   (the other is discarded)", all.join("|")));
             out.extend(you.choice.iter().map(|c| format!("  {}", card_text(c))));
             return out;
         }
-        Phase::Discard => return vec![format!("discard <{} card ids>   (hand limit {})", you.hand.len() - you.hand_cap, you.hand_cap)],
+        Phase::Discard => return vec![format!("{{\"do\":\"discard\",\"cards\":[\"<{} card ids>\"]}}   (hand limit {})", you.hand.len() - you.hand_cap, you.hand_cap)],
         _ => {
             if let Some(r) = &g.raid {
                 if r.step == Step::Vote && you.why_no_vote.is_none() {
-                    out.push(format!("vote <1-{}>", r.candidates.len()));
+                    out.push(format!("{{\"do\":\"vote\",\"target\":\"<{}>\"}}", r.candidates.iter().map(|t| t.key).collect::<Vec<_>>().join("|")));
                 }
                 if r.step == Step::Choose {
-                    out.push("fight  |  fight <dragon ids>  |  hold   (secret: all, some or none of your dragons fight; held back, they stay out of the combat but still share the loot if the kingdom falls)".into());
+                    out.push("{\"do\":\"fight\"}  |  {\"do\":\"fight\",\"dragons\":[\"<dragon id>\", ...]}  |  {\"do\":\"hold\"}   (secret: all, some or none of your dragons fight; held back, they stay out of the combat but still share the loot if the kingdom falls)".into());
                 }
             }
             return out;
@@ -275,43 +275,43 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
             continue;
         }
         let why = you.cant_accept.0.iter().find(|x| x.0 == o.id).map(|x| &x.1);
-        let accept = if why.is_some() { String::new() } else { format!("accept {}  |  ", o.id) };
-        out.push(format!("{accept}decline {}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, o.get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
+        let accept = if why.is_some() { String::new() } else { format!("{{\"do\":\"accept\",\"offer\":\"{}\"}}  |  ", o.id) };
+        out.push(format!("{accept}{{\"do\":\"decline\",\"offer\":\"{}\"}}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, o.get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
     }
     if !you.my_turn {
-        out.push(format!("offer {0} give <items> get <items>   (out of turn, only with {0})", pname(g.turn)));
+        out.push(format!("{{\"do\":\"offer\",\"to\":\"{0}\",\"give\":{{...}},\"get\":{{...}}}}   (out of turn, only with {0})", pname(g.turn)));
         return out;
     }
     let none = |s: String| if s.is_empty() { "none".to_string() } else { s };
     for c in &you.hand {
         let can = afford(c.affordable);
         match c.kind {
-            "building" if c.needs == "none" => out.push(format!("build {}   ({}){can}", c.id, c.name)),
+            "building" if c.needs == "none" => out.push(format!("{{\"do\":\"build\",\"card\":\"{}\"}}   ({}){can}", c.id, c.name)),
             "building" => {
                 let hexes: Vec<String> = match &c.counts {
                     Some(n) => n.0.iter().map(|(k, n)| format!("{k}(x{n})")).collect(),
                     None => c.hexes.iter().map(|k| k.to_string()).collect(),
                 };
-                out.push(format!("build {} <hex>   ({}; hexes: {}){can}", c.id, c.name, none(hexes.join(" "))));
+                out.push(format!("{{\"do\":\"build\",\"card\":\"{}\",\"hex\":\"<hex>\"}}   ({}; hexes: {}){can}", c.id, c.name, none(hexes.join(" "))));
             }
-            "upgrade" => out.push(format!("upgrade {} <hex>   ({}; on: {}){can}", c.id, c.name, none(keys(&c.hexes)))),
-            "dragon" => out.push(format!("play {}   (hatch {}){can}{}", c.id, c.name, blocked(c))),
+            "upgrade" => out.push(format!("{{\"do\":\"upgrade\",\"card\":\"{}\",\"hex\":\"<hex>\"}}   ({}; on: {}){can}", c.id, c.name, none(keys(&c.hexes)))),
+            "dragon" => out.push(format!("{{\"do\":\"play\",\"card\":\"{}\"}}   (hatch {}){can}{}", c.id, c.name, blocked(c))),
             _ if c.needs == "unplayable" => {}
             _ => {
                 let arg = match c.needs {
-                    "resource" => " <stone|timber|crystal|livestock>",
-                    "dragon" => " <dragon id>",
-                    "hex" => " <hex>",
+                    "resource" => ",\"resource\":\"<stone|timber|crystal|livestock>\"",
+                    "dragon" => ",\"dragon\":\"<dragon id>\"",
+                    "hex" => ",\"hex\":\"<hex>\"",
                     _ => "",
                 };
                 let fauna = c.fauna.as_ref().map_or(String::new(), |f| format!(": a land hex with no tower or beast; {}", fauna_text(f)));
-                out.push(format!("play {}{arg}   ({}{fauna}){can}{}", c.id, c.name, blocked(c)));
+                out.push(format!("{{\"do\":\"play\",\"card\":\"{}\"{arg}}}   ({}{fauna}){can}{}", c.id, c.name, blocked(c)));
             }
         }
     }
     for b in you.basics.iter().filter(|b| !b.hexes.is_empty()) {
-        let (arg, at) = if b.on_tower { ("", String::new()) } else { (" <hex>", format!(" Hexes: {}", keys(&b.hexes))) };
-        out.push(format!("build {}{arg}   (no card, cost {}: {}{at}){}", b.key, res_text(&b.cost), b.text, afford(b.affordable)));
+        let (arg, at) = if b.on_tower { ("", String::new()) } else { (",\"hex\":\"<hex>\"", format!(" Hexes: {}", keys(&b.hexes))) };
+        out.push(format!("{{\"do\":\"build_basic\",\"building\":\"{}\"{arg}}}   (no card, cost {}: {}{at}){}", b.key, res_text(&b.cost), b.text, afford(b.affordable)));
     }
     let ready = ids(&you.raid_ready);
     let any = !you.raid_ready.is_empty();
@@ -326,25 +326,25 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
                 format!("{k} {}", who.join(" and "))
             })
             .collect();
-        out.push(format!("clear <hex> <dragon ids...>   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: {ready}. Hexes: {})", foes.join(", ")));
+        out.push(format!("{{\"do\":\"clear\",\"hex\":\"<hex>\",\"dragons\":[\"<dragon id>\", ...]}}   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: {ready}. Hexes: {})", foes.join(", ")));
     }
     if !you.auto_clear.is_empty() && any {
-        out.push(format!("autoclear   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: {})", keys(&you.auto_clear)));
+        out.push(format!("{{\"do\":\"auto_clear\"}}   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: {})", keys(&you.auto_clear)));
     }
     if !you.perchable.is_empty() && any {
-        out.push(format!("perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: {})", keys(&you.perchable)));
+        out.push(format!("{{\"do\":\"perch\",\"hex\":\"<hex>\",\"dragons\":[\"<dragon id>\", ...]}}   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: {})", keys(&you.perchable)));
     }
     if !you.perched.is_empty() {
-        out.push(format!("recall <dragon ids...>   (perched: {})", ids(&you.perched)));
+        out.push(format!("{{\"do\":\"recall\",\"dragons\":[\"<dragon id>\", ...]}}   (perched: {})", ids(&you.perched)));
     }
-    out.push(format!("project <{}>   (base dragon egg, no card, cost {})", you.egg_project.elements.join("|"), res_text(&you.egg_project.cost)));
+    out.push(format!("{{\"do\":\"project_egg\",\"element\":\"<{}>\"}}   (base dragon egg, no card, cost {})", you.egg_project.elements.join("|"), res_text(&you.egg_project.cost)));
     for u in you.upgrade_projects.iter().filter(|u| !u.hexes.is_empty()) {
-        out.push(format!("project {} <hex>   ({}, no card, cost {}: {} On: {}){}", u.key, u.name, res_text(&u.cost), u.text, keys(&u.hexes), afford(u.affordable)));
+        out.push(format!("{{\"do\":\"project_upgrade\",\"upgrade\":\"{}\",\"hex\":\"<hex>\"}}   ({}, no card, cost {}: {} On: {}){}", u.key, u.name, res_text(&u.cost), u.text, keys(&u.hexes), afford(u.affordable)));
     }
-    out.push(format!("merchants <give resource> <get resource> [times]   (not gold; {})", rate_text(&you.bank_rates)));
-    out.push("offer <player|anyone> give <items> get <items>   (items like \"2 stone\" or \"c12\"; to anyone: the first to accept trades)".into());
-    out.extend(g.offers.iter().filter(|o| o.from == you.seat).map(|o| format!("cancel {}", o.id)));
-    out.push(if g.offers.iter().any(|o| o.to == Some(you.seat)) { "end   (after answering the offers to you)".into() } else { "end".into() });
+    out.push(format!("{{\"do\":\"merchants\",\"pay\":\"<resource>\",\"gain\":\"<resource>\",\"times\":1}}   (not gold; {})", rate_text(&you.bank_rates)));
+    out.push("{\"do\":\"offer\",\"to\":\"<player|anyone>\",\"give\":{\"stone\":2},\"get\":{\"gold\":1,\"cards\":[\"c12\"]}}   (resources, cards or both; to anyone: the first to accept trades)".into());
+    out.extend(g.offers.iter().filter(|o| o.from == you.seat).map(|o| format!("{{\"do\":\"cancel\",\"offer\":\"{}\"}}", o.id)));
+    out.push(if g.offers.iter().any(|o| o.to == Some(you.seat)) { "{\"do\":\"end\"}   (after answering the offers to you)".into() } else { "{\"do\":\"end\"}".into() });
     out
 }
 fn phase_text(g: &PublicState) -> String {
@@ -519,7 +519,7 @@ pub fn seat_view(s: &Shown, log_lines: usize) -> String {
         out.extend(hints.iter().map(|h| format!("  {h}")));
     }
     if g.phase != Phase::Over {
-        out.push("Talk any time: say <message>, or tell <P#> <message> (private). Promises bind no one.".into());
+        out.push("Talk any time: {\"do\":\"say\",\"message\":\"...\"}, or {\"do\":\"tell\",\"to\":\"P2\",\"message\":\"...\"} (private). Promises bind no one.".into());
     }
     out.join("\n")
 }

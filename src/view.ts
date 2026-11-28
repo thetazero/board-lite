@@ -129,29 +129,29 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   if (g.phase === 'action') {
     for (const o of g.offers.filter((x) => (x.to === null ? x.from !== you.seat && !x.passed.includes(you.seat) : x.to === you.seat))) {
       const why = you.cantAccept[o.id];
-      out.push(`${why ? '' : `accept ${o.id}  |  `}decline ${o.id}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? ', to anyone' : ''})${why ? ` ${why}` : ''}`);
+      out.push(`${why ? '' : `{"do":"accept","offer":"${o.id}"}  |  `}{"do":"decline","offer":"${o.id}"}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? ', to anyone' : ''})${why ? ` ${why}` : ''}`);
     }
     if (!you.myTurn) {
-      out.push(`offer ${P(g.turn)} give <items> get <items>   (out of turn, only with ${P(g.turn)})`);
+      out.push(`{"do":"offer","to":"${P(g.turn)}","give":{...},"get":{...}}   (out of turn, only with ${P(g.turn)})`);
       return out;
     }
     for (const c of you.hand) {
       if (c.kind === 'building') {
         // For a building that counts its neighbours, each hex shows its count, like 2,-1(x3).
         const hexes = c.hexes.map((k) => (c.counts ? `${k}(x${c.counts[k]})` : k));
-        if (c.needs === 'none') out.push(`build ${c.id}   (${c.name})${afford(c)}`);
-        else out.push(`build ${c.id} <hex>   (${c.name}; hexes: ${hexes.join(' ') || 'none'})${afford(c)}`);
+        if (c.needs === 'none') out.push(`{"do":"build","card":"${c.id}"}   (${c.name})${afford(c)}`);
+        else out.push(`{"do":"build","card":"${c.id}","hex":"<hex>"}   (${c.name}; hexes: ${hexes.join(' ') || 'none'})${afford(c)}`);
       } else if (c.kind === 'upgrade') {
-        out.push(`upgrade ${c.id} <hex>   (${c.name}; on: ${c.hexes.join(' ') || 'none'})${afford(c)}`);
+        out.push(`{"do":"upgrade","card":"${c.id}","hex":"<hex>"}   (${c.name}; on: ${c.hexes.join(' ') || 'none'})${afford(c)}`);
       } else if (c.kind === 'dragon') {
-        out.push(`play ${c.id}   (hatch ${c.name})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
+        out.push(`{"do":"play","card":"${c.id}"}   (hatch ${c.name})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
       } else if (c.needs !== 'unplayable') {
-        const arg = { resource: ' <stone|timber|crystal|livestock>', dragon: ' <dragon id>', hex: ' <hex>', none: '' }[c.needs];
-        out.push(`play ${c.id}${arg}   (${c.name}${c.fauna ? `: a land hex with no tower or beast; ${faunaText(c.fauna)}` : ''})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
+        const arg = { resource: ',"resource":"<stone|timber|crystal|livestock>"', dragon: ',"dragon":"<dragon id>"', hex: ',"hex":"<hex>"', none: '' }[c.needs];
+        out.push(`{"do":"play","card":"${c.id}"${arg}}   (${c.name}${c.fauna ? `: a land hex with no tower or beast; ${faunaText(c.fauna)}` : ''})${afford(c)}${c.blocked ? ` (${c.blocked.replace(/\.$/, '')})` : ''}`);
       }
     }
     for (const b of you.basics) {
-      if (b.hexes.length) out.push(`build ${b.key}${b.onTower ? '' : ' <hex>'}   (no card, cost ${resText(b.cost)}: ${b.text}${b.onTower ? '' : ` Hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
+      if (b.hexes.length) out.push(`{"do":"build_basic","building":"${b.key}"${b.onTower ? '' : ',"hex":"<hex>"'}}   (no card, cost ${resText(b.cost)}: ${b.text}${b.onTower ? '' : ` Hexes: ${b.hexes.join(' ')}`})${afford(b)}`);
     }
     if (you.huntable.length && you.raidReady.length) {
       const foes = you.huntable.map((k) => {
@@ -159,34 +159,34 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
         const ds = h.perched.filter((x) => x.owner !== you.seat).map((x) => x.d);
         return `${k} ${[...(h.fauna ? [h.fauna.name] : []), ...ds].join(' and ')}`;
       });
-      out.push(`clear <hex> <dragon ids...>   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
+      out.push(`{"do":"clear","hex":"<hex>","dragons":["<dragon id>", ...]}   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: ${you.raidReady.join(' ')}. Hexes: ${foes.join(', ')})`);
     }
-    if (you.autoClear.length && you.raidReady.length) out.push(`autoclear   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: ${you.autoClear.join(' ')})`);
-    if (you.perchable.length && you.raidReady.length) out.push(`perch <hex> <dragon ids...>   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: ${you.perchable.join(' ')})`);
-    if (you.perched.length) out.push(`recall <dragon ids...>   (perched: ${you.perched.join(' ')})`);
-    out.push(`project <${you.eggProject.elements.join('|')}>   (base dragon egg, no card, cost ${resText(you.eggProject.cost)})`);
+    if (you.autoClear.length && you.raidReady.length) out.push(`{"do":"auto_clear"}   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: ${you.autoClear.join(' ')})`);
+    if (you.perchable.length && you.raidReady.length) out.push(`{"do":"perch","hex":"<hex>","dragons":["<dragon id>", ...]}   (a rival's building, not a tower, is suppressed while they stay; they don't raid. Dragons perched on one building fight together when it's cleared; a lone one fights alone. Hexes: ${you.perchable.join(' ')})`);
+    if (you.perched.length) out.push(`{"do":"recall","dragons":["<dragon id>", ...]}   (perched: ${you.perched.join(' ')})`);
+    out.push(`{"do":"project_egg","element":"<${you.eggProject.elements.join('|')}>"}   (base dragon egg, no card, cost ${resText(you.eggProject.cost)})`);
     for (const u of you.upgradeProjects) {
-      if (u.hexes.length) out.push(`project ${u.key} <hex>   (${u.name}, no card, cost ${resText(u.cost)}: ${u.text} On: ${u.hexes.join(' ')})${afford(u)}`);
+      if (u.hexes.length) out.push(`{"do":"project_upgrade","upgrade":"${u.key}","hex":"<hex>"}   (${u.name}, no card, cost ${resText(u.cost)}: ${u.text} On: ${u.hexes.join(' ')})${afford(u)}`);
     }
-    out.push(`merchants <give resource> <get resource> [times]   (not gold; ${rateText(you.bankRates)})`);
-    out.push(`offer <player|anyone> give <items> get <items>   (items like "2 stone" or "c12"; to anyone: the first to accept trades)`);
-    for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`cancel ${o.id}`);
-    out.push(g.offers.some((o) => o.to === you.seat) ? 'end   (after answering the offers to you)' : 'end');
+    out.push(`{"do":"merchants","pay":"<resource>","gain":"<resource>","times":1}   (not gold; ${rateText(you.bankRates)})`);
+    out.push(`{"do":"offer","to":"<player|anyone>","give":{"stone":2},"get":{"gold":1,"cards":["c12"]}}   (resources, cards or both; to anyone: the first to accept trades)`);
+    for (const o of g.offers.filter((x) => x.from === you.seat)) out.push(`{"do":"cancel","offer":"${o.id}"}`);
+    out.push(g.offers.some((o) => o.to === you.seat) ? '{"do":"end"}   (after answering the offers to you)' : '{"do":"end"}');
     return out;
   }
   if (g.phase === 'cards') {
-    out.push(`keep <${you.choice.map((c) => c.id).join('|')}>   (the other is discarded)`);
+    out.push(`{"do":"keep","card":"<${you.choice.map((c) => c.id).join('|')}>"}   (the other is discarded)`);
     for (const c of you.choice) out.push(`  ${cardText(c)}`);
     return out;
   }
   if (g.phase === 'discard') {
     const n = you.hand.length - you.handCap;
-    out.push(`discard <${n} card ids>   (hand limit ${you.handCap})`);
+    out.push(`{"do":"discard","cards":["<${n} card ids>"]}   (hand limit ${you.handCap})`);
     return out;
   }
   const raid = g.raid;
-  if (raid?.step === 'vote' && !you.whyNoVote) out.push(`vote <1-${raid.candidates.length}>`);
-  if (raid?.step === 'choose') out.push('fight  |  fight <dragon ids>  |  hold   (secret: all, some or none of your dragons fight; held back, they stay out of the combat but still share the loot if the kingdom falls)');
+  if (raid?.step === 'vote' && !you.whyNoVote) out.push(`{"do":"vote","target":"<${raid.candidates.map((t) => t.key).join('|')}>"}`);
+  if (raid?.step === 'choose') out.push('{"do":"fight"}  |  {"do":"fight","dragons":["<dragon id>", ...]}  |  {"do":"hold"}   (secret: all, some or none of your dragons fight; held back, they stay out of the combat but still share the loot if the kingdom falls)');
   return out;
 }
 
@@ -303,7 +303,7 @@ export function seatView(s: Snapshot, logLines = 25, opts: ViewOptions = {}): st
     out.push('== Your options ==');
     for (const h of hints) out.push(`  ${h}`);
   }
-  if (g.phase !== 'over') out.push(`Talk any time: say <message>, or tell <P#> <message> (private). Promises bind no one.`);
+  if (g.phase !== 'over') out.push(`Talk any time: {"do":"say","message":"..."}, or {"do":"tell","to":"P2","message":"..."} (private). Promises bind no one.`);
   return out.join('\n');
 }
 

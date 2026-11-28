@@ -43,11 +43,15 @@ fn tools() -> Vec<Tool> {
     vec![
         tool("join", "Take a seat in a game, before it starts (or take back your own seat, by its name, when no one is at it). Returns your seat token, which every other tool needs.", json!({"game": game, "name": {"type": "string", "description": "Your name at the table, up to 12 characters."}}), &["game", "name"]),
         tool("view", &h.view, json!({"game": game, "token": token}), &["game", "token"]),
-        tool("act", &h.act, json!({"game": game, "token": token, "command": {"type": "string"}}), &["game", "token", "command"]),
+        tool("act", &h.act, act_args(json!({"game": game, "token": token})), &["game", "token", "do"]),
         tool("say", &h.say, json!({"game": game, "token": token, "message": {"type": "string"}, "to": {"type": "string", "description": "A player like \"P2\" for a private message."}}), &["game", "token", "message"]),
         tool("wait", &h.wait, json!({"game": game, "token": token}), &["game", "token"]),
         tool("rules", &h.rules, json!({}), &[]),
     ]
+}
+fn act_args(mut args: Value) -> Value {
+    args.as_object_mut().unwrap().extend(DATA.help.act_fields.clone());
+    args
 }
 fn say(text: impl Into<String>) -> Vec<Value> {
     vec![json!({"type": "text", "text": text.into()})]
@@ -67,7 +71,7 @@ async fn listen<T>(room: &Room, tok: &str, secs: f64, then: impl FnOnce(&Room, &
     })
     .await
 }
-async fn act(room: &Room, tok: &str, command: &str) -> Res<Vec<Value>> {
+async fn act(room: &Room, tok: &str, command: &Value) -> Res<Vec<Value>> {
     room.command(tok, command, Some("claude"), "")?;
     listen(room, tok, 0.0, |_, _, t| say(format!("Done.\n{t}"))).await
 }
@@ -95,11 +99,15 @@ async fn run(name: &str, a: &Map<String, Value>, find: impl Fn(&str) -> Res<Arc<
             })
             .await
         }
-        "act" => act(&room, tok, text(a, "command")).await,
+        "act" => {
+            // The command is the rest of the arguments; some clients send null for those they leave out.
+            let command: Map<String, Value> = a.iter().filter(|(k, v)| *k != "game" && *k != "token" && !v.is_null()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            act(&room, tok, &Value::Object(command)).await
+        }
         "say" => {
             let to = text(a, "to");
             let message = text(a, "message");
-            act(&room, tok, &if to.is_empty() { format!("say {message}") } else { format!("tell {to} {message}") }).await
+            act(&room, tok, &if to.is_empty() { json!({"do": "say", "message": message}) } else { json!({"do": "tell", "to": to, "message": message}) }).await
         }
         _ => listen(&room, tok, WAIT_SECS, |_, _, t| say(t)).await,
     }

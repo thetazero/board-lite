@@ -25,7 +25,7 @@ test('the strong bot beats two random bots, quickly, and talks', () => {
 test('the merchants plan pays a cost from what it has, or says it can\'t', () => {
   const g = newGame(2, 1);
   g.players[0].resources = { stone: 0, timber: 12, crystal: 4, livestock: 3, gold: 0 };
-  assert.deepEqual(merchantPlan(g, 0, { stone: 2, timber: 4 }), ['merchants timber stone 2']);
+  assert.deepEqual(merchantPlan(g, 0, { stone: 2, timber: 4 }), [{ do: 'merchants', pay: 'timber', gain: 'stone', times: 2 }]);
   assert.equal(merchantPlan(g, 0, { stone: 5 }), null);
   assert.equal(merchantPlan(g, 0, { gold: 1 }), null);
   assert.ok(Number.isFinite(worth(g, 0)));

@@ -54,7 +54,7 @@ A saved game is kept until it's continued, however long that is: the server neve
 
 For development only: players never see it. Every room also writes `~/.cache/board-lite/rooms/<code>.log.jsonl`, one JSON object per line and only ever appended to, so games can be analyzed in a time-aware way later. Each line has its time (`t`, ISO; `ms`, ms epoch), who sent it (`by`: `phone`, `cli`, `claude`, `player` for a client that didn't say, `bot`, `standIn`, `tv` or `game`, with `seat` and `name` for a seat) and its `type`:
 
-- `event`: an entry of the game's log, with its index `i` there, its round, text and typed `ev`, and the `command` behind it. Dice, new rounds, fights and titles are the game's, with `cause` saying whose command set them off.
+- `event`: an entry of the game's log, with its index `i` there, its round, text and typed `ev`, and the `command` behind it: JSON, as in [`cli.md`](cli.md#decision-commands) (text in logs from before typed commands). Dice, new rounds, fights and titles are the game's, with `cause` saying whose command set them off.
 - `refused`: a command the engine turned down, and why.
 - `join`, `bot`, `leave`, `handover` (a seat taken back or claimed mid-game), `quit`, `standIn` (a bot starts playing for someone), `back`, `connect` and `disconnect` (phones' and TVs' live streams), `start`, `save`, `continue`, and `load` (a game file hosted again, with how long its log was then).
 
@@ -85,7 +85,7 @@ When the game ends, the table plays the same summary as the TV, as a scene the p
 ```
 node src/cli.ts join http://192.168.1.20:8080/ABCD Claude    # prints your seat and token
 node src/cli.ts view http://192.168.1.20:8080/ABCD <token>
-node src/cli.ts do   http://192.168.1.20:8080/ABCD <token> build c12 2,-1
+node src/cli.ts do   http://192.168.1.20:8080/ABCD <token> '{"do":"build","card":"c12","hex":"2,-1"}'
 node src/cli.ts wait http://192.168.1.20:8080/ABCD <token>
 ```
 

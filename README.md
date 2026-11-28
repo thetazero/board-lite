@@ -21,7 +21,7 @@ A "board game lite" for one room: wizards raise dragons, build out from their to
 TypeScript, run directly by Node 22.18+, and the rules in Rust: `npm install`, `rustup target add wasm32-unknown-unknown` and `npm run rust:build` first, and the build again after changing the rules: the TV's board needs three.js.
 
 - `src/data.ts`: every card, unit, kingdom and tuning number; `src/datasheet.ts` turns them into `docs/datasheet.md`
-- `rust/src/engine.rs`: the rules, through `src/engine.ts`; `apply(game, seat, command)` is the only way to change a game
+- `rust/src/engine.rs`: the rules, through `src/engine.ts`; `apply(game, seat, command)` is the only way to change a game, and a command is typed JSON (`rust/src/command.rs`, `src/command.ts`)
 - `src/view.ts`: a snapshot from `src/state.ts` as text (what the CLI and Claude players print): what one seat sees, and its options; `src/mapimage.ts`: the board as a PNG, which Claude players get beside the text map
 - `src/cli.ts`: the command-line interface, a client of the server's API; `src/bot.ts`: a random bot for tests and sims; `src/strongbot.ts`: the strong bot, pure code, a free baseline for playtests and contests ([`docs/strongbot.md`](docs/strongbot.md)); `src/store.ts`: the game file and its lock
 - `src/playtest/`: the runner that seats Claude and Codex players (hosting a playtest, or joining a room) and the per-seat MCP server they play through; the eval (`eval.ts`), the leaderboard's rating (`leaderboard.ts`, `rating.ts`) and the live page, a contest's or the whole leaderboard's (`live.ts`, `live.html`)
