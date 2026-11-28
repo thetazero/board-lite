@@ -1,26 +1,27 @@
 // A simple random-ish bot. It exists to test that games run to the end and
 // to give rough tuning numbers; it is not meant to play well.
 
+import type { Command } from './command.ts';
 import { TUNING } from './data.ts';
 import { score, waitingOn, type Game } from './engine.ts';
 import { type Rng, pick } from './rng.ts';
 import { ask, moved } from './wasm.ts';
 
 // Concrete commands worth trying for player p, best guesses first.
-export function candidateCommands(g: Game, p: number, rng: Rng): string[] {
+export function candidateCommands(g: Game, p: number, rng: Rng): Command[] {
   const r = ask('candidates', g, { p, state: rng.state });
   rng.state = r.state;
   return r.cmds;
 }
 
 // Makes one move for one waiting player. Returns the command it applied.
-export function botMove(g: Game, p: number, rng: Rng): string {
+export function botMove(g: Game, p: number, rng: Rng): Command {
   const r = moved('botMove', g, { p, state: rng.state });
   rng.state = r.state;
   return r.cmd!;
 }
 
-export function botStep(g: Game, rng: Rng): { player: number; command: string } {
+export function botStep(g: Game, rng: Rng): { player: number; command: Command } {
   const p = pick(rng, waitingOn(g));
   return { player: p, command: botMove(g, p, rng) };
 }
@@ -63,5 +64,5 @@ export function endingTarget(g: Game, target: number, by = 40): number {
 // It answers offers with a decline, ends the turn, keeps the first building
 // card, votes for the first target, sends no dragons (or holds back the ones it sent), and discards the
 // oldest cards.
-export const standInCommands = (g: Game, p: number): string[] => ask('standInCommands', g, { p });
-export const standInMove = (g: Game, p: number): string => moved('standInMove', g, { p }).cmd!;
+export const standInCommands = (g: Game, p: number): Command[] => ask('standInCommands', g, { p });
+export const standInMove = (g: Game, p: number): Command => moved('standInMove', g, { p }).cmd!;

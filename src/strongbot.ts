@@ -22,6 +22,7 @@
 // Compute: a turn is a few hundred copies of the game and a few thousand
 // simulated fights, tens of milliseconds.
 
+import type { Command } from './command.ts';
 import type { Bundle } from './data.ts';
 import type { Game } from './engine.ts';
 import type { Rng } from './rng.ts';
@@ -73,13 +74,13 @@ const q = (p: number, opts: StrongOptions = {}) => ({ p, name: opts.name, now: o
 export const worth = (g: Game, p: number, h?: number): number => ask('worth', g, { ...q(p), h });
 
 // The merchants trades that would let p pay `cost`, or null if they can't.
-export const merchantPlan = (g: Game, p: number, cost: Bundle): string[] | null => ask('merchantPlan', g, { ...q(p), cost });
+export const merchantPlan = (g: Game, p: number, cost: Bundle): Command[] | null => ask('merchantPlan', g, { ...q(p), cost });
 
 // Whether p is waiting on answers to its own offer, with nothing to do till they come.
 export const strongWaits = (g: Game, p: number, opts: StrongOptions = {}): boolean => ask('strongWaits', g, q(p, opts), true);
 
 // Applies p's next move and returns it, or null while it waits on answers to its offer.
-export function strongMove(g: Game, p: number, rng: Rng, opts: StrongOptions = {}): string | null {
+export function strongMove(g: Game, p: number, rng: Rng, opts: StrongOptions = {}): Command | null {
   const r = moved('strongMove', g, { ...q(p, opts), state: rng.state }, true);
   rng.state = r.state;
   return r.cmd;

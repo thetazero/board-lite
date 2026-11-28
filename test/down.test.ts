@@ -75,14 +75,14 @@ test('a move that could not be saved did not happen, and tapping again does it o
     assert.equal(room.game, null);
     s.mends();
     assert.equal((await s.post(`${at}/start`, { token: hostToken })).status, 200);
-    for (const [p, token] of [ada, bram].entries()) await s.post(`${at}/do`, { token, command: `keep ${room.game!.players[p].choice[0].id}` });
+    for (const [p, token] of [ada, bram].entries()) await s.post(`${at}/do`, { token, command: { do: 'keep', card: room.game!.players[p].choice[0].id } });
     const token = [ada, bram][room.game!.turn];
 
     // The same command again, under the same id and under another.
     const saved = readFileSync(room.file, 'utf8'), before = structuredClone(room.game);
-    const say = { token, command: 'say Hello', id: 'a' };
+    const say = { token, command: { do: 'say', message: 'Hello' }, id: 'a' };
     s.breaks();
-    for (const body of [say, say, { ...say, id: 'b' }, { token, command: 'end' }]) await refused(`${at}/do`, body);
+    for (const body of [say, say, { ...say, id: 'b' }, { token, command: { do: 'end' } }]) await refused(`${at}/do`, body);
     await refused(`${at}/save`, { token });
     await refused(`${at}/quit`, { token });
     assert.deepEqual(room.game, before);
@@ -122,7 +122,7 @@ test('a tap on an open phone while the server is down says so, and is the same t
   await once(proxy, 'listening');
   try {
     const url = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}/api/rooms/ABCD/do`;
-    await assert.rejects(tap(url, { command: 'end' }), (e: any) => e.message === DOWN && e.unanswered === true);
+    await assert.rejects(tap(url, { command: { do: 'end' } }), (e: any) => e.message === DOWN && e.unanswered === true);
   } finally { proxy.close(); }
 });
 

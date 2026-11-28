@@ -184,14 +184,14 @@ test('a player who quits: a bot makes as few moves as it can, and the seat can b
   const quitter = bram.token;
   room.quit(quitter);
   assert.ok(room.seats[1].left && room.seats[1].standIn);
-  assert.throws(() => room.command(quitter, 'end'), /not in this game/, 'the phone that quit no longer holds the seat');
+  assert.throws(() => room.command(quitter, { do: 'end' }), /not in this game/, 'the phone that quit no longer holds the seat');
   assert.equal(room.lobby().seats[1].connected, false);
   // The table plays on; the bot answers for Bram at once.
   for (let i = 0; i < 300 && g.round < 3; i++) {
     const p = waitingOn(g).find((q) => q !== 1);
     if (p !== undefined) {
       const [seat] = [ada, bram, cora].filter((_, k) => k === p);
-      for (const cmd of candidateCommands(g, p, { state: i }).filter((c) => !c.startsWith('accept'))) {
+      for (const cmd of candidateCommands(g, p, { state: i }).filter((c) => c.do !== 'accept')) {
         try {
           room.command(seat.token, cmd);
           break;
@@ -210,7 +210,7 @@ test('a player who quits: a bot makes as few moves as it can, and the seat can b
   const back = room.join(' bram ');
   assert.equal(back, room.seats[1]);
   assert.ok(!back.left && !back.standIn);
-  room.command(back.token, 'say hello');
+  room.command(back.token, { do: 'say', message: 'hello' });
   room.close();
 });
 
@@ -235,7 +235,7 @@ test('a player who is away: the table lets a bot play for them, and their phone 
   room.state(bram.token);
   assert.ok(!room.seats[1].standIn);
   // And one waiting on the table (a long "wait" or "listen") is at their seat all along.
-  room.command(bram.token, `keep ${room.game!.players[1].choice[0].id}`);
+  room.command(bram.token, { do: 'keep', card: room.game!.players[1].choice[0].id });
   const waiting = room.wait(bram.token, 20);
   room.seats[1].seen = 0; // a minute later, still waiting
   assert.throws(() => room.standInFor(ada.token, 1), /is back/);
@@ -306,7 +306,7 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     // The table plays on: being sent it doesn't make Bram here.
     const end = Date.now() + 2000;
     while (room.here(room.seats[1]) && Date.now() < end) {
-      room.command(ada, 'say hello');
+      room.command(ada, { do: 'say', message: 'hello' });
       await sleep(20);
     }
     assert.equal(room.seats[1].connected, 1, 'the stream never closed');
@@ -429,21 +429,26 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
     assert.equal(snap.you!.name, 'Ada');
     assert.equal(snap.game!.round, 1);
 
-    const bad = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'build c999 0,0' });
+    const bad = await post(`/api/rooms/${made.code}/do`, { token: ada, command: { do: 'build', card: 'c999', hex: '0,0' } });
     assert.equal(bad.status, 400);
-    assert.match(bad.body.error, /Keep 1 of your 2 building cards/); // the round opens with picking a card
-    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: made.hostToken, command: 'end' })).status, 400, 'the TV has no seat');
+    assert.match(bad.body.error, /keep 1 of your 2 building cards/); // the round opens with picking a card
+    const old = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end', via: 'cli' });
+    assert.equal(old.status, 400);
+    assert.match(old.body.error, /JSON/, 'text is no command');
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: made.hostToken, command: { do: 'end' } })).status, 400, 'the TV has no seat');
+    const oldPage = await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end', via: 'phone' });
+    assert.equal(oldPage.body.error, 'This page is out of date: reload it.', 'a phone page from when commands were text');
     // The round opens with everyone keeping one of two building cards.
     assert.equal(snap.you!.choice.length, 2);
-    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: `keep ${snap.you!.choice[0].id}` })).status, 200);
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: { do: 'keep', card: snap.you!.choice[0].id } })).status, 200);
     const g = rooms.get(made.code)!.game!;
-    apply(g, 1, `keep ${g.players[1].choice[0].id}`);
+    apply(g, 1, { do: 'keep', card: g.players[1].choice[0].id });
     rooms.get(made.code)!.changed();
-    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'end' })).status, 200);
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: { do: 'end' } })).status, 200);
     // Mid-game: a bot for someone away (not someone at their phone), and quitting.
     assert.match((await post(`/api/rooms/${made.code}/standin`, { token: ada, seat: 1 })).body.error, /is back/);
     assert.equal((await post(`/api/rooms/${made.code}/quit`, { token: ada })).status, 200);
-    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: 'say hi' })).status, 400, 'the seat is no longer theirs');
+    assert.equal((await post(`/api/rooms/${made.code}/do`, { token: ada, command: { do: 'say', message: 'hi' } })).status, 400, 'the seat is no longer theirs');
     assert.equal((await post(`/api/rooms/${made.code}/join`, { name: 'ADA' })).status, 200, 'taken back by name');
 
     // A game with no TV: a phone makes the room, and its first player adds bots and starts.
@@ -552,12 +557,12 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
     const view = await cli('view', url!, token!);
     assert.match(view, /You are P1/);
     assert.match(view, /Your options/);
-    const keep = /keep <(c\d+)\|/.exec(view)?.[1];
+    const keep = /"do":"keep","card":"<(c\d+)\|/.exec(view)?.[1];
     assert.ok(keep, view);
-    assert.match(await cli('do', url!, token!, 'keep', keep!), /You keep/);
+    assert.match(await cli('do', url!, token!, JSON.stringify({ do: 'keep', card: keep })), /You keep/);
     assert.match(await cli('wait', url!, token!, '--timeout', '20'), /your decision/); // the bot keeps one too
-    assert.match(await cli('do', url!, token!, 'build', 'c999', '0,0'), /Not allowed: Build a card from your hand/);
-    const ended = await cli('do', url!, token!, 'end');
+    assert.match(await cli('do', url!, token!, '{"do":"build","card":"c999","hex":"0,0"}'), /Not allowed: You have no card c999 in hand/);
+    const ended = await cli('do', url!, token!, '{"do":"end"}');
     assert.match(ended, /P1 ends their turn/);
     // The bot plays its turn. Everyone's dragon is still an egg, so there is no
     // raid: wait returns at our next decision, the next round's cards.
@@ -575,14 +580,14 @@ test('one game, any client: a CLI player and a bot at a server-hosted table', as
 test('a saved game with no seats file can be hosted; players claim its open seats', () => {
   const file = join(dir, 'hosted.json');
   const g = newGame(3, 4, 0);
-  for (const p of [0, 1, 2]) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  for (const p of [0, 1, 2]) apply(g, p, { do: 'keep', card: g.players[p].choice[0].id });
   save(file, g);
   const room = new Room('HOST', { file, botDelayMs: 60000 });
   assert.deepEqual(room.seats.map((s) => s.kind), ['open', 'open', 'open']);
   assert.equal(room.lobby().seating, true, 'back in the lobby until every seat is taken');
   const ada = room.join('Ada');
   assert.equal(room.seats.indexOf(ada), 0);
-  assert.throws(() => room.command(ada.token, 'end'), /once every seat is taken/, 'the game waits for the open seat');
+  assert.throws(() => room.command(ada.token, { do: 'end' }), /once every seat is taken/, 'the game waits for the open seat');
   // Leaving, or removing someone, gives the seat back while the game waits.
   const bram = room.join('Bram');
   room.leave(room.seats.indexOf(bram));
@@ -591,7 +596,7 @@ test('a saved game with no seats file can be hosted; players claim its open seat
   room.join('Bram');
   room.addBot();
   assert.equal(room.lobby().seating, false);
-  room.command(ada.token, 'end');
+  room.command(ada.token, { do: 'end' });
   assert.equal(load(file).turn, 1, 'moves are saved to the same file');
   assert.throws(() => room.join('Cora'), /every seat is taken/);
   assert.throws(() => room.leave(2), /has started/);
@@ -657,13 +662,13 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     const opus = await post(`/api/rooms/${code}/join`, { name: 'Opus' }); // Claude
     await post(`/api/rooms/${code}/start`, { token: ada.token });
     const g = rooms.get(code)!.game!;
-    for (const [p, t] of [[0, ada.token], [1, opus.token]] as const) await post(`/api/rooms/${code}/do`, { token: t, command: `keep ${g.players[p].choice[0].id}` });
+    for (const [p, t] of [[0, ada.token], [1, opus.token]] as const) await post(`/api/rooms/${code}/do`, { token: t, command: { do: 'keep', card: g.players[p].choice[0].id } });
     const reqs = [
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
       { jsonrpc: '2.0', id: 2, method: 'tools/list' },
       { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'view', arguments: {} } },
       { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'say', arguments: { message: 'hello', to: 'P1' } } },
-      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'act', arguments: { command: 'end', why: 'nothing left to build' } } },
+      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'act', arguments: { do: 'end', card: null, why: 'nothing left to build' } } },
       { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'wait', arguments: {} } },
     ];
     const moves = join(mkdtempSync(join(tmpdir(), 'board-lite-moves-')), 'moves.txt');
@@ -697,13 +702,13 @@ test('a Claude seat server plays one seat of a room over MCP, and wakes when som
     assert.match((await reply(4)).result.content[0].text, /P2 to P1 \(private\): "hello"/);
     assert.match((await reply(5)).result.content[0].text, /Not allowed/); // it's P1's turn, and the server only plays P2
     // The moves file pairs each move's private reason with what really happened.
-    assert.match(readFileSync(moves, 'utf8'), /tell P1 hello\n  -> done\n.* end\n  why: nothing left to build\n  -> not allowed: It's P1's turn/);
+    assert.match(readFileSync(moves, 'utf8'), /{"do":"tell","to":"P1","message":"hello"}\n  -> done\n.* {"do":"end"}\n  why: nothing left to build\n  -> not allowed: It's P1's turn/);
     rmSync(dirname(moves), { recursive: true });
     // Waiting returns as soon as the phone player talks.
     child.stdin!.write(`${JSON.stringify(reqs[5])}\n`);
     await sleep(200);
     assert.ok(!lines.some((l) => l.id === 6), 'wait blocks while nothing happens');
-    await post(`/api/rooms/${code}/do`, { token: ada.token, command: 'say hi Opus, want to trade?' });
+    await post(`/api/rooms/${code}/do`, { token: ada.token, command: { do: 'say', message: 'hi Opus, want to trade?' } });
     assert.match((await reply(6)).result.content[0].text, /P1 says: "hi Opus, want to trade\?"[\s\S]*Waiting for/);
     child.kill();
   } finally {
@@ -757,12 +762,12 @@ test('saving a game: it stops for everyone, survives a restart however old, and 
   await first.post(`/api/rooms/${made.code}/start`, { token: ada });
   const room = first.rooms.get(made.code)!;
   // The bot's opening keep happens; then Ada saves.
-  for (const p of [0, 1]) room.command([ada, bram][p], `keep ${room.game!.players[p].choice[0].id}`);
+  for (const p of [0, 1]) room.command([ada, bram][p], { do: 'keep', card: room.game!.players[p].choice[0].id });
   await sleep(100);
   await assert.rejects(first.post(`/api/rooms/${made.code}/save`, { token: 'nobody' }), /not in this game/);
   await first.post(`/api/rooms/${made.code}/save`, { token: ada });
   assert.ok(room.snapshot(bram).lobby.saved, 'every phone hears it');
-  assert.throws(() => room.command(ada, 'end'), /saved: continue it first/);
+  assert.throws(() => room.command(ada, { do: 'end' }), /saved: continue it first/);
   const log = room.game!.log.length;
   const waited = await room.wait(ada, 100);
   assert.equal(waited.code, 2, "a CLI or Claude player's wait doesn't wake on a saved game");
@@ -786,7 +791,7 @@ test('saving a game: it stops for everyone, survives a restart however old, and 
     await again.post(`/api/rooms/${made.code}/continue`, { token: bram });
     assert.equal(back.lobby().saved, null);
     await again.post(`/api/rooms/${made.code}/continue`, { token: bram }); // a second tap does nothing
-    back.command(ada, 'end');
+    back.command(ada, { do: 'end' });
     assert.deepEqual((await (await fetch(`${again.base}/api/saved`)).json()), []);
   } finally {
     again.stop();

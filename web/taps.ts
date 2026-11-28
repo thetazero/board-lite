@@ -15,6 +15,8 @@
 //
 // No DOM here, so the tests can tap with a slow server of their own.
 
+import type { Command } from '../src/command.ts';
+
 export type Taps = {
   // A button tapped: `key` names it (the same button, the same key), `fn` does
   // what it does. Ignored while that button's last tap is still being carried out.
@@ -22,7 +24,7 @@ export type Taps = {
   // A game command, queued behind the ones before it. A command that repeats
   // the last one still waiting is the same tap again, and sent once. Resolves
   // true once it's done, false if it was refused or got no answer.
-  send(command: string): Promise<boolean>;
+  send(command: Command): Promise<boolean>;
   // Any other request to the server a tap makes (join, add a bot, quit): the
   // button waits for its answer, and for the table to show it, too.
   call<T>(request: Promise<T>): Promise<T>;
@@ -30,18 +32,20 @@ export type Taps = {
   seen(): void;
 };
 
+const same = (a: Command | undefined, b: Command) => JSON.stringify(a) === JSON.stringify(b);
+
 type Outcome = 'shown' | 'sent' | 'failed'; // on screen now; done, but the screen hasn't caught up yet; refused
 
 export function taps(opts: {
-  post: (command: string, id: string) => Promise<unknown>; // one command to the server, resolving with its reply
+  post: (command: Command, id: string) => Promise<unknown>; // one command to the server, resolving with its reply
   answer: (reply: unknown) => boolean; // shows the reply's snapshot: true if it was newer than the one on screen
   fail: (e: unknown) => void; // says what went wrong
   waitMs?: number; // the longest a button waits for the screen to catch up, once the server has answered
 }): Taps {
   const waitMs = opts.waitMs ?? 4000;
   const busy = new Set<string>();
-  const outbox: { command: string; id: string; done: Promise<Outcome>; settle: (o: Outcome) => void }[] = [];
-  let lost: { command: string; id: string } | null = null; // the last command whose answer never came
+  const outbox: { command: Command; id: string; done: Promise<Outcome>; settle: (o: Outcome) => void }[] = [];
+  let lost: { command: Command; id: string } | null = null; // the last command whose answer never came
   let sending = false;
   let work: Promise<Outcome>[] | null = null; // what the tap being run asked of the server
   let shown = 0; // snapshots shown so far
@@ -74,12 +78,12 @@ export function taps(opts: {
     })();
   }
 
-  function send(command: string): Promise<boolean> {
-    let done = outbox.at(-1)?.command === command ? outbox.at(-1)!.done : null;
+  function send(command: Command): Promise<boolean> {
+    let done = same(outbox.at(-1)?.command, command) ? outbox.at(-1)!.done : null;
     if (!done) {
       let settle!: (o: Outcome) => void;
       done = new Promise<Outcome>((r) => (settle = r));
-      const id = lost?.command === command ? lost.id : newId();
+      const id = lost && same(lost.command, command) ? lost.id : newId();
       lost = null;
       outbox.push({ command, id, done, settle });
       if (!sending) void flush();

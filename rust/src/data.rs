@@ -291,6 +291,8 @@ pub struct Tuning {
 #[derive(Deserialize)]
 pub struct Help {
     pub act: String,
+    #[serde(rename = "actFields")]
+    pub act_fields: serde_json::Map<String, serde_json::Value>,
     pub rules: String,
     pub say: String,
     pub view: String,

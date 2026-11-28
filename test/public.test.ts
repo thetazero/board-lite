@@ -54,12 +54,12 @@ test('a Claude client given a game link joins and plays over /mcp', async () => 
     assert.ok(!view.content[0].text.includes('undefined'));
     const card = room.snapshot(token).you!.choice[0];
     assert.ok(waitingOn(room.game!).includes(0));
-    assert.match((await s.tool('act', { game: code, token, command: `keep ${card.id}` })).content[0].text, /Done/);
+    assert.match((await s.tool('act', { game: code, token, do: 'keep', card: card.id })).content[0].text, /Done/);
     await s.tool('say', { game: code, token, message: 'Hello' });
     assert.ok(room.game!.log.some((e) => e.text.includes('"Hello"')));
-    const refused = await s.tool('act', { game: code, token, command: 'nonsense' });
+    const refused = await s.tool('act', { game: code, token, do: 'nonsense' });
     assert.ok(refused.isError);
-    for (const name of ['view', 'wait', 'act']) assert.ok((await s.tool(name, { game: link, token: 'wrong', command: 'end' })).isError, `${name} needs a seat`);
+    for (const name of ['view', 'wait', 'act']) assert.ok((await s.tool(name, { game: link, token: 'wrong', do: 'end' })).isError, `${name} needs a seat`);
     assert.equal((await s.tool('view', { game: link })).content[0].type, 'text');
     assert.ok((await s.tool('view', { game: link })).isError, 'no token is refused');
   } finally { s.close(); }

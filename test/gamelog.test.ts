@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -20,7 +20,7 @@ test('every entry of a game, timed and with who sent it, beside the save', () =>
   room.start(seats[0].token, 3);
   const g = room.game!;
   const rng = { state: 2 };
-  assert.throws(() => room.command(seats[0].token, 'nonsense', 'phone'), RoomError);
+  assert.throws(() => room.command(seats[0].token, { do: 'dance' } as any, 'phone'), RoomError);
   playToEnd(g, () => {
     const p = waitingOn(g)[0];
     for (const cmd of candidateCommands(g, p, rng)) {
@@ -41,12 +41,12 @@ test('every entry of a game, timed and with who sent it, beside the save', () =>
   assert.deepEqual(events.map((l) => l.i), g.log.map((_, i) => i), 'every entry of the game log, once, in order');
   assert.deepEqual(events.map((l) => l.text), g.log.map((e) => e.text));
   assert.deepEqual(log.slice(0, 3).map((l) => [l.type, l.by.kind]), [['join', 'phone'], ['join', 'cli'], ['start', 'phone']]);
-  assert.ok(events.some((l) => l.by.kind === 'phone' && l.by.seat === 0 && l.command), 'a phone player\'s moves are theirs');
+  assert.ok(events.some((l) => l.by.kind === 'phone' && l.by.seat === 0 && l.command?.do), 'a phone player\'s moves are theirs');
   assert.ok(events.some((l) => l.by.kind === 'cli' && l.by.name === 'Bram'), 'and a CLI player\'s');
   const dice = events.find((l) => l.ev.k === 'produce' && l.round > 1)!;
   assert.equal(dice.by.kind, 'game', 'dice are the game\'s');
   assert.ok(dice.cause?.seat >= 0 && dice.command, 'set off by whoever ended the round before');
-  assert.ok(log.some((l) => l.type === 'refused' && l.command === 'nonsense' && l.by.name === 'Ada'), 'refused commands too');
+  assert.ok(log.some((l) => l.type === 'refused' && l.command.do === 'dance' && l.by.name === 'Ada'), 'refused commands too');
   room.close();
 });
 
@@ -96,5 +96,25 @@ test('an old save with no game log still hosts and plays; only what happens from
   const events = log.filter((l) => l.type === 'event');
   assert.ok(events.length && events.every((l) => l.i >= g.log.length), 'the old entries stay untimed');
   assert.equal(events[0].by.kind, 'player', 'a client that doesn\'t say what it is is a player');
+  room.close();
+});
+
+test('a game log from when commands were text still opens, and the game goes on in it', () => {
+  const file = join(dir, 'text.json');
+  const g = newGame(2, 9, 0);
+  save(file, g);
+  const by = { kind: 'phone', seat: 0, name: 'Ada' };
+  const old = [
+    ...g.log.map((e, i) => ({ t: '2026-01-01T00:00:00.000Z', ms: 1767225600000, type: 'event', by, i, round: e.round, text: e.text, ev: e.ev, command: 'end' })),
+    { t: '2026-01-01T00:00:00.000Z', ms: 1767225600000, type: 'refused', by, command: 'vote 1', error: "It's P2's turn." },
+  ];
+  writeFileSync(gameLogFile(file), old.map((l) => `${JSON.stringify(l)}\n`).join(''));
+  const room = new Room('GTXT', { dir, file });
+  const seats = [room.join('Ada'), room.join('Bram')];
+  const p = waitingOn(room.game!)[0];
+  room.command(seats[p].token, { do: 'keep', card: room.game!.players[p].choice[0].id });
+  const log = lines(room);
+  assert.deepEqual(log.slice(0, old.length).map((l) => l.command), old.map((l) => l.command), 'the old lines are as they were');
+  assert.deepEqual(log.at(-1).command.do, 'keep');
   room.close();
 });

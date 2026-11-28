@@ -21,14 +21,14 @@ function addDragon(g: Game, owner: number, stage: number, key = 'fire_whelp'): D
 // the dragons it needs.
 function perchGame(players = 2) {
   const g = newGame(players, 5, 0);
-  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, { do: 'keep', card: g.players[p].choice[0].id });
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
   g.dragons = [];
   rich(g, 0);
   rich(g, 1);
   const pasture = neighbors(g.towers[0]).find((k) => g.map[k] && g.map[k].terrain !== 'ocean')!;
   g.map[pasture].terrain = 'meadow';
-  apply(g, 0, `build pasture ${pasture}`);
+  apply(g, 0, { do: 'build_basic', building: 'pasture', hex: pasture });
   return { g, pasture };
 }
 
@@ -55,30 +55,30 @@ test("a dragon perches only on a rival's building, never a tower, and only if ra
   const { g, pasture } = perchGame();
   const d = addDragon(g, 1, 1);
   const egg = addDragon(g, 1, 0);
-  apply(g, 0, 'end');
-  assert.throws(() => apply(g, 1, `perch ${g.towers[0]} ${d.id}`), RuleError); // a tower
-  assert.throws(() => apply(g, 1, `perch ${g.towers[1]} ${d.id}`), RuleError); // their own tower
-  assert.throws(() => apply(g, 1, `perch ${pasture}`), RuleError); // no dragon
-  assert.throws(() => apply(g, 1, `perch ${pasture} ${egg.id}`), RuleError); // an egg
+  apply(g, 0, { do: 'end' });
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: g.towers[0], dragons: [d.id] }), RuleError); // a tower
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: g.towers[1], dragons: [d.id] }), RuleError); // their own tower
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: pasture, dragons: [] }), RuleError); // no dragon
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: pasture, dragons: [egg.id] }), RuleError); // an egg
   g.dragons.find((x) => x.id === d.id)!.damage = DRAGONS[d.key].stages[0].hp;
-  assert.throws(() => apply(g, 1, `perch ${pasture} ${d.id}`), RuleError); // knocked out
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] }), RuleError); // knocked out
   g.dragons.find((x) => x.id === d.id)!.damage = 1; // hurt is fine
-  apply(g, 1, `perch ${pasture} ${d.id}`);
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
   assert.equal(g.dragons.find((x) => x.id === d.id)!.perch, pasture);
   // P1 can't perch on their own building.
   const mine = addDragon(g, 0, 1);
-  apply(g, 1, 'end');
+  apply(g, 1, { do: 'end' });
   toTurnOf(g, 0);
-  assert.throws(() => apply(g, g.turn, `perch ${pasture} ${mine.id}`), RuleError);
+  assert.throws(() => apply(g, g.turn, { do: 'perch', hex: pasture, dragons: [mine.id] }), RuleError);
 });
 
 test('a perched building makes nothing, the dragon stays until recalled, and it sits out raids and clearing', () => {
   const { g, pasture } = perchGame();
   const before = production(g, 0).livestock.dice.length;
   assert.equal(before, 1);
-  apply(g, 0, 'end');
+  apply(g, 0, { do: 'end' });
   const d = addDragon(g, 1, 2);
-  apply(g, 1, `perch ${pasture} ${d.id}`);
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
   const perched = () => g.dragons.find((x) => x.id === d.id)!;
   assert.equal(production(g, 0).livestock.dice.length, 0);
   assert.equal(production(g, 0).livestock.base, TUNING.towerProduction.livestock); // the tower still makes its own
@@ -89,14 +89,14 @@ test('a perched building makes nothing, the dragon stays until recalled, and it 
   const produced = g.log.filter((e) => e.round === g.round && e.ev?.k === 'produce' && e.ev.p === 0);
   assert.equal(produced[0].dice?.length ?? 0, 0);
   // It can't be sent anywhere while it perches.
-  assert.throws(() => apply(g, 1, `perch ${pasture} ${d.id}`), RuleError);
+  assert.throws(() => apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] }), RuleError);
   // Recalled, it's home, and the Pasture makes livestock again.
-  assert.throws(() => apply(g, 0, `recall ${d.id}`), RuleError); // not P1's to recall
-  apply(g, 1, `recall ${d.id}`);
+  assert.throws(() => apply(g, 0, { do: 'recall', dragons: [d.id] }), RuleError); // not P1's to recall
+  apply(g, 1, { do: 'recall', dragons: [d.id] });
   assert.equal(perched().perch, undefined);
   assert.equal(production(g, 0).livestock.dice.length, 1);
   assert.equal(canRaid(perched()), true);
-  assert.throws(() => apply(g, 1, `recall ${d.id}`), RuleError); // not perched
+  assert.throws(() => apply(g, 1, { do: 'recall', dragons: [d.id] }), RuleError); // not perched
 });
 
 test('a shut-down building is as if it were not there: it scores nothing, and counts for nothing adjacent (#352)', () => {
@@ -108,13 +108,13 @@ test('a shut-down building is as if it were not there: it scores nothing, and co
   const points = score(g, 0).buildings;
   const goldBefore = gold();
   assert.ok(goldBefore >= 1);
-  apply(g, 0, 'end');
+  apply(g, 0, { do: 'end' });
   const d = addDragon(g, 1, 2);
-  apply(g, 1, `perch ${pasture} ${d.id}`);
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
   assert.equal(score(g, 0).buildings, points - 1); // the Pasture's 1 point is gone
   assert.equal(gold(), goldBefore - 1); // and the Market no longer counts it
   assert.equal(seatState(g, 0).totalPoints, score(g, 0).total);
-  apply(g, 1, `recall ${d.id}`);
+  apply(g, 1, { do: 'recall', dragons: [d.id] });
   assert.equal(score(g, 0).buildings, points);
   assert.equal(gold(), goldBefore);
   // A beast on it does the same, until it's cleared.
@@ -133,10 +133,10 @@ test('a suppressed roost houses no dragons, and too many dragons only stops hatc
   for (let i = 0; i < room; i++) addDragon(g, 0, 1);
   // Nothing is built beside the Pasture through it while it's suppressed.
   const beside = buildableHexes(g, 0, 'roost').filter((k) => neighbors(k).includes(pasture) && !neighbors(k).some((n) => n !== pasture && g.buildings[n]?.owner === 0));
-  apply(g, 0, 'end');
+  apply(g, 0, { do: 'end' });
   const d = addDragon(g, 1, 2);
-  apply(g, 1, `perch ${roost} ${d.id}`);
-  apply(g, 1, `perch ${pasture} ${addDragon(g, 1, 2).id}`);
+  apply(g, 1, { do: 'perch', hex: roost, dragons: [d.id] });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [addDragon(g, 1, 2).id] });
   assert.equal(dragonCapacity(g, 0), room - 2);
   for (const k of beside) assert.ok(!buildableHexes(g, 0, 'roost').includes(k));
   // P1 keeps every dragon; the phone and the CLI say they're over their room.
@@ -160,16 +160,16 @@ test("several players' dragons perch on one building, and they fight together", 
   rich(g, 2);
   const a = addDragon(g, 1, 1);
   const b = addDragon(g, 2, 1);
-  apply(g, 0, 'end');
-  apply(g, 1, `perch ${pasture} ${a.id}`);
-  apply(g, 1, 'end');
-  apply(g, 2, `perch ${pasture} ${b.id}`);
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [a.id] });
+  apply(g, 1, { do: 'end' });
+  apply(g, 2, { do: 'perch', hex: pasture, dragons: [b.id] });
   assert.deepEqual(publicState(g).map.find((h) => h.k === pasture)!.perched.map((x) => x.owner), [1, 2]);
   // P1 attacks with four adults: whatever the dice, both hatchlings fall in the first round.
   const hunters = [addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3)];
-  apply(g, 2, 'end');
+  apply(g, 2, { do: 'end' });
   toTurnOf(g, 0);
-  apply(g, 0, `clear ${pasture} ${hunters.map((d) => d.id).join(' ')}`);
+  apply(g, 0, { do: 'clear', hex: pasture, dragons: hunters.map((d) => d.id) });
   const hunt = g.log.findLast((e) => e.ev?.k === 'hunt')!.ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
   assert.deepEqual(hunt.units.map((u) => u.d), [a.id, b.id]);
   assert.equal(hunt.fauna, null);
@@ -189,17 +189,17 @@ test("several players' dragons perch on one building, and they fight together", 
 test('anyone may clear perched dragons; a lost fight leaves them perched, keeping their hits', () => {
   const { g, pasture } = perchGame();
   const [a, b] = [addDragon(g, 1, 3), addDragon(g, 1, 3)];
-  apply(g, 0, 'end');
-  apply(g, 1, `perch ${pasture} ${a.id} ${b.id}`);
-  assert.throws(() => apply(g, 1, `clear ${pasture} ${a.id}`), RuleError); // your own perched dragons aren't foes (and a perched one can't fight)
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [a.id, b.id] });
+  assert.throws(() => apply(g, 1, { do: 'clear', hex: pasture, dragons: [a.id] }), RuleError); // your own perched dragons aren't foes (and a perched one can't fight)
   const own = addDragon(g, 1, 3);
-  assert.throws(() => apply(g, 1, `clear ${pasture} ${own.id}`), RuleError);
-  apply(g, 1, 'end');
+  assert.throws(() => apply(g, 1, { do: 'clear', hex: pasture, dragons: [own.id] }), RuleError);
+  apply(g, 1, { do: 'end' });
   toTurnOf(g, 0);
   // A hatchling against two adults: it's knocked out in the first round, and
   // deals at most 6 damage.
   const h = addDragon(g, 0, 1);
-  apply(g, 0, `clear ${pasture} ${h.id}`);
+  apply(g, 0, { do: 'clear', hex: pasture, dragons: [h.id] });
   const end = g.log.findLast((e) => e.ev?.k === 'cleared')!.ev as Extract<Game['log'][number]['ev'], { k: 'cleared' }>;
   assert.equal(end.won, false);
   const hurt = [a, b].map((x) => g.dragons.find((d) => d.id === x.id)!);
@@ -212,8 +212,8 @@ test('anyone may clear perched dragons; a lost fight leaves them perched, keepin
 test('a perched dragon heals at production like any other, and keeps blocking while hurt', () => {
   const { g, pasture } = perchGame();
   const d = addDragon(g, 1, 3);
-  apply(g, 0, 'end');
-  apply(g, 1, `perch ${pasture} ${d.id}`);
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
   const hp = DRAGONS.fire_whelp.stages[2].hp;
   g.dragons.find((x) => x.id === d.id)!.damage = hp - 1; // 1 health left
   toTurnOf(g, 1);
@@ -229,15 +229,15 @@ test('a perched dragon heals at production like any other, and keeps blocking wh
 test('a beast and perched dragons on one building fight together', () => {
   const { g, pasture } = perchGame();
   const a = addDragon(g, 1, 1);
-  apply(g, 0, 'end');
-  apply(g, 1, `perch ${pasture} ${a.id}`);
-  apply(g, 1, 'end');
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [a.id] });
+  apply(g, 1, { do: 'end' });
   toTurnOf(g, 0);
   // Placed after production, so it can't wander off first.
   g.map[pasture].fauna = 'wolf';
   assert.equal(g.dragons.find((x) => x.id === a.id)!.perch, pasture);
   const hunters = [addDragon(g, 0, 3, 'ember_wyrm'), addDragon(g, 0, 3), addDragon(g, 0, 3), addDragon(g, 0, 3)];
-  apply(g, 0, `clear ${pasture} ${hunters.map((d) => d.id).join(' ')}`);
+  apply(g, 0, { do: 'clear', hex: pasture, dragons: hunters.map((d) => d.id) });
   const hunt = g.log.findLast((e) => e.ev?.k === 'hunt')!.ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
   assert.equal(hunt.fauna, 'wolf');
   assert.equal(hunt.units.length, 2);
@@ -249,13 +249,13 @@ test("the CLI offers perch, recall and clearing a rival's perched dragons", () =
   const seats = g.players.map((_, q) => ({ id: q, name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));
   const view = (p: number) => seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: p, game: publicState(g, 100), scene: 0, you: { ...seatState(g, p, 100), name: `P${p + 1}` } }, 10);
   const d = addDragon(g, 1, 2);
-  apply(g, 0, 'end');
-  assert.match(view(1), new RegExp(`perch <hex> <dragon ids\\.\\.\\.>.*${pasture}`));
-  apply(g, 1, `perch ${pasture} ${d.id}`);
-  assert.match(view(1), new RegExp(`recall <dragon ids\\.\\.\\.>.*${d.id}`));
+  apply(g, 0, { do: 'end' });
+  assert.match(view(1), new RegExp(`"do":"perch".*${pasture}`));
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
+  assert.match(view(1), new RegExp(`"do":"recall".*${d.id}`));
   assert.match(view(1), new RegExp(`${pasture}:[^ ]*<${d.id}>`));
   const h = addDragon(g, 0, 2);
-  apply(g, 1, 'end');
+  apply(g, 1, { do: 'end' });
   toTurnOf(g, 0);
   assert.ok(seatState(g, 0).huntable.includes(pasture));
   assert.match(view(0), new RegExp(`Hexes: .*${pasture} ${d.id}`));
@@ -291,12 +291,12 @@ test('foe elements', () => {
 function fightHits(attacker: string, hunters: number) {
   const { g, pasture } = perchGame();
   const fire = addDragon(g, 1, 3);
-  apply(g, 0, 'end');
-  apply(g, 1, `perch ${pasture} ${fire.id}`);
-  apply(g, 1, 'end');
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [fire.id] });
+  apply(g, 1, { do: 'end' });
   toTurnOf(g, 0);
   const ids = Array.from({ length: hunters }, () => addDragon(g, 0, 3, attacker).id);
-  apply(g, 0, `clear ${pasture} ${ids.join(' ')}`);
+  apply(g, 0, { do: 'clear', hex: pasture, dragons: ids });
   return g.log.flatMap((e) => (e.ev?.k === 'combat' ? e.ev.hits : []));
 }
 
@@ -314,13 +314,13 @@ test('a coin flip, once a fight, decides which side strikes first each combat ro
   for (let seed = 1; seen.size < 2 && seed < 40; seed++) {
     const { g, pasture } = perchGame();
     const [a, b] = [addDragon(g, 1, 3), addDragon(g, 1, 3)];
-    apply(g, 0, 'end');
-    apply(g, 1, `perch ${pasture} ${a.id} ${b.id}`);
-    apply(g, 1, 'end');
+    apply(g, 0, { do: 'end' });
+    apply(g, 1, { do: 'perch', hex: pasture, dragons: [a.id, b.id] });
+    apply(g, 1, { do: 'end' });
     toTurnOf(g, 0);
     g.rng.state = seed;
     const ds = [addDragon(g, 0, 3), addDragon(g, 0, 3)];
-    apply(g, 0, `clear ${pasture} ${ds.map((d) => d.id).join(' ')}`);
+    apply(g, 0, { do: 'clear', hex: pasture, dragons: ds.map((d) => d.id) });
     const at = g.log.findLastIndex((e) => e.ev?.k === 'hunt');
     const hunt = g.log[at].ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
     assert.ok(hunt.first === 'dragons' || hunt.first === 'defenders');
@@ -346,7 +346,7 @@ test('a building the Leviathan holds from an adjacent hex is suppressed, and wor
   const harbor = neighbors(tower).find((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k])!;
   g.map[harbor].terrain = 'harbor';
   g.players[0].hand.push({ id: 'cport', deck: 'building', key: 'stone_port' });
-  apply(g, 0, `build cport ${harbor}`);
+  apply(g, 0, { do: 'build', card: 'cport', hex: harbor });
   assert.equal(bankRates(g, 0).stone, 2);
   const before = score(g, 0).buildings;
   // Somewhere beside the port but not beside the tower, as the ocean there would be.

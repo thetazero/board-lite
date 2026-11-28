@@ -7,6 +7,7 @@
 //
 // users: people and TVs connected; rate: moves a second at each table.
 // Prints a JSON line for each step, read from the container's own cgroup.
+import type { Command } from '../../src/command.ts';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { Agent, request, type ClientRequest, type IncomingMessage } from 'node:http';
@@ -105,21 +106,21 @@ async function table(): Promise<Table> {
 }
 
 // What a phone would send now, from what it shows: half the time just end the turn or answer.
-function choose(you: any, g: any): string | null {
+function choose(you: any, g: any): Command | null {
   if (!you.deciding) return null;
   const any = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
-  if (g.phase === 'cards') return `keep ${any<any>(you.choice).id}`;
-  if (g.phase === 'discard') return `discard ${you.hand.slice(0, you.hand.length - you.handCap).map((c: any) => c.id).join(' ')}`;
-  if (g.phase === 'raid') return g.raid.step === 'vote' ? `vote ${1 + Math.floor(Math.random() * g.raid.candidates.length)}` : 'fight';
-  for (const o of g.offers) if (o.to === you.seat) return `decline ${o.id}`;
+  if (g.phase === 'cards') return { do: 'keep', card: any<any>(you.choice).id };
+  if (g.phase === 'discard') return { do: 'discard', cards: you.hand.slice(0, you.hand.length - you.handCap).map((c: any) => c.id) };
+  if (g.phase === 'raid') return g.raid.step === 'vote' ? { do: 'vote', target: any<any>(g.raid.candidates).key } : { do: 'fight' };
+  for (const o of g.offers) if (o.to === you.seat) return { do: 'decline', offer: o.id };
   if (!you.myTurn) return null;
-  for (const b of you.basics) if (!b.why && b.hexes.length && Math.random() < 0.6) return b.onTower ? `build ${b.key}` : `build ${b.key} ${any(b.hexes)}`;
+  for (const b of you.basics) if (!b.why && b.hexes.length && Math.random() < 0.6) return { do: 'build_basic', building: b.key, ...(!b.onTower && { hex: any<string>(b.hexes) }) };
   for (const c of you.hand) if (!c.why && Math.random() < 0.6) {
-    if (c.kind === 'building' && c.hexes.length) return `build ${c.id} ${any(c.hexes)}`;
-    if (c.kind === 'upgrade' && c.hexes.length) return `upgrade ${c.id} ${any(c.hexes)}`;
-    if (c.kind === 'dragon') return `play ${c.id}`;
+    if (c.kind === 'building' && c.hexes.length) return { do: 'build', card: c.id, hex: any<string>(c.hexes) };
+    if (c.kind === 'upgrade' && c.hexes.length) return { do: 'upgrade', card: c.id, hex: any<string>(c.hexes) };
+    if (c.kind === 'dragon') return { do: 'play', card: c.id };
   }
-  return 'end';
+  return { do: 'end' };
 }
 
 // One table's moves: a seat that has something to decide, at a steady rate, until told to stop.
@@ -143,7 +144,7 @@ async function play(t: Table, stop: { now: boolean }) {
         if (Math.random() < 0.5) {
           const mark = `mark${talkNo++}m`;
           t.sent.set(mark, performance.now());
-          const q = await call('POST', `/api/rooms/${t.code}/do`, { token: t.tokens[p], command: `say ${mark}`, via: 'phone' }, t.ips[p]);
+          const q = await call('POST', `/api/rooms/${t.code}/do`, { token: t.tokens[p], command: { do: 'say', message: mark }, via: 'phone' }, t.ips[p]);
           q.status === 200 ? moves++ : refused++;
           lat.push(q.ms);
         }

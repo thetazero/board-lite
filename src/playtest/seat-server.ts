@@ -17,7 +17,8 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../seattools.ts';
+import type { Command } from '../command.ts';
+import { ACT_FIELDS, ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../seattools.ts';
 import type { EventView, Snapshot } from '../state.ts';
 import { eventLine, seatStatus, seatView, type ViewOptions } from '../view.ts';
 import { MAP_IMAGE_KEY, mapImage } from '../mapimage.ts';
@@ -53,13 +54,13 @@ async function listen(timeoutSecs: number, head?: string): Promise<string> {
   return [head, ev.length ? `New events:\n${ev.map((e) => `  ${eventLine(e)}`).join('\n')}` : 'No new events.', seatStatus(r.state as Snapshot)].filter(Boolean).join('\n');
 }
 
-function record(command: string, why: string | undefined, outcome: string) {
+function record(command: object, why: string | undefined, outcome: string) {
   if (!movesFile) return;
   const time = new Date().toISOString().slice(11, 19);
-  appendFileSync(movesFile, `${time} ${command}\n${why ? `  why: ${why.replace(/\s+/g, ' ').trim()}\n` : ''}  -> ${outcome}\n`);
+  appendFileSync(movesFile, `${time} ${JSON.stringify(command)}\n${why ? `  why: ${why.replace(/\s+/g, ' ').trim()}\n` : ''}  -> ${outcome}\n`);
 }
 
-async function act(command: string, why?: string): Promise<string> {
+async function act(command: object, why?: string): Promise<string> {
   const r = await call('/do', { token, command, via: 'claude' });
   if (r.error) {
     record(command, why, `not allowed: ${r.error}`);
@@ -96,14 +97,15 @@ const TOOLS = [
   {
     name: 'act',
     description: ACT_HELP,
-    inputSchema: { type: 'object', properties: { command: { type: 'string' }, why: WHY }, required: ['command', 'why'] },
-    run: (a: { command: string; why?: string }) => act(String(a.command ?? ''), a.why),
+    inputSchema: { type: 'object', properties: { ...ACT_FIELDS, why: WHY }, required: ['do', 'why'] },
+    // The command is the rest of the arguments; some clients send null for those they leave out.
+    run: ({ why, ...command }: { why?: string }) => act(Object.fromEntries(Object.entries(command).filter(([, v]) => v !== null)), why),
   },
   {
     name: 'say',
     description: SAY_HELP,
     inputSchema: { type: 'object', properties: { message: { type: 'string' }, to: { type: 'string', description: 'A player like "P2" for a private message.' }, why: WHY }, required: ['message'] },
-    run: (a: { message: string; to?: string; why?: string }) => act(a.to ? `tell ${a.to} ${a.message}` : `say ${a.message}`, a.why),
+    run: (a: { message: string; to?: string; why?: string }) => act((a.to ? { do: 'tell', to: a.to, message: a.message } : { do: 'say', message: a.message }) satisfies Command, a.why),
   },
   {
     name: 'wait',

@@ -7,7 +7,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as D from '../../src/data.ts';
-import { ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../../src/seattools.ts';
+import { ACT_FIELDS, ACT_HELP, RULES_HELP, SAY_HELP, VIEW_HELP, waitHelp } from '../../src/seattools.ts';
 import { MAP_IMAGE_KEY } from '../../src/mapimage.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -16,7 +16,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
 const data = Object.fromEntries(Object.entries(D).filter(([, v]) => typeof v !== 'function'));
-writeFileSync(join(out, 'data.json'), JSON.stringify({ ...data, HELP: { act: ACT_HELP, rules: RULES_HELP, say: SAY_HELP, view: VIEW_HELP, wait: waitHelp(50), image: MAP_IMAGE_KEY } }));
+writeFileSync(join(out, 'data.json'), JSON.stringify({ ...data, HELP: { act: ACT_HELP, actFields: ACT_FIELDS, rules: RULES_HELP, say: SAY_HELP, view: VIEW_HELP, wait: waitHelp(50), image: MAP_IMAGE_KEY } }));
 writeFileSync(join(out, 'rules.md'), readFileSync(join(root, 'docs/rules.md')));
 
 const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.ts': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };

@@ -1,4 +1,5 @@
 //! The game log, for development.
+use crate::command::Command;
 use crate::engine::LogEntry;
 use crate::recap::iso;
 use serde::Serialize;
@@ -61,7 +62,7 @@ impl GameLog {
         self.append(&format!("{}\n", Value::Object(line)));
     }
     /// The game's log entries from index `from` on, sent by `by` (with the command, when one made them).
-    pub fn events(&mut self, entries: &[LogEntry], from: usize, by: &Sender, command: Option<&str>) {
+    pub fn events(&mut self, entries: &[LogEntry], from: usize, by: &Sender, command: Option<&Command>) {
         let ms = now_ms();
         let t = iso(ms);
         let sender = json!(by);

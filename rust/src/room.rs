@@ -4,6 +4,7 @@
 //! pushed to whoever is watching. The game is saved after each change, and who
 //! sits where beside it (<game>.seats.json), so a restart loses nothing.
 use crate::bot;
+use crate::command::Command;
 use crate::data::DATA;
 use crate::engine::{Game, Phase};
 use crate::gamelog::{GameLog, Sender, now_ms};
@@ -537,7 +538,7 @@ impl Room {
 
     // The only way the room changes the game: through the engine, then saved. A
     // move that can't be saved didn't happen: the game goes back to before it.
-    fn mutate(&self, i: &mut Inner, by: Sender, make: impl FnOnce(&mut Game, &mut Rng) -> Result<String, String>) -> Res {
+    fn mutate(&self, i: &mut Inner, by: Sender, make: impl FnOnce(&mut Game, &mut Rng) -> Result<Command, String>) -> Res {
         let Some(g) = i.game.as_mut() else { return no("The game hasn't started.") };
         let before = g.log.len();
         let was = g.clone_without_log();
@@ -817,7 +818,7 @@ impl Room {
 
     /// A player's command. `id`, when the client gives one, names this one
     /// sending of it: the same id again is the same tap retried.
-    pub fn command(&self, tok: &str, cmd: &str, via: Option<&'static str>, id: &str) -> Res {
+    pub fn command(&self, tok: &str, cmd: &Value, via: Option<&'static str>, id: &str) -> Res {
         let i = &mut *lock(&self.inner);
         let p = self.player_seat(i, tok)?;
         if via.is_some() {
@@ -836,7 +837,7 @@ impl Room {
         }
         Ok(())
     }
-    fn act(&self, i: &mut Inner, p: usize, cmd: &str) -> Res {
+    fn act(&self, i: &mut Inner, p: usize, cmd: &Value) -> Res {
         if i.game.is_none() {
             return no("The game hasn't started.");
         }
@@ -847,7 +848,12 @@ impl Room {
             return no("The game is saved: continue it first.");
         }
         let by = i.sender(p);
-        let done = self.mutate(i, by.clone(), |g, _| g.apply(p, cmd).map(|_| cmd.to_string()));
+        let done = match Command::read(cmd) {
+            Ok(c) => self.mutate(i, by.clone(), |g, _| g.apply(p, &c).map(|_| c)),
+            // A page left open from when commands were text.
+            Err(_) if cmd.is_string() && i.seats[p].via == Some("phone") => no("This page is out of date: reload it."),
+            Err(why) => Err(Fail::Room(why)),
+        };
         if let Err(Fail::Room(why)) = &done {
             i.log.write("refused", &by, json!({"command": cmd, "error": why}));
         }
