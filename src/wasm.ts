@@ -1,6 +1,7 @@
 // The Rust rules (rust/src), called from TypeScript: the tools and tests keep
 // plain game objects, and each call sends one over as JSON. Built by
 // `npm run wasm:build` into rust/board_lite.wasm.
+import type { Command } from './command.ts';
 import { TUNING } from './data.ts';
 import type { Game } from './engine.ts';
 
@@ -57,7 +58,7 @@ export function become(was: any, now: any): any {
 }
 
 // A move: the game after it, its new log entries added to the log it had.
-export function moved(op: string, g: Game, q: object, log = false): { cmd: string | null; state: number } {
+export function moved(op: string, g: Game, q: object, log = false): { cmd: Command | null; state: number } {
   const r = ask(op, g, q, log);
   const entries = g.log;
   const { log: added, ...rest } = r.g;

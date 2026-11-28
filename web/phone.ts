@@ -5,6 +5,8 @@
 // plays. In a game with no TV (remote mode: the room was made on a phone) that's
 // from the start; in a game with a TV, once the player first opens the table.
 
+import type { Command, Side } from '../src/command.ts';
+import type { Resource } from '../src/data.ts';
 import type { CardView, DragonStageView, DragonView, PublicState, SavedGame, SeatState, Snapshot, TargetView } from '../src/state.ts';
 import {
   ELEMENT_COLORS, PLAYER_COLORS, fadeAway, starterName, POINTS_TO_WIN, RESOURCES, STAGE_LABEL, buildingIcon, dragonBadge, dragonChip, dragonLabel as dragonName, dragonState, hungerTags, elemIcon, elemWords, esc, hpBar, icon, powerTag, statTag, iconText, hexCenter, incomeText, lastRoundHtml, mapSvg, named, playerTag, post, resChips, resIcon, savedWhen, standingsHtml, tiebreakNote, watch,
@@ -32,9 +34,10 @@ let stop: (() => void) | null = null;
 let tab: 'none' | 'more' | 'trade' = 'none'; // the panel open above the hand, if any
 // Picking a hex: what for (`about`: what's being placed, shown under the map).
 // With `confirm`, a tap only picks the hex: what it does shows under the map
-// (`detail`), and the confirm button (`verb`) carries out the command.
+// (`detail`), and the confirm button (`verb`) carries out the command. To
+// clear or perch, the dragons to send are chosen next.
 let picking: {
-  title: string; hexes: string[]; command: (hex: string) => string; labels?: Record<string, string>; about: string;
+  title: string; hexes: string[]; command: ((hex: string) => Command) | 'clear' | 'perch'; labels?: Record<string, string>; about: string;
   confirm?: { verb: string; detail: (hex: string) => string }; picked?: string;
 } | null = null;
 // Clearing fauna: the beast's hex, and the dragons picked to send against it.
@@ -593,7 +596,7 @@ const tapper = taps({
   fail: toast,
 });
 
-function send(command: string): Promise<boolean> {
+function send(command: Command): Promise<boolean> {
   endAsk = null; // doing anything else on your turn takes back an End turn waiting for its confirm
   return tapper.send(command);
 }
@@ -945,8 +948,8 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
   // to play it on) shows its button greyed, and why under it (unless it's the
   // cost: its chips show that, the short ones marked).
   else if (c.why || !playable) actions = act(c.verb, '', c.why ?? `${c.verb} it on your turn.`);
-  else if (c.needs === 'resource') actions = choose('Choose a resource to gain', RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="primary" data-play="${c.id} ${r}" aria-label="Gain ${r}">Gain ${resIcon(r, 1.6)}</button>`));
-  else if (c.needs === 'dragon') actions = choose(`Choose a dragon for the ${esc(c.name)}`, c.dragons.map((id) => dragonOption(id, `data-play="${c.id} ${id}"`)));
+  else if (c.needs === 'resource') actions = choose('Choose a resource to gain', RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="primary" data-play="${c.id}" data-resource="${r}" aria-label="Gain ${r}">Gain ${resIcon(r, 1.6)}</button>`));
+  else if (c.needs === 'dragon') actions = choose(`Choose a dragon for the ${esc(c.name)}`, c.dragons.map((id) => dragonOption(id, `data-play="${c.id}" data-on="${id}"`)));
   else if (c.needs === 'hex') actions = act(c.verb, `data-pickhex="${c.id}"`);
   else if (c.kind === 'building') actions = act(c.verb, `data-build="${c.id}"`);
   else actions = act(c.verb, `data-play="${c.id}"`);
@@ -1291,7 +1294,7 @@ function raidView(g: PublicState, me: Me): string {
     // What each vote is worth, cast or not: the kingdom with the most power voted for it is raided.
     const worth = `<div class="vote-power">${names.flatMap((_, p) => (raid.voters[p] ? [voterTag(p, raid.votePower[p], names)] : [])).join('')}</div>`;
     return worth + raid.candidates.map((t, i) => kingdomCard(t, i, raid.candidates.length, raid.votes, raid.votePower, names,
-      { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${i + 1}"${voted ? ' disabled' : ''}` })).join('');
+      { tag: 'button', cls: `choice${me.myVote === i ? ' on' : ''}`, attrs: `data-vote="${t.key}"${voted ? ' disabled' : ''}` })).join('');
   }
   const lead = pointsLeader(g, raid.sent);
   if (raid.step === 'choose') {
@@ -1402,13 +1405,13 @@ function pullOut(id: string) {
   if ((g.phase === 'discard' && me.deciding) || tradeOpen(g, me)) return tapCard(g, me, id);
   const ready = !c.why;
   if (ready && c.needs === 'hex') return pickHexFor(c);
-  if (ready && c.needs === 'none') return send(`${c.kind === 'building' ? 'build' : 'play'} ${c.id}`);
+  if (ready && c.needs === 'none') return send({ do: c.kind === 'building' ? 'build' : 'play', card: c.id });
   openCard = id;
   render();
 }
 
 function pickHexFor(c: CardView) {
-  const verb = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build'; // the command, not the button
+  const what = c.kind === 'upgrade' ? 'upgrade' : c.kind === 'action' ? 'play' : 'build'; // the command, not the button
   const labels = c.counts && Object.fromEntries(Object.entries(c.counts).map(([k, n]) => [k, String(n)]));
   const title = c.kind === 'upgrade' ? `Choose a building for the ${c.name}` : `Choose a hex for the ${c.fauna ? c.fauna.name : c.name}`;
   const about = pickAbout(cardArt(c.kind, c.key, c.element, c.cls), c.name, c.text, frameColor(c.kind, c.element));
@@ -1418,7 +1421,7 @@ function pickHexFor(c: CardView) {
   const confirm = c.kind === 'upgrade' ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k, after(k)) }
     : c.kind === 'building' ? { verb: c.verb, detail: (k: string) => placeDetail(now().g, c.name, after(k)) }
     : c.fauna ? { verb: c.verb, detail: (k: string) => hexDetail(now().g, now().me, k) } : undefined;
-  picking = { title, hexes: c.hexes, command: (h) => `${verb} ${c.id} ${h}`, labels, about, confirm };
+  picking = { title, hexes: c.hexes, command: (hex) => ({ do: what, card: c.id, hex }), labels, about, confirm };
   openCard = null;
   render();
 }
@@ -1568,7 +1571,7 @@ talk.form.onsubmit = (e) => {
   const to = Number(talk.to.value);
   // Said once, however often Send is tapped, and when sent again after the
   // server didn't answer (it may have heard it): the same id, said at most once.
-  tapper.tap('talk', () => tapper.send(to >= 0 ? `tell P${to + 1} ${text}` : `say ${text}`)
+  tapper.tap('talk', () => tapper.send(to >= 0 ? { do: 'tell', to: `P${to + 1}`, message: text } : { do: 'say', message: text })
     .then((ok) => ok && (talk.input.value = '')));
 };
 
@@ -1633,16 +1636,16 @@ function wire(g: PublicState, me: Me) {
     openCard = null;
     render();
   });
-  bind('[data-play]', (el) => send(`play ${el.dataset.play}`));
-  bind('[data-build]', (el) => send(`build ${el.dataset.build}`));
+  bind('[data-play]', (el) => send({ do: 'play', card: el.dataset.play!, ...(el.dataset.resource && { resource: el.dataset.resource as Resource }), ...(el.dataset.on && { dragon: el.dataset.on }) }));
+  bind('[data-build]', (el) => send({ do: 'build', card: el.dataset.build! }));
   bind('[data-pickhex]', (el) => pickHexFor(me.hand.find((x) => x.id === el.dataset.pickhex)!));
   bind('[data-basic]', (el) => {
     const b = me.basics.find((x) => x.key === el.dataset.basic)!;
-    if (b.onTower) return send(`build ${b.key}`);
+    if (b.onTower) return send({ do: 'build_basic', building: b.key });
     const about = pickAbout(cardArt('building', b.key, undefined, b.cls), b.name, b.text, frameColor('building'));
     const after = (k: string) => (snap!.you!.basics.find((x) => x.key === b.key) ?? b).after[k];
     const confirm = { verb: 'Build', detail: (k: string) => placeDetail(snap!.game!, b.name, after(k)) };
-    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (h) => `build ${b.key} ${h}`, about, confirm };
+    picking = { title: `Choose a hex for the ${b.name}`, hexes: b.hexes, command: (hex) => ({ do: 'build_basic', building: b.key, hex }), about, confirm };
     render();
   });
   bind('[data-upproject]', (el) => {
@@ -1652,17 +1655,17 @@ function wire(g: PublicState, me: Me) {
     const now = () => ({ g: snap!.game!, me: snap!.you! });
     const after = (k: string) => (now().me.upgradeProjects.find((x) => x.key === u.key) ?? u).after[k];
     const confirm = { verb: 'Upgrade', detail: (k: string) => hexDetail(now().g, now().me, k, after(k)) };
-    picking = { title: `Choose a building for the ${u.name}`, hexes: u.hexes, command: (h) => `project ${u.key} ${h}`, about, confirm };
+    picking = { title: `Choose a building for the ${u.name}`, hexes: u.hexes, command: (hex) => ({ do: 'project_upgrade', upgrade: u.key, hex }), about, confirm };
     render();
   });
-  bind('[data-keep]', (el) => send(`keep ${el.dataset.keep}`));
+  bind('[data-keep]', (el) => send({ do: 'keep', card: el.dataset.keep! }));
   on('egg', () => {
     eggOpen = !eggOpen;
     render();
   });
   bind('[data-egg]', (el) => {
     eggOpen = false;
-    send(`project ${el.dataset.egg}`);
+    send({ do: 'project_egg', element: el.dataset.egg! });
   });
   app.querySelectorAll<SVGElement>('[data-hex]').forEach((el) => (el.onclick = () => tapper.tap(`hex ${el.dataset.hex}`, () => {
     if (!picking) return; // a second tap, after the first sent its command
@@ -1670,17 +1673,17 @@ function wire(g: PublicState, me: Me) {
       picking.picked = el.dataset.hex!;
       return render();
     }
-    const cmd = picking!.command(el.dataset.hex!);
+    const { command } = picking;
     picking = null;
     // Picking a beast to clear opens the dragon choice; everything else is a command.
-    const send2 = /^(hunt|perch) /.exec(cmd);
-    if (send2) hunting = { hex: el.dataset.hex!, chosen: new Set(), perch: send2[1] === 'perch' };
+    const dragonsNext = typeof command === 'string';
+    if (dragonsNext) hunting = { hex: el.dataset.hex!, chosen: new Set(), perch: command === 'perch' };
     render();
-    if (!send2) return send(cmd);
+    if (!dragonsNext) return send(command(el.dataset.hex!));
   })));
   on('confirmpick', () => {
-    if (!picking?.picked) return;
-    const cmd = picking!.command(picking!.picked!);
+    if (!picking?.picked || typeof picking.command === 'string') return;
+    const cmd = picking.command(picking.picked);
     picking = null;
     render();
     send(cmd);
@@ -1690,15 +1693,15 @@ function wire(g: PublicState, me: Me) {
     const about = beastsOnly
       ? ''
       : '<p class="hint pabout">You fight its beast and any rival dragons perched there.</p>';
-    picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: (h) => `hunt ${h}`, about };
+    picking = { title: beastsOnly ? 'Choose a beast to clear' : 'Choose a hex to clear', hexes: me.huntable, command: 'clear', about };
     render();
   });
-  on('autoclear', () => send('autoclear'));
+  on('autoclear', () => send({ do: 'auto_clear' }));
   on('perch', () => {
-    picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: (h) => `perch ${h}`, about: '' };
+    picking = { title: 'Choose a building to perch on', hexes: me.perchable, command: 'perch', about: '' };
     render();
   });
-  bind('[data-recall]', (el) => send(`recall ${el.dataset.recall}`));
+  bind('[data-recall]', (el) => send({ do: 'recall', dragons: [el.dataset.recall!] }));
   bind('[data-hunter]', (el) => {
     const id = el.dataset.hunter!;
     if (hunting!.chosen.has(id)) hunting!.chosen.delete(id);
@@ -1711,7 +1714,7 @@ function wire(g: PublicState, me: Me) {
   });
   on('huntgo', () => {
     if (!hunting) return;
-    const cmd = `${hunting!.perch ? 'perch' : 'clear'} ${hunting!.hex} ${[...hunting!.chosen].join(' ')}`;
+    const cmd: Command = { do: hunting.perch ? 'perch' : 'clear', hex: hunting.hex, dragons: [...hunting.chosen] };
     hunting = null;
     render();
     send(cmd);
@@ -1765,10 +1768,10 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   // A tap within a moment of End turn is the same finger bouncing, not a confirm.
-  on('endyes', () => endAsk !== null && performance.now() - endAsk > 400 && send('end'));
-  bind('[data-accept]', (el) => send(`accept ${el.dataset.accept}`));
-  bind('[data-decline]', (el) => send(`decline ${el.dataset.decline}`));
-  bind('[data-cancel]', (el) => send(`cancel ${el.dataset.cancel}`));
+  on('endyes', () => endAsk !== null && performance.now() - endAsk > 400 && send({ do: 'end' }));
+  bind('[data-accept]', (el) => send({ do: 'accept', offer: el.dataset.accept! }));
+  bind('[data-decline]', (el) => send({ do: 'decline', offer: el.dataset.decline! }));
+  bind('[data-cancel]', (el) => send({ do: 'cancel', offer: el.dataset.cancel! }));
   // bank
   bind('[data-bank]', (el) => {
     const [side, r] = el.dataset.bank!.split(' ');
@@ -1779,7 +1782,7 @@ function wire(g: PublicState, me: Me) {
     bank.times = Math.max(1, bank.times + Number(el.dataset.btimes));
     render();
   });
-  on('bankgo', () => send(`merchants ${bank.give} ${bank.get} ${bank.times}`));
+  on('bankgo', () => send({ do: 'merchants', pay: bank.give as Resource, gain: bank.get as Resource, times: bank.times }));
   // trade
   bind('[data-to]', (el) => {
     trade.to = el.dataset.to === 'anyone' ? null : Number(el.dataset.to);
@@ -1792,15 +1795,16 @@ function wire(g: PublicState, me: Me) {
     render();
   });
   on('offer', () => {
-    const side = (m: Record<string, number>, cards: string[] = []) => [...RESOURCES.filter((r) => m[r]).map((r) => `${m[r]} ${r}`), ...cards].join(' ');
-    const cmd = `offer ${trade.to === null ? 'anyone' : `P${trade.to + 1}`} give ${side(trade.give, [...trade.cards].filter((id) => me.hand.some((c) => c.id === id)))} get ${side(trade.get)}`;
+    const side = (m: Record<string, number>): Side => Object.fromEntries(RESOURCES.filter((r) => m[r]).map((r) => [r, m[r]]));
+    const cards = [...trade.cards].filter((id) => me.hand.some((c) => c.id === id));
+    const cmd: Command = { do: 'offer', to: trade.to === null ? 'anyone' : `P${trade.to + 1}`, give: { ...side(trade.give), cards }, get: side(trade.get) };
     trade = fresh();
     tab = 'none';
     render();
     return send(cmd);
   });
   // raid
-  bind('[data-vote]', (el) => send(`vote ${el.dataset.vote}`));
+  bind('[data-vote]', (el) => send({ do: 'vote', target: el.dataset.vote! }));
   bind('[data-fighter]', (el) => {
     const cur = new Set(fightDraft ?? g.raid!.sent[me.seat]);
     const id = el.dataset.fighter!;
@@ -1814,9 +1818,9 @@ function wire(g: PublicState, me: Me) {
     fightDraft = (fightDraft ?? mine).length === mine.length ? [] : [...mine];
     render();
   });
-  on('fight', () => send(`fight ${(fightDraft ?? g.raid!.sent[me.seat]).join(' ')}`));
-  on('hold', () => send('hold'));
-  on('discard', () => send(`discard ${[...selected].join(' ')}`));
+  on('fight', () => send({ do: 'fight', dragons: fightDraft ?? g.raid!.sent[me.seat] }));
+  on('hold', () => send({ do: 'hold' }));
+  on('discard', () => send({ do: 'discard', cards: [...selected] }));
   on('newgame', () => {
     code = ''; // a new game is in a new room: type its code, or scan the TV
     leaveToJoin('');

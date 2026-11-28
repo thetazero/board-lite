@@ -2,6 +2,7 @@
 //! for playtests and contests. It looks one step ahead on its turn (every
 //! purchase tried on a copy and scored by `worth`), estimates fights with its
 //! own dice, sees only what its seat sees, and talks. docs/strongbot.md.
+use crate::command::{Command, Resource, Seat, Side, To};
 use crate::bot::{first_legal, stand_in_commands};
 use crate::data::*;
 use crate::engine::*;
@@ -40,7 +41,13 @@ pub type Seen = HashMap<Id, i64>;
 fn copy(g: &Game) -> Game {
     g.clone_without_log()
 }
-fn try_all(g: &mut Game, p: usize, cmds: &[String]) -> bool {
+fn say(message: String) -> Command {
+    Command::Say { message }
+}
+fn play(card: Id, resource: Option<Resource>, dragon: Option<Id>, hex: Option<K>) -> Command {
+    Command::Play { card, resource, dragon, hex }
+}
+fn try_all(g: &mut Game, p: usize, cmds: &[Command]) -> bool {
     cmds.iter().all(|c| g.apply(p, c).is_ok())
 }
 
@@ -212,7 +219,7 @@ fn talk_line(text: &str) -> Option<(usize, bool, &str)> {
 }
 
 pub struct Purchase {
-    pub cmds: Vec<String>,
+    pub cmds: Vec<Command>,
     pub gain: f64,
 }
 
@@ -331,7 +338,7 @@ impl Bot<'_> {
     }
 
     /// The merchants trades that would let it pay `cost`, or None if they can't.
-    pub fn merchant_plan(&self, g: &Game, cost: &Bundle) -> Option<Vec<String>> {
+    pub fn merchant_plan(&self, g: &Game, cost: &Bundle) -> Option<Vec<Command>> {
         let mut have = g.players[self.p].resources.0;
         if cost.get(GOLD) > have[GOLD] {
             return None;
@@ -351,7 +358,7 @@ impl Bot<'_> {
                 }
                 let s = best?;
                 let n = need.min(most);
-                cmds.push(format!("merchants {} {} {n}", RESOURCES[s], RESOURCES[r]));
+                cmds.push(Command::Merchants { pay: Resource::ALL[s], gain: Resource::ALL[r], times: n as u32 });
                 have[s] -= n * rates[s];
                 have[r] += n;
                 need -= n;
@@ -505,26 +512,26 @@ impl Bot<'_> {
         }
         lead
     }
-    fn warning(&self, g: &Game) -> Option<String> {
+    fn warning(&self, g: &Game) -> Option<Command> {
         let (q, pts) = self.leader(g);
         let win = points_to_win();
         if pts < win - 14 || pts <= g.score(self.p).total || self.talked(g) || self.said_this_round(g, "points") {
             return None;
         }
         let who = pname(q);
-        Some(format!("say {who} has {pts} points, {} from winning. Don't trade with {who}, and let's not raid where {who} scores.", win - pts))
+        Some(say(format!("{who} has {pts} points, {} from winning. Don't trade with {who}, and let's not raid where {who} scores.", win - pts)))
     }
-    fn reply(&self, g: &Game, h: f64, rng: &mut Rng) -> Option<String> {
+    fn reply(&self, g: &Game, h: f64, rng: &mut Rng) -> Option<Command> {
         if self.talked(g) {
             return None;
         }
         let m = self.unanswered(g)?;
-        let to = if m.private { format!("tell {} ", pname(m.from)) } else { "say ".into() };
+        let answer = |message: String| Some(if m.private { Command::Tell { to: Seat(m.from), message } } else { say(message) });
         let any = |words: &[&str]| words.iter().any(|w| has_word(&m.text, w));
         if any(&["raid", "vote", "fight", "attack", "kingdom", "hold back", "join"]) {
             let in_raid = ready_by(g);
             if in_raid[self.p].is_empty() {
-                return Some(format!("{to}I have no dragon ready to raid this round."));
+                return answer("I have no dragon ready to raid this round.".into());
             }
             let mut best: Option<(f64, S)> = None;
             for (t, def) in &DATA.targets {
@@ -533,22 +540,22 @@ impl Bot<'_> {
                     best = Some((ev, def.name));
                 }
             }
-            return Some(format!("{to}I'll vote {}: that's the one we can take.", best?.1));
+            return answer(format!("I'll vote {}: that's the one we can take.", best?.1));
         }
         if any(&["stone", "timber", "crystal", "livestock", "gold", "trade", "offer", "swap", "deal", "need", "want", "give"]) {
             let (q, pts) = self.leader(g);
             if m.from == q && pts >= points_to_win() - 12 {
-                return Some(format!("{to}You're too close to winning: no trades with you."));
+                return answer("You're too close to winning: no trades with you.".into());
             }
-            return Some(format!("{to}Make me an offer. I take any trade that helps me, and 2 for 1 usually does."));
+            return answer("Make me an offer. I take any trade that helps me, and 2 for 1 usually does.".into());
         }
-        Some(format!("{to}{}", rng.pick(&["Noted.", "Good luck to you too.", "We'll see.", "Fair enough."])))
+        answer(rng.pick(&["Noted.", "Good luck to you too.", "We'll see.", "Fair enough."]).to_string())
     }
 
     // ---------- the moves ----------
 
     /// What it does next; None while it waits on answers to its own offer.
-    pub fn commands(&self, g: &Game, rng: &mut Rng, seen: &mut Seen) -> Option<Vec<String>> {
+    pub fn commands(&self, g: &Game, rng: &mut Rng, seen: &mut Seen) -> Option<Vec<Command>> {
         let p = self.p;
         let pl = &g.players[p];
         let h = self.horizon(g);
@@ -557,9 +564,9 @@ impl Bot<'_> {
                 if let Some(r) = self.reply(g, h, rng) {
                     return Some(vec![r]);
                 }
-                return Some(if pl.choice.is_empty() { vec![] } else { vec![format!("keep {}", self.keep_choice(g, h))] });
+                return Some(if pl.choice.is_empty() { vec![] } else { vec![Command::Keep { card: self.keep_choice(g, h) }] });
             }
-            Phase::Discard => return Some(vec![format!("discard {}", ids(&self.discard_choice(g, h)))]),
+            Phase::Discard => return Some(vec![Command::Discard { cards: self.discard_choice(g, h) }]),
             Phase::Raid => return Some(self.raid_move(g, h)),
             Phase::Over => return Some(vec![]),
             Phase::Action => {}
@@ -577,7 +584,7 @@ impl Bot<'_> {
         for o in g.offers.iter().filter(|o| o.from == p) {
             let since = *seen.entry(o.id).or_insert(self.now);
             if self.now - since > self.tune.offer_wait_ms {
-                return Some(vec![format!("cancel {}", o.id)]);
+                return Some(vec![Command::Cancel { offer: o.id }]);
             }
             open |= (0..g.players.len()).any(|q| o.waits_on(q));
         }
@@ -592,28 +599,28 @@ impl Bot<'_> {
             let ask = if buy.cmds.len() > 1 { self.ask_table(g, &buy.cmds) } else { None };
             return Some(ask.unwrap_or_else(|| vec![buy.cmds[0].clone()]));
         }
-        Some(vec!["end".into()])
+        Some(vec![Command::End {}])
     }
 
     // ---------- purchases ----------
 
     // Everything it might buy now: the commands that buy it, and its cost.
-    fn purchases(&self, g: &Game) -> Vec<(Vec<String>, Bundle)> {
+    fn purchases(&self, g: &Game) -> Vec<(Vec<Command>, Bundle)> {
         let p = self.p;
-        let mut out: Vec<(Vec<String>, Bundle)> = vec![];
+        let mut out: Vec<(Vec<Command>, Bundle)> = vec![];
         let room = g.housed(p) < g.dragon_capacity(p);
-        let mut roosts: Vec<(String, Bundle)> = vec![];
+        let mut roosts: Vec<(Command, Bundle)> = vec![];
         for b in &DATA.basic_buildings {
             let def = &DATA.buildings[b];
             for k in g.buildable_hexes(p, b) {
-                let cmd = if def.on_tower { format!("build {b}") } else { format!("build {b} {k}") };
+                let cmd = Command::BuildBasic { building: Key::of(b), hex: (!def.on_tower).then_some(k) };
                 if def.dragon_capacity != 0 {
                     roosts.push((cmd.clone(), def.cost));
                 }
                 out.push((vec![cmd], def.cost));
             }
         }
-        let mut eggs = vec![(format!("project {}", self.egg_element(g)), egg_cost("fire_whelp"))];
+        let mut eggs = vec![(Command::ProjectEgg { element: Key(self.egg_element(g)) }, egg_cost("fire_whelp"))];
         let mut seen: Vec<Key> = vec![];
         for c in &g.players[p].hand {
             if seen.contains(&c.key) {
@@ -621,17 +628,17 @@ impl Bot<'_> {
             }
             seen.push(c.key);
             match c.kind() {
-                "building" => out.extend(g.buildable_hexes(p, c.key.0).into_iter().map(|k| (vec![format!("build {} {k}", c.id)], *c.cost()))),
-                "upgrade" => out.extend(g.upgrade_targets(p, c.key.0).into_iter().map(|k| (vec![format!("upgrade {} {k}", c.id)], *c.cost()))),
-                "dragon" => eggs.push((format!("play {}", c.id), *c.cost())),
+                "building" => out.extend(g.buildable_hexes(p, c.key.0).into_iter().map(|k| (vec![Command::Build { card: c.id, hex: Some(k) }], *c.cost()))),
+                "upgrade" => out.extend(g.upgrade_targets(p, c.key.0).into_iter().map(|k| (vec![Command::Upgrade { card: c.id, hex: k }], *c.cost()))),
+                "dragon" => eggs.push((play(c.id, None, None, None), *c.cost())),
                 _ => {
                     let a = &DATA.actions[c.key.0];
-                    let mut one = |what: String| out.push((vec![format!("play {}{what}", c.id)], a.cost));
+                    let mut one = |resource, dragon| out.push((vec![play(c.id, resource, dragon, None)], a.cost));
                     match a.effect {
-                        "gain_gold" => one(String::new()),
-                        "gain_resource" => RESOURCES[..4].iter().for_each(|r| one(format!(" {r}"))),
-                        "grow_dragon" => g.dragons_of(p).filter(|d| d.stage < 3).for_each(|d| one(format!(" {}", d.id))),
-                        "heal_dragon" => g.dragons_of(p).filter(|d| d.damage > 0).for_each(|d| one(format!(" {}", d.id))),
+                        "gain_gold" => one(None, None),
+                        "gain_resource" => Resource::ALL[..4].iter().for_each(|r| one(Some(*r), None)),
+                        "grow_dragon" => g.dragons_of(p).filter(|d| d.stage < 3).for_each(|d| one(None, Some(d.id))),
+                        "heal_dragon" => g.dragons_of(p).filter(|d| d.damage > 0).for_each(|d| one(None, Some(d.id))),
                         _ => {}
                     }
                 }
@@ -646,7 +653,7 @@ impl Bot<'_> {
             }
         }
         for u in project_upgrades() {
-            out.extend(g.upgrade_targets(p, u).into_iter().map(|k| (vec![format!("project {u} {k}")], upgrade_project_cost(u))));
+            out.extend(g.upgrade_targets(p, u).into_iter().map(|k| (vec![Command::ProjectUpgrade { upgrade: Key::of(u), hex: k }], upgrade_project_cost(u))));
         }
         out
     }
@@ -682,21 +689,21 @@ impl Bot<'_> {
     }
     // Before trading 4 for 1 with the merchants for a resource it's 1 or 2
     // short of, ask the table for it at 2 for 1, once a turn.
-    fn ask_table(&self, g: &Game, cmds: &[String]) -> Option<Vec<String>> {
-        let m: Vec<Vec<&str>> = cmds.iter().filter(|c| c.starts_with("merchants ")).map(|c| c.split(' ').collect()).collect();
-        let [m] = &m[..] else { return None };
-        let (give, get, times) = (m[1], m[2], m[3].parse::<i64>().ok()?);
-        if g.bank_rates(self.p)[resource(give)?] < 4 || times > 2 {
+    fn ask_table(&self, g: &Game, cmds: &[Command]) -> Option<Vec<Command>> {
+        let mut trades = cmds.iter().filter_map(|c| if let Command::Merchants { pay, gain, times } = c { Some((*pay, *gain, *times)) } else { None });
+        let (Some((give, get, times)), None) = (trades.next(), trades.next()) else { return None };
+        if g.bank_rates(self.p)[give as usize] < 4 || times > 2 {
             return None;
         }
         let mine = format!("{{\"k\":\"offer\",\"p\":{},", self.p);
         if g.log.iter().rev().take_while(|e| e.kind() != "turn").any(|e| e.raw().starts_with(&mine)) {
             return None;
         }
-        let offer = format!("offer anyone give {} {give} get {times} {get}", times * 2);
+        let offer = Command::Offer { to: To::Anyone, give: Side::of(give, times * 2), get: Side::of(get, times) };
+        let (give, get) = (RESOURCES[give as usize], RESOURCES[get as usize]);
         let line = format!("Anyone spare {times} {get}? {} {give} for {}.", times * 2, if times == 1 { "it" } else { "them" });
         if !self.said_this_turn(g, &line) && !self.talked(g) {
-            return Some(vec![format!("say {line}"), offer]);
+            return Some(vec![say(line), offer]);
         }
         Some(vec![offer])
     }
@@ -706,8 +713,8 @@ impl Bot<'_> {
     fn prospects(&self, g: &Game, h: f64) -> f64 {
         self.worth(g, h) + self.best_purchase(g, h).map_or(0.0, |b| b.gain)
     }
-    fn answer(&self, g: &Game, o: &Offer, h: f64) -> String {
-        let no = format!("decline {}", o.id);
+    fn answer(&self, g: &Game, o: &Offer, h: f64) -> Command {
+        let no = Command::Decline { offer: o.id };
         if !o.get.cards.is_empty() || g.accept_problem(o, self.p).is_some() {
             return no;
         }
@@ -722,12 +729,12 @@ impl Bot<'_> {
         }
         let after = self.prospects(&c, h) + o.give.cards.len() as f64 * 0.4;
         let margin = if o.from == q { 0.5 } else { 0.15 };
-        if after > before + margin { format!("accept {}", o.id) } else { no }
+        if after > before + margin { Command::Accept { offer: o.id } } else { no }
     }
 
     // ---------- clearing hexes, and cards that hurt rivals or call raids ----------
 
-    fn best_clear(&self, g: &Game, rng: &mut Rng, h: f64) -> Option<String> {
+    fn best_clear(&self, g: &Game, rng: &mut Rng, h: f64) -> Option<Command> {
         let p = self.p;
         let mut by_power: Vec<Dragon> = g.dragons_of(p).filter(|d| d.ready()).cloned().collect();
         if by_power.is_empty() {
@@ -754,7 +761,7 @@ impl Bot<'_> {
         g.map.iter().filter(|(_, x)| x.beast()).for_each(|(k, _)| aim(*k));
         by_power.sort_by_key(|d| -d.power());
         let n = by_power.len();
-        let mut best: Option<(String, f64)> = None;
+        let mut best: Option<(Command, f64)> = None;
         for k in targets {
             let f = g.map[&k].fauna;
             let great = f.is_some_and(|f| is_beast(f.0));
@@ -778,14 +785,14 @@ impl Bot<'_> {
                 }
                 let ev = win * gain - hurt;
                 if ev > 0.3 && best.as_ref().is_none_or(|b| ev > b.1) {
-                    best = Some((format!("clear {k} {}", ids(&ds.iter().map(|d| d.id).collect::<Vec<_>>())), ev));
+                    best = Some((Command::Clear { hex: k, dragons: ds.iter().map(|d| d.id).collect() }, ev));
                 }
             }
         }
         best.map(|b| b.0)
     }
     // Rouse the Bear or Wake the Basilisk on the leading rival's best building.
-    fn sabotage(&self, g: &Game, h: f64) -> Option<String> {
+    fn sabotage(&self, g: &Game, h: f64) -> Option<Command> {
         let pl = &g.players[self.p];
         let card = pl.hand.iter().find(|c| DATA.actions.get(c.key.0).is_some_and(|a| a.effect == "send_fauna"))?;
         let a = &DATA.actions[card.key.0];
@@ -818,10 +825,10 @@ impl Bot<'_> {
                 best = Some((*k, harm));
             }
         }
-        best.filter(|b| b.1 > 0.6).map(|b| format!("play {} {}", card.id, b.0))
+        best.filter(|b| b.1 > 0.6).map(|b| play(card.id, None, None, Some(b.0)))
     }
     // A War Horn, when another raid is worth more than its crystal.
-    fn horn(&self, g: &Game, rng: &mut Rng, h: f64) -> Option<String> {
+    fn horn(&self, g: &Game, rng: &mut Rng, h: f64) -> Option<Command> {
         let pl = &g.players[self.p];
         let card = pl.hand.iter().find(|c| DATA.actions.get(c.key.0).is_some_and(|a| a.effect == "extra_raid"))?;
         let in_raid = ready_by(g);
@@ -829,12 +836,12 @@ impl Bot<'_> {
             return None;
         }
         let best = DATA.targets.keys().map(|t| self.best_raid_plan(g, Key::of(t), &in_raid, rng, h).0).fold(f64::NEG_INFINITY, f64::max);
-        (best > 1.2).then(|| format!("play {}", card.id))
+        (best > 1.2).then(|| play(card.id, None, None, None))
     }
 
     // ---------- the raid ----------
 
-    fn raid_move(&self, g: &Game, h: f64) -> Vec<String> {
+    fn raid_move(&self, g: &Game, h: f64) -> Vec<Command> {
         let p = self.p;
         let raid = g.raid.as_ref().expect("a raid");
         // Its own dice, seeded by the round and the raid, so saying its vote
@@ -844,7 +851,7 @@ impl Bot<'_> {
         if raid.step == Step::Choose {
             let in_raid: Vec<Vec<Dragon>> = raid.sent.iter().map(|ds| ds.iter().map(|d| g.dragon(*d).clone()).collect()).collect();
             let (_, fight) = self.best_raid_plan(g, raid.target.expect("a target"), &in_raid, &mut rng, h);
-            return vec![if fight.is_empty() { "hold".into() } else { format!("fight {}", ids(&fight)) }];
+            return vec![if fight.is_empty() { Command::Hold {} } else { Command::Fight { dragons: Some(fight) } }];
         }
         let in_raid = ready_by(g);
         let evs: Vec<f64> = raid.candidates.iter().map(|t| self.best_raid_plan(g, *t, &in_raid, &mut rng, h).0).collect();
@@ -861,13 +868,13 @@ impl Bot<'_> {
             }
         }
         let t = raid.candidates[pick];
-        let mut out = vec![format!("vote {}", pick + 1)];
+        let mut out = vec![Command::Vote { target: t }];
         let others = in_raid.iter().enumerate().any(|(q, ds)| q != p && !ds.is_empty());
         if others && !self.talked(g) && !self.said_this_round(g, "I vote") {
             let name = DATA.targets[t.0].name;
             let (_, fight) = self.best_raid_plan(g, t, &in_raid, &mut rng, h);
             let line = if fight.is_empty() { format!("I vote {name}.") } else { format!("I vote {name}. Fight with me and it falls; we split {}.", loot_text(&g.loot_of(t))) };
-            out.insert(0, format!("say {line}"));
+            out.insert(0, say(line));
         }
         out
     }
@@ -891,10 +898,10 @@ impl Bot<'_> {
         }
         let base = self.worth(g, h);
         let kind = c.kind();
-        let tries: Vec<String> = match kind {
-            "building" => g.buildable_hexes(p, c.key.0).iter().map(|k| format!("build {} {k}", c.id)).collect(),
-            "upgrade" => g.upgrade_targets(p, c.key.0).iter().map(|k| format!("upgrade {} {k}", c.id)).collect(),
-            _ => vec![format!("play {}", c.id)],
+        let tries: Vec<Command> = match kind {
+            "building" => g.buildable_hexes(p, c.key.0).iter().map(|k| Command::Build { card: c.id, hex: Some(*k) }).collect(),
+            "upgrade" => g.upgrade_targets(p, c.key.0).iter().map(|k| Command::Upgrade { card: c.id, hex: *k }).collect(),
+            _ => vec![play(c.id, None, None, None)],
         };
         let mut best: f64 = if kind == "building" { 0.2 } else { 0.0 };
         for cmd in tries {
@@ -936,7 +943,7 @@ pub fn strong_waits(g: &Game, bot: &Bot, seen: &mut Seen) -> bool {
     bot.commands(g, &mut Rng::new(g.next_id as i64), seen).is_none()
 }
 /// Applies its next move and returns it: Ok(None) while it waits on answers to its offer.
-pub fn strong_move(g: &mut Game, bot: &Bot, rng: &mut Rng, seen: &mut Seen) -> Result<Option<String>, String> {
+pub fn strong_move(g: &mut Game, bot: &Bot, rng: &mut Rng, seen: &mut Seen) -> Result<Option<Command>, String> {
     let Some(mut cmds) = bot.commands(g, rng, seen) else { return Ok(None) };
     cmds.extend(stand_in_commands(g, bot.p));
     first_legal(g, bot.p, cmds).map(Some).ok_or_else(|| format!("The strong bot found no legal move for {} in phase {:?}", pname(bot.p), g.phase))

@@ -3,6 +3,7 @@
 // in a state. It starts rust/src/bin/stage.rs once and asks it one thing at a
 // time, waiting for each answer. A room's game and seats here are copies, kept
 // as the server's are: a change made to them goes over with the next call.
+import type { Command } from './command.ts';
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -251,7 +252,7 @@ export class Room {
   continue(tok: string): boolean { return this.ask('continue', { tok }); }
   canStart(tok: string): boolean { return this.ask('canStart', { tok }); }
   start(tok: string, seed?: number) { this.ask('start', { tok, seed }); }
-  command(tok: string, cmd: string, via?: Seat['via'], id?: string) { this.ask('command', { tok, cmd, via, id }); }
+  command(tok: string, cmd: Command, via?: Seat['via'], id?: string) { this.ask('command', { tok, cmd, via, id }); }
   state(tok: string): Snapshot { return this.ask('state', { tok }); }
   snapshot(tok: string | null): Snapshot { return this.ask('snapshot', { tok }); }
   lobby(): Lobby { return this.ask('lobby'); }

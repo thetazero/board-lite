@@ -2,6 +2,7 @@
 pub mod addresses;
 pub mod api;
 pub mod bot;
+pub mod command;
 pub mod data;
 pub mod engine;
 #[cfg(feature = "server")]

@@ -555,7 +555,7 @@ impl Server {
                 if tok == room.host {
                     return Err(Fail::Room("The TV has no seat.".into()));
                 }
-                room.command(tok, str_of(&b, "command"), via(str_of(&b, "via")), str_of(&b, "id"))?;
+                room.command(tok, b.get("command").unwrap_or(&Value::Null), via(str_of(&b, "via")), str_of(&b, "id"))?;
                 return Ok(parts(wrap(room.snapshot(Some(tok)), r#"{"state":"#.into(), "}")));
             }
             _ => return Ok(not_found()),

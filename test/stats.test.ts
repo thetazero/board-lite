@@ -1,3 +1,4 @@
+import type { Command } from '../src/command.ts';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -16,8 +17,8 @@ test('points rebuilt from the log equal score() at any point in a game, and the 
   for (let seed = 1; seed <= 4; seed++) {
     const players = 2 + (seed % 4);
     const g = newGame(players, seed);
-    apply(g, 0, 'say anyone want timber?');
-    apply(g, 1, 'tell P1 maybe');
+    apply(g, 0, { do: 'say', message: 'anyone want timber?' });
+    apply(g, 1, { do: 'tell', to: 'P1', message: 'maybe' });
     const rng = { state: seed * 7 };
     const stop = seed % 3 ? Infinity : 150 + seed * 40; // some games cut off mid-round
     for (let i = 0; g.phase !== 'over' && i < Math.min(stop, 20000); i++) botStep(g, rng);
@@ -126,16 +127,16 @@ test('stats.json saved while a batch plays gains the games that finish later, an
 
 test('trade surplus counts basic resources 1 and gold and cards 0, players only, with and without gold trades (#475)', () => {
   const g = newGame(3, 5);
-  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, { do: 'keep', card: g.players[p].choice[0].id });
   const pl = g.players;
   for (const p of pl) Object.assign(p.resources, { stone: 9, timber: 9, crystal: 9, livestock: 9, gold: 9 });
-  const offer = (p: number, cmd: string) => { apply(g, p, cmd); return g.offers.at(-1)!.id; };
+  const offer = (p: number, cmd: Command) => { apply(g, p, cmd); return g.offers.at(-1)!.id; };
   const turn = g.turn; // the acting seat: others can only offer to it out of turn
   const a = turn, b = (turn + 1) % 3, c = (turn + 2) % 3;
-  apply(g, b, `accept ${offer(a, `offer P${b + 1} give 3 stone get 1 timber`)}`); // a −2, b +2
-  apply(g, c, `accept ${offer(a, `offer P${c + 1} give 1 gold get 2 crystal`)}`); // a +2, c −2; gold
-  apply(g, a, `accept ${offer(b, `offer P${a + 1} give 1 livestock get 2 timber`)}`); // b +1, a −1
-  apply(g, a, 'merchants stone timber'); // merchants: not counted
+  apply(g, b, { do: 'accept', offer: offer(a, { do: 'offer', to: `P${b + 1}`, give: { stone: 3 }, get: { timber: 1 } }) }); // a −2, b +2
+  apply(g, c, { do: 'accept', offer: offer(a, { do: 'offer', to: `P${c + 1}`, give: { gold: 1 }, get: { crystal: 2 } }) }); // a +2, c −2; gold
+  apply(g, a, { do: 'accept', offer: offer(b, { do: 'offer', to: `P${a + 1}`, give: { livestock: 1 }, get: { timber: 2 } }) }); // b +1, a −1
+  apply(g, a, { do: 'merchants', pay: 'stone', gain: 'timber' }); // merchants: not counted
   const s = gameStats(g, seats(3));
   const at = (xs: number[]) => [xs[a], xs[b], xs[c]];
   assert.deepEqual(at(s.surplus!.all), [-1, 3, -2]);

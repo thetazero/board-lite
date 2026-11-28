@@ -2,6 +2,7 @@
 //! one JSON request in, one JSON answer out, and no state kept but the strong
 //! bots' memory of their own offers.
 use crate::data::{Key, set_points_to_win};
+use crate::command::Command;
 use crate::engine::Game;
 use crate::map::K;
 use crate::rng::Rng;
@@ -71,17 +72,17 @@ fn answer(text: &str) -> Result<String, String> {
     let tune: strongbot::Tune = serde_json::from_value(a.q["tune"].clone()).unwrap_or_default();
     let b = strongbot::Bot { p, name, now: int("now"), tune: &tune };
     match a.op {
-        "apply" => match g.apply(p, a.q["cmd"].as_str().unwrap_or("")) {
+        "apply" => match Command::read(&a.q["cmd"]).and_then(|c| g.apply(p, &c)) {
             Ok(()) => moved(&mut g, Value::Null, rng),
             Err(e) => Ok(json!({"rule": e}).to_string()),
         },
         "botMove" => {
             let cmd = bot::bot_move(&mut g, p, &mut rng).ok_or("the bot found no legal move")?;
-            moved(&mut g, cmd.into(), rng)
+            moved(&mut g, json!(cmd), rng)
         }
         "standInMove" => {
             let cmd = bot::stand_in_move(&mut g, p).ok_or("the stand-in found no legal move")?;
-            moved(&mut g, cmd.into(), rng)
+            moved(&mut g, json!(cmd), rng)
         }
         "strongMove" => {
             let cmd = strongbot::strong_move(&mut g, &b, &mut rng, seen)?;

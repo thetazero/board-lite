@@ -20,7 +20,7 @@ function addDragon(g: Game, owner: number, stage: number, key = 'fire_whelp'): D
 // hex with nothing on it beside one of them.
 function setup(seed = 5) {
   const g = newGame(2, seed, 0);
-  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, `keep ${g.players[p].choice[0].id}`);
+  while (g.phase === 'cards') for (const p of waitingOn(g)) apply(g, p, { do: 'keep', card: g.players[p].choice[0].id });
   for (const k of Object.keys(g.map)) delete g.map[k].fauna;
   g.dragons = [];
   const land = neighbors(g.towers[0]).filter((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k]);
@@ -54,7 +54,7 @@ test('auto clear fights each target in turn with every raid-ready dragon, as cle
   const ds = [0, 1, 2, 3, 4].map(() => addDragon(g, 0, 3));
   const egg = addDragon(g, 0, 0);
   const before = g.log.length;
-  apply(g, 0, 'autoclear');
+  apply(g, 0, { do: 'auto_clear' });
   const hunts = g.log.slice(before).flatMap((e) => (e.ev?.k === 'hunt' ? [e.ev] : []));
   const ends = g.log.slice(before).flatMap((e) => (e.ev?.k === 'cleared' ? [e.ev] : []));
   assert.equal(hunts[0].hex, b); // the wolves first, the weaker
@@ -79,7 +79,7 @@ test('auto clear stops at a lost fight, when nothing is left, or when no dragon 
     addDragon(g, 0, 2);
     addDragon(g, 0, 3);
     const before = g.log.length;
-    apply(g, 0, 'autoclear');
+    apply(g, 0, { do: 'auto_clear' });
     const ends = g.log.slice(before).flatMap((e) => (e.ev?.k === 'cleared' ? [e.ev] : []));
     assert.ok(ends.length >= 1);
     ends.slice(0, -1).forEach((e) => assert.ok(e.won));
@@ -91,12 +91,12 @@ test('auto clear stops at a lost fight, when nothing is left, or when no dragon 
 test("auto clear is refused with nothing to clear, no raid-ready dragon, or off your turn, and changes nothing", () => {
   const { g, mine: [a] } = setup();
   addDragon(g, 0, 3);
-  assert.throws(() => apply(g, 0, 'autoclear'), /nothing to auto clear/);
+  assert.throws(() => apply(g, 0, { do: 'auto_clear' }), /nothing to auto clear/);
   g.map[a].fauna = 'wolf';
   g.dragons[0].damage = 999;
-  assert.throws(() => apply(g, 0, 'autoclear'), /no raid-ready dragon/);
+  assert.throws(() => apply(g, 0, { do: 'auto_clear' }), /no raid-ready dragon/);
   g.dragons[0].damage = 0;
-  assert.throws(() => apply(g, 1, 'autoclear'), RuleError);
+  assert.throws(() => apply(g, 1, { do: 'auto_clear' }), RuleError);
   assert.equal(g.map[a].fauna, 'wolf');
 });
 
@@ -106,7 +106,7 @@ test('the phone and the CLI offer auto clear only with something to clear and a 
   const view = () => seatView({ lobby: { code: 'T', started: true, seating: false, saved: null, seats, minPlayers: 2, maxPlayers: 6, file: '', remote: true }, seat: 0, game: publicState(g, 100), scene: 0, you: { ...seatState(g, 0), name: 'P1' } }, 10);
   g.map[a].fauna = 'wolf';
   assert.deepEqual(seatState(g, 0).autoClear, [a]);
-  assert.doesNotMatch(view(), /^\s*autoclear /m); // no dragon
+  assert.doesNotMatch(view(), /^\s*{"do":"auto_clear"} /m); // no dragon
   addDragon(g, 0, 3);
-  assert.match(view(), /^\s*autoclear /m);
+  assert.match(view(), /^\s*{"do":"auto_clear"} /m);
 });

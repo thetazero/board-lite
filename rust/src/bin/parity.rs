@@ -1,5 +1,6 @@
 //! A line-by-line door into the engine for test/rust-parity.test.ts: one JSON
 //! request a line on stdin, one JSON answer a line on stdout.
+use board_lite::command::Command;
 use board_lite::engine::Game;
 use board_lite::rng::Rng;
 use board_lite::{bot, mapimage, recap, scenes, state, store, strongbot, view};
@@ -27,7 +28,7 @@ fn main() {
             op => {
                 let g = g.as_mut().unwrap();
                 match op {
-                    "apply" => json!(g.apply(p, q["cmd"].as_str().unwrap()).err()),
+                    "apply" => json!(Command::read(&q["cmd"]).and_then(|c| g.apply(p, &c)).err()),
                     "bot" => {
                         let mut rng = Rng { state: int("state") as i32 };
                         let cmd = bot::bot_move(g, p, &mut rng);

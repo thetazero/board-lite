@@ -123,12 +123,12 @@ The seat server (`src/playtest/seat-server.ts <room-url> <token>`, an MCP server
 | Tool | Does |
 |---|---|
 | `view` | the seat's view (`node src/cli.ts view`): public board, own hand and resources, recent events, options; plus a picture of the board (`src/mapimage.ts`), since the text map's rows don't line up as a hex grid: each hex in place with its coordinates, filled in its owner's color, beasts, and dots for who can build on each empty hex |
-| `act` | one decision command, exactly as in `docs/cli.md`, with a private `why` (see `seat-N.moves.txt`) |
+| `act` | one decision, its arguments the command's fields as in `docs/cli.md` (`do` and the rest), with a private `why` (see `seat-N.moves.txt`) |
 | `say` | talk: to the table, or with `to: "P2"` privately to one player |
 | `wait` | blocks up to 120 s until it's the seat's decision, someone talks, or the game ends; returns the new events |
 | `rules` | `docs/rules.md` |
 
-Talk is part of the game: `say <message>` and `tell P2 <message>` are engine commands (any player, any time, binding no one), so they land in the game log and every player's view like other events. Players are told the game is social and to negotiate, ally, bluff and reply when spoken to.
+Talk is part of the game: `say` and `tell` are engine commands (any player, any time, binding no one), so they land in the game log and every player's view like other events. Players are told the game is social and to negotiate, ally, bluff and reply when spoken to.
 
 ## How the sandbox works
 
