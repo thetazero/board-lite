@@ -53,7 +53,8 @@ let trade = fresh();
 let bank = { give: 'stone', get: 'timber', times: 1 };
 let shownV = -1; // the version (Snapshot.v) of the snapshot on screen
 let menu = false; // the menu under your name (Save game, Quit game) is open
-let bookTab: BookTab | null = null; // the rulebook, from Rules or the wheel in the header, open at this tab
+let bookTab: BookTab | null = null; // the rulebook, from a Rules button or the wheel in the header, open at this tab
+let bookSeat = -1; // the seat whose color its pictures were last asked for in
 let eggOpen = false; // the base dragon egg's Hatch tapped: choosing its element
 // End turn tapped once, waiting for its confirm (#417): a mis-tap alone never ends a turn.
 // When it was tapped, so a double tap doesn't land on the confirm too.
@@ -131,6 +132,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
         <p class="error" role="alert">${esc(err)}</p>
         <button class="primary big" type="submit">Join</button>
+        <button id="book" class="ghost" type="button">Rules</button>
         ${known ? '' : `<div class="hostline">
           <button id="hosttv" class="big" type="button">Host on a TV</button>
           <p id="hosthow" hidden>On the TV, open <b class="url">${esc(`${location.host}/tv`)}</b>. Then join here with the room code it shows.</p>
@@ -138,7 +140,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
         </div>`}
         ${saved.length ? `<div class="hostline savedgames"><p>Saved games</p><ul>${saved.slice(0, 5).map((g) => `<li><a class="button" href="/${esc(g.code)}"><b>${esc(g.names.join(', '))}</b><small>Round ${g.round}, saved ${esc(savedWhen(g.savedAt))}</small></a></li>`).join('')}</ul></div>` : ''}
       </form>
-    </div>`;
+    </div><div id="joinbook"></div>`;
   wireJoin();
 }
 
@@ -153,7 +155,18 @@ function missing(code: boolean): boolean {
   return true;
 }
 
+// The rulebook over a page with no seat yet. Only the book is drawn again, so
+// what's typed in the form stays. Its pictures are in the first seat's color.
+function drawJoinBook() {
+  const box = document.getElementById('joinbook');
+  if (!box) return;
+  morph(box, bookTab ? bookSheet(bookTab) : '');
+  document.getElementById('book')?.setAttribute('aria-expanded', String(!!bookTab));
+  wireBook(0, drawJoinBook);
+}
+
 function wireJoin() {
+  drawJoinBook();
   const form = document.getElementById('join') as HTMLFormElement | null;
   if (!form) return;
   // A game with no TV: this phone makes the room and is its first player.
@@ -217,9 +230,10 @@ function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '')
           <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
           <button class="primary big" type="submit">Join</button></form>` : ''}
         <p class="error" role="alert">${esc(err)}</p>
+        <button id="book" class="ghost" type="button">Rules</button>
         <a class="button" href="/">Go to the home page</a>
       </div>
-    </div>`;
+    </div><div id="joinbook"></div>`;
   app.querySelectorAll<HTMLElement>('[data-seat]').forEach((b) => (b.onclick = () => tapper.tap('join', () => join(l.code, b.dataset.seat!, name))));
   wireJoin();
 }
@@ -372,6 +386,7 @@ function leaveToJoin(msg: string) {
   stop?.();
   stop = null;
   localStorage.removeItem('seat');
+  bookTab = null;
   document.body.classList.remove('has-hand', 'hand-below', 'hand-tucked');
   document.body.style.removeProperty('--hs');
   renderJoin('', undefined, msg);
@@ -398,7 +413,7 @@ function renderLobby() {
   const hint = l.seating ? `The game goes on once every seat is taken.`
     : host ? '' : `${first ? esc(first) : 'The first to join'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
-  morph(app, screen('lobby', `
+  morph(app, `${screen('lobby', `
     <div class="plobby${l.remote ? ' notv' : ''}" style="--pc:${pc}">
       <div class="hero">${l.remote ? tableScene([pc], 480, 124) : tableScene([pc])}</div>
       <div class="lobbybody">
@@ -410,10 +425,12 @@ function renderLobby() {
         ${l.remote && !host ? invite(l.code) : ''}
         ${host && !l.seating ? act('Start game', 'id="start"', l.seats.length >= l.minPlayers ? null : `You need ${l.minPlayers} players: add a bot.`) : ''}
         ${host ? act('Add a bot', 'id="bot"', l.seating ? null : l.seats.length >= l.maxPlayers ? `The table is full: ${l.maxPlayers} players.` : null, '') : ''}
+        <button id="book" class="ghost" aria-expanded="${!!bookTab}">Rules</button>
         <button id="leave" class="ghost">Leave</button>
         ${l.remote ? tvHint(l.code) : ''}
       </div>
-    </div>`));
+    </div>`)}${bookTab ? bookSheet(bookTab) : ''}`);
+  wireBook(me, renderLobby);
   if (host) {
     on('bot', () => call(`/api/rooms/${code}/bot`, { token }));
     if (!l.seating) on('start', () => call(`/api/rooms/${code}/start`, { token }));
@@ -623,6 +640,41 @@ function bind(sel: string, fn: (el: HTMLElement) => unknown) {
     tapper.tap(`${sel} ${JSON.stringify(el.dataset)}`, () => fn(el));
   }));
 }
+
+// The rulebook lies over whatever the screen is, and closes back to it: `redraw`
+// draws that screen. Rules opens it at its first tab, the wheel's ring of dots
+// at Elements. Its pictures are drawn in the color of `seat`.
+function wireBook(seat: number, redraw: () => void) {
+  const load = () => {
+    bookSeat = seat;
+    // The screen may have moved on (joined, the game started) before it loads.
+    loadBook(seat, redrawBook);
+  };
+  bookRedraw = redraw;
+  const openBook = (tab: BookTab) => {
+    bookTab = bookTab ? null : tab;
+    menu = false;
+    (document.activeElement as HTMLElement | null)?.blur(); // the keyboard goes down: it would cover the book
+    redraw();
+    if (bookTab) load();
+  };
+  on('book', () => openBook('howto'));
+  on('wheel', () => openBook('elements'));
+  for (const id of ['bookclose', 'bookdone']) {
+    on(id, () => {
+      bookTab = null;
+      redraw();
+    });
+  }
+  bind('[data-booktab]', (el) => {
+    bookTab = el.dataset.booktab as BookTab;
+    redraw();
+    app.querySelector('.bookpage')?.scrollTo(0, 0);
+  });
+  if (bookTab && bookSeat !== seat) load(); // open while the seat changed
+}
+let bookRedraw: (() => void) | null = null; // draws the screen the book lies over now
+const redrawBook = () => bookTab && app.querySelector('.booksheet') && bookRedraw?.();
 
 // Every button the phone offers is drawn by `act`, and every choice by
 // `choose`, so each screen says the same things the same way:
@@ -1818,27 +1870,7 @@ function wire(g: PublicState, me: Me) {
     bookTab = null;
     render();
   });
-  // The rulebook lies over whatever the screen is, and closes back to it.
-  // Rules opens it at its first tab, the wheel's ring of dots at Elements.
-  const openBook = (tab: BookTab) => {
-    bookTab = bookTab ? null : tab;
-    menu = false;
-    render();
-    if (bookTab) loadBook(me.seat, () => bookTab && render());
-  };
-  on('book', () => openBook('board'));
-  on('wheel', () => openBook('elements'));
-  for (const id of ['bookclose', 'bookdone']) {
-    on(id, () => {
-      bookTab = null;
-      render();
-    });
-  }
-  bind('[data-booktab]', (el) => {
-    bookTab = el.dataset.booktab as BookTab;
-    render();
-    app.querySelector('.bookpage')?.scrollTo(0, 0);
-  });
+  wireBook(me.seat, render);
   for (const id of ['menuclose', 'menucancel']) {
     on(id, () => {
       menu = false;
