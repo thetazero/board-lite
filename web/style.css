@@ -812,7 +812,6 @@ body.phone :is(input, textarea, [contenteditable]) { user-select: text; -webkit-
 .joinpage .hero .title { position: absolute; left: 50%; top: .5em; transform: translateX(-50%) rotate(-1.5deg); font-size: min(2.3em, 8.8vw); color: #2a1d33; background: var(--sheet); padding: .05em .6em .15em; white-space: nowrap;
   clip-path: polygon(0 8%, 4% 0, 96% 3%, 100% 14%, 98% 92%, 93% 100%, 3% 97%, 0 86%); filter: drop-shadow(0 .2em .3em #0008); }
 .joinform { display: flex; flex-direction: column; gap: 1em; padding: 1.2em 1.2em 2em; }
-.joinform .subtitle { text-align: center; font-size: 1.05em; }
 .joinform label { display: flex; flex-direction: column; gap: .3em; font-weight: 700; }
 .joinform label small { font-weight: 500; }
 .joinform input { font-size: 1.4em; padding: .5em; color: var(--ink); }
@@ -1258,7 +1257,6 @@ body:has(.talkbar.open) .viewswitch { display: none; }
   .hosthere { display: flex; flex-direction: column; padding: 1.5em 0 1.5em 2em; text-align: center; }
   .hosthere .button.big { font-size: 1.9em; }
   .home .joinform { padding: 1.5em 2em 1.5em 3em; border-left: 1px dashed var(--line); }
-  .home .joinform .subtitle { display: none; }
   .home #hosttv, .home #hosthow { display: none; }
   .home .joinform button.primary { --text: var(--ink); --edge: var(--paper-edge); color: var(--ink); background: var(--grain), var(--mottle), linear-gradient(180deg, #faf4e4, #ece0c5); text-shadow: none; }
 }
@@ -1280,7 +1278,6 @@ body:has(.talkbar.open) .viewswitch { display: none; }
   .joinform.inner { gap: .7em; }
   .joinform input { font-size: 1.2em; padding: .4em .5em; }
   .joinform .big { padding: .6em 1em; }
-  .joinform .subtitle { font-size: 1em; }
   .home .joinform { display: grid; grid-template-columns: 1fr 1fr; }
   .home .joinform > :not(label) { grid-column: 1 / -1; }
   .home .joinform input { min-width: 0; width: 100%; }
