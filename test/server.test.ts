@@ -381,7 +381,8 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     const bram = (await post(`/api/rooms/${code}/join`, { name: 'Bram' })).token;
     await post(`/api/rooms/${code}/start`, { token: ada });
     const room = rooms.get(code)!;
-    await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
+    // Held to the end: a response that's garbage collected closes its stream.
+    const stream = await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
     assert.ok(room.here(room.seats[1]), 'not at once');
     // The table plays on: being sent it doesn't make Bram here.
     const end = Date.now() + 2000;
@@ -403,6 +404,7 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
       assert.ok(room.here(room.seats[1]));
     }
     assert.ok(room.snapshot(null).v! <= version! + 1, 'at most Ada going quiet');
+    assert.ok(stream.ok);
     // Its stream ending long after the phone went doesn't bring it back.
     assert.ok(await until(() => !room.here(room.seats[1]), 2000));
     ctrl.abort();
