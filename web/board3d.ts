@@ -2023,10 +2023,13 @@ export class Board3D {
     }
   }
 
-  update(g: PublicState, highlight: number | null) {
+  update(g: Pick<PublicState, 'map' | 'dragons'>, highlight: number | null) {
     this.highlight = highlight;
     const sig = g.map.map((h) => `${h.k}${h.terrain}`).join();
-    if (sig !== this.mapSig) this.buildMap(g.map, sig);
+    if (sig !== this.mapSig) {
+      this.buildMap(g.map, sig);
+      this.firstUpdate = true; // another map (the lobby's, then the game's) is there at once, not folded up
+    }
     const now = clock();
     const animate = !this.firstUpdate;
     // Each hex with something new gets its turn in the cascade; its scenery
@@ -2370,7 +2373,7 @@ export class Board3D {
     this.resize();
   }
 
-  private placeDragons(g: PublicState, animate: boolean, now: number) {
+  private placeDragons(g: Pick<PublicState, 'dragons' | 'map'>, animate: boolean, now: number) {
     // Perches: each owner's tower, roosts and hatcheries, in that order; eggs
     // go to a hatchery's nest first. Any extra dragons stand round the tower.
     const perches = new Map<number, { pos: THREE.Vector3; face: number; home: THREE.Vector3; egg: boolean }[]>();
@@ -3495,12 +3498,14 @@ export class FightStage {
 
   private upright: boolean;
   private safe: { top: number; bottom: number };
+  private strip: boolean; // a wide, low stage: each side in one rank, seen from nearer
   private left: Standing[] = [];
   private foes: Standing[] = [];
   private boss: Standing | null = null;
 
-  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }) {
+  constructor(place: string, left: FightFigure[], right: FightFigure[], upright: boolean, safe: { top: number; bottom: number }, strip = false) {
     this.upright = upright;
+    this.strip = strip;
     this.safe = safe;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -3647,7 +3652,7 @@ export class FightStage {
   // across the columns, each as far in front of the one behind as its
   // tallest figure needs to leave that one, its plate and crown showing.
   private layout(fs: Standing[], side: 1 | -1) {
-    const per = this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
+    const per = this.strip ? 1 : this.upright ? PER_COLUMN.upright : PER_COLUMN.wide;
     const cols: Standing[][] = [];
     for (let i = 0; i < fs.length; i += per) cols.push(fs.slice(i, i + per));
     if (!cols.length) return;
@@ -3760,7 +3765,7 @@ export class FightStage {
       if (fits(mid)) hi = mid;
       else lo = mid;
     }
-    const d = Math.max(hi, 22);
+    const d = Math.max(hi, this.strip ? 14 : 22);
     // Then moved up or down the screen so what's drawn sits in the middle of the clear band.
     const e = extent(d);
     this.camera.setViewOffset(w, h, 0, (((top + bottom) - (e.hi + e.lo)) / 2) * (h / 2), w, h);
