@@ -105,7 +105,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Timber Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade timber with the merchants at 2:1. | — |
 | Crystal Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade crystal with the merchants at 2:1. | — |
 | Livestock Port | building card | building | 1 | 2 stone, 6 timber, 2 livestock | You trade livestock with the merchants at 2:1. | — |
-| Market | building card | building | 3 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each of your adjacent production buildings, up to 3. | — |
+| Market | building card | building | 3 | 6 stone, 6 timber, 6 crystal, 4 gold | Makes 1 gold each round for each of your adjacent production buildings, up to 3; worth 1 point. | 1 |
 | Monument | building card | building | 2 | 6 stone, 5 timber | Worth 2 points. Build adjacent to a monument. | 2 |
 | Standing Stones | building card | building | 2 | 5 stone, 6 crystal | Worth 2 points. Build adjacent to a crystal field hex. | 2 |
 | Lighthouse | building card | building | 2 | 7 stone, 4 timber | Worth 2 points. Build adjacent to an ocean hex. | 2 |
@@ -114,7 +114,7 @@ Everything that can be bought, as the game has it. Deck is the deck its cards ar
 | Nesting Grounds | upgrade | building | 3 | 4 stone, 2 timber | This dragon building houses 2 more dragons. | — |
 | Windfall | action card | action | 4 | nothing | Gain 3 of one resource other than gold. | — |
 | Buried Treasure | action card | action | 10 | nothing | Gain 2 gold. | — |
-| Growth Elixir | action card | action | 10 | 3 gold | Grow one of your dragons to its next life stage. | — |
+| Growth Elixir | action card | action | 10 | 3 gold | Grow one of your fully healed dragons to its next life stage, with 0 steps grown. | — |
 | Healing Potion | action card | action | 8 | nothing | Fully heal one of your hurt dragons. | — |
 | War Horn | action card | action | 6 | 1 crystal | Hold 1 more raid this round. | — |
 | Secret Hoard | action card | action | 4 | nothing | Worth 2 points while in your hand. | 2 |
@@ -191,7 +191,7 @@ Each effect is multiplied by how many of the building's six neighbouring hexes c
 | Shepherd's Fold | livestock building | meadow hexes | 3 stone, 3 timber, 2 crystal | 1 livestock a round |
 | Drovers' Barn | livestock building | livestock buildings (anyone's) | 2 stone, 3 timber, 3 crystal | 1 livestock a round |
 | Fishery | livestock building | ocean hexes | 3 stone, 4 timber, 3 crystal | 1 livestock a round |
-| Market | trade building | production buildings (your own), up to 3 | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
+| Market | gold building | production buildings (your own), up to 3 | 6 stone, 6 timber, 6 crystal, 4 gold | 1 gold a round |
 
 ## Points
 
@@ -214,6 +214,7 @@ Every way to buy points. Building points are flat: they never count what's adjac
 | Shepherd's Fold | 3 stone, 3 timber, 2 crystal | 1 | 3 stone, 3 timber, 2 crystal | now, and makes resources |
 | Drovers' Barn | 2 stone, 3 timber, 3 crystal | 1 | 2 stone, 3 timber, 3 crystal | now, and makes resources |
 | Fishery | 3 stone, 4 timber, 3 crystal | 1 | 3 stone, 4 timber, 3 crystal | now, and makes resources |
+| Market | 6 stone, 6 timber, 6 crystal, 4 gold | 1 | 6 stone, 6 timber, 6 crystal, 4 gold | now, and makes resources |
 | Monument, adjacent to a monument | 6 stone, 5 timber | 2 | 3 stone, 2.5 timber | now |
 | Standing Stones, adjacent to a crystal field hex | 5 stone, 6 crystal | 2 | 2.5 stone, 3 crystal | now |
 | Lighthouse, adjacent to an ocean hex | 7 stone, 4 timber | 2 | 3.5 stone, 2 timber | now |
@@ -270,7 +271,7 @@ Everything that fights, on either side, hits up to its targets number of differe
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
-Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: after every raid, each kingdom that didn't fall adds 1 gold, and the one that fell goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
+Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: each round, raid or not, each kingdom that didn't fall that round adds 1 gold (once, however many raids), and one that falls goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
 
 | Kingdom | Defenders | Power | Total health | Avg damage a round | Loot | Points |
 |---|---|---|---|---|---|---|

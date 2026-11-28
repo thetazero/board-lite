@@ -493,7 +493,7 @@ pub fn seat_view(s: &Shown, log_lines: usize) -> String {
     let slain: Vec<String> = g.beasts.iter().filter_map(|b| b.slain_by.map(|p| format!("{} by {}", b.name, pname(p)))).collect();
     out.push(format!("Great beasts slain: {}. Once the Thunderbird is slain, production buildings on or adjacent to the peak{peak} make {} more each round.", if slain.is_empty() { "none".into() } else { slain.join(", ") }, g.peak_bonus));
     let kingdoms: Vec<String> = g.kingdoms.iter().map(|t| format!("{} (Power {}) {}{}", t.name, t.power, res_text(&t.loot), t.points.map_or(String::new(), |n| format!(", {}", plural(n, "point"))))).collect();
-    out.push(format!("Kingdoms (loot now; +1 gold after each raid it doesn't fall in): {}.", kingdoms.join("; ")));
+    out.push(format!("Kingdoms (loot now; +1 gold each round it doesn't fall in): {}.", kingdoms.join("; ")));
     if let Some(r) = &g.raid {
         out.push(String::new());
         out.extend(raid_text(g, r, you));
