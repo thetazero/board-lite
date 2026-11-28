@@ -104,7 +104,7 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
     const ev = e.ev as GameEvent;
     if (ev?.k === 'wander') { fauna[ev.from] = fauna[ev.to]; delete fauna[ev.to]; }
     else if (ev?.k === 'play' && ev.fauna && ev.hex) delete fauna[ev.hex];
-    else if (ev?.k === 'cleared' && ev.won && ev.fauna) fauna[ev.hex] = ev.fauna;
+    else if (ev?.k === 'cleared' && (ev.won || ev.fell) && ev.fauna) fauna[ev.hex] = ev.fauna;
   }
   const r: Game = {
     ...g,
@@ -175,9 +175,10 @@ export function gameStats(g: Game, res: { commit?: string; seats: { name?: strin
       case 'recall': for (const d of ev.ds) delete dragon(d).perch; break;
       case 'cleared':
         for (const d of ev.home ?? []) delete dragon(d).perch;
-        if (ev.won && ev.fauna) delete r.map[ev.hex].fauna;
-        if (ev.won) s.fauna[ev.fauna ?? 'perched'].cleared[ev.p]++;
-        if (ev.won && ev.fauna && BEASTS[ev.fauna]) r.slain[ev.fauna] = ev.p;
+        if (!ev.won && !ev.fell) break;
+        if (ev.fauna) delete r.map[ev.hex].fauna;
+        s.fauna[ev.fauna ?? 'perched'].cleared[ev.p]++;
+        if (ev.fauna && BEASTS[ev.fauna]) r.slain[ev.fauna] = ev.p;
         break;
       case 'target': target = ev.t; (s.raids.targets[ev.t] ??= { chosen: 0, fell: 0 }).chosen++; break;
       case 'fight': for (const p of ev.ps) s.raids.joined[p]++; break;

@@ -853,7 +853,8 @@ function huntBanner(g: PublicState, sc: Extract<Scene, { kind: 'hunt' }>, fresh:
   const home = (end?.home ?? []).map((id) => g.dragons.find((d) => d.id === id)).filter((d) => !!d).map((d) => dragonBadge(d!, 40)).join('');
   const flown = home ? `<div class="spoils"><span>${home}<span class="arrow">➜</span>${HOME}</span></div>` : '';
   const The = ev.fauna ? `The ${esc(ev.name)}` : 'The perched dragons';
-  const outcome = !end ? '' : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
+  const outcome = !end ? '' : end.fell ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div><h1>The perched dragons <span class="no">hold</span></h1>${flown}`
+    : !end.won ? `<h1>${The} <span class="no">${ev.fauna ? 'holds' : 'hold'}</span></h1>${flown}`
     : great ? `<h1>The ${esc(end.name)} <span class="ok">is slain</span></h1><div class="spoils"><span>${playerTag(end.p, names)} +${end.points ?? 0} ${icon('points', 1.6)}</span></div>${ev.fauna === 'thunderbird' ? peakBoon(g.peakBonus) : ''}`
     : ev.fauna ? `<h1>The ${esc(end.name)} <span class="ok">falls</span></h1><div class="spoils"><span>${playerTag(end.p, names)} ${gainChips(end.gain, 1.6)}</span></div>${flown}`
     : `<h1>The perched dragons <span class="ok">fall</span></h1>${flown}`;
@@ -885,7 +886,7 @@ function startHp(ds: string[], hps: number[] | undefined): Map<string, number> {
 
 // A figure's size: its full health's square root, so its area goes with its
 // health. A Knight (12) is about 3.5, an adult dragon (20 to 30) 4.5 to 5.5,
-// the Fire Giant (96) nearly 10 and the Titan (160) over 12: the bosses loom.
+// the Fire Giant (100) 10 and the Titan (164) over 12: the bosses loom.
 const figSize = (maxHp: number) => Math.sqrt(Math.max(1, maxHp));
 // Defenders without an element (old saves) and neutral ones strike in steel.
 const STEEL = '#c9ced6';

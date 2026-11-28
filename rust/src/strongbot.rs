@@ -73,11 +73,12 @@ impl Fighter {
 struct Foe {
     attack: Attack,
     element: S,
+    targeting: S,
     hp: i64,
 }
 impl Foe {
     fn unit(x: &UnitDef) -> Foe {
-        Foe { attack: x.attack(), element: x.element, hp: x.hp }
+        Foe { attack: x.attack(), element: x.element, targeting: "random", hp: x.hp }
     }
 }
 fn roll_sum(rng: &mut Rng, a: &Attack) -> i64 {
@@ -94,21 +95,8 @@ fn fight_once(fighters: &[Fighter], foes: &[Foe], rng: &mut Rng) -> (bool, Vec<i
                 continue;
             }
             let (st, def) = (f.stats(), f.def());
-            let mut alive: Vec<usize> = (0..fhp.len()).filter(|j| fhp[*j] > 0).collect();
-            if alive.is_empty() {
-                return;
-            }
-            rng.shuffle(&mut alive);
-            match def.targeting {
-                "lowest_health" => alive.sort_by_key(|j| fhp[*j]),
-                "strongest_attacker" => alive.sort_by_key(|j| {
-                    let a = &foes[*j].attack;
-                    -(a.targets * a.dice * (a.sides + 1))
-                }),
-                "weak_to_me" => alive.sort_by_key(|j| !DATA.element_weak[foes[*j].element].contains(&def.element)),
-                _ => {}
-            }
-            for j in alive.into_iter().take(st.targets as usize) {
+            let marks: Vec<Mark> = foes.iter().zip(fhp.iter()).map(|(x, hp)| Mark { hp: *hp, attack: x.attack, element: x.element }).collect();
+            for j in pick_targets(rng, def.targeting, def.element, st.targets, &marks) {
                 fhp[j] = (fhp[j] - elemental(roll_sum(rng, &st), def.element, foes[j].element)).max(0);
             }
         }
@@ -118,12 +106,8 @@ fn fight_once(fighters: &[Fighter], foes: &[Foe], rng: &mut Rng) -> (bool, Vec<i
             if fhp[j] <= 0 {
                 continue;
             }
-            for _ in 0..foe.attack.targets {
-                let up: Vec<usize> = (0..hp.len()).filter(|i| hp[*i] > 0).collect();
-                if up.is_empty() {
-                    return;
-                }
-                let i = rng.pick(&up);
+            let marks: Vec<Mark> = fighters.iter().zip(hp.iter()).map(|(f, hp)| Mark { hp: *hp, attack: f.stats(), element: f.def().element }).collect();
+            for i in pick_targets(rng, foe.targeting, foe.element, foe.attack.targets, &marks) {
                 hp[i] = (hp[i] - elemental(roll_sum(rng, &foe.attack), foe.element, fighters[i].def().element)).max(0);
             }
         }
@@ -395,7 +379,7 @@ impl Bot<'_> {
         let mut foes: Vec<Foe> = g.map[&k].fauna.iter().map(|f| Foe::unit(fauna_def(f.0))).collect();
         foes.extend(g.rivals_perched(self.p, k).into_iter().map(|d| {
             let attack = d.stats().unwrap();
-            Foe { attack, element: d.def().element, hp: attack.hp - d.damage }
+            Foe { attack, element: d.def().element, targeting: d.def().targeting, hp: attack.hp - d.damage }
         }));
         let fs: Vec<Fighter> = ds.iter().map(Fighter::of).collect();
         let (mut wins, mut hurt) = (0, 0.0);
@@ -767,9 +751,7 @@ impl Bot<'_> {
                 }
             }
         }
-        if g.beast_tried[p] != g.round {
-            g.map.iter().filter(|(_, x)| x.beast()).for_each(|(k, _)| aim(*k));
-        }
+        g.map.iter().filter(|(_, x)| x.beast()).for_each(|(k, _)| aim(*k));
         by_power.sort_by_key(|d| -d.power());
         let n = by_power.len();
         let mut best: Option<(String, f64)> = None;

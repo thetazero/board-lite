@@ -362,8 +362,8 @@ export function eventHtml(e: EventView, g: PublicState, names: string[]): string
       if (!ev.fauna) return ev.won ? `The perched dragons <span class="ok">fall</span> to ${who(ev.p)}${home ? `; ${home} go home` : ''}` : `The perched dragons <span class="no">hold</span> against ${who(ev.p)}${home ? `; ${home} go home` : ''}`;
       const it = beast(ev.fauna, ev.name);
       const The = it.replace(/^the/, 'The');
-      if (!ev.won) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
-      return ev.points ? `${The} <span class="ok">is slain</span>: ${who(ev.p)} +${ev.points} ${icon('points', 1.2)}` : `${The} <span class="ok">falls</span>: ${who(ev.p)} ${gainChips(ev.gain, 1.2)}`;
+      if (!ev.won && !ev.fell) return `${The} <span class="no">holds</span> against ${who(ev.p)}`;
+      return ev.points ? `${The} <span class="ok">is slain</span>: ${who(ev.p)} +${ev.points} ${icon('points', 1.2)}` : `${The} <span class="ok">falls</span>${gainChips(ev.gain, 1.2) ? `: ${who(ev.p)} ${gainChips(ev.gain, 1.2)}` : ''}${ev.fell ? `; the perched dragons <span class="no">hold</span> against ${who(ev.p)}` : ''}`;
     }
     case 'wander': {
       const b = g.map.find((h) => h.k === ev.to && h.fauna?.key === ev.fauna)?.building;

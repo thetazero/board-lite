@@ -25,6 +25,7 @@ struct Ev {
     name: Option<String>,
     card: Option<String>,
     won: Option<bool>,
+    fell: Option<bool>,
     stage: Option<Value>,
     floors: Option<i64>,
     points: Option<i64>,
@@ -37,6 +38,10 @@ impl Ev {
     }
     fn won(&self) -> bool {
         self.won == Some(true)
+    }
+    // The beast falls in a fight won, or one lost to the dragons perched beside it.
+    fn beast_fell(&self) -> bool {
+        self.won() || self.fell == Some(true)
     }
 }
 fn id(v: &Value) -> Option<Id> {
@@ -116,7 +121,7 @@ fn moments(g: &Game, evs: &[(usize, Ev)]) -> Vec<Moment> {
                     None => titles.push((t, ev.p)),
                 }
             }
-            "cleared" if ev.won() && ev.points.is_some_and(|n| n != 0) => {
+            "cleared" if ev.beast_fell() && ev.points.is_some_and(|n| n != 0) => {
                 out.push(Moment::Beast(round, json!({"round": round, "k": "beast", "p": ev.p, "key": ev.fauna.map_or("", |f| f.0), "name": ev.name, "points": ev.points})))
             }
             "raidEnd" if ev.won() => {
@@ -165,7 +170,7 @@ fn rebuilt(g: &Game, evs: &[(usize, Ev)]) -> (Vec<Vec<i64>>, Vec<Vec<i64>>) {
                     r.map[&h].fauna = None;
                 }
             }
-            "cleared" if ev.won() => {
+            "cleared" if ev.beast_fell() => {
                 if let (Some(f), Some(h)) = (ev.fauna, ev.hex) {
                     r.map[&h].fauna = Some(f);
                 }
@@ -261,7 +266,7 @@ fn rebuilt(g: &Game, evs: &[(usize, Ev)]) -> (Vec<Vec<i64>>, Vec<Vec<i64>>) {
                         d.perch = None;
                     }
                 }
-                if let (true, Some(f), Some(h)) = (ev.won(), ev.fauna, ev.hex) {
+                if let (true, Some(f), Some(h)) = (ev.beast_fell(), ev.fauna, ev.hex) {
                     r.map[&h].fauna = None;
                     if let Some(p) = ev.p.filter(|_| is_beast(f.0)) {
                         r.slain.insert(f, p);

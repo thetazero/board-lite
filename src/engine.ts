@@ -115,7 +115,7 @@ export type GameEvent =
   // `hps`: each of `ds`'s health as the fight starts (as for `fight`).
   // `first`: who won the coin flip and strikes first each combat round (absent in old saves: the dragons).
   | { k: 'hunt'; p: number; hex: string; fauna: string | null; name: string; hp: number; ds: string[]; hps?: number[]; units: { name: string; hp: number; d?: string; el?: string }[]; first?: Side }
-  | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; gain: Bundle; points?: number; home?: string[] } // home: perched dragons driven off
+  | { k: 'cleared'; p: number; hex: string; fauna: string | null; name: string; won: boolean; fell?: true; gain: Bundle; points?: number; home?: string[] } // fell: the beast did, in a fight lost to the dragons perched with it; home: perched dragons driven off
   | { k: 'perch'; p: number; hex: string; ds: string[]; on: string; owner: number } // on: the building's type
   | { k: 'recall'; p: number; ds: string[] }
   | { k: 'wander'; from: string; to: string; fauna: string; name: string } // in production, a beast of the fauna moves 1 hex, or the Leviathan swims anywhere in its waters
@@ -176,7 +176,6 @@ export interface Game {
   titles: Record<Title, number | null>;
   slain: Record<string, number>; // great beasts slain, and by whom
   raidPoints: number[]; // each player's points from kingdoms that score (#321)
-  beastTried: number[]; // the last round each player fought a great beast
   // Who goes first in round 1, picked at random so joining the lobby first
   // gives no edge (#416). Absent in old saves: the first seat.
   firstSeat?: number;
