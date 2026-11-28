@@ -1646,6 +1646,80 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // A title changes hands (#551): the TV says who takes it, and who loses it.
+    name: 'title-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.round === 4 && g.phase === 'action',
+    setup: (g) => {
+      const t = g.turn, a = (t + 1) % 4;
+      apply(g, t, `offer P${a + 1} give 1 ${most(g, t)} get 1 ${most(g, a, most(g, t))}`);
+      g.titles.tower = a;
+      g.titles.army = null;
+    },
+    shots: (g) => [
+      { file: 'tv-title-taken-4p', caption: 'TV: a title taken from someone, under an open offer', client: 'tv', waitFor: '.title-toast', hold: true, then: (room) => room.mutate((g2) => { g2.titles.tower = g!.turn; }) },
+      { file: 'tv-title-first-4p', caption: 'TV: a title no one held, and one no one holds now', client: 'tv', waitFor: '.title-toast', hold: true, then: (room) => room.mutate((g2) => { g2.titles.army = g!.turn; g2.titles.tower = null; }) },
+    ],
+  },
+  {
+    // A title that changes in a scene (a fight with the Thunderbird): told after it.
+    name: 'title-scene-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      g.titles.tower = (g.turn + 1) % 3;
+    },
+    shots: () => [
+      { file: 'tv-title-after-scene-3p', caption: 'TV: the same title, once the scene is over', client: 'tv', waitFor: '.title-toast', hold: true, then: (room) => room.mutate((g) => { huntPeak(g); g.titles.tower = g.turn; }) },
+    ],
+  },
+  {
+    // The same change, while its scene plays.
+    name: 'title-in-scene-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      beastHunters(g);
+      g.titles.tower = (g.turn + 1) % 3;
+    },
+    shots: () => [
+      { file: 'tv-title-in-scene-3p', caption: 'TV: a title changed in this scene: nothing yet', client: 'tv', waitMs: 3200, then: (room) => room.mutate((g) => { huntPeak(g); g.titles.tower = g.turn; }) },
+    ],
+  },
+  // A title that changes as the game ends (#551): told on the board first, then the recap.
+  ...(['toast', 'recap'] as const).map((step): Scene => ({
+    name: `title-end-${step}-4p`,
+    players: 4,
+    seed: 1,
+    until: (g) => g.phase === 'over',
+    setup: (g) => {
+      g.titles.tower = (g.winner! + 1) % 4;
+      g.phase = 'action';
+    },
+    shots: (g) => [{
+      file: `tv-title-end-${step}-4p`, client: 'tv', hold: true,
+      caption: step === 'toast' ? 'TV: the title that ends the game, before the recap' : 'TV: then the recap or the scores, the toast gone',
+      waitFor: step === 'toast' ? '.title-toast' : '.summary, .endbox',
+      then: (room) => room.mutate((g2) => {
+        g2.titles.tower = g!.winner;
+        g2.phase = 'over';
+      }),
+    }],
+  })),
+  {
+    // A title that changed in the raid before: told over this raid's vote.
+    name: 'title-vote-5p',
+    players: 5,
+    seed: 1,
+    until: (g) => g.phase === 'raid' && g.raid?.step === 'vote',
+    setup: (g) => { g.titles.hoard = 0; },
+    shots: () => [{ file: 'tv-title-vote-5p', caption: 'TV: a title taken, over a raid vote', client: 'tv', waitFor: '.title-toast', hold: true, then: (room) => room.mutate((g) => { g.titles.hoard = 2; }) }],
+  },
+  {
     // Fauna beside a great beast (#357): a Basilisk on a hex the Thunderbird
     // holds. The hex is still held, so it keeps its border.
     name: 'beast-hold-fauna-3p',
