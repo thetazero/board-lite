@@ -156,6 +156,24 @@ test('scenes: when the phones are held and released, with a TV or with none', as
   for (const r of [tv.room, none.room, unwatched.room]) r.close();
 });
 
+test("scenes: the game's end holds the phones for the TV's summary", async () => {
+  const room = new Room('GSEN', { dir, botDelayMs: 60000, endingMs: 60 });
+  const ada = room.join('Ada', 'player', 'phone');
+  room.join('Bram', 'player', 'phone');
+  room.start(ada.token, 3);
+  const gone = room.connect(null, true);
+  room.mutate((g) => void g.log.push({ round: g.round, text: 'P1 wins', ev: { k: 'final', totals: [1, 0], winner: 0 } } as any));
+  const i = room.game!.log.length - 1;
+  const [hold, ...rest] = ofScenes(room);
+  assert.deepEqual([hold.type, hold.scenes], ['hold', [{ kind: 'summary', i }]]);
+  assert.ok(hold.until > hold.ms && !rest.length);
+  await released(room);
+  const done = ofScenes(room).at(-1);
+  assert.deepEqual([done.type, done.scenes], ['release', hold.scenes]);
+  gone();
+  room.close();
+});
+
 test('scenes: when the TV starts and ends each, and one that reloads in the middle of one', async (t) => {
   const { server, rooms } = startServer(0, { dir: join(dir, 'tv'), botDelayMs: 60000 }, [], '127.0.0.1');
   await once(server, 'listening');

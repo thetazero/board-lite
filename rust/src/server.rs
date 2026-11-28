@@ -588,6 +588,7 @@ impl Server {
                 let at = b.get("i").and_then(|v| v.as_u64()).map_or(usize::MAX, |n| n as usize);
                 room.scene_played(str_of(&b, "tv"), at, b.get("ends") == Some(&Value::Bool(true)), b.get("cut") == Some(&Value::Bool(true)))?
             }
+            "shown" => room.final_shown(),
             "here" => room.answer(tok)?,
             "start" => room.start(tok)?,
             "save" => room.save(tok)?,

@@ -1,6 +1,7 @@
 // The rulebook on each phone: what every piece on the TV is and does, so the
-// board needs no labels (#275). Opened from the header on every screen of the
-// game, it lies over the screen and closes back to it.
+// board needs no labels (#275), after a short How to play (howto.ts). Opened from
+// Rules on the home page, the join page, the lobby and every screen of the game,
+// it lies over the screen and closes back to it.
 //
 // Each building, beast and dragon is drawn by the TV's own 3D models
 // (board3d.ts, portraits): the same hex, paper and light, so a piece looks the
@@ -14,8 +15,9 @@ import type { Portrait } from './board3d.ts';
 import { ELEMENT_COLORS, STAGE_LABEL, elemIcon, elemWords, esc, iconText, powerTag, resChips, statTag } from './common.ts';
 import { foeStack, lootLine, pointsLine } from './kingdom.ts';
 import { cardArt, frameColor } from './art.ts';
+import { GOAL, PHASES, SCORES } from './howto.ts';
 
-export const BOOK_TABS = { board: 'Board', buildings: 'Buildings', beasts: 'Beasts', dragons: 'Dragons', elements: 'Elements', kingdoms: 'Kingdoms', cards: 'Cards' } as const;
+export const BOOK_TABS = { howto: 'How to play', board: 'Board', buildings: 'Buildings', beasts: 'Beasts', dragons: 'Dragons', elements: 'Elements', kingdoms: 'Kingdoms', cards: 'Cards' } as const;
 export type BookTab = keyof typeof BOOK_TABS;
 
 let book: Rulebook | null = null;
@@ -54,6 +56,8 @@ export async function loadBook(seat: number, ready: () => void) {
     const { portraits, Board3D } = await import('./board3d.ts');
     if (!Board3D.supported()) return;
     const urls = await portraits(list.map((x) => x.p), 300, 240);
+    // Drawn for another seat since (joining, or the lobby's seats moving up): those pictures win.
+    if (picsFor !== seat) return urls.forEach((u) => u && URL.revokeObjectURL(u));
     for (const old of pics.values()) URL.revokeObjectURL(old);
     pics.clear();
     list.forEach((x, i) => urls[i] && pics.set(x.id, urls[i]));
@@ -130,14 +134,20 @@ const head = (h: string, intro = '') => `<h3 class="bhead">${esc(h)}</h3>${intro
 // The book, open at a tab, over the screen.
 export function bookSheet(tab: BookTab): string {
   const tabs = (Object.keys(BOOK_TABS) as BookTab[]).map((t) => `<button data-booktab="${t}" class="${t === tab ? 'on' : ''}">${BOOK_TABS[t]}</button>`).join('');
-  const body = book ? PAGES[tab](book) : `<p class="bintro">${failed ? 'The rules didn’t load.' : 'Loading…'}</p>`;
+  const body = tab === 'howto' ? howTo() : book ? PAGES[tab](book) : `<p class="bintro">${failed ? 'The rules didn’t load.' : 'Loading…'}</p>`;
   return `<div class="menuback" id="bookclose"></div><div class="menu booksheet" role="dialog" aria-label="Rules">
     <div class="bookbar"><h3>Rules</h3><button id="bookdone">Close</button></div>
     <nav class="booktabs">${tabs}</nav>
     <div class="bookpage" data-key="bookpage ${tab}">${body}</div></div>`;
 }
 
-const PAGES: Record<BookTab, (b: Rulebook) => string> = {
+function howTo(): string {
+  return `${head('Goal', GOAL)}
+    ${head('Each round')}<ol class="bphases">${PHASES.map((p) => `<li><b>${p.name}</b>${text(p.text)}</li>`).join('')}</ol>
+    ${head('Points')}<ul class="bscores">${SCORES.map((s) => `<li>${iconText(`${s.points} points`)}<span>${esc(s.text)}</span></li>`).join('')}</ul>`;
+}
+
+const PAGES: Record<Exclude<BookTab, 'howto'>, (b: Rulebook) => string> = {
   board(b) {
     const land = b.terrains.filter((t) => t !== 'ocean').map((t) => {
       const here = b.buildings.filter((x) => x.terrain === t).map((x) => `the ${x.name}`);

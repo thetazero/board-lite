@@ -32,6 +32,7 @@ const MAX_PLAYERS: usize = 6;
 const AWAY_MS: i64 = 60_000;
 const OPEN_MS: i64 = 180_000;
 const TV_GONE_MS: i64 = 20_000;
+const ENDING_MS: i64 = 75_000; // longer than the TV's titles, recap and summary take (web/tv.ts)
 const IDLE_MS: i64 = 6 * 60 * 60 * 1000;
 const BOT_DELAY_MS: i64 = 700;
 const CACHE_MS: i64 = 500; // how long a quiet room keeps the JSON it last sent
@@ -193,6 +194,9 @@ struct Inner {
     screens: usize,
     scene_until: i64,
     held: Vec<Scene>, // the scenes the phones are held for now
+    ending_until: i64, // the phones don't show the winner before the TV does, or this
+    ending_at: usize, // the entry of the game's log that ended it
+    ending_timer: Option<AbortHandle>,
     tvs: usize,
     has_tv: bool,
     recapped: bool,
@@ -210,6 +214,7 @@ pub struct Opts {
     pub away_ms: i64,
     pub open_ms: i64, // how long the game waits on someone who is here before their seat can be opened
     pub tv_gone_ms: i64,
+    pub ending_ms: i64, // how long phones wait at most for the TV to show the final scores
     pub idle_ms: i64, // how long with nothing happening before a game under way is saved, and any other room forgotten
     pub first_seat: Option<usize>,
     pub recap_id: Option<String>,
@@ -217,7 +222,7 @@ pub struct Opts {
 }
 impl Default for Opts {
     fn default() -> Opts {
-        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, idle_ms: IDLE_MS, first_seat: None, recap_id: None, ended: None }
+        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, ending_ms: ENDING_MS, idle_ms: IDLE_MS, first_seat: None, recap_id: None, ended: None }
     }
 }
 /// Where rooms and recaps go, and whether it's a home's server.
@@ -336,6 +341,9 @@ impl Inner {
     fn scene_left(&self) -> i64 {
         (self.scene_until - now_ms()).max(0)
     }
+    fn ending_left(&self) -> i64 {
+        (self.ending_until - now_ms()).max(0)
+    }
     fn watched(&self) -> bool {
         self.screens > 0 || (!self.has_tv && self.seats.iter().any(|s| s.via == Some("phone") && s.connected > 0))
     }
@@ -411,6 +419,9 @@ impl Room {
             screens: 0,
             scene_until: 0,
             held: vec![],
+            ending_until: 0,
+            ending_at: 0,
+            ending_timer: None,
             tvs: 0,
             has_tv: saved.as_ref().map_or(!remote, |s| !s.remote),
             recapped: false,
@@ -601,8 +612,9 @@ impl Room {
         i.log.events(&g.log, before, &by, Some(&command));
         i.public = None;
         i.game_rev += 1;
-        let scenes = scenes::of(&g.log, before);
+        let (scenes, end) = (scenes::of(&g.log, before), end_of(&g.log, before));
         self.hold_for(i, scenes);
+        self.hold_end(i, end);
         self.changed(i);
         Ok(())
     }
@@ -615,6 +627,40 @@ impl Room {
         i.log.write("hold", &Sender::GAME, json!({"scenes": scenes, "until": i.scene_until}));
         i.held.extend(scenes);
         self.wake_after_scene(i);
+    }
+    /// The game ends with a TV: the phones wait while it plays the game's summary.
+    /// A TV that just went may be reloading, and counts until it's gone.
+    fn hold_end(&self, i: &mut Inner, end: Option<usize>) {
+        let Some(end) = end else { return };
+        if i.tvs == 0 && (!i.has_tv || i.tv_timer.is_none()) {
+            return;
+        }
+        let ms = i.scene_left() + self.opts.ending_ms;
+        i.ending_until = now_ms() + ms;
+        i.ending_at = end;
+        i.log.write("hold", &Sender::GAME, json!({"scenes": [{"kind": "summary", "i": end}], "until": i.ending_until}));
+        clear(&mut i.ending_timer);
+        i.ending_timer = self.after(ms + 1, |room, i| room.end_shown(i));
+    }
+    fn end_shown(&self, i: &mut Inner) {
+        i.ending_timer = None;
+        if self.let_end(i) {
+            self.changed(i);
+        }
+    }
+    fn let_end(&self, i: &mut Inner) -> bool {
+        let held = std::mem::take(&mut i.ending_until) > 0;
+        if held {
+            i.log.write("release", &Sender::GAME, json!({"scenes": [{"kind": "summary", "i": i.ending_at}]}));
+        }
+        held
+    }
+    /// A TV shows the final scores. It needs no token: any TV page on the room, with
+    /// buttons or not, gives the winner away just the same.
+    pub fn final_shown(&self) {
+        let i = &mut *lock(&self.inner);
+        clear(&mut i.ending_timer);
+        self.end_shown(i);
     }
     fn wake_after_scene(&self, i: &mut Inner) {
         clear(&mut i.scene_timer);
@@ -1242,7 +1288,7 @@ impl Room {
             Some(g) => i.public.get_or_insert_with(|| json_bytes(&state::public_state(g))).clone(),
         });
         let recap = (i.recapped && i.phase() == Some(Phase::Over)).then_some(&self.recap_id);
-        let head = format!(r#","scene":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.version, json!(recap));
+        let head = format!(r#","scene":{},"ending":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.ending_left(), i.version, json!(recap));
         match (&i.game, p.filter(|p| i.seats[*p].kind == Kind::Player)) {
             (Some(g), Some(p)) => {
                 let you = json_bytes(&state::seat_state(g, p));
@@ -1304,7 +1350,7 @@ impl Room {
     /// A TV says it starts or ends the scene of the game's log entry `at`; `cut` if it left it unfinished. For the game log only.
     pub fn scene_played(&self, page: &str, at: usize, ends: bool, cut: bool) -> Res {
         let i = &mut *lock(&self.inner);
-        let Some(kind) = i.game.as_ref().and_then(|g| g.log.get(at)).and_then(scenes::kind) else { return no("There is no such scene.") };
+        let Some(kind) = i.game.as_ref().and_then(|g| g.log.get(at)).and_then(|e| if e.kind() == "final" { Some("summary") } else { scenes::kind(e) }) else { return no("There is no such scene.") };
         let mut v = json!({"tv": page_id(page), "kind": kind, "i": at});
         if ends && cut {
             v["cut"] = true.into();
@@ -1321,6 +1367,8 @@ impl Room {
             i.tv_timer = None;
             if i.tvs == 0 && i.has_tv {
                 i.has_tv = false;
+                room.let_end(i);
+                clear(&mut i.ending_timer);
                 room.changed(i);
             }
         });
@@ -1361,7 +1409,7 @@ impl Room {
     pub fn close(&self) {
         let i = &mut *lock(&self.inner);
         i.closed = true;
-        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer] {
+        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer, &mut i.ending_timer] {
             clear(t);
         }
     }
@@ -1378,6 +1426,10 @@ fn screen_fields(tv: Option<&str>) -> Value {
         Some("") => json!({"what": "tv"}),
         Some(page) => json!({"what": "tv", "tv": page}),
     }
+}
+/// The entry that ends the game, if it's among those from index `from` on.
+fn end_of(log: &[crate::engine::LogEntry], from: usize) -> Option<usize> {
+    log.iter().skip(from).rposition(|e| e.kind() == "final").map(|n| from + n)
 }
 fn bot_plays(i: &Inner, p: usize) -> bool {
     i.seats.get(p).is_some_and(|s| s.kind == Kind::Bot || s.stand_in)
@@ -1507,8 +1559,9 @@ pub mod stage {
             let Some(g) = i.game.as_ref() else { return no("The game hasn't started.") };
             i.log.events(&g.log, before, &Sender::GAME, None);
             let saved = store::save(&self.file, &**g);
-            let scenes = scenes::of(&g.log, before);
+            let (scenes, end) = (scenes::of(&g.log, before), end_of(&g.log, before));
             self.hold_for(i, scenes);
+            self.hold_end(i, end);
             self.changed(i);
             saved.map_err(|e| Fail::Server(e.to_string()))
         }

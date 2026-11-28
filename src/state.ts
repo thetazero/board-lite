@@ -244,6 +244,7 @@ export interface Snapshot {
   seat: number; // the viewer's seat, -1 for the TV
   game: PublicState | null;
   scene: number; // ms left of the scene the TV is playing; everyone's next decision waits for it
+  ending?: number; // ms the phones still wait, at most, for the TV to show who won; 0 for none
   // How many times the room has changed when this was taken: a later snapshot
   // has a higher one, so a phone can tell the answer to its own tap from an
   // older push arriving after it (#456). Counted from the server's start, so

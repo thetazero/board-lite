@@ -429,11 +429,6 @@ fn fauna_view(key: S, loot: Bundle) -> FaunaView {
     let x = fauna_def(key);
     FaunaView { key, unit: unit_view(x, x.hp), loot: loot.nonzero(), points: is_beast(key).then_some(x.points) }
 }
-fn side_text(g: &Game, s: &TradeSide) -> String {
-    let mut parts: Vec<String> = (0..5).filter(|r| s.res.get(*r) > 0).map(|r| format!("{} {}", s.res.get(r), RESOURCES[r])).collect();
-    parts.extend(s.cards.iter().map(|id| g.any_card(id).map_or(format!("card {id}"), |c| format!("{} card", c.name()))));
-    if parts.is_empty() { "nothing".into() } else { parts.join(", ") }
-}
 pub fn is_talk(text: &str) -> bool {
     text.contains(" says: \"") || text.contains(" (private): \"")
 }
@@ -594,7 +589,7 @@ pub fn public_state_with(g: &Game, lines: usize) -> PublicState<'_> {
             })
             .collect(),
         dragons: g.dragons.iter().map(dragon_view).collect(),
-        offers: g.offers.iter().map(|o| OfferView { id: o.id, from: o.from, to: o.to, passed: o.passed(), give: side_text(g, &o.give), get: side_text(g, &o.get) }).collect(),
+        offers: g.offers.iter().map(|o| OfferView { id: o.id, from: o.from, to: o.to, passed: o.passed(), give: g.trade_text(&o.give, false), get: g.trade_text(&o.get, false) }).collect(),
         raid: g.raid.as_ref().map(|r| RaidView {
             step: r.step,
             candidates: r.candidates.iter().map(|t| target_view(g, t.0, None)).collect(),

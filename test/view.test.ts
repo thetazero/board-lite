@@ -40,7 +40,7 @@ test("a scene ends on the phone's own clock when the server's word that it's ove
   assert.equal(v.view(4999), 'table');
   assert.equal(v.scene(5000), false);
   assert.equal(v.view(5000), 'you', 'back on You with no snapshot at all');
-  assert.equal(v.sceneEndsAt(), 5000, 'the phone knows when to look again');
+  assert.equal(v.nextEnd(4999), 5000, 'the phone knows when to look again');
 });
 
 test('the server saying the scene is over ends it at once, even early', () => {
@@ -124,4 +124,36 @@ test('the decision key changes with each new decision, and is empty with none', 
   assert.equal(askKey(null, true), '');
   assert.notEqual(vote, askKey({ phase: 'raid', round: 2, turn: 0, raid: { step: 'choose' } }, true));
   assert.notEqual(askKey({ phase: 'action', round: 2, turn: 0 }, true), askKey({ phase: 'action', round: 2, turn: 1 }, true));
+});
+
+test("with a TV, a game that ends is the TV's to tell first: the phone waits on You, Table off (#557)", () => {
+  const v = new PhoneView();
+  v.snapshot(0, withTv(), true);
+  v.tap(0, 'table');
+  v.snapshot(1000, withTv({ over: true, scene: 2000, ending: 60_000 }), true);
+  assert.equal(v.view(1000), 'table', "the last fight's scene plays as ever");
+  assert.equal(v.tableOff(1000), false);
+  assert.equal(v.nextEnd(1000), 3000, 'the phone looks again when the scene ends');
+  assert.equal(v.view(3000), 'you');
+  assert.equal(v.ending(3000), true);
+  assert.equal(v.tableOff(3000), true);
+  v.tap(3000, 'table');
+  assert.equal(v.view(3000), 'you', 'a tap on Table does nothing then');
+  v.snapshot(40_000, withTv({ over: true }), true);
+  assert.equal(v.ending(40_000), false, 'the TV has shown the scores');
+  assert.equal(v.tableOff(40_000), false);
+});
+
+test("the wait for the TV's summary ends on the phone's own clock, and at once when the TV goes (#557)", () => {
+  const v = new PhoneView();
+  v.snapshot(0, withTv(), false);
+  v.snapshot(1000, withTv({ over: true, ending: 60_000 }), false);
+  assert.equal(v.nextEnd(1000), 61_000);
+  assert.equal(v.ending(61_000), false, 'with no snapshot at all');
+  assert.equal(v.nextEnd(61_000), 0);
+  const w = new PhoneView();
+  w.snapshot(0, withTv(), false);
+  w.snapshot(1000, withTv({ over: true, ending: 60_000 }), false);
+  w.snapshot(2000, noTv({ over: true }), true);
+  assert.equal(w.view(2000), 'table', 'with no TV, the end goes to the table, as ever');
 });

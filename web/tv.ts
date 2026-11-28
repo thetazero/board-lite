@@ -1189,12 +1189,15 @@ function playSummary(from = 0) {
   summaryPlayed = true;
   cutTitleToasts();
   summary = { step: from, timer: 0 };
+  const end = snap?.game?.log.findLast((e) => e.ev?.k === 'final');
+  if (!remote && end) sceneLog.start(code, end.i);
   summaryStep();
 }
 // For the screenshots: play it from a step (from the end if negative).
 (window as unknown as { summaryAt: (n: number) => void }).summaryAt = (n) => recap && playSummary(n < 0 ? summarySteps(recap).length + n : n);
 
-function stopSummary() {
+function stopSummary(cut = false) {
+  sceneLog.end(cut);
   if (summary) clearTimeout(summary.timer);
   summary = null;
   if (snap?.game) showFinal(snap.game);
@@ -1211,7 +1214,7 @@ function summaryStep() {
         <h1>How the game went</h1>
         <div class="sumbody"><div class="chart" id="sumchart"></div><div class="told" id="sumtold"></div></div>
         <button id="skip">Skip</button></div>`);
-      $('skip').onclick = stopSummary;
+      $('skip').onclick = () => stopSummary(true);
     }
     $('sumchart').innerHTML = raceSvg(r, { upTo: step.upTo });
     // What happened lately: this round's moments under the ones before it.
@@ -1228,13 +1231,13 @@ function summaryStep() {
         <figure><figcaption>Resources made each round</figcaption>${madeSvg(r, { width: 700, height: 460 })}</figure>
       </div>
       <button id="skip">Skip</button></div>`);
-    if (box) $('skip').onclick = stopSummary;
+    if (box) $('skip').onclick = () => stopSummary(true);
   } else {
     const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
       <h1>Points</h1>
       ${breakdownHtml(r)}
       <button id="skip">Skip</button></div>`);
-    if (box) $('skip').onclick = stopSummary;
+    if (box) $('skip').onclick = () => stopSummary(true);
   }
   summary!.timer = window.setTimeout(() => {
     if (!summary) return;
@@ -1260,6 +1263,8 @@ function showFinal(g: PublicState) {
         : `<div class="endactions">${recap ? '<button id="replay">Watch again</button>' : ''}<button class="primary" id="again">New game</button></div>`}</div>`);
   if (recap) $('replay').onclick = () => playSummary();
   if (remote) return;
+  // The winner is on the screen: the phones, which waited for it, may show it too.
+  if (snap?.ending) post(`/api/rooms/${code}/shown`, {}).catch(() => {}); // they don't wait long without it
   $('again').onclick = () => (location.href = '/tv');
 }
 
@@ -1270,6 +1275,10 @@ function updateOverlay(g: PublicState) {
   if (bannerUp) return;
   const next = banners.shift();
   if (next) return showBanner(next);
+  if (g.phase === 'over' && remote && snap?.ending) {
+    summaryPlayed = true; // the TV plays it: here the scores come after it
+    return hideOverlay();
+  }
   if (g.phase === 'over') return endHeld(g) ? undefined : showEnd(g);
   dropEndHold();
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
