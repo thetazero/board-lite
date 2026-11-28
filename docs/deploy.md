@@ -12,7 +12,7 @@ board-lite as a website anyone can open. It's one container and one folder of ga
    DOMAIN=dragons.example docker compose -f deploy/compose.yml up -d --build
    ```
 
-Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.example/`, the TV's `https://dragons.example/tv`, and `/healthz` says the server is up.
+Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.example/`, the TV's `https://dragons.example/tv`, and `/healthz` says whether the server can go on: it answers 503 while games can't be saved (it tries, at most every 3 seconds), and 200 once they can again, with no restart.
 
 **Update:** `git pull`, then the same command. Every change is saved as it happens, so games go on and everyone reconnects to their seat.
 
@@ -26,6 +26,8 @@ Caddy gets the HTTPS certificate by itself. The phone page is `https://dragons.e
 | `BOARD_LITE_TRUST_PROXY` | `1` when, and only when, every request comes through a proxy that adds the visitor's address to `X-Forwarded-For` (`--trust-proxy`). Without it, behind a proxy, everyone counts as one visitor |
 | `BOARD_LITE_DATA` | where games are kept (`--data`; `/data` in the image) |
 | `PORT` | the port (8080) |
+
+**When the server can't go on:** the image has `/down.html`, an "Under maintenance" page in one file. Have the proxy answer every request with it, status 503, while `/healthz` fails or the server doesn't answer (`docker cp` gets it out of the image). It refreshes on its own every 30 seconds, so it's gone once the server works again. A tap on a phone already open then says "The server is down. Refresh the page." A move that couldn't be saved didn't happen. (`deploy/compose.yml` doesn't show the page.)
 
 ## board.losha.dev
 

@@ -143,7 +143,7 @@ pub async fn rpc(m: &Map<String, Value>, find: impl Fn(&str) -> Res<Arc<Room>>) 
                         Fail::Limit(m) => m.into(),
                         Fail::Server(m) => {
                             eprintln!("{m}");
-                            "Something went wrong on the server.".into()
+                            "The server is down: try again later.".into()
                         }
                     };
                     result(json!({"content": say(format!("Not allowed: {why}")), "isError": true}))

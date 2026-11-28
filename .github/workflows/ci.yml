@@ -49,6 +49,7 @@ jobs:
           curl -fsS -X POST localhost:8080/api/rooms | grep hostToken
           curl -fsS localhost:8080/vendor/three/three.module.js -o /dev/null
           curl -fsS localhost:8080/llms.txt | grep https://dragons.example/mcp
+          docker cp site:/down.html - | tar -xO | grep 'Under maintenance'
   # Each merge to main that passes is published, for whatever machine runs the
   # website to pull (docs/deploy.md).
   publish:

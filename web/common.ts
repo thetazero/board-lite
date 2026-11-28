@@ -43,6 +43,8 @@ export async function post(path: string, body: Record<string, unknown>): Promise
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(POST_MS) })
     .catch(() => { throw unanswered("The server didn't answer: try again."); });
   const data = await res.json().catch(() => null);
+  // The maintenance page instead of an answer (or a proxy's own error): the server may have had the request, or not.
+  if (data === null && res.status >= 502 && res.status <= 504) throw unanswered('The server is down. Refresh the page.');
   if (data === null) throw unanswered('The server sent a bad reply.');
   if (!res.ok) throw new Error(String(data.error ?? 'Something went wrong.'));
   return data;

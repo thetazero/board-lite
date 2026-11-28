@@ -23,6 +23,8 @@ RUN touch src/*.rs && cargo build --release --locked --bin board-lite
 FROM scratch
 COPY --from=build --chown=1000:1000 /data /data
 COPY --from=build /app/rust/target/release/board-lite /board-lite
+# What whoever runs the site shows while /healthz fails (docs/deploy.md).
+COPY web/down.html /down.html
 ENV BOARD_LITE_DATA=/data PORT=8080
 USER 1000:1000
 VOLUME /data

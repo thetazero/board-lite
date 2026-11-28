@@ -31,6 +31,20 @@ pub fn load(file: &Path) -> Result<Game, String> {
 }
 pub fn save(file: &Path, v: &impl Serialize) -> std::io::Result<()> {
     let tmp = PathBuf::from(format!("{}.{}.tmp", file.display(), std::process::id()));
-    std::fs::write(&tmp, serde_json::to_vec(v)?)?;
-    std::fs::rename(tmp, file)
+    let done = std::fs::write(&tmp, serde_json::to_vec(v)?).and_then(|_| std::fs::rename(&tmp, file));
+    if done.is_err() {
+        let _ = std::fs::remove_file(&tmp); // half a file on a full disk keeps it full
+    }
+    done
+}
+
+/// Whether games can be saved in `dir`: it tries, with more than any game's file takes.
+pub fn can_save(dir: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let (tmp, file) = (dir.join(format!(".healthz.{}.tmp", std::process::id())), dir.join(".healthz"));
+    let done = std::fs::write(&tmp, vec![b'x'; 1 << 20]).and_then(|_| std::fs::rename(&tmp, &file));
+    for f in [tmp, file] {
+        let _ = std::fs::remove_file(f);
+    }
+    done
 }

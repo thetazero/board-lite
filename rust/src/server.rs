@@ -1,7 +1,7 @@
 //! The server: serves the clients and runs rooms, at home or as a public website.
 use crate::limits::{Hold, Limits, clear_old, is_recap_id, lock, visitor};
 use crate::mcp;
-use crate::room::{Fail, Here, Place, Res, Room, new_code, remove_files};
+use crate::room::{DOWN, Fail, Here, Place, Res, Room, new_code, remove_files};
 use bytes::Bytes;
 use futures_util::Stream;
 use futures_util::stream::unfold;
@@ -19,7 +19,7 @@ use std::pin::Pin;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tokio::time::{Interval, MissedTickBehavior, interval, timeout};
@@ -36,6 +36,7 @@ include!("../generated/assets.rs");
 const MAX_BODY: usize = 4096;
 const MAX_MCP_BODY: usize = 16384;
 const PING: Duration = Duration::from_secs(15); // web/common.ts's STALE_MS allows for a couple missed
+const HEALTH: Duration = Duration::from_secs(3); // how long /healthz keeps its answer, so asking often doesn't keep the disk busy
 const ROOM_IDLE: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// A public website's address; a home's server has none.
@@ -50,6 +51,7 @@ pub struct Server {
     hosted: Vec<PathBuf>, // game files named at the start: never forgotten
     rooms: Mutex<HashMap<String, Arc<Room>>>,
     pub limits: Option<Limits>,
+    health: Mutex<Option<(Instant, bool)>>,
     drops: watch::Sender<u64>, // closes every connection
     headers: HeaderMap,
 }
@@ -234,7 +236,7 @@ impl Server {
             rooms.insert(code, room);
         }
         let limits = site.is_some().then(Limits::default);
-        Ok(Arc::new(Server { site, place, port, hosted, rooms: Mutex::new(rooms), limits, drops: watch::Sender::new(0), headers }))
+        Ok(Arc::new(Server { site, place, port, hosted, rooms: Mutex::new(rooms), limits, health: Mutex::new(None), drops: watch::Sender::new(0), headers }))
     }
     /// The rooms with a game or players, and their files.
     pub fn in_use(&self) -> Vec<(String, PathBuf)> {
@@ -260,6 +262,19 @@ impl Server {
     }
     pub fn clear_rooms(&self) {
         lock(&self.rooms).clear();
+    }
+    /// Whether games can be saved now.
+    fn can_save(&self) -> bool {
+        let mut health = lock(&self.health);
+        if let Some((_, can)) = health.filter(|(at, _)| at.elapsed() < HEALTH) {
+            return can;
+        }
+        let tried = crate::store::can_save(&self.place.rooms);
+        if let Err(e) = &tried {
+            eprintln!("Could not save in {}: {e}", self.place.rooms.display());
+        }
+        *health = Some((Instant::now(), tried.is_ok()));
+        tried.is_ok()
     }
     pub fn count(&self) -> usize {
         lock(&self.rooms).len()
@@ -308,6 +323,7 @@ impl Server {
                     l.sweep();
                 }
                 for r in &rooms {
+                    r.catch_up();
                     if let Some(files) = r.forget().filter(|_| !self.hosted.contains(&r.file)) {
                         r.close();
                         lock(&self.rooms).remove(&r.code);
@@ -330,7 +346,7 @@ impl Server {
             Err(Fail::Room(m)) => wrong(StatusCode::BAD_REQUEST, &m),
             Err(Fail::Server(m)) => {
                 eprintln!("{m}");
-                wrong(StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong on the server.")
+                wrong(StatusCode::SERVICE_UNAVAILABLE, DOWN)
             }
         };
         for (k, v) in &self.headers {
@@ -366,7 +382,8 @@ impl Server {
         let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         let first = parts.first().copied().unwrap_or("");
         if path == "/healthz" {
-            return Ok(ok(json!({"ok": true, "rooms": self.count()})));
+            let can = self.can_save();
+            return Ok(json_text(if can { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE }, json!({"ok": can, "rooms": self.count()}).to_string()));
         }
         let who = self.who(&req, peer);
         if let Some(l) = self.limits.as_ref().filter(|_| first == "api" || first == "mcp") {
