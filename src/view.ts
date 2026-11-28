@@ -129,7 +129,7 @@ export function commandHints(g: PublicState, you: SeatState): string[] {
   if (g.phase === 'action') {
     for (const o of g.offers.filter((x) => (x.to === null ? x.from !== you.seat && !x.passed.includes(you.seat) : x.to === you.seat))) {
       const why = you.cantAccept[o.id];
-      out.push(`${why ? '' : `{"do":"accept","offer":"${o.id}"}  |  `}{"do":"decline","offer":"${o.id}"}   (${P(o.from)} gives ${o.give} for ${o.get}${o.to === null ? ', to anyone' : ''})${why ? ` ${why}` : ''}`);
+      out.push(`${why ? '' : `{"do":"accept","offer":"${o.id}"}  |  `}{"do":"decline","offer":"${o.id}"}   (${P(o.from)} gives ${o.give} for ${you.asked[o.id] ?? o.get}${o.to === null ? ', to anyone' : ''})${why ? ` ${why}` : ''}`);
     }
     if (!you.myTurn) {
       out.push(`{"do":"offer","to":"${P(g.turn)}","give":{...},"get":{...}}   (out of turn, only with ${P(g.turn)})`);

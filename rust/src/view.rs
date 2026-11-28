@@ -275,8 +275,9 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
             continue;
         }
         let why = you.cant_accept.0.iter().find(|x| x.0 == o.id).map(|x| &x.1);
+        let get = you.asked.0.iter().find(|x| x.0 == o.id).map_or(&o.get, |x| &x.1);
         let accept = if why.is_some() { String::new() } else { format!("{{\"do\":\"accept\",\"offer\":\"{}\"}}  |  ", o.id) };
-        out.push(format!("{accept}{{\"do\":\"decline\",\"offer\":\"{}\"}}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, o.get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
+        out.push(format!("{accept}{{\"do\":\"decline\",\"offer\":\"{}\"}}   ({} gives {} for {}{}){}", o.id, pname(o.from), o.give, get, if o.to.is_none() { ", to anyone" } else { "" }, why.map_or(String::new(), |w| format!(" {w}"))));
     }
     if !you.my_turn {
         out.push(format!("{{\"do\":\"offer\",\"to\":\"{0}\",\"give\":{{...}},\"get\":{{...}}}}   (out of turn, only with {0})", pname(g.turn)));

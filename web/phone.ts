@@ -874,7 +874,7 @@ function myDragon(d: DragonView, g: PublicState): string {
 
 function actionView(g: PublicState, me: Me): string {
   const incoming = g.offers.filter((o) => (o.to === null ? o.from !== me.seat && !o.passed.includes(me.seat) : o.to === me.seat)).map((o) => `
-    <div class="offer in" data-key="offer ${o.id}">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(o.get))}</b>`}
+    <div class="offer in" data-key="offer ${o.id}">${playerTag(o.from, names)} offers <b>${iconText(esc(o.give))}</b> ${o.get === 'nothing' ? 'for <b>nothing</b>' : `for your <b>${iconText(esc(me.asked[o.id] ?? o.get))}</b>`}
       ${o.to === null ? '<p class="open">To anyone: the first to accept trades.</p>' : ''}
       ${me.cantAccept[o.id] ? `<p class="blocked">${named(me.cantAccept[o.id], names)}</p>` : ''}
       <div class="row"><button class="primary" data-accept="${o.id}" ${me.cantAccept[o.id] ? 'disabled' : ''}>Accept</button><button data-decline="${o.id}">Decline</button></div></div>`).join('');

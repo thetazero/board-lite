@@ -1015,7 +1015,7 @@ impl Game {
     }
     fn end_turn(&mut self) {
         for o in mem::take(&mut self.offers) {
-            let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+            let (give, get) = (self.trade_text(&o.give, Some(o.from)), self.trade_text(&o.get, None));
             self.close(&o, Closed::Expired, None);
             self.log(format!("Offer {} expires.", o.id), ev! {"k": "expire", "from": o.from, "to": o.to, "give": give, "get": get});
         }
@@ -1466,22 +1466,24 @@ impl Game {
         }
         Ok(ds)
     }
-    pub fn trade_text(&self, s: &TradeSide) -> String {
+    /// A side of a trade, its cards named only if they're in `holder`'s hand: the offer's maker's for what
+    /// they give (they show it to everyone), no one's for what they ask for, the reader's for their own eyes.
+    pub fn trade_text(&self, s: &TradeSide, holder: Option<usize>) -> String {
         let mut parts = vec![];
         if s.res.0.iter().any(|n| n.unwrap_or(0) != 0) {
             parts.push(s.res.text());
         }
         for id in &s.cards {
-            parts.push(match self.any_card(id) {
+            parts.push(match self.held_card(holder, id) {
                 Some(c) => format!("{} card ({id})", c.name()),
                 None => format!("card {id}"),
             });
         }
         if parts.is_empty() { "nothing".into() } else { parts.join(", ") }
     }
-    pub fn any_card(&self, id: &str) -> Option<&Card> {
+    pub fn held_card(&self, holder: Option<usize>, id: &str) -> Option<&Card> {
         let want = Id::parse(id)?;
-        self.players.iter().flat_map(|p| &p.hand).find(|c| c.id == want)
+        self.players[holder?].hand.iter().find(|c| c.id == want)
     }
     fn has_side(&self, p: usize, s: &TradeSide) -> bool {
         self.players[p].can_afford(&s.res) && s.cards.iter().all(|id| Id::parse(id).is_some_and(|id| self.hand_card(p, id).is_ok()))
@@ -1490,7 +1492,7 @@ impl Game {
         if !self.has_side(o.from, &o.give) {
             return Some(format!("{} no longer has what they offered.", pname(o.from)));
         }
-        (!self.has_side(p, &o.get)).then(|| format!("You don't have {}.", self.trade_text(&o.get)))
+        (!self.has_side(p, &o.get)).then(|| format!("You don't have {}.", self.trade_text(&o.get, Some(p))))
     }
     fn move_side(&mut self, from: usize, to: usize, s: &TradeSide) -> Rule {
         self.players[from].pay(&s.res)?;
@@ -1638,7 +1640,7 @@ impl Game {
         }
         let o = self.offers.remove(i);
         self.close(&o, Closed::Accepted, Some(p));
-        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        let (give, get) = (self.trade_text(&o.give, Some(o.from)), self.trade_text(&o.get, None));
         self.move_side(o.from, p, &o.give)?;
         self.move_side(p, o.from, &o.get)?;
         self.log(format!("{} accepts offer {}: {} gives {give} for {get}.", pname(p), o.id, pname(o.from)), ev! {"k": "trade", "from": o.from, "to": p, "give": give, "get": get});
@@ -1654,7 +1656,7 @@ impl Game {
             self.offers.remove(i);
             self.close(&o, Closed::Declined, None);
         }
-        let (give, get) = (self.trade_text(&o.give), self.trade_text(&o.get));
+        let (give, get) = (self.trade_text(&o.give, Some(o.from)), self.trade_text(&o.get, None));
         self.log(format!("{} declines offer {}.", pname(p), o.id), ev! {"k": "decline", "p": p, "from": o.from, "give": give, "get": get});
         Ok(())
     }
@@ -1687,7 +1689,7 @@ impl Game {
             return fail("Name each card once.");
         }
         if !self.has_side(p, &o.give) {
-            return fail(format!("You don't have {}.", self.trade_text(&o.give)));
+            return fail(format!("You don't have {}.", self.trade_text(&o.give, Some(p))));
         }
         let gold = match to {
             None => (0..self.n()).filter(|q| *q != p).map(|q| self.players[q].gold()).max().unwrap(),
@@ -1696,7 +1698,7 @@ impl Game {
         if o.get.res.get(GOLD) > gold {
             return fail(to.map_or(format!("No other player has more than {gold} gold."), |q| format!("{} has {gold} gold.", pname(q))));
         }
-        let text = format!("{} offers {} ({id}): {} for {}.", pname(p), to.map_or("anyone".into(), pname), self.trade_text(&o.give), self.trade_text(&o.get));
+        let text = format!("{} offers {} ({id}): {} for {}.", pname(p), to.map_or("anyone".into(), pname), self.trade_text(&o.give, Some(p)), self.trade_text(&o.get, None));
         self.offers.push(o);
         self.log(text, ev! {"k": "offer", "p": p, "to": to});
         Ok(())
