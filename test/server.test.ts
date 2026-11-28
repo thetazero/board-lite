@@ -877,3 +877,87 @@ test('saving a game: it stops for everyone, survives a restart however old, and 
     again.stop();
   }
 });
+
+test('a game left idle saves itself, over a restart too, and the table continues it the next day (#526)', async () => {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const seatsOf = (file: string) => file.replace(/\.json$/, '.seats.json');
+  const serve = async (roomsDir: string, idleMs?: number, site?: { origin: string }) => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60_000, firstSeat: 0, idleMs }, [], '127.0.0.1', true, site);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const get = async (path: string) => (await fetch(base + path)).json() as Promise<any>;
+    const post = async (path: string, body: object) => {
+      const r = await fetch(base + path, { method: 'POST', body: JSON.stringify(body) });
+      if (!r.ok) assert.fail(await r.text());
+      return (await r.json()) as Record<string, string>;
+    };
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    return { ...s, get, post, stop };
+  };
+  const start = async (s: Awaited<ReturnType<typeof serve>>) => {
+    const { code } = await s.post('/api/rooms', {});
+    const tokens = [];
+    for (const name of ['Ada', 'Bram']) tokens.push((await s.post(`/api/rooms/${code}/join`, { name })).token);
+    await s.post(`/api/rooms/${code}/start`, { token: tokens[0] });
+    return { code, tokens, file: s.rooms.get(code)!.file };
+  };
+  const age = (file: string, at: Date) => [file, seatsOf(file)].forEach((f) => utimesSync(f, at, at));
+  const continues = async (s: Awaited<ReturnType<typeof serve>>, g: Awaited<ReturnType<typeof start>>) => {
+    assert.ok((await s.get(`/api/rooms/${g.code}?token=${g.tokens[1]}`)), 'its address answers');
+    const room = s.rooms.get(g.code)!;
+    assert.ok(room.snapshot(g.tokens[0]).lobby.saved, 'its player sees it was saved');
+    await s.post(`/api/rooms/${g.code}/continue`, { token: g.tokens[1] });
+    assert.equal(room.lobby().saved, null);
+    room.command(g.tokens[0], { do: 'keep', card: room.game!.players[0].choice[0].id });
+  };
+
+  // The server stays up, at home and as a website.
+  for (const site of [undefined, { origin: 'https://dragons.example' }]) {
+    const s = await serve(mkdtempSync(join(dir, 'idle-')), 400, site);
+    try {
+      const g = await start(s);
+      s.server.tidy();
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, null, 'not while it is played');
+      const last = s.rooms.get(g.code)!.lastActive;
+      // A room still in its lobby, and a game every player quit, are forgotten.
+      const lobby = await s.post('/api/rooms', {});
+      const gone = await start(s);
+      for (const t of gone.tokens) s.rooms.get(gone.code)!.quit(t);
+      await sleep(500);
+      s.server.tidy();
+      assert.deepEqual(s.rooms.keys(), [g.code]);
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, last, 'saved as of when it stopped');
+      if (!site) assert.deepEqual((await s.get('/api/saved')).map((x: any) => x.code), [g.code]);
+      assert.ok(JSON.parse(readFileSync(seatsOf(g.file), 'utf8')).savedAt, 'on disk too');
+      await continues(s, g);
+      s.server.tidy();
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, null, 'continued, it is played again');
+    } finally {
+      s.stop();
+    }
+  }
+
+  // The server stopped before the game was idle for long, and starts the next day.
+  const roomsDir = mkdtempSync(join(dir, 'idle-'));
+  const first = await serve(roomsDir);
+  const g = await start(first);
+  const ancient = await start(first), quit = await start(first), over = await start(first), recent = await start(first);
+  for (const t of quit.tokens) first.rooms.get(quit.code)!.quit(t);
+  first.rooms.get(over.code)!.mutate((x) => { x.phase = 'over'; });
+  first.stop();
+  for (const x of [g, quit, over]) age(x.file, dayAgo);
+  age(ancient.file, new Date(Date.now() - 40 * 24 * 60 * 60 * 1000));
+  const again = await serve(roomsDir);
+  try {
+    assert.deepEqual(again.rooms.keys().sort(), [g.code, recent.code].sort());
+    assert.equal(again.rooms.get(recent.code)!.lobby().saved, null, 'one from just now goes on');
+    assert.ok(Math.abs(again.rooms.get(g.code)!.lobby().saved! - dayAgo.getTime()) < 1000, 'saved as of when it stopped');
+    await continues(again, g);
+  } finally {
+    again.stop();
+  }
+});

@@ -115,6 +115,7 @@ export interface RoomOptions {
   openMs?: number;
   remote?: boolean;
   tvGoneMs?: number;
+  idleMs?: number;
   recaps?: string;
   now?: () => number; // the clock a recap is dated by
   recapId?: string;
@@ -340,6 +341,8 @@ class Server extends EventEmitter {
       this.emit('listening');
     });
   }
+  /** What the server does every minute: idle rooms are saved or forgotten. */
+  tidy() { call('tidy', { server: this.id }); }
   address() { return { port: this.port }; }
   private closed = false;
   closeAllConnections() {
@@ -353,7 +356,7 @@ class Server extends EventEmitter {
   }
 }
 
-// `resume`: host again every room active in the last few hours, and every saved game, each under its own code.
+// `resume`: host again every room active in the last few hours, every saved game, and every game left idle (saved then), each under its own code.
 export function startServer(port: number, opts: RoomOptions = {}, files: string[] = [], host = '0.0.0.0', resume = false, site?: Site): { server: Server; rooms: Rooms } {
   const r = call('serve', { port, opts: sent(opts), files, host, resume, site });
   return { server: new Server(r), rooms: new Rooms(r.id) };

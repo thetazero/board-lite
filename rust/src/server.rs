@@ -37,7 +37,6 @@ const MAX_BODY: usize = 4096;
 const MAX_MCP_BODY: usize = 16384;
 const PING: Duration = Duration::from_secs(15); // web/common.ts's STALE_MS allows for a couple missed
 const HEALTH: Duration = Duration::from_secs(3); // how long /healthz keeps its answer, so asking often doesn't keep the disk busy
-const ROOM_IDLE: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// A public website's address; a home's server has none.
 pub struct Site {
@@ -221,8 +220,8 @@ impl Server {
             }
         }
         let mut rooms = HashMap::new();
-        let saved = if resume { Room::saved(&place.rooms, ROOM_IDLE) } else { vec![] };
-        for (code, file) in saved.into_iter().filter(|(_, f)| !hosted.contains(f)) {
+        let saved = if resume { Room::saved(&place.rooms, place.opts.idle_ms, &hosted) } else { vec![] };
+        for (code, file) in saved {
             match Room::host(&code, file.clone(), &place, false) {
                 Ok(room) => drop(rooms.insert(code, room)),
                 Err(e) => eprintln!("Could not host room {code} again ({}): {e}", file.display()),
@@ -309,6 +308,22 @@ impl Server {
             });
         }
     }
+    /// Every minute: what couldn't be saved is, and idle rooms are saved or forgotten.
+    pub fn tidy(&self) {
+        for r in self.rooms() {
+            r.catch_up();
+            if self.hosted.contains(&r.file) {
+                continue;
+            }
+            if let Some(files) = r.forget() {
+                r.close();
+                self.delete_room(&r.code);
+                if files {
+                    remove_files(&r.file);
+                }
+            }
+        }
+    }
     async fn keep_house(&self) {
         let mut tick = interval(Duration::from_secs(1));
         tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -322,16 +337,7 @@ impl Server {
                 if let Some(l) = &self.limits {
                     l.sweep();
                 }
-                for r in &rooms {
-                    r.catch_up();
-                    if let Some(files) = r.forget().filter(|_| !self.hosted.contains(&r.file)) {
-                        r.close();
-                        lock(&self.rooms).remove(&r.code);
-                        if files {
-                            remove_files(&r.file);
-                        }
-                    }
-                }
+                self.tidy();
             }
             if n % 3600 == 0 && self.site.is_some() {
                 clear_old(&self.place.rooms, |code| lock(&self.rooms).contains_key(code));

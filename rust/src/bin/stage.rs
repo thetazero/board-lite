@@ -103,6 +103,7 @@ impl Stage {
                 }
                 "setRoom" => server.set_room(self.rooms[&int("room")].clone()),
                 "deleteRoom" => server.delete_room(s(q, "code")),
+                "tidy" => server.tidy(),
                 "clearRooms" => server.clear_rooms(),
                 "drop" => server.drop_connections(),
                 "close" => {
