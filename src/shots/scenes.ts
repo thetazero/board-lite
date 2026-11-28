@@ -1276,6 +1276,18 @@ export const SCENES: Scene[] = [
     ],
   },
 
+  // ---------- the server is down ----------
+  {
+    name: 'down-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action',
+    shots: (g) => [
+      { file: 'phone-down-tap', caption: 'Phone: End turn tapped while the server is down', client: 'phone', seat: g!.turn, waitFor: '.toast', hold: true,
+        run: `const real = fetch; window.fetch = (u, o) => o?.method === 'POST' ? Promise.resolve(new Response('<!doctype html>', { status: 503 })) : real(u, o); document.querySelector('#end').click(); setTimeout(() => document.querySelector('#endyes').click(), 600)` },
+    ],
+  },
+
   // ---------- the hand, more ways ----------
   {
     // A staged hand of cards that can all be played (each needs something different), with resources to pay.
