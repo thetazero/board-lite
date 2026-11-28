@@ -775,6 +775,56 @@ test('a saved game with no seats file can be hosted; players claim its open seat
   room.close();
 });
 
+test('once the server forgets a game every player quit, a TV still on it hears so (#525)', { timeout: 20_000 }, async () => {
+  const s = startServer(0, { dir: mkdtempSync(join(dir, 'quit-')), idleMs: 200, botDelayMs: 60000 }, [], '127.0.0.1');
+  await new Promise((r) => s.server.once('listening', r));
+  const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+  try {
+    const { code } = (await (await fetch(`${base}/api/rooms`, { method: 'POST', body: '{}' })).json()) as { code: string };
+    const room = s.rooms.get(code)!;
+    const seats = ['Ada', 'Bram'].map((n) => room.join(n));
+    room.start(seats[0].token, 5);
+    const stream = (await fetch(`${base}/api/rooms/${code}/events?tv`)).body!;
+    let sent = '';
+    const ended = (async () => {
+      for await (const part of stream.pipeThrough(new TextDecoderStream())) sent += part;
+    })();
+    for (const seat of seats) room.quit(seat.token);
+    await sleep(400);
+    s.server.tidy();
+    await ended;
+    // The last the TV was told: everyone quit. Then its stream ended, and there's no such room.
+    const last = JSON.parse(sent.trim().split('\n\n').filter((e) => e.startsWith('data: ')).at(-1)!.slice(6)) as Snapshot;
+    assert.ok(last.lobby.seats.every((x) => x.left));
+    assert.equal((await fetch(`${base}/api/rooms/${code}`)).status, 400);
+  } finally {
+    for (const r of s.rooms.values()) r.close();
+    s.server.closeAllConnections();
+    s.server.close();
+  }
+});
+
+test('a tap retried after a server restart happens once (#522)', () => {
+  const opts = { dir: mkdtempSync(join(dir, 'retry-')), botDelayMs: 60000, firstSeat: 0 };
+  let room = new Room('TAPR', opts);
+  const [ada] = ['Ada', 'Bram'].map((n) => room.join(n));
+  room.start(ada.token, 5);
+  const said = () => room.game!.log.filter((e) => e.text.includes('"Hello"')).length;
+  const say = (id: string) => room.command(ada.token, { do: 'say', message: 'Hello' }, 'phone', id);
+  // A refused tap didn't happen, so it isn't counted as done.
+  assert.throws(() => room.command(ada.token, { do: 'end' }, 'phone', 'b'), RoomError);
+  say('a');
+  for (let restart = 0; restart < 2; restart++) {
+    room.close();
+    room = new Room('TAPR', opts);
+    say('a');
+    assert.equal(said(), 1);
+  }
+  say('b');
+  assert.equal(said(), 2);
+  room.close();
+});
+
 test('a server restart: the room comes back under its own code, and every client to its own seat', async () => {
   const roomsDir = mkdtempSync(join(dir, 'restart-'));
   const serve = async (hostFiles: string[] = []) => {

@@ -89,6 +89,7 @@ export function watch(code: string, token: string | null, onSnapshot: (s: Snapsh
       if (closed || es !== mine) return;
       if (status === 400 && onGone) {
         stop();
+        onStatus(true); // the server answers: nothing is reconnecting any more
         return onGone();
       }
       retry = setTimeout(open, 1500);

@@ -124,6 +124,28 @@ fn under_way(g: &Game, seats: impl Iterator<Item = (Kind, bool)>) -> bool {
     }
     g.phase != Phase::Over && n == g.players.len() && !open && people > left
 }
+/// The game file: the game, and the taps already done, saved in one write so that
+/// after a restart a tap is either in both or in neither.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedGame<'a> {
+    #[serde(flatten)]
+    game: &'a Game,
+    done_ids: &'a VecDeque<String>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedDone {
+    #[serde(default)]
+    done_ids: VecDeque<String>, // (games saved before had none)
+}
+fn save_game(file: &Path, game: &Game, done_ids: &VecDeque<String>) -> std::io::Result<()> {
+    store::save(file, &SavedGame { game, done_ids })
+}
+fn read_done(file: &Path) -> VecDeque<String> {
+    let done = std::fs::read_to_string(file).ok().and_then(|t| serde_json::from_str::<SavedDone>(&t).ok());
+    done.map_or_else(VecDeque::new, |d| d.done_ids)
+}
 fn read_saved(file: &Path) -> Option<SavedRoom> {
     serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()
 }
@@ -260,6 +282,9 @@ impl Drop for Here {
     fn drop(&mut self) {
         let room = &self.room;
         let i = &mut *lock(&room.inner);
+        if i.closed {
+            return; // its files may be gone: nothing is written again
+        }
         match self.who {
             Who::Nobody => {}
             Who::Screen { ref tv } => {
@@ -411,7 +436,7 @@ impl Room {
             tv_timer: None,
             version: 0,
             game_rev: 1,
-            done_ids: VecDeque::new(),
+            done_ids: read_done(&file),
             bot_rng: Rng::new(now_ms()),
             offers_seen: Seen::new(),
             saved_seats: String::new(),
@@ -603,7 +628,7 @@ impl Room {
         let before = g.log.len();
         let was = g.clone_without_log();
         let command = make(g, &mut i.bot_rng).map_err(Fail::Room)?;
-        if let Err(e) = store::save(&self.file, &**g) {
+        if let Err(e) = save_game(&self.file, g, &i.done_ids) {
             let mut log = std::mem::take(&mut g.log);
             log.truncate(before);
             **g = Game { log, ..was };
@@ -1006,18 +1031,20 @@ impl Room {
         if let Some(at) = i.waited.get_mut(&uid) {
             *at = now_ms(); // whatever it says, someone is there
         }
-        let key = (!id.is_empty()).then(|| format!("{p} {id}"));
+        let key = (!id.is_empty()).then(|| hex(&Sha256::digest(format!("{p} {id}")))[..16].to_string()); // short, whatever a client sends: it's saved
         if key.as_ref().is_some_and(|k| i.done_ids.contains(k)) {
             return Ok(());
         }
-        self.act(i, p, cmd)?;
-        if let Some(k) = key {
-            i.done_ids.push_back(k);
-            if i.done_ids.len() > 500 {
-                i.done_ids.pop_front();
-            }
+        // Before the command, so it's saved with what the command does.
+        let Some(k) = key else { return self.act(i, p, cmd) };
+        i.done_ids.push_back(k);
+        let done = self.act(i, p, cmd);
+        if done.is_err() {
+            i.done_ids.pop_back();
+        } else if i.done_ids.len() > 500 {
+            i.done_ids.pop_front();
         }
-        Ok(())
+        done
     }
     fn act(&self, i: &mut Inner, p: usize, cmd: &Value) -> Res {
         if i.game.is_none() {
@@ -1406,9 +1433,13 @@ impl Room {
         let empty = !self.home && i.game.is_none() && idle > HOUR && self.changes.receiver_count() == 0;
         (idle > self.opts.idle_ms || empty || (i.abandoned() && idle > 10 * 60 * 1000)).then_some(false)
     }
+    pub fn is_closed(&self) -> bool {
+        lock(&self.inner).closed
+    }
     pub fn close(&self) {
         let i = &mut *lock(&self.inner);
         i.closed = true;
+        self.changes.send_replace(i.version); // the streams end
         for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer, &mut i.ending_timer] {
             clear(t);
         }
@@ -1558,7 +1589,7 @@ pub mod stage {
             let i = &mut *lock(&self.inner);
             let Some(g) = i.game.as_ref() else { return no("The game hasn't started.") };
             i.log.events(&g.log, before, &Sender::GAME, None);
-            let saved = store::save(&self.file, &**g);
+            let saved = save_game(&self.file, g, &i.done_ids);
             let (scenes, end) = (scenes::of(&g.log, before), end_of(&g.log, before));
             self.hold_for(i, scenes);
             self.hold_end(i, end);
