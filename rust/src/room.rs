@@ -653,6 +653,30 @@ impl Room {
         i.held.extend(scenes);
         self.wake_after_scene(i);
     }
+    /// The TV, reloaded or back online, plays no scene the table waits for, having seen the
+    /// log up to `seen`: the table goes on, unless a scene it hasn't heard of has begun.
+    pub fn skip_scene(&self, tok: &str, seen: usize) -> Res {
+        let i = &mut *lock(&self.inner);
+        if tok != self.host {
+            return no("Only the TV can do that.");
+        }
+        if i.scene_left() > 0 && i.held.iter().all(|s| s.i <= seen) {
+            self.drop_hold(i);
+            self.changed(i);
+        }
+        Ok(())
+    }
+    fn drop_hold(&self, i: &mut Inner) {
+        i.scene_until = 0;
+        clear(&mut i.scene_timer);
+        self.release(i);
+    }
+    fn release(&self, i: &mut Inner) {
+        let held: Vec<Value> = std::mem::take(&mut i.held).iter().map(|s| json!({"kind": s.kind, "i": s.i})).collect();
+        if !held.is_empty() {
+            i.log.write("release", &Sender::GAME, json!({"scenes": held}));
+        }
+    }
     /// The game ends with a TV: the phones wait while it plays the game's summary.
     /// A TV that just went may be reloading, and counts until it's gone.
     fn hold_end(&self, i: &mut Inner, end: Option<usize>) {
@@ -694,10 +718,7 @@ impl Room {
             if i.scene_left() > 0 {
                 return room.wake_after_scene(i);
             }
-            let held: Vec<Value> = std::mem::take(&mut i.held).iter().map(|s| json!({"kind": s.kind, "i": s.i})).collect();
-            if !held.is_empty() {
-                i.log.write("release", &Sender::GAME, json!({"scenes": held}));
-            }
+            room.release(i);
             room.changed(i)
         });
     }
@@ -939,6 +960,7 @@ impl Room {
         let Some(g) = i.game.as_ref() else { return no("The game isn't under way.") };
         let fields = json!({"round": g.round, "phase": g.phase, "entries": g.log.len()});
         self.change(i, |i| i.saved_at = Some(at))?;
+        self.drop_hold(i); // the TV drops the scene: nothing to wait for once it's continued
         i.log.write("save", &by, fields);
         self.changed(i);
         Ok(())

@@ -26,6 +26,7 @@ import type { Recap } from '../src/state.ts';
 import type { Side } from '../src/engine.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
 import { SceneLog } from './scenelog.ts';
+import { TvScenes } from './tvscenes.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -41,7 +42,6 @@ let snap: Snapshot | null = null;
 let names: string[] = [];
 // `origin`: a public website's one address
 let lan: { lan: string[]; tailscale: string[]; port: number; origin?: string } = { lan: [], tailscale: [], port: Number(location.port) || 80 };
-let seenLog = -1; // highest log index already animated
 let savedGames: SavedGame[] = []; // the server's saved games, offered in a new room's lobby
 // The 3D board lives across re-renders; without WebGL the TV falls back to the flat map.
 let board3d: Board3D | null | undefined;
@@ -97,8 +97,9 @@ async function boot() {
   watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), sceneLog.page);
 }
 
-function onSnapshot(s: Snapshot) {
-  const first = !snap?.game && !!s.game && seenLog < 0;
+// `stream`: the first snapshot of a new connection.
+function onSnapshot(s: Snapshot, stream: boolean) {
+  const first = !snap?.game && !!s.game && scenes.seen < 0;
   if (snap?.game && s.game) seatNews(snap, s);
   snap = s;
   names = s.lobby.seats.map((x) => x.name);
@@ -106,10 +107,12 @@ function onSnapshot(s: Snapshot) {
   // Before the game, while a game file hosted again takes its seats, and
   // while the game is saved, the TV shows the lobby.
   if (!s.game || s.lobby.seating || s.lobby.saved) {
+    scenes.drop();
+    bannerTop = null;
     clearOverlay();
     sceneLog.end(true); // the lobby takes over: saved in the middle of a scene, say
     if (remote) return void (app.innerHTML = '');
-    if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
+    if (s.game) scenes.skip(s.game.log); // the game goes on from here: nothing to replay
     dropTitleToasts();
     dropEndHold();
     if (s.game) titleNews.skip(s.game);
@@ -120,11 +123,11 @@ function onSnapshot(s: Snapshot) {
   if (first) {
     // Joined mid-game (e.g. the TV reloaded): only animate what happens from now on,
     // except the opening round, which is worth showing.
-    seenLog = s.game.round === 1 && (s.game.phase === 'action' || s.game.phase === 'cards') ? -1 : log.at(-1)?.i ?? -1;
+    if (s.game.round !== 1 || (s.game.phase !== 'action' && s.game.phase !== 'cards')) scenes.skip(log);
   }
-  const fresh = log.filter((e) => e.i > seenLog);
-  if (fresh.length) seenLog = fresh.at(-1)!.i;
-  queueBanners(s.game, fresh);
+  const { play, missed } = scenes.take(log, stream && !first && !remote);
+  if (missed) dropScenes();
+  queueBanners(s.game, play);
   // A phone's table view plays scenes only while the server holds the table
   // for them: one it missed (the phone asleep, or the frame made just now)
   // isn't played late over what's open now (#449, #455).
@@ -132,10 +135,12 @@ function onSnapshot(s: Snapshot) {
   // While a scene plays, the board, the panels, the feed and the titles stay
   // as they were when it began, so nothing in the corners gives its ending
   // away; they catch up when it's over.
-  if (!shown || (!bannerUp && !banners.length)) renderGame(s.game);
+  if (!shown || (!scenes.up && !scenes.waiting)) renderGame(s.game);
   else renderGame(shown);
   updateOverlay(s.game);
   tellTitles();
+  // The table waits for a scene this TV won't play (it was reloaded, or offline): it needn't.
+  if (stream && !remote && isHost && s.scene && !scenes.up) post(`/api/rooms/${code}/skip`, { token: hostToken, seen: scenes.seen }).catch(() => {});
 }
 
 // Mid-game, the table hears when someone quits, when a bot starts playing for
@@ -327,7 +332,7 @@ function phaseTrack(g: PublicState): string {
 
 // What one player is doing right now, if the table is waiting on them.
 function doing(g: PublicState, p: number): string {
-  if (bannerUp || !g.waitingOn.includes(p)) return ''; // during a scene, everyone watches
+  if (scenes.up || !g.waitingOn.includes(p)) return ''; // during a scene, everyone watches
   if (g.phase === 'action') return g.turn === p ? 'Taking a turn' : 'Answering an offer';
   if (g.phase === 'discard') return 'Discarding';
   // The card step shows nothing: everyone keeps a card at once, and the phone asks (#229).
@@ -621,12 +626,11 @@ function renderRaid(g: PublicState) {
 // i: the scene's entry in the game's log.
 interface Banner { i?: number; html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
 let bannerTop: Banner['top'] | null = null;
-const banners: Banner[] = [];
-let bannerUp = false;
+const scenes = new TvScenes<Banner>();
 const sceneLog = new SceneLog();
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
-  for (const sc of scenesOf(fresh)) banners.push({ ...banner(g, sc, fresh), i: fresh[sc.at].i });
+  for (const sc of scenesOf(fresh)) scenes.add({ ...banner(g, sc, fresh), i: fresh[sc.at].i });
 }
 
 function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
@@ -1269,11 +1273,11 @@ function showFinal(g: PublicState) {
 }
 
 // Whether the board itself comes next, with no overlay over it.
-const boardNext = (g: PublicState) => !banners.length && !everyoneQuit(snap!.lobby) && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
+const boardNext = (g: PublicState) => !scenes.waiting && !everyoneQuit(snap!.lobby) && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
 
 function updateOverlay(g: PublicState) {
-  if (bannerUp) return;
-  const next = banners.shift();
+  if (scenes.up) return;
+  const next = scenes.next();
   if (next) return showBanner(next);
   if (g.phase === 'over' && remote && snap?.ending) {
     summaryPlayed = true; // the TV plays it: here the scores come after it
@@ -1294,12 +1298,11 @@ function showQuit() {
 }
 
 let bannerN = 0;
-let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
-  bannerUp = true;
   if (!remote && b.i !== undefined) sceneLog.start(code, b.i);
   cutTitleToasts();
+  scenes.start([Math.max(0, b.ms - FADE_MS - CATCH_UP_MS), catchUp], [b.ms, endBanner]);
   bannerTop = b.top ?? null;
   const key = `banner ${++bannerN}`;
   const box = showOverlay('banner', key, b.html);
@@ -1311,31 +1314,32 @@ function showBanner(b: Banner) {
   // rather than all of it landing in the frame the scene ends. The fade starts
   // once the caught-up board is drawn: drawing it takes a while on a slow TV,
   // and would eat the fade.
-  bannerTimers = [window.setTimeout(() => {
-    if (!bannerUp || !snap?.game || !boardNext(snap.game)) return;
+  function catchUp() {
+    if (!snap?.game || !boardNext(snap.game)) return;
     bannerTop = null;
     renderGame(snap.game);
     requestAnimationFrame(() => requestAnimationFrame(() => overlayKey === key && hideOverlay()));
-  }, Math.max(0, b.ms - FADE_MS - CATCH_UP_MS)), window.setTimeout(endBanner, b.ms)];
+  }
 }
 
 function endBanner() {
-  bannerTimers.forEach(clearTimeout);
   sceneLog.end();
-  bannerUp = false;
+  scenes.end();
   bannerTop = null;
   if (!snap?.game) return;
   updateOverlay(snap.game);
-  if (!bannerUp) {
+  if (!scenes.up) {
     renderGame(snap.game); // the scenes are over: the board catches up
     tellTitles();
   }
 }
 
-// The server holds nothing: the scenes queued go, and the one playing ends.
+// The scenes queued go, and the one playing ends: the server holds nothing, or they were missed.
 function dropScenes() {
-  banners.length = 0;
-  if (bannerUp) endBanner();
+  const up = scenes.up;
+  scenes.drop();
+  sceneLog.end(true);
+  if (up) endBanner();
 }
 
 // The overlay over the board: a banner, a raid step or the final scores.
@@ -1414,7 +1418,7 @@ let titleToasts: { change: TitleChange; el: HTMLElement; since: number; timer: n
 
 function tellTitles() {
   const g = snap?.game;
-  if (remote || !g || bannerUp || banners.length || summary) return;
+  if (remote || !g || scenes.up || scenes.waiting || summary) return;
   for (const change of titleNews.next(g)) {
     const { key, name, from, to } = change;
     const pts = (sign: string) => `<span class="tpts">${sign}${iconText(`${g.titlePoints} points`)}</span>`;
