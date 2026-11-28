@@ -27,7 +27,7 @@ TypeScript, run directly by Node 22.18+, and the rules in Rust: `npm install`, `
 - `src/playtest/`: the runner that seats Claude and Codex players (hosting a playtest, or joining a room) and the per-seat MCP server they play through; the eval (`eval.ts`), the leaderboard's rating (`leaderboard.ts`, `rating.ts`) and the live page, a contest's or the whole leaderboard's (`live.ts`, `live.html`)
 - `src/recap.ts`: a finished game's recap, the story the TV plays at the end and the recap page (`web/recap.ts`) shows
 - `rust/src/server.rs`, `room.rs`: the web server and rooms for the TV and phone clients, the limits a public website adds (`limits.rs`) and the MCP endpoint Claude clients join through (`mcp.rs`); `src/host.ts`: how the tests and tools host rooms on it; `src/state.ts`: the JSON the clients receive; `web/`: the clients (the TV's 3D board is `web/board3d.ts`, on three.js, the one runtime dependency)
-- `src/shots/`: staged screenshots of the clients (`npm run shots`)
+- `src/shots/`: staged screenshots of the clients (`npm run shots`); `src/shots/head.ts` draws the favicon, the home screen icon and the link preview image
 - `rust/`: the rules and bots, and the public website, in Rust ([`docs/rust-server.md`](docs/rust-server.md))
 
 Design rules between tuning numbers (payback, point efficiency) are tests in `test/design/`, with their own [README](test/design/README.md).

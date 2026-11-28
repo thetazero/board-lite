@@ -33,6 +33,7 @@ pub struct Asset {
 }
 include!("../generated/assets.rs");
 
+const PREVIEW_TEXT: &str = "Raise dragons and raid kingdoms.";
 const MAX_BODY: usize = 4096;
 const MAX_MCP_BODY: usize = 16384;
 const PING: Duration = Duration::from_secs(15); // web/common.ts's STALE_MS allows for a couple missed
@@ -413,7 +414,40 @@ impl Server {
             _ if first == "recap" && parts.len() == 2 && is_recap_id(parts[1]) => "/recap.html",
             p => p,
         };
-        Ok(asset(file, req.headers()))
+        let mut r = asset(file, req.headers());
+        if file.ends_with(".html") && r.status() == StatusCode::OK {
+            self.put_preview(&mut r, &req, page.map(|(code, _)| code.to_uppercase()));
+        }
+        Ok(r)
+    }
+    /// Fills in what an app that previews links reads: it runs no scripts and
+    /// needs the image's whole address. A game's link gives the code whether or
+    /// not there's such a game, so a preview can't be used to find games.
+    fn put_preview(&self, r: &mut Answer, req: &Request<Incoming>, code: Option<String>) {
+        let Body::Whole(Some(html)) = r.body() else { return };
+        let Ok(html) = std::str::from_utf8(html) else { return };
+        let origin = self.origin(req);
+        let origin: String = origin.chars().filter(|c| c.is_ascii_alphanumeric() || ":/.-_[]".contains(*c)).collect(); // the visitor's Host header, at home
+        let title = code.map_or_else(|| "board-lite".into(), |c| format!("Join game {c}"));
+        let tags = format!(
+            r#"<meta name="description" content="{PREVIEW_TEXT}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="board-lite">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{PREVIEW_TEXT}">
+  <meta property="og:image" content="{origin}/preview.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A fire dragon breathing fire">
+  <meta name="twitter:card" content="summary_large_image">"#
+        );
+        let html = html.replacen("<!--preview-->", &tags, 1);
+        *r.body_mut() = Body::Whole(Some(html.into()));
+    }
+    fn origin(&self, req: &Request<Incoming>) -> String {
+        let host = req.headers().get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or("localhost");
+        self.site.as_ref().map_or_else(|| format!("http://{host}"), |s| s.origin.clone())
     }
 
     async fn mcp(&self, req: Request<Incoming>, who: &str) -> Res<Answer> {
@@ -435,9 +469,7 @@ impl Server {
         })
     }
     fn guide(&self, req: &Request<Incoming>, code: Option<&str>) -> Answer {
-        let host = req.headers().get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or("localhost");
-        let origin = self.site.as_ref().map_or_else(|| format!("http://{host}"), |s| s.origin.clone());
-        let text = mcp::guide(&origin, code);
+        let text = mcp::guide(&self.origin(req), code);
         let mut r = answer(StatusCode::OK, "text/markdown; charset=utf-8", "no-cache", Body::Whole(Some(text.into())));
         r.headers_mut().insert(header::VARY, HeaderValue::from_static("accept"));
         r
