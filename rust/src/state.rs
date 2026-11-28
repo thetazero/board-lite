@@ -52,7 +52,9 @@ pub struct Does {
     pub houses: i64,
     pub points: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub note: Option<S>,
+    pub growth: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate: Option<&'static BankRate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak: Option<S>,
 }
@@ -484,8 +486,10 @@ fn upgrade_names(ups: &[Key]) -> Option<String> {
 }
 fn does(g: &Game, k: K, b: &Building, upgrades: &[Key]) -> Does {
     let y = g.building_yield(k, b, upgrades);
-    let note = (!b.tower() && (b.def().growth_bonus != 0 || b.def().bank_rate.is_some())).then(|| b.def().text);
-    Does { makes: ByRes(y.makes), houses: y.houses, points: y.points, note, peak: None }
+    let def = (!b.tower()).then(|| b.def());
+    let growth = def.map(|d| d.growth_bonus).filter(|n| *n != 0);
+    let rate = def.and_then(|d| d.bank_rate.as_ref());
+    Does { makes: ByRes(y.makes), houses: y.houses, points: y.points, growth, rate, peak: None }
 }
 fn does_if_built(g: &Game, p: usize, key: S, hexes: &[K]) -> Pairs<K, Does> {
     let b = Building { kind: Key::of(key), owner: p, upgrades: vec![], floors: 0 };
@@ -703,8 +707,9 @@ fn card_view(g: &Game, p: usize, c: &Card) -> CardView {
                 "gain_resource" => v.needs = "resource",
                 "grow_dragon" => {
                     v.needs = "dragon";
-                    v.dragons = g.dragons_of(p).filter(|d| d.stage < 3).map(|d| d.id).collect();
-                    v.blocked = v.dragons.is_empty().then(|| "All your dragons are adults.".into());
+                    v.dragons = g.dragons_of(p).filter(|d| d.stage < 3 && d.damage == 0).map(|d| d.id).collect();
+                    let grown = g.dragons_of(p).all(|d| d.stage == 3);
+                    v.blocked = v.dragons.is_empty().then(|| if grown { "All your dragons are adults." } else { "All your dragons that can grow are hurt: heal one first." }.into());
                 }
                 "heal_dragon" => {
                     v.needs = "dragon";
@@ -827,7 +832,13 @@ pub fn rulebook() -> serde_json::Value {
     let kingdoms: Vec<TargetView> = d.targets.iter().map(|(key, t)| TargetView { key, name: t.name, loot: t.loot.nonzero(), power: t.power(), points: t.points, units: t.units.iter().map(|u| unit_view(&d.units[u], d.units[u].hp)).collect() }).collect();
     json!({
         "buildings": buildings,
-        "upgrades": d.upgrades.iter().map(|(key, u)| json!({"key": key, "name": u.name, "text": u.text, "cost": u.cost.nonzero(), "on": u.applies_to, "base": u.base})).collect::<Vec<_>>(),
+        "upgrades": d.upgrades.iter().map(|(key, u)| {
+            let mut v = json!({"key": key, "name": u.name, "text": u.text, "cost": u.cost.nonzero(), "on": u.applies_to});
+            if u.base {
+                v["project"] = tuning().special_project_multiplier.upgrade.into();
+            }
+            v
+        }).collect::<Vec<_>>(),
         "actions": actions,
         "dragons": d.dragons.iter().map(|(key, x)| json!({"key": key, "name": x.name, "element": x.element, "cost": x.cost.nonzero(), "base": x.base, "growth": x.growth_time, "targeting": d.targeting_text[x.targeting], "stages": stage_views(x)})).collect::<Vec<_>>(),
         "fauna": beasts(&d.fauna),

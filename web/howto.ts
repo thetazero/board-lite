@@ -24,5 +24,5 @@ export const SCORES: { points: number; text: string }[] = [
   { points: MONUMENT_POINTS, text: 'Each monument card you build' },
   { points: HOARD_POINTS, text: 'Each Secret Hoard card in your hand' },
   { points: BUILDING_POINTS, text: 'Each production building and each Workshop' },
-  ...KINGDOM_POINTS.map((k) => ({ points: k.points, text: `${k.name} falls: most power in the raid` })),
+  ...KINGDOM_POINTS.map((k) => ({ points: k.points, text: `${k.name} falls: most power left standing` })),
 ];

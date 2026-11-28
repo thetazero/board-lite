@@ -110,7 +110,7 @@ pub struct Produces {
     pub base: i64,
     pub die: i64,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(bound(deserialize = "'de: 'static"))]
 pub struct BankRate {
     pub resource: S,

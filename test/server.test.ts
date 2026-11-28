@@ -370,7 +370,7 @@ const until = async (done: () => boolean, ms: number) => {
 };
 
 test('a phone that loses Wi-Fi with its stream still open is away once it stops answering pings', async () => {
-  const { server, rooms } = startServer(0, { dir, botDelayMs: 60_000, awayMs: 400 }, [], '127.0.0.1');
+  const { server, rooms } = startServer(0, { dir, botDelayMs: 60_000, awayMs: 1000 }, [], '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = async (path: string, body: object) => (await (await fetch(base + path, { method: 'POST', body: JSON.stringify(body) })).json()) as Record<string, string>;
@@ -381,10 +381,11 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     const bram = (await post(`/api/rooms/${code}/join`, { name: 'Bram' })).token;
     await post(`/api/rooms/${code}/start`, { token: ada });
     const room = rooms.get(code)!;
-    await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
+    // Held to the end: a response that's garbage collected closes its stream.
+    const stream = await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
     assert.ok(room.here(room.seats[1]), 'not at once');
     // The table plays on: being sent it doesn't make Bram here.
-    const end = Date.now() + 2000;
+    const end = Date.now() + 5000;
     while (room.here(room.seats[1]) && Date.now() < end) {
       room.command(ada, { do: 'say', message: 'hello' });
       await sleep(20);
@@ -397,16 +398,21 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     assert.ok(room.here(room.seats[1]) && !room.seats[1].standIn);
     // Answering, it stays, and the table isn't told anything new.
     const version = room.snapshot(null).v;
-    for (let i = 0; i < 16; i++) {
+    const quiet = Date.now() + 5000;
+    while (room.here(room.seats[0]) && Date.now() < quiet) {
       await sleep(50);
       await post(`/api/rooms/${code}/here`, { token: bram });
       assert.ok(room.here(room.seats[1]));
     }
+    // (Ada has sent nothing since the bot sat in, so Ada goes away first.)
+    assert.ok(!room.here(room.seats[0]), 'Ada goes away');
+    assert.equal(room.seats[1].connected, 1, 'on the same stream');
     assert.ok(room.snapshot(null).v! <= version! + 1, 'at most Ada going quiet');
     // Its stream ending long after the phone went doesn't bring it back.
-    assert.ok(await until(() => !room.here(room.seats[1]), 2000));
+    assert.ok(await until(() => !room.here(room.seats[1]), 5000));
+    assert.ok(stream.ok);
     ctrl.abort();
-    assert.ok(await until(() => room.seats[1].connected === 0, 2000));
+    assert.ok(await until(() => room.seats[1].connected === 0, 5000));
     assert.ok(!room.here(room.seats[1]));
   } finally {
     ctrl.abort();
@@ -876,6 +882,90 @@ test('saving a game: it stops for everyone, survives a restart however old, and 
     await again.post(`/api/rooms/${made.code}/continue`, { token: bram }); // a second tap does nothing
     back.command(ada, { do: 'end' });
     assert.deepEqual((await (await fetch(`${again.base}/api/saved`)).json()), []);
+  } finally {
+    again.stop();
+  }
+});
+
+test('a game left idle saves itself, over a restart too, and the table continues it the next day (#526)', async () => {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const seatsOf = (file: string) => file.replace(/\.json$/, '.seats.json');
+  const serve = async (roomsDir: string, idleMs?: number, site?: { origin: string }) => {
+    const s = startServer(0, { dir: roomsDir, botDelayMs: 60_000, firstSeat: 0, idleMs }, [], '127.0.0.1', true, site);
+    await new Promise((r) => s.server.once('listening', r));
+    const base = `http://127.0.0.1:${(s.server.address() as AddressInfo).port}`;
+    const get = async (path: string) => (await fetch(base + path)).json() as Promise<any>;
+    const post = async (path: string, body: object) => {
+      const r = await fetch(base + path, { method: 'POST', body: JSON.stringify(body) });
+      if (!r.ok) assert.fail(await r.text());
+      return (await r.json()) as Record<string, string>;
+    };
+    const stop = () => {
+      for (const r of s.rooms.values()) r.close();
+      s.server.closeAllConnections();
+      s.server.close();
+    };
+    return { ...s, get, post, stop };
+  };
+  const start = async (s: Awaited<ReturnType<typeof serve>>) => {
+    const { code } = await s.post('/api/rooms', {});
+    const tokens = [];
+    for (const name of ['Ada', 'Bram']) tokens.push((await s.post(`/api/rooms/${code}/join`, { name })).token);
+    await s.post(`/api/rooms/${code}/start`, { token: tokens[0] });
+    return { code, tokens, file: s.rooms.get(code)!.file };
+  };
+  const age = (file: string, at: Date) => [file, seatsOf(file)].forEach((f) => utimesSync(f, at, at));
+  const continues = async (s: Awaited<ReturnType<typeof serve>>, g: Awaited<ReturnType<typeof start>>) => {
+    assert.ok((await s.get(`/api/rooms/${g.code}?token=${g.tokens[1]}`)), 'its address answers');
+    const room = s.rooms.get(g.code)!;
+    assert.ok(room.snapshot(g.tokens[0]).lobby.saved, 'its player sees it was saved');
+    await s.post(`/api/rooms/${g.code}/continue`, { token: g.tokens[1] });
+    assert.equal(room.lobby().saved, null);
+    room.command(g.tokens[0], { do: 'keep', card: room.game!.players[0].choice[0].id });
+  };
+
+  // The server stays up, at home and as a website.
+  for (const site of [undefined, { origin: 'https://dragons.example' }]) {
+    const s = await serve(mkdtempSync(join(dir, 'idle-')), 400, site);
+    try {
+      const g = await start(s);
+      s.server.tidy();
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, null, 'not while it is played');
+      const last = s.rooms.get(g.code)!.lastActive;
+      // A room still in its lobby, and a game every player quit, are forgotten.
+      const lobby = await s.post('/api/rooms', {});
+      const gone = await start(s);
+      for (const t of gone.tokens) s.rooms.get(gone.code)!.quit(t);
+      await sleep(500);
+      s.server.tidy();
+      assert.deepEqual(s.rooms.keys(), [g.code]);
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, last, 'saved as of when it stopped');
+      if (!site) assert.deepEqual((await s.get('/api/saved')).map((x: any) => x.code), [g.code]);
+      assert.ok(JSON.parse(readFileSync(seatsOf(g.file), 'utf8')).savedAt, 'on disk too');
+      await continues(s, g);
+      s.server.tidy();
+      assert.equal(s.rooms.get(g.code)!.lobby().saved, null, 'continued, it is played again');
+    } finally {
+      s.stop();
+    }
+  }
+
+  // The server stopped before the game was idle for long, and starts the next day.
+  const roomsDir = mkdtempSync(join(dir, 'idle-'));
+  const first = await serve(roomsDir);
+  const g = await start(first);
+  const ancient = await start(first), quit = await start(first), over = await start(first), recent = await start(first);
+  for (const t of quit.tokens) first.rooms.get(quit.code)!.quit(t);
+  first.rooms.get(over.code)!.mutate((x) => { x.phase = 'over'; });
+  first.stop();
+  for (const x of [g, quit, over]) age(x.file, dayAgo);
+  age(ancient.file, new Date(Date.now() - 40 * 24 * 60 * 60 * 1000));
+  const again = await serve(roomsDir);
+  try {
+    assert.deepEqual(again.rooms.keys().sort(), [g.code, recent.code].sort());
+    assert.equal(again.rooms.get(recent.code)!.lobby().saved, null, 'one from just now goes on');
+    assert.ok(Math.abs(again.rooms.get(g.code)!.lobby().saved! - dayAgo.getTime()) < 1000, 'saved as of when it stopped');
+    await continues(again, g);
   } finally {
     again.stop();
   }

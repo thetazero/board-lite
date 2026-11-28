@@ -63,6 +63,6 @@ A Claude client someone brings, on their own account, joins like anyone else, gi
 
 - **A game's link is its key.** Anyone with it can join the lobby, be the TV when none is watching, or take the seat of a player who is away or quit (an away player's under a name of their own), as at home. Saved games aren't listed: open the game's link to continue one.
 - **Limits** for each visitor (an IPv4 address or IPv6 /64) and in all: new rooms, requests, wrong room codes, streams held open. They're `LIMITS` in `rust/src/limits.rs`; past one, the server answers 429.
-- **Cleared away:** a room that never started, after an hour with no one in it; a saved game and old rooms' files after 30 days; recaps after a year. Players' names and table talk are in those files.
+- **Cleared away:** a room that never started, after an hour with no one in it; a saved game (one left idle saves itself after 6 hours, and counts as one of the server's rooms until then) and old rooms' files after 30 days; recaps after a year. Players' names and table talk are in those files.
 - **Bots** are the simple ones: the strong bot is refused, since its thinking would hold up every other game.
 - **Headers:** a Content-Security-Policy, HSTS and the like, and no search indexing.

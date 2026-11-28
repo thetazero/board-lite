@@ -31,6 +31,7 @@ const MAX_PLAYERS: usize = 6;
 const AWAY_MS: i64 = 60_000;
 const OPEN_MS: i64 = 180_000;
 const TV_GONE_MS: i64 = 20_000;
+const IDLE_MS: i64 = 6 * 60 * 60 * 1000;
 const BOT_DELAY_MS: i64 = 700;
 const CACHE_MS: i64 = 500; // how long a quiet room keeps the JSON it last sent
 
@@ -109,6 +110,17 @@ struct SavedRoom {
     #[serde(default)]
     last_id: u64, // the last seat id given: none is given twice
     seats: Vec<SavedSeat>,
+}
+/// Whether there's a game to save: not over, every seat taken, and not every player quit.
+fn under_way(g: &Game, seats: impl Iterator<Item = (Kind, bool)>) -> bool {
+    let (mut people, mut open, mut left, mut n) = (0, false, 0, 0);
+    for (kind, quit) in seats {
+        n += 1;
+        open |= kind == Kind::Open;
+        people += usize::from(kind == Kind::Player);
+        left += usize::from(kind == Kind::Player && quit);
+    }
+    g.phase != Phase::Over && n == g.players.len() && !open && people > left
 }
 fn read_saved(file: &Path) -> Option<SavedRoom> {
     serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()
@@ -196,13 +208,14 @@ pub struct Opts {
     pub away_ms: i64,
     pub open_ms: i64, // how long the game waits on someone who is here before their seat can be opened
     pub tv_gone_ms: i64,
+    pub idle_ms: i64, // how long with nothing happening before a game under way is saved, and any other room forgotten
     pub first_seat: Option<usize>,
     pub recap_id: Option<String>,
     pub ended: Option<i64>, // the time a recap is dated by
 }
 impl Default for Opts {
     fn default() -> Opts {
-        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, first_seat: None, recap_id: None, ended: None }
+        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, idle_ms: IDLE_MS, first_seat: None, recap_id: None, ended: None }
     }
 }
 /// Where rooms and recaps go, and whether it's a home's server.
@@ -458,8 +471,10 @@ impl Room {
         let v: Value = std::fs::read_to_string(beside(&self.file, ".claude.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
         v["runners"].as_array().into_iter().flatten().filter_map(|d| d.as_str().map(PathBuf::from)).collect()
     }
-    /// Rooms saved in `dir` and active in the last `within`, and every saved game however old.
-    pub fn saved(dir: &Path, within: Duration) -> Vec<(String, PathBuf)> {
+    /// Rooms in `dir` active in the last `idle_ms`, and every saved game however old. A game
+    /// under way that went idle while no server ran is saved now, but for one in `skip`.
+    pub fn saved(dir: &Path, idle_ms: i64, skip: &[PathBuf]) -> Vec<(String, PathBuf)> {
+        let within = Duration::from_millis(idle_ms.max(0) as u64);
         let touched = |f: &Path| std::fs::metadata(f).and_then(|m| m.modified()).ok();
         let recent = |f: &Path| touched(f).is_some_and(|t| t.elapsed().map_or(true, |d| d <= within));
         let Ok(files) = std::fs::read_dir(dir) else { return vec![] };
@@ -467,9 +482,27 @@ impl Room {
             .filter_map(|e| {
                 let path = e.ok()?.path();
                 let base = path.to_str()?.strip_suffix(".seats.json")?.to_string();
-                let saved = read_saved(&path)?;
+                let mut saved = read_saved(&path)?;
                 let file = PathBuf::from(format!("{base}.json"));
-                (saved.saved_at.is_some() || recent(&path) || recent(&file)).then_some((saved.code, file))
+                if skip.contains(&file) {
+                    return None;
+                }
+                if saved.saved_at.is_none() && !recent(&path) && !recent(&file) {
+                    let at = touched(&path).max(touched(&file))?;
+                    if at.elapsed().is_ok_and(|d| d > crate::limits::SAVED_KEEP) {
+                        return None;
+                    }
+                    let g = store::load(&file).ok()?;
+                    if !under_way(&g, saved.seats.iter().map(|s| (s.kind, s.left))) {
+                        return None;
+                    }
+                    saved.saved_at = at.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_millis() as i64);
+                    if let Err(e) = store::save(&path, &saved) {
+                        eprintln!("Room {}: could not save the idle game: {e}", saved.code);
+                        return None; // its files are as they were, for the next start
+                    }
+                }
+                Some((saved.code, file))
             })
             .collect()
     }
@@ -815,9 +848,13 @@ impl Room {
         if i.saved_at.is_some() {
             return Ok(());
         }
-        let fields = json!({"round": g.round, "phase": g.phase, "entries": g.log.len()});
         let by = self.sender_of(i, tok);
-        self.change(i, |i| i.saved_at = Some(now_ms()))?;
+        self.save_as(i, by, now_ms())
+    }
+    fn save_as(&self, i: &mut Inner, by: Sender, at: i64) -> Res {
+        let Some(g) = i.game.as_ref() else { return no("The game isn't under way.") };
+        let fields = json!({"round": g.round, "phase": g.phase, "entries": g.log.len()});
+        self.change(i, |i| i.saved_at = Some(at))?;
         i.log.write("save", &by, fields);
         self.changed(i);
         Ok(())
@@ -1274,19 +1311,27 @@ impl Room {
         }
     }
     /// Whether the server forgets the room now, and if so whether its files go too.
+    /// A game under way left idle is saved instead.
     pub fn forget(&self) -> Option<bool> {
         const HOUR: i64 = 60 * 60 * 1000;
-        let i = &*lock(&self.inner);
+        let i = &mut *lock(&self.inner);
         let idle = now_ms() - i.last_active;
         if let Some(at) = i.saved_at {
             if self.home {
                 return None;
             }
             let keep = crate::limits::SAVED_KEEP.as_millis() as i64;
-            return (now_ms() - at > keep && idle > 6 * HOUR).then_some(true);
+            return (now_ms() - at > keep && idle > self.opts.idle_ms).then_some(true);
+        }
+        let going = i.game.as_ref().is_some_and(|g| under_way(g, i.seats.iter().map(|s| (s.kind, s.left))));
+        if going && idle > self.opts.idle_ms {
+            if let Err(Fail::Server(e)) = self.save_as(i, Sender::GAME, i.last_active) {
+                eprintln!("{e}"); // tried again in a minute
+            }
+            return None;
         }
         let empty = !self.home && i.game.is_none() && idle > HOUR && self.changes.receiver_count() == 0;
-        (idle > 6 * HOUR || empty || (i.abandoned() && idle > 10 * 60 * 1000)).then_some(false)
+        (idle > self.opts.idle_ms || empty || (i.abandoned() && idle > 10 * 60 * 1000)).then_some(false)
     }
     pub fn close(&self) {
         let i = &mut *lock(&self.inner);

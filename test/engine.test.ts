@@ -24,6 +24,17 @@ function advanceToRaidVote(g: Game) {
   while (g.phase === 'action') apply(g, g.turn, { do: 'end' });
 }
 
+// Everyone holds back from the round's raids.
+function passRaids(g: Game) {
+  while (g.phase === 'raid') for (const q of waitingOn(g)) apply(g, q, g.raid!.step === 'vote' ? { do: 'vote', target: g.raid!.candidates[0] } : { do: 'hold' });
+}
+// To the next round's cards, with no one raiding.
+function passRound(g: Game) {
+  advanceToRaidVote(g);
+  passRaids(g);
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, { do: 'discard', cards: [] });
+}
+
 // Everyone starts with an egg; tests that raid in round 1 hatch them first.
 const hatchAll = (g: Game) => g.dragons.forEach((d) => (d.stage = Math.max(d.stage, 1)));
 
@@ -547,6 +558,119 @@ test('eggs do not eat livestock, and grow even with none (#415)', () => {
   assert.ok(egg.growth + egg.stage * 100 > before, 'the egg grows');
 });
 
+test('an egg grows with a hungry dragon before it (#528)', () => {
+  const g = newGame(2, 7);
+  const p = 0;
+  const egg = g.dragons.find((d) => d.owner === p)!;
+  const fed = { ...egg, id: 'd90', stage: 1 };
+  const unfed = { ...egg, id: 'd91', stage: 1 };
+  g.dragons = [fed, unfed, egg, ...g.dragons.filter((d) => d.owner !== p)];
+  advanceToRaidVote(g);
+  g.players[p].resources.livestock = 0; // the tower makes 1
+  const was = egg.growth + egg.stage * 100;
+  passRaids(g);
+  while (g.phase === 'discard') for (const q of waitingOn(g)) apply(g, q, { do: 'discard', cards: [] });
+  assert.deepEqual(['d90', 'd91', egg.id].map((id) => !!g.dragons.find((d) => d.id === id)!.hungry), [false, true, false]);
+  const grown = g.dragons.find((d) => d.id === egg.id)!;
+  assert.ok(grown.growth + grown.stage * 100 > was, 'the egg grows');
+});
+
+test('each kingdom adds 1 gold once a round, with no raid, and however many War Horns (#533)', () => {
+  const g = newGame(2, 7);
+  const all = (n: number) => Object.fromEntries(Object.keys(TARGETS).map((t) => [t, n]));
+  passRound(g); // only eggs: no raid
+  assert.deepEqual(g.hoard, all(1));
+  hatchAll(g);
+  passRound(g); // everyone holds back
+  assert.deepEqual(g.hoard, all(2));
+  keepAll(g);
+  g.players[g.turn].hand.push({ id: 'cwh', deck: 'action', key: 'war_horn' });
+  rich(g, g.turn);
+  apply(g, g.turn, { do: 'play', card: 'cwh' });
+  assert.equal(g.raidsLeft, 2);
+  passRound(g);
+  assert.deepEqual(g.hoard, all(3));
+});
+
+test('a Market is a production building: 1 point, counts Markets, not a trade building (#529)', () => {
+  const g = newGame(2, 7, 0);
+  keepAll(g);
+  const p = 0;
+  const hex = (around: string) => neighbors(around).filter((k) => g.map[k] && g.map[k].terrain !== 'ocean' && !g.buildings[k]);
+  const put = (k: string, type: string) => { g.map[k].fauna = undefined; g.buildings[k] = { type, owner: p, upgrades: [], floors: 0 }; };
+  const a = hex(g.towers[p]).find((k) => hex(k).some((n) => !neighbors(n).includes(g.towers[p])))!;
+  const before = score(g, p).buildings;
+  put(a, 'market');
+  assert.equal(score(g, p).buildings, before + 1);
+  assert.equal(production(g, p).gold.base, 0);
+  const b = hex(a).find((k) => !neighbors(k).includes(g.towers[p]))!;
+  put(b, 'market');
+  assert.equal(production(g, p).gold.base, 2, 'each counts the other');
+  for (const k of hex(a)) put(k, 'market');
+  assert.equal(buildingYield(g, a).makes.gold!.base, 3, 'up to 3');
+  for (const k of Object.keys(g.buildings)) if (g.buildings[k].type === 'market' && k !== a && k !== b) delete g.buildings[k];
+  // A Workshop goes on it as on any production building.
+  assert.equal(buildingYield(g, a, ['workshop']).makes.gold!.base, 1 + UPGRADES.workshop.baseBonus!);
+  rich(g, p);
+  g.players[p].hand.push({ id: 'cws', deck: 'building', key: 'workshop' }, { id: 'cgh', deck: 'building', key: 'guildhall' });
+  apply(g, p, { do: 'upgrade', card: 'cws', hex: a });
+  // No port anywhere: a Guildhall has nowhere to go.
+  assert.ok(seatState(g, p).hand.find((c) => c.id === 'cgh')!.blocked);
+  assert.throws(() => apply(g, p, { do: 'build', card: 'cgh', hex: hex(b)[0] }), RuleError);
+  // By the slain Thunderbird's peak it makes 2 more.
+  put(PEAK, 'market');
+  g.slain.thunderbird = p;
+  const there = buildingYield(g, PEAK).makes.gold!.base;
+  delete g.slain.thunderbird;
+  assert.equal(there - (buildingYield(g, PEAK).makes.gold?.base ?? 0), TUNING.peakBonus);
+});
+
+test('Growth Elixir only works on a fully healed dragon (#536)', () => {
+  const g = newGame(2, 7);
+  keepAll(g);
+  const p = g.turn;
+  rich(g, p);
+  const egg = g.dragons.find((d) => d.owner === p)!;
+  const id = egg.id;
+  const now = () => g.dragons.find((d) => d.id === id)!;
+  const elixir = () => seatState(g, p).hand.find((c) => c.id === 'ce1')!;
+  g.players[p].hand = [{ id: 'ce1', deck: 'action', key: 'growth_elixir' }, { id: 'ce2', deck: 'action', key: 'growth_elixir' }];
+  egg.stage = 1;
+  for (const damage of [1, DRAGONS[egg.key].stages[0].hp]) {
+    now().damage = damage;
+    assert.throws(() => apply(g, p, { do: 'play', card: 'ce1', dragon: id }), /is hurt: heal it first/);
+    assert.deepEqual(elixir().dragons, []);
+    assert.match(elixir().why!, /are hurt: heal one first/);
+  }
+  now().stage = 0;
+  now().damage = 0;
+  now().growth = 1;
+  assert.deepEqual(elixir().dragons, [id]);
+  apply(g, p, { do: 'play', card: 'ce1', dragon: id }); // an egg
+  assert.deepEqual([now().stage, now().growth], [1, 0]);
+  apply(g, p, { do: 'play', card: 'ce2', dragon: id });
+  assert.equal(now().stage, 2);
+});
+
+test('cards are drawn in turn order, and the log says who keeps 1 of 2 (#537)', () => {
+  const g = newGame(3, 7, 1);
+  const draws = (from: number) => g.log.slice(from).flatMap((e) => (e.ev?.k === 'draw' ? [e.ev.p] : []));
+  assert.deepEqual(draws(0), [1, 2, 0]);
+  const from = g.log.length;
+  keepAll(g);
+  g.decks.building = g.decks.building.slice(0, 3);
+  g.discards.building = [];
+  for (const pl of g.players) pl.hand = [];
+  passRound(g);
+  const order = turnOrder(g);
+  assert.deepEqual(draws(from), order);
+  assert.deepEqual(order.map((p) => g.players[p].choice.length), [2, 0, 0], 'the second drew 1 and kept it');
+  assert.deepEqual(order.map((p) => g.players[p].hand.filter((c) => c.deck === 'building').length), [0, 1, 0]);
+  const said = g.log.slice(from).map((e) => e.text);
+  assert.ok(said.includes('Each player who drew 2 building cards keeps 1.'));
+  assert.ok(!said.some((t) => /^Everyone keeps/.test(t)));
+});
+
 test('a tower floor is built without a card, for gold, and is worth no points', () => {
   const g = newGame(2, 7);
   keepAll(g);
@@ -723,8 +847,12 @@ test('raid loot is split by the combat power still fighting at the end, when eve
     const end = g.log.findLast((e) => e.ev?.k === 'raidEnd')!.ev!;
     if (end.k !== 'raidEnd' || !end.won) continue;
     assert.equal(loot.gold, TARGETS.archers_hold.loot.gold! + hoard.archers_hold);
-    // The kingdom that fell is back to its printed loot; every other one adds 1 gold.
-    for (const t of Object.keys(TARGETS)) assert.equal(g.hoard[t], t === 'archers_hold' ? 0 : hoard[t] + 1, t);
+    // The kingdom that fell is back to its printed loot; the rest add their gold after the round's last raid.
+    for (const t of Object.keys(TARGETS)) assert.equal(g.hoard[t], t === 'archers_hold' ? 0 : hoard[t], t);
+    const after = structuredClone(g);
+    passRaids(after);
+    assert.equal(after.hoard.archers_hold, 0, 'it fell this round, so it adds nothing after the last raid');
+    assert.equal(after.hoard.brindle, hoard.brindle + 1);
     const power = g.players.map((_, p) => { const i = end.winners.indexOf(p); return i < 0 ? 0 : end.power[i]; });
     const shares = splitLoot(loot, power);
     for (const r of RESOURCES) {
@@ -1062,7 +1190,7 @@ test('placing a building shows what it would do on each hex, peak bonus or not',
   assert.deepEqual(pasture.after[ring], { makes: { livestock: { base: TUNING.peakBonus, dice: [4] } }, houses: 0, points: 1, peak: 'more' });
   const hatchery = s.hand.find((c) => c.id === 'ch')!;
   assert.ok(hatchery.hexes.includes(ring));
-  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, note: BUILDINGS.hatchery.text, peak: 'none' });
+  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, growth: 1, peak: 'none' });
   // Away from the peak, no word of it; and nothing is built by asking.
   const far = pasture.hexes.find((k) => k !== PEAK && !neighbors(PEAK).includes(k));
   if (far) assert.equal(pasture.after[far].peak, undefined);

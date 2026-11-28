@@ -324,6 +324,7 @@ export const SCENES: Scene[] = [
       { file: 'phone-home-rules', caption: 'Phone: Rules tapped on the home page: the rulebook at How to play', client: 'phone', path: '/', clicks: ['#book'], waitFor: '.bookpage .bphases', sizes: true },
       { file: 'phone-join-rules', caption: "Phone: Rules tapped at a room's address, before joining", client: 'phone', clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic' },
       { file: 'phone-lobby-rules', caption: 'Phone: Rules tapped in the lobby', client: 'phone', seat: 1, clicks: ['#book'], waitFor: '.bookpage .bphases' },
+      { file: 'desktop-home-rules', caption: 'Desktop: the rulebook over the home page, scrolling', client: 'tv', path: '/', window: [1280, 720], clicks: ['#book'], waitFor: '.bookpage .bphases' },
       { file: 'desktop-home', caption: 'Desktop: the home page', client: 'tv', path: '/', window: [1440, 900], waitFor: '#join' },
       { file: 'desktop-home-720', caption: "Desktop: the home page on a TV's browser or a small laptop", client: 'tv', path: '/', window: [1280, 720], waitFor: '#join' },
       { file: 'desktop-join', caption: "Desktop: a room's address still goes straight to joining it", client: 'tv', path: (room) => `/${room.code}`, window: [1440, 900], waitFor: '#join' },
@@ -1387,6 +1388,20 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // Growth Elixir with every dragon that can grow hurt (#536).
+    name: 'elixir-hurt-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      arm(g, g.turn, [1, 2, 3]);
+      g.dragons.filter((d) => d.owner === g.turn).forEach((d) => (d.damage = 2));
+      giveHand(g, g.turn, ['growth_elixir']);
+      g.players[g.turn].resources.gold = 9;
+    },
+    shots: (g) => [{ file: 'phone-elixir-hurt-2p', caption: "Phone: Growth Elixir can't be played: every dragon that can grow is hurt", client: 'phone', seat: g!.turn, clicks: ['[data-card]'] }],
+  },
+  {
     name: 'empty-hand-2p',
     players: 2,
     seed: 1,
@@ -1792,7 +1807,7 @@ export const SCENES: Scene[] = [
   {
     // Building by the freed peak (#366): a hex tapped shows what the building
     // would do there before Build, a Pasture with the peak's 2 more, and a
-    // Hatchery, which makes no resource, told it makes nothing more.
+    // Hatchery, which makes no resource, told the peak adds nothing.
     name: 'peak-build-3p',
     players: 3,
     seed: 1,
@@ -1812,7 +1827,7 @@ export const SCENES: Scene[] = [
       const peakHex = (hexes: string[]) => hexes.find((k) => k === PEAK || neighbors(PEAK).includes(k))!;
       const pasture = peakHex(me.basics.find((b) => b.key === 'pasture')!.hexes);
       return [
-        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that it makes nothing more', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
+        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that the peak adds nothing', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
         { file: 'phone-peak-build-pasture-3p', caption: "Phone: a hex by the freed peak tapped for a Pasture: what it makes there, the peak's 2 more included", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-basic=pasture]', `.pmap [data-hex="${pasture}"]`] },
       ];
     },
@@ -1965,6 +1980,7 @@ export const SCENES: Scene[] = [
       })),
       { file: 'phone-rules-marks-3p', caption: 'Phone: the rulebook, further down its board tab: borders and marks on the board', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="board"]'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = document.querySelectorAll('.bookpage .bhead')[1].offsetTop - document.querySelector('.bookpage').offsetTop` },
       { file: 'phone-rules-trade-3p', caption: 'Phone: the rulebook, at the trade buildings on its buildings tab: the four ports', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `const p = document.querySelector('.bookpage'); p.scrollTop = [...p.querySelectorAll('.bhead')].find((h) => h.textContent === 'Trade buildings').offsetTop - p.offsetTop` },
+      { file: 'phone-rules-gold-3p', caption: 'Phone: the rulebook, at the gold buildings on its buildings tab: the Market', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `const p = document.querySelector('.bookpage'); p.scrollTop = [...p.querySelectorAll('.bhead')].find((h) => h.textContent === 'Gold buildings').offsetTop - p.offsetTop` },
       { file: 'phone-rules-upgrades-3p', caption: 'Phone: the rulebook, at the end of its buildings tab: the upgrades', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = 1e6` },
       { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
       { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },
