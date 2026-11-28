@@ -7,10 +7,11 @@
 // while the server holds the table for it; the phone, not this page, decides
 // when to show it (view.ts).
 
+import { openRoom } from './tvroom.ts';
 import { steady } from './taps.ts';
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, firstPlayer, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, starterName, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
@@ -57,6 +58,8 @@ async function load3d(): Promise<typeof import('./board3d.ts') | null> {
 }
 const remote = new URLSearchParams(location.search).has('remote');
 
+const notice = (kind: 'loading' | 'noroom', html: string) => (app.innerHTML = `<div class="${kind}"><h1 class="title">board-lite</h1>${html}</div>`);
+
 async function boot() {
   const params = new URLSearchParams(location.search);
   code = (params.get('room') ?? '').toUpperCase();
@@ -74,30 +77,17 @@ async function boot() {
   // If three.js can't load, the TV still runs, on the flat map.
   fight3d = await load3d();
   Board3DClass = fight3d?.Board3D ?? null;
-  hostToken = localStorage.getItem(`tv:${code}`) ?? '';
-  if (code) {
-    const room = await fetch(`/api/rooms/${code}?token=${hostToken}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    if (!room) code = '';
-    isHost = !!room?.host;
-    // No TV watching this room (one made from a phone, or this TV's token is
-    // in another browser): this one becomes its TV, buttons and all.
-    if (room && !isHost) {
-      const r = await post(`/api/rooms/${code}/tv`, {}).catch(() => null);
-      if (r?.hostToken) {
-        hostToken = String(r.hostToken);
-        isHost = true;
-        localStorage.setItem(`tv:${code}`, hostToken);
-      }
-    }
+  const asked = code;
+  if (asked) notice('loading', `<p>Opening room ${esc(asked)}…</p>`);
+  const room = await openRoom(asked, localStorage.getItem(`tv:${asked}`) ?? '', (ok) => document.body.classList.toggle('offline', !ok));
+  if (!room) {
+    notice('noroom', `<p>No room with code ${esc(asked)}: check the code.</p><button id="newroom" class="primary">Open a new room</button>`);
+    $('newroom').onclick = () => location.assign('/tv');
+    return;
   }
-  if (!code) {
-    const r = await post('/api/rooms', {});
-    code = String(r.code);
-    hostToken = String(r.hostToken);
-    isHost = true;
-    localStorage.setItem(`tv:${code}`, hostToken);
-    history.replaceState(null, '', `/tv?room=${code}`);
-  }
+  ({ code, hostToken, isHost } = room);
+  if (isHost) localStorage.setItem(`tv:${code}`, hostToken);
+  if (!asked) history.replaceState(null, '', `/tv?room=${code}`);
   lan = await fetch('/api/info').then((r) => r.json()).catch(() => lan);
   savedGames = await fetch('/api/saved').then((r) => r.json()).catch(() => []);
   // A room the server no longer has (forgotten after hours idle): open a new one.
@@ -214,7 +204,7 @@ function renderLobby() {
       ${isHost ? `<button class="x" data-remove="${s.id}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`).join('')
     + (l.seating ? '' : Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join(''));
   const canStart = l.seats.length >= l.minPlayers;
-  const first = firstPlayer(l);
+  const first = starterName(l);
   const hint = l.seating ? 'The game goes on once every seat is taken.'
     : !canStart ? `Waiting for ${l.minPlayers - l.seats.length} more player${l.minPlayers - l.seats.length > 1 ? 's' : ''} (a bot counts).`
     : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')

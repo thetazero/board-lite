@@ -390,13 +390,14 @@ const SEATING: &str = "The game goes on once every seat is taken.";
 
 pub fn lobby_text(l: &Lobby) -> String {
     let names = table_text(l, None);
+    let starter = l.starter.and_then(|p| l.seats.get(p)).map_or("the first to join", |s| s.name.as_str());
     format!(
-        "Room {}, in the lobby: {}. {} to {} players; {}.",
+        "Room {}, in the lobby: {}. {} to {} players; {}{starter} starts.",
         l.code,
         if names.is_empty() { "no one yet" } else { &names },
         l.min_players,
         l.max_players,
-        if l.remote { "the first to join starts" } else { "the TV or the first to join starts" }
+        if l.remote { "" } else { "the TV or " }
     )
 }
 

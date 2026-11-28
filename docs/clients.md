@@ -22,11 +22,11 @@ board-lite is running on port 8080.
 
 1. **TV:** open the TV address (or the bare address on the TV or a desktop, and press **Host on this screen**; on a phone, **Host on a TV** says what to open on the TV) and press **Full screen** in the top corner (or F11). The button is always there in the lobby; in a game it shows while the mouse moves. It shows the room's QR code, address and 4-letter code. While people join, it plays a minute's explanation of the game, over and over. The server's terminal prints the commands that seat a CLI or Claude player in each new room.
 2. **Phones:** scan the QR code (or type the address), type a name, tap **Join**. The name is remembered.
-3. **Start:** with 2 to 6 players, press **Start game** on the TV or the phone of the first to join. **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
+3. **Start:** with 2 to 6 players, press **Start game** on the TV or the phone of the first to join (if they leave, or are away for a minute, of the next player who is here). **Add a bot** fills a seat with the test bot; the same two remove anyone with **×**. A second TV opened on the room's address shows the room but has no buttons, unless no other TV is watching: then it becomes the TV.
 
 **Phones can't connect?** They must be on the same Wi-Fi as the server, or the same tailnet using its Tailscale address, and the firewall must allow the port (ufw: `sudo ufw allow 8080/tcp`, or `sudo ufw allow in on tailscale0`). Some guest Wi-Fi blocks devices from reaching each other.
 
-**Reconnecting:** a phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. A page whose connection goes quiet (no word from the server for 40 seconds, though it pings every 15) connects again by itself, so it never sits on an old moment of the game until someone reloads it. On another phone, open the room's address and tap your name.
+**Reconnecting:** a TV that reloads while the server fails keeps trying until its game is back; a TV address with a wrong code says so and offers a new room. A phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. A page whose connection goes quiet (no word from the server for 40 seconds, though it pings every 15) connects again by itself, so it never sits on an old moment of the game until someone reloads it. On another phone, open the room's address and tap your name.
 
 **Nobody stalls the table:**
 

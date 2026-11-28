@@ -365,6 +365,7 @@ pub struct Lobby {
     pub seats: Vec<LobbySeat>,
     pub min_players: usize,
     pub max_players: usize,
+    pub starter: Option<usize>, // the seat that can start the game (with the TV)
     pub file: String,
     pub remote: bool,
 }

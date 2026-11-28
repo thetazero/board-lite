@@ -89,6 +89,8 @@ struct SavedSeat {
     left: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     strong: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    claude: bool,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -391,7 +393,7 @@ impl Room {
             let seat = i.new_seat(s.name, s.kind);
             let uid = if s.id == 0 { seat.uid } else { s.id }; // (saved before seats had ids)
             // Everyone has as long to come back as if their phone had just dropped.
-            i.seats.push(Seat { uid, token: s.token, seen: now_ms(), stand_in: s.stand_in, left: s.left, strong: s.strong, ..seat });
+            i.seats.push(Seat { uid, token: s.token, seen: now_ms(), stand_in: s.stand_in, left: s.left, strong: s.strong, via: s.claude.then_some("claude"), ..seat });
         }
         if let Some(g) = &i.game {
             let seats: Vec<Value> = i.seats.iter().map(|s| json!({"name": s.name, "kind": s.kind.name(), "standIn": s.stand_in, "left": s.left})).collect();
@@ -468,7 +470,7 @@ impl Room {
             remote: !i.has_tv,
             saved_at: i.saved_at,
             last_id: i.next_uid,
-            seats: i.seats.iter().map(|s| SavedSeat { id: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            seats: i.seats.iter().map(|s| SavedSeat { id: s.uid, name: s.name.clone(), token: s.token.clone(), kind: s.kind, stand_in: s.stand_in, left: s.left, strong: s.strong, claude: s.via == Some("claude") }).collect(),
         };
         let text = json!(saved).to_string();
         if text == i.saved_seats {
@@ -634,8 +636,9 @@ impl Room {
     }
     pub fn add_bot(&self, tok: &str, strong: bool) -> Res {
         let i = &mut *lock(&self.inner);
+        i.seat_of(tok);
         if !self.can_start(i, tok) {
-            return no("Only the TV or the first to join can add bots.");
+            return no(format!("Only {} can add bots.", self.who_starts(i)));
         }
         let free = ["Tick", "Gizmo", "Widget", "Pinion", "Cog", "Ratchet", "Bolt"].into_iter().find(|n| !i.seats.iter().any(|s| s.kind != Kind::Open && s.name.eq_ignore_ascii_case(n)));
         let name = free.map_or_else(|| format!("Cog {}", i.seats.len() + 1), |n| n.into());
@@ -643,7 +646,7 @@ impl Room {
         self.join_as(i, &name, Kind::Bot, None, strong && self.home)?;
         Ok(())
     }
-    /// A player leaves the lobby; the TV or first player can remove anyone, by
+    /// A player leaves the lobby; the TV or whoever can start can remove anyone, by
     /// the seat's id: its number may be someone else's by now.
     pub fn leave(&self, tok: &str, id: Option<u64>) -> Res {
         let i = &mut *lock(&self.inner);
@@ -756,15 +759,30 @@ impl Room {
         Ok(())
     }
     fn can_start(&self, i: &Inner, tok: &str) -> bool {
-        tok == self.host || i.seats.first().is_some_and(|s| s.token == tok && s.kind == Kind::Player)
+        tok == self.host || self.starter(i).is_some_and(|p| i.seats[p].token == tok)
+    }
+    /// Who starts the game from their seat: the first player who is here. A
+    /// Claude player has no way to, so it's only ever one if no one else could be.
+    fn starter(&self, i: &Inner) -> Option<usize> {
+        let now = now_ms();
+        let players = (0..i.seats.len()).filter(|p| i.seats[*p].kind == Kind::Player);
+        players.min_by_key(|p| {
+            let s = &i.seats[*p];
+            (s.via == Some("claude"), !s.here(now, self.opts.away_ms))
+        })
+    }
+    fn who_starts(&self, i: &Inner) -> String {
+        let name = self.starter(i).map_or("the first to join", |p| i.seats[p].name.as_str());
+        if i.has_tv { format!("the TV or {name}") } else { name.into() }
     }
     pub fn start(&self, tok: &str) -> Res {
         self.start_seeded(tok, now_ms())
     }
     pub fn start_seeded(&self, tok: &str, seed: i64) -> Res {
         let i = &mut *lock(&self.inner);
+        i.seat_of(tok);
         if !self.can_start(i, tok) {
-            return no("Only the TV or the first to join can start the game.");
+            return no(format!("Only {} can start the game.", self.who_starts(i)));
         }
         if i.game.is_some() || self.file.exists() {
             return no("The game has already started.");
@@ -1020,6 +1038,7 @@ impl Room {
             seats: i.seats.iter().map(|s| LobbySeat { id: s.uid, name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
             min_players: MIN_PLAYERS,
             max_players: MAX_PLAYERS,
+            starter: self.starter(i),
             file: if self.home { self.file.display().to_string() } else { String::new() }, // a public website doesn't say where its files are
             remote: !i.has_tv,
         }
@@ -1083,6 +1102,7 @@ impl Room {
                     i.has_tv = true;
                     self.changed(i);
                 }
+                self.schedule_bot(i); // after a restart, a game of only bots has no one else to wake it
             }
             i.log.write("connect", if tv { &Sender::TV } else { &Sender::GAME }, json!({"what": if tv { "tv" } else { "screen" }}));
             return Here { room, who: Who::Screen { tv } };

@@ -224,6 +224,7 @@ export interface Lobby {
   seats: { id: number; name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean; strong?: boolean }[];
   minPlayers: number;
   maxPlayers: number;
+  starter?: number | null; // the seat that can start the game (with the TV)
   file: string; // where the server saves the game
   remote: boolean; // no TV: a phone made the room, and each phone shows the table itself
 }

@@ -85,8 +85,10 @@ small { color: var(--muted); }
 .title, .topbar .phase, .production h1, .result h1, .endbox h1, .summary h1, .recap-page h1, .recap-page h2, .raidbox h1, .target h2, .result.fight h2, .panel h3, .corner.titles h3, .pover h1, .plobby h1, .pbody h2, .trade h3, .phone .status { font-family: var(--serif); }
 /* A ribbon: a strip of paper with notched ends, like the cards' name strips. */
 .doing, .phone .status.you, .topbar .phase { clip-path: polygon(0 0, 100% 0, calc(100% - .45em) 50%, 100% 100%, 0 100%, .45em 50%); }
-.loading { min-height: 100vh; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; color: var(--muted); }
-.loading .title { font-size: 2.5em; }
+.loading, .noroom { min-height: 100vh; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; color: var(--muted); }
+.loading .title, .noroom .title { font-size: 2.5em; }
+body.tv :is(.loading, .noroom) { font-size: 1.6em; }
+body.tv .noroom button { font-size: 1em; }
 .hidden { display: none !important; }
 
 .ptag { color: var(--pc); font-weight: 800; }
