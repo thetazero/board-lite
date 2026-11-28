@@ -1193,10 +1193,8 @@ body:has(.talkbar.open) .viewswitch { display: none; }
   .home .hero svg.scene { display: none; }
   .home .hero svg.scene + svg.scene { display: block; }
   .joinpage.home .hero .title { left: 6%; top: 50%; transform: translateY(-50%) rotate(-1.5deg); font-size: 4em; }
-  .hosthere { display: flex; flex-direction: column; gap: 1em; padding: 1.5em 0 1.5em 2em; text-align: center; }
+  .hosthere { display: flex; flex-direction: column; padding: 1.5em 0 1.5em 2em; text-align: center; }
   .hosthere .button.big { font-size: 1.9em; }
-  .hosthere p { margin: 0; font-size: 1.2em; text-wrap: balance; }
-  .hosthere .subtitle { color: var(--text); font-size: 1.4em; }
   .home .joinform { padding: 1.5em 2em 1.5em 3em; border-left: 1px dashed var(--line); }
   .home .joinform .subtitle { display: none; }
   .home #hosttv, .home #hosthow { display: none; }
