@@ -9,7 +9,7 @@ export const HOLD_COLORS: Record<string, string> = { thunderbird: '#5b4bb7', lev
 
 export const RESOURCES = ['stone', 'timber', 'crystal', 'livestock', 'gold'] as const;
 
-// The lobby and the join form show the goal before there's a game to read it from.
+// The TV shows the goal before there's a game to read it from.
 // It must match TUNING.pointsToWin in src/data.ts; test/server.test.ts checks it does.
 export const POINTS_TO_WIN = 50;
 

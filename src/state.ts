@@ -22,12 +22,12 @@ export interface HexView {
   peakZone?: number; // on or next to the freed peak: a production building here makes this many more each round
 }
 
-// What a building does each round on its hex (engine's buildingYield), with,
-// for a building whose effect is none of those (the Hatchery, a Port), its
-// card's words. What the phone shows for a hex before a beast or an upgrade
+// What a building does on its hex: what it makes, houses and is worth
+// (engine's buildingYield), and a Hatchery's or a Port's effect. What the phone shows for a hex before a beast or an upgrade
 // goes on it.
 export interface BuildingDoes extends BuildingYield {
-  note?: string;
+  growth?: number; // the extra steps its owner's dragons grow each round
+  rate?: { resource: string; rate: number }; // its owner trades this resource with the merchants at rate:1
   // Placing a building on or next to the freed peak (doesIfBuilt): 'more' if
   // it makes the peak's bonus there, 'none' if it makes no resource to add it to.
   peak?: 'more' | 'none';
@@ -300,7 +300,7 @@ export interface Recap {
 export interface BookBuilding { key: string; name: string; cls: string; text: string; cost: Res; terrain?: string; basic: boolean }
 export interface Rulebook {
   buildings: BookBuilding[]; // the basic buildings, then the building cards
-  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */; base: boolean /* also a special project */ }[];
+  upgrades: { key: string; name: string; text: string; cost: Res; on: string[] /* building classes */; project?: number /* also a special project, at this many times the cost */ }[];
   actions: { key: string; name: string; text: string; cost: Res; fauna?: FaunaView }[];
   dragons: { key: string; name: string; element: string; cost: Res; base: boolean; growth: number; targeting: string; stages: DragonStageView[] }[];
   fauna: FaunaView[];

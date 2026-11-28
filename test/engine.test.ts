@@ -1190,7 +1190,7 @@ test('placing a building shows what it would do on each hex, peak bonus or not',
   assert.deepEqual(pasture.after[ring], { makes: { livestock: { base: TUNING.peakBonus, dice: [4] } }, houses: 0, points: 1, peak: 'more' });
   const hatchery = s.hand.find((c) => c.id === 'ch')!;
   assert.ok(hatchery.hexes.includes(ring));
-  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, note: BUILDINGS.hatchery.text, peak: 'none' });
+  assert.deepEqual(hatchery.after![ring], { makes: {}, houses: 0, points: 0, growth: 1, peak: 'none' });
   // Away from the peak, no word of it; and nothing is built by asking.
   const far = pasture.hexes.find((k) => k !== PEAK && !neighbors(PEAK).includes(k));
   if (far) assert.equal(pasture.after[far].peak, undefined);

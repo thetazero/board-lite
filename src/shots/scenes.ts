@@ -1803,7 +1803,7 @@ export const SCENES: Scene[] = [
   {
     // Building by the freed peak (#366): a hex tapped shows what the building
     // would do there before Build, a Pasture with the peak's 2 more, and a
-    // Hatchery, which makes no resource, told it makes nothing more.
+    // Hatchery, which makes no resource, told the peak adds nothing.
     name: 'peak-build-3p',
     players: 3,
     seed: 1,
@@ -1823,7 +1823,7 @@ export const SCENES: Scene[] = [
       const peakHex = (hexes: string[]) => hexes.find((k) => k === PEAK || neighbors(PEAK).includes(k))!;
       const pasture = peakHex(me.basics.find((b) => b.key === 'pasture')!.hexes);
       return [
-        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that it makes nothing more', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
+        { file: 'phone-peak-build-hatchery-3p', caption: 'Phone: a hex by the freed peak tapped for a Hatchery: what it does there, and that the peak adds nothing', client: 'phone', seat: g!.turn, clicks: [card('c900'), '[data-pickhex]', `.pmap [data-hex="${peakHex(me.hand[0].hexes)}"]`] },
         { file: 'phone-peak-build-pasture-3p', caption: "Phone: a hex by the freed peak tapped for a Pasture: what it makes there, the peak's 2 more included", client: 'phone', seat: g!.turn, clicks: ['[data-tab=more]', '[data-basic=pasture]', `.pmap [data-hex="${pasture}"]`] },
       ];
     },
