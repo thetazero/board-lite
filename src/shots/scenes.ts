@@ -1142,6 +1142,19 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    name: 'ending-4p',
+    players: 4,
+    seed: 1,
+    until: (g) => g.phase === 'over',
+    shots: (g) => [{
+      file: 'phone-ending-4p', caption: "Phone: the game has ended, and the TV is playing its summary", client: 'phone', seat: (g!.winner! + 1) % 4, waitFor: '.watchtv',
+      then: (room) => {
+        room.connect(null, true);
+        room.mutate((x) => void x.log.push({ ...x.log.at(-1)! })); // the end, again: now a TV is there for it
+      },
+    }],
+  },
+  {
     name: 'over-4p',
     players: 4,
     seed: 1,

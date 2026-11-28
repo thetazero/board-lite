@@ -1249,6 +1249,8 @@ function showFinal(g: PublicState) {
         : `<div class="endactions">${recap ? '<button id="replay">Watch again</button>' : ''}<button class="primary" id="again">New game</button></div>`}</div>`);
   if (recap) $('replay').onclick = () => playSummary();
   if (remote) return;
+  // The winner is on the screen: the phones, which waited for it, may show it too.
+  if (snap?.ending) post(`/api/rooms/${code}/shown`, {}).catch(() => {}); // they don't wait long without it
   $('again').onclick = () => (location.href = '/tv');
 }
 
@@ -1259,6 +1261,10 @@ function updateOverlay(g: PublicState) {
   if (bannerUp) return;
   const next = banners.shift();
   if (next) return showBanner(next);
+  if (g.phase === 'over' && remote && snap?.ending) {
+    summaryPlayed = true; // the TV plays it: here the scores come after it
+    return hideOverlay();
+  }
   if (g.phase === 'over') return endHeld(g) ? undefined : showEnd(g);
   dropEndHold();
   if (g.phase === 'raid' && g.raid) return renderRaid(g);

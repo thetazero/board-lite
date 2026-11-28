@@ -31,6 +31,7 @@ const MAX_PLAYERS: usize = 6;
 const AWAY_MS: i64 = 60_000;
 const OPEN_MS: i64 = 180_000;
 const TV_GONE_MS: i64 = 20_000;
+const ENDING_MS: i64 = 75_000; // longer than the TV's titles, recap and summary take (web/tv.ts)
 const IDLE_MS: i64 = 6 * 60 * 60 * 1000;
 const BOT_DELAY_MS: i64 = 700;
 const CACHE_MS: i64 = 500; // how long a quiet room keeps the JSON it last sent
@@ -191,6 +192,8 @@ struct Inner {
     behind: bool, // the seats or the recap couldn't be saved when they changed
     screens: usize,
     scene_until: i64,
+    ending_until: i64, // the phones don't show the winner before the TV does, or this
+    ending_timer: Option<AbortHandle>,
     tvs: usize,
     has_tv: bool,
     recapped: bool,
@@ -208,6 +211,7 @@ pub struct Opts {
     pub away_ms: i64,
     pub open_ms: i64, // how long the game waits on someone who is here before their seat can be opened
     pub tv_gone_ms: i64,
+    pub ending_ms: i64, // how long phones wait at most for the TV to show the final scores
     pub idle_ms: i64, // how long with nothing happening before a game under way is saved, and any other room forgotten
     pub first_seat: Option<usize>,
     pub recap_id: Option<String>,
@@ -215,7 +219,7 @@ pub struct Opts {
 }
 impl Default for Opts {
     fn default() -> Opts {
-        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, idle_ms: IDLE_MS, first_seat: None, recap_id: None, ended: None }
+        Opts { bot_delay_ms: BOT_DELAY_MS, away_ms: AWAY_MS, open_ms: OPEN_MS, tv_gone_ms: TV_GONE_MS, ending_ms: ENDING_MS, idle_ms: IDLE_MS, first_seat: None, recap_id: None, ended: None }
     }
 }
 /// Where rooms and recaps go, and whether it's a home's server.
@@ -334,6 +338,9 @@ impl Inner {
     fn scene_left(&self) -> i64 {
         (self.scene_until - now_ms()).max(0)
     }
+    fn ending_left(&self) -> i64 {
+        (self.ending_until - now_ms()).max(0)
+    }
     fn watched(&self) -> bool {
         self.screens > 0 || (!self.has_tv && self.seats.iter().any(|s| s.via == Some("phone") && s.connected > 0))
     }
@@ -408,6 +415,8 @@ impl Room {
             behind: false,
             screens: 0,
             scene_until: 0,
+            ending_until: 0,
+            ending_timer: None,
             tvs: 0,
             has_tv: saved.as_ref().map_or(!remote, |s| !s.remote),
             recapped: false,
@@ -598,8 +607,9 @@ impl Room {
         i.log.events(&g.log, before, &by, Some(&command));
         i.public = None;
         i.game_rev += 1;
-        let ms = scenes::ms(&g.log[before..]);
+        let (ms, ends) = (scenes::ms(&g.log[before..]), ends(&g.log[before..]));
         self.hold_for(i, ms);
+        self.hold_end(i, ends);
         self.changed(i);
         Ok(())
     }
@@ -609,6 +619,31 @@ impl Room {
         }
         i.scene_until = now_ms().max(i.scene_until) + ms.ceil() as i64;
         self.wake_after_scene(i);
+    }
+    /// The game ends with a TV: the phones wait while it plays the game's summary.
+    /// A TV that just went may be reloading, and counts until it's gone.
+    fn hold_end(&self, i: &mut Inner, ends: bool) {
+        if !ends || (i.tvs == 0 && (!i.has_tv || i.tv_timer.is_none())) {
+            return;
+        }
+        let ms = i.scene_left() + self.opts.ending_ms;
+        i.ending_until = now_ms() + ms;
+        clear(&mut i.ending_timer);
+        i.ending_timer = self.after(ms + 1, |room, i| room.end_shown(i));
+    }
+    fn end_shown(&self, i: &mut Inner) {
+        i.ending_timer = None;
+        if i.ending_until > 0 {
+            i.ending_until = 0;
+            self.changed(i);
+        }
+    }
+    /// A TV shows the final scores. It needs no token: any TV page on the room, with
+    /// buttons or not, gives the winner away just the same.
+    pub fn final_shown(&self) {
+        let i = &mut *lock(&self.inner);
+        clear(&mut i.ending_timer);
+        self.end_shown(i);
     }
     fn wake_after_scene(&self, i: &mut Inner) {
         clear(&mut i.scene_timer);
@@ -1229,7 +1264,7 @@ impl Room {
             Some(g) => i.public.get_or_insert_with(|| json_bytes(&state::public_state(g))).clone(),
         });
         let recap = (i.recapped && i.phase() == Some(Phase::Over)).then_some(&self.recap_id);
-        let head = format!(r#","scene":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.version, json!(recap));
+        let head = format!(r#","scene":{},"ending":{},"v":{},"recap":{},"you":"#, i.scene_left(), i.ending_left(), i.version, json!(recap));
         match (&i.game, p.filter(|p| i.seats[*p].kind == Kind::Player)) {
             (Some(g), Some(p)) => {
                 let you = json_bytes(&state::seat_state(g, p));
@@ -1296,6 +1331,8 @@ impl Room {
             i.tv_timer = None;
             if i.tvs == 0 && i.has_tv {
                 i.has_tv = false;
+                i.ending_until = 0;
+                clear(&mut i.ending_timer);
                 room.changed(i);
             }
         });
@@ -1336,12 +1373,15 @@ impl Room {
     pub fn close(&self) {
         let i = &mut *lock(&self.inner);
         i.closed = true;
-        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer] {
+        for t in [&mut i.bot_timer, &mut i.away_timer, &mut i.open_timer, &mut i.scene_timer, &mut i.tv_timer, &mut i.ending_timer] {
             clear(t);
         }
     }
 }
 
+fn ends(news: &[crate::engine::LogEntry]) -> bool {
+    news.iter().any(|e| e.kind() == "final")
+}
 fn bot_plays(i: &Inner, p: usize) -> bool {
     i.seats.get(p).is_some_and(|s| s.kind == Kind::Bot || s.stand_in)
 }
@@ -1470,8 +1510,10 @@ pub mod stage {
             let Some(g) = i.game.as_ref() else { return no("The game hasn't started.") };
             i.log.events(&g.log, before, &Sender::GAME, None);
             let saved = store::save(&self.file, &**g);
-            let ms = scenes::ms(&g.log[before.min(g.log.len())..]);
+            let news = &g.log[before.min(g.log.len())..];
+            let (ms, ends) = (scenes::ms(news), ends(news));
             self.hold_for(i, ms);
+            self.hold_end(i, ends);
             self.changed(i);
             saved.map_err(|e| Fail::Server(e.to_string()))
         }
