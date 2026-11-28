@@ -650,6 +650,21 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // Six voters with long names, one of whom has voted: the line under the
+    // kingdoms keeps each player's mark beside them (#552).
+    name: 'vote-6p',
+    players: 6,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      for (const p of g.players.keys()) arm(g, p, [3, 2]);
+      toVote(g);
+      vote(g, byPower(g)[0], [turnOrder(g)[0]]);
+    },
+    shots: () => [{ file: 'tv-raid-vote-6p', caption: 'TV, raid vote (6 players, long names): everyone with their mark beside them', client: 'tv', sizes: true }],
+  },
+  {
     name: 'in-4p',
     players: 4,
     seed: 1,
@@ -1075,6 +1090,27 @@ export const SCENES: Scene[] = [
       for (const d of g.dragons) d.damage = Math.min(d.damage, stageStats(d)?.hp ?? 0);
     },
     shots: () => [{ file: 'tv-late-many-6p', caption: 'TV, late game (6 players): 12 or 13 dragons each', client: 'tv', sizes: true }],
+  },
+  {
+    // Knocked out and perched dragons, everyone's, beside growing ones (#546):
+    // the widest lines a panel's list of dragons has.
+    name: 'dragon-tags-4p',
+    players: 4,
+    seed: 1,
+    names: LONG_NAMES,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      const hexes = g.players.map((_, p) => Object.keys(g.buildings).find((k) => g.buildings[k].owner === p && g.buildings[k].type !== 'tower')!);
+      g.dragons = [];
+      for (const p of g.players.keys()) {
+        const add = (key: string, stage: number, more: Partial<Dragon> = {}) => g.dragons.push({ id: `d${g.nextId++}`, owner: p, key, stage, growth: 0, damage: 0, ...more });
+        add('ember_wyrm', 2, { damage: 99 });
+        add('reef_drake', p % 2 ? 2 : 1, { perch: hexes[(p + 1) % 4] });
+        add('bolt_drake', 0);
+      }
+      for (const d of g.dragons) d.damage = Math.min(d.damage, stageStats(d)?.hp ?? 0);
+    },
+    shots: () => [{ file: 'tv-dragon-tags-4p', caption: "TV (4 players): knocked out and perched dragons, each with its tag and health bar in full", client: 'tv', sizes: true }],
   },
   {
     name: 'late-2p',
