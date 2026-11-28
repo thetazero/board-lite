@@ -14,6 +14,7 @@ import {
   ELEMENT_COLORS, PLAYER_COLORS, starterName, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
+import { TITLE_READ_MS, TITLE_TOAST_MS, TitleNews, type TitleChange } from './titles.ts';
 import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D, Fighter } from './board3d.ts';
@@ -107,6 +108,8 @@ function onSnapshot(s: Snapshot) {
     clearOverlay();
     if (remote) return void (app.innerHTML = '');
     if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
+    dropTitleToasts();
+    if (s.game) titleNews.skip(s.game);
     return renderLobby();
   }
   if (s.game.phase !== 'over') sawPlay = true;
@@ -129,6 +132,7 @@ function onSnapshot(s: Snapshot) {
   if (!shown || (!bannerUp && !banners.length)) renderGame(s.game);
   else renderGame(shown);
   updateOverlay(s.game);
+  tellTitles();
 }
 
 // Mid-game, the table hears when someone quits, when a bot starts playing for
@@ -467,6 +471,7 @@ function renderGame(g: PublicState) {
   // Open offers sit just below the turn order, however many lines it wraps to.
   const orderEl = app.querySelector<HTMLElement>('.board > .turnorder'), offersEl = app.querySelector<HTMLElement>('.board > .offers');
   if (!remote && orderEl && offersEl) offersEl.style.top = `${orderEl.getBoundingClientRect().bottom - app.querySelector<HTMLElement>('.board')!.getBoundingClientRect().top + 6}px`;
+  if (!remote) titleToastBox().style.top = `${Math.max(0, ...[orderEl, offersEl].map((el) => el?.getBoundingClientRect().bottom ?? 0)) + 10}px`;
   // The feed shows the newest lines at the bottom; an older one that only
   // partly fits at the top is dropped rather than shown sliced in half.
   for (const ul of app.querySelectorAll<HTMLElement>('.side ul.feed')) {
@@ -1166,6 +1171,7 @@ function playSummary(from = 0) {
   if (!recap) return;
   if (summary) clearTimeout(summary.timer);
   summaryPlayed = true;
+  cutTitleToasts();
   summary = { step: from, timer: 0 };
   summaryStep();
 }
@@ -1237,6 +1243,7 @@ function showFinal(g: PublicState) {
         ? recap ? `<div class="endactions"><button id="replay">Watch again</button><a class="button primary" href="/recap/${recap.id}" target="_blank" rel="noopener">Open the recap</a></div>` : ''
         : `<div class="endactions">${recap ? '<button id="replay">Watch again</button>' : ''}<button class="primary" id="again">New game</button></div>`}</div>`);
   if (recap) $('replay').onclick = () => playSummary();
+  tellTitles();
   if (remote) return;
   $('again').onclick = () => (location.href = '/tv');
 }
@@ -1258,6 +1265,7 @@ let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
   bannerUp = true;
+  cutTitleToasts();
   bannerTop = b.top ?? null;
   const key = `banner ${++bannerN}`;
   const box = showOverlay('banner', key, b.html);
@@ -1285,6 +1293,7 @@ function endBanner() {
   updateOverlay(snap.game);
   if (!bannerUp) {
     renderGame(snap.game); // the scenes are over: the board catches up
+    tellTitles();
   }
 }
 
@@ -1362,6 +1371,56 @@ function note(html: string) {
   setTimeout(() => fadeAway(t), 8000);
 }
 
+// A title that changes hands: who takes it, and who loses it, with the points
+// each way, at the top for a few seconds over the board or a raid's step, but
+// never over a scene (the recap is one too). The TV only, not a phone's table view.
+const titleNews = new TitleNews();
+let titleToasts: { change: TitleChange; el: HTMLElement; since: number; timer: number }[] = [];
+
+function tellTitles() {
+  const g = snap?.game;
+  if (remote || !g || bannerUp || banners.length || summary) return;
+  if (g.phase === 'over' && overlayKey !== 'end') return; // the recap is about to play
+  for (const change of titleNews.next(g)) {
+    const { key, name, from, to } = change;
+    const pts = (sign: string) => `<span class="tpts">${sign}${iconText(`${g.titlePoints} points`)}</span>`;
+    const title = `${icon(TITLE_ICON[key], 1.2)}<b>${esc(name)}</b>`;
+    const el = document.createElement('div');
+    el.className = 'toast title-toast';
+    el.style.setProperty('--pc', PLAYER_COLORS[to ?? from!]);
+    el.innerHTML = `<div>${to === null ? `No one holds ${title}` : `${playerTag(to, names)} takes ${title} ${pts('+')}`}</div>${from === null ? '' : `<small>${to === null ? '' : 'from '}${playerTag(from, names)} ${pts('−')}</small>`}`;
+    titleToastBox().append(el);
+    const t = { change, el, since: performance.now(), timer: 0 };
+    t.timer = window.setTimeout(() => {
+      titleToasts = titleToasts.filter((x) => x !== t);
+      fadeAway(el);
+    }, TITLE_TOAST_MS);
+    titleToasts.push(t);
+  }
+}
+
+// renderGame keeps it under the turn order and any open trade offers.
+function titleToastBox(): HTMLElement {
+  let box = document.getElementById('titletoasts');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'titletoasts';
+    document.body.append(box);
+  }
+  return box;
+}
+
+// A scene starts: they go at once, and one the table had no time to read comes back after it.
+function cutTitleToasts() {
+  titleNews.unread(titleToasts.filter((t) => performance.now() - t.since < TITLE_READ_MS).map((t) => t.change));
+  dropTitleToasts();
+}
+
+function dropTitleToasts() {
+  titleToasts.forEach((t) => clearTimeout(t.timer));
+  titleToasts = [];
+  document.getElementById('titletoasts')?.replaceChildren(); // one fading away too
+}
 
 function toast(e: unknown) {
   const t = document.createElement('div');

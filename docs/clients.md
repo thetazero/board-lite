@@ -28,6 +28,8 @@ board-lite is running on port 8080.
 
 **Reconnecting:** a TV that reloads while the server fails keeps trying until its game is back; a TV address with a wrong code says so and offers a new room. A phone that reloads, sleeps or drops off the Wi-Fi gets its seat back when the page is open again. A page whose connection goes quiet (no word from the server for 40 seconds, though it pings every 15) connects again by itself, so it never sits on an old moment of the game until someone reloads it. On another phone, open the room's address and tap your name.
 
+**Titles:** when a title changes hands, the TV says so at the top for a few seconds: who takes it and who loses it, with the points each way (`web/titles.ts`). It holds nothing up and never shows over a scene: a title that changes in one is told after it.
+
 **Nobody stalls the table:**
 
 - **Element wheel:** the ring of colored dots by your points on the phone opens the rulebook at **Elements**: which element beats which.
