@@ -116,11 +116,7 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
   app.innerHTML = `
     <div class="joinpage${known ? '' : ' home'}">
       <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}${known ? '' : tableScene(PLAYER_COLORS.slice(0, 3), 480, 124, 0.4, 1)}<h1 class="title">board-lite</h1></div>
-      ${known ? '' : `<div class="hosthere">
-        <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
-        <a class="button primary big" href="/tv">Host on this screen</a>
-        <p>The board is on this screen. Everyone joins on their phone.</p>
-      </div>`}
+      ${known ? '' : `<div class="hosthere"><a class="button primary big" href="/tv">Host on this screen</a></div>`}
       <form class="joinform" id="join">
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
