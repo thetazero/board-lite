@@ -180,9 +180,11 @@ export interface Game {
   closedOffers?: ClosedOffer[]; // the latest no longer open, so a late answer to one hears why
   raidsLeft: number;
   raid: Raid | null;
-  // Gold each kingdom has added to its printed loot: 1 after every raid it
-  // doesn't fall in, back to 0 when it falls (#99).
+  // Gold each kingdom has added to its printed loot: 1 each round it
+  // doesn't fall in, raid or not, back to 0 when it falls (#99, #533).
+  // `fell`: the kingdoms that fell this round, in its raids so far.
   hoard: Record<string, number>;
+  fell?: string[];
   titles: Record<Title, number | null>;
   slain: Record<string, number>; // great beasts slain, and by whom
   raidPoints: number[]; // each player's points from kingdoms that score (#321)

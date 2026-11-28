@@ -653,7 +653,7 @@ impl Bot<'_> {
                     match a.effect {
                         "gain_gold" => one(None, None),
                         "gain_resource" => Resource::ALL[..4].iter().for_each(|r| one(Some(*r), None)),
-                        "grow_dragon" => g.dragons_of(p).filter(|d| d.stage < 3).for_each(|d| one(None, Some(d.id))),
+                        "grow_dragon" => g.dragons_of(p).filter(|d| d.stage < 3 && d.damage == 0).for_each(|d| one(None, Some(d.id))),
                         "heal_dragon" => g.dragons_of(p).filter(|d| d.damage > 0).for_each(|d| one(None, Some(d.id))),
                         _ => {}
                     }

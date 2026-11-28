@@ -67,7 +67,7 @@ pub fn candidates(g: &Game, p: usize, rng: &mut Rng) -> Vec<Command> {
                 match DATA.actions[c.key.0].effect {
                     "gain_resource" => out.push(play(Some(rng.pick(&Resource::ALL[..4])), None, None)),
                     "gain_gold" | "extra_raid" => out.push(play(None, None, None)),
-                    "grow_dragon" => some(g.dragons_of(p).filter(|d| d.stage < 3).map(|d| d.id).collect(), &mut out, rng),
+                    "grow_dragon" => some(g.dragons_of(p).filter(|d| d.stage < 3 && d.damage == 0).map(|d| d.id).collect(), &mut out, rng),
                     "heal_dragon" => some(g.dragons_of(p).filter(|d| d.damage > 0).map(|d| d.id).collect(), &mut out, rng),
                     "send_fauna" => {
                         let theirs: Vec<K> = g.buildings.iter().filter(|(k, b)| b.owner != p && !b.tower() && g.map[*k].fauna.is_none()).map(|(k, _)| *k).collect();
