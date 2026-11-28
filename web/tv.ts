@@ -16,6 +16,7 @@ import { ART_DEFS, tableScene, towerToken, winnerScene } from './art.ts';
 import { backdrop, burst, crown, dragonFigure, unitFigure } from './arena.ts';
 import type { Board3D, Fighter } from './board3d.ts';
 import { qrSvg } from './qr.ts';
+import { explain, type Explainer } from './explain.ts';
 import { nextTip, TIP_MS, TIPS } from './tips.ts';
 import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-view.ts';
 import type { Recap } from '../src/state.ts';
@@ -173,8 +174,9 @@ function tailscaleUrl(): string | null {
   return t && lan.lan.length ? joinUrl(t) : null;
 }
 
-// The lobby's tip (tips.ts): a random one, changed every TIP_MS. Only the
+// The tip (tips.ts) in the lobby of a game already under way: a random one, changed every TIP_MS. Only the
 // tip's text changes, so the rest of the lobby stays still under it.
+let explainer: Explainer | null = null;
 let tip = Math.floor(Math.random() * TIPS.length);
 setInterval(() => {
   const el = document.getElementById('tip');
@@ -185,9 +187,17 @@ setInterval(() => {
 
 // The lobby: who's at the table, and how to join. A game file hosted again
 // comes back here until every seat is taken: its seats are the game's, the
-// open ones waiting in their player's colour. A saved game waits here too,
+// open ones waiting in their player's colour. A new game's lobby explains the
+// game while people join (explain.ts); only what's under that is drawn again
+// as they do, so it plays on. A saved game waits here too,
 // with Continue in place of Start game, until someone continues it. A new
 // room offers the server's saved games.
+// The 3D board, made when first shown: the explanation plays on the game's own.
+function theBoard(): Board3D | null {
+  if (board3d === undefined) board3d = Board3DClass?.supported() ? new Board3DClass() : null;
+  return board3d;
+}
+
 function renderLobby() {
   const l = snap!.lobby;
   if (l.saved) return renderSaved();
@@ -206,9 +216,8 @@ function renderLobby() {
     : !canStart ? `Waiting for ${l.minPlayers - l.seats.length} more player${l.minPlayers - l.seats.length > 1 ? 's' : ''} (a bot counts).`
     : isHost ? (first ? `Or start from ${esc(first)}'s phone.` : '')
     : first ? `${esc(first)} starts the game.` : 'The TV that made the room starts the game.';
-  app.innerHTML = `
-    <div class="lobby">
-      <div class="hero">${tableScene(seated, 480, 124, 0.4, 1)}${nameplate()}</div>
+  const scene = `${tableScene(seated, 480, 124, 0.4, 1)}${nameplate(!!snap!.game)}`; // a new game's explanation says the goal itself
+  const main = `
       <div class="lobby-main">
         ${joinBox(l.seating ? 'Take your seat on your phone' : 'Join on your phone')}
         <div class="table">
@@ -220,9 +229,20 @@ function renderLobby() {
           </div>` : ''}
           ${hint ? `<p class="hint">${hint}</p>` : ''}
         </div>
-      </div>
-      ${(isHost && !snap!.game && savedList()) || `<p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p>`}
-    </div>`;
+      </div>`;
+  if (snap!.game) {
+    app.innerHTML = `<div class="lobby"><div class="hero">${scene}</div>${main}<p class="tipline"><b>Tip</b> <span id="tip">${esc(TIPS[tip])}</span></p></div>`;
+  } else {
+    const saved = isHost ? savedList() : '';
+    let under = app.querySelector<HTMLElement>('.lobby.new > .under');
+    if (under && explainer) explainer.title(scene);
+    else {
+      app.innerHTML = '<div class="lobby new"><div class="hero explain"></div><div class="under"></div></div>';
+      under = app.querySelector<HTMLElement>('.under')!;
+      explainer = explain(app.querySelector<HTMLElement>('.explain')!, scene, theBoard(), fight3d);
+    }
+    under.innerHTML = `${main}${saved}`;
+  }
   if (!isHost) return;
   app.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => location.assign(`/tv?room=${b.dataset.open}`)));
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
@@ -230,7 +250,7 @@ function renderLobby() {
   app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, seat: Number(b.dataset.remove) }).catch(toast)));
 }
 
-const nameplate = () => `<div class="nameplate"><h1 class="title">board-lite</h1><p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p></div>`;
+const nameplate = (goal = true) => `<div class="nameplate"><h1 class="title">board-lite</h1>${goal ? `<p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>` : ''}</div>`;
 
 // How to join: the room's QR code, address and code.
 function joinBox(step: string): string {
@@ -417,7 +437,7 @@ function renderGame(g: PublicState) {
   const feed = [...g.log.map((e) => ({ i: e.i, html: eventHtml(e, g, names), said: false })), ...g.talk.map((e) => ({ i: e.i, html: talkLine(e.text, g), said: true }))]
     .filter((x) => x.html).sort((a, b) => a.i - b.i).slice(-5)
     .map((x) => `<li${x.said ? ' class="said"' : ''}>${x.html}</li>`).join('');
-  if (board3d === undefined) board3d = Board3DClass?.supported() ? new Board3DClass() : null;
+  theBoard();
   const highlight = g.phase === 'action' ? g.turn : null;
   // The flat map needs a legend; the 3D board shows what things are.
   const flat = () => {
