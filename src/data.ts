@@ -233,10 +233,10 @@ export const ACTIONS: Record<string, ActionDef> = {
 
 export type Targeting = 'random' | 'lowest_health' | 'strongest_attacker' | 'weak_to_me';
 export const TARGETING_TEXT: Record<Targeting, string> = {
-  random: 'attacks random defenders',
-  lowest_health: 'attacks the defenders with the lowest health',
-  strongest_attacker: 'attacks the hardest-hitting defenders',
-  weak_to_me: 'attacks defenders weak to its element first',
+  random: 'attacks random enemies',
+  lowest_health: 'attacks the enemies with the lowest health',
+  strongest_attacker: 'attacks the hardest-hitting enemies',
+  weak_to_me: 'attacks enemies weak to its element first',
 };
 
 export interface Attack {
@@ -337,18 +337,19 @@ export interface UnitDef extends Attack {
   element: UnitElement; // what beats it and what it beats: the element wheel (ELEMENT_BEATS)
 }
 
-// Defenders attack a random dragon still in the fight.
+// Defenders and beasts fight as dragons do, hitting up to their targets'
+// number of different dragons each combat round, picked at random.
 export const UNITS: Record<string, UnitDef> = {
   militia: { name: 'Militia', hp: 5, targets: 1, dice: 1, sides: 4, element: 'neutral' },
   archers: { name: 'Archers', hp: 6, targets: 1, dice: 1, sides: 6, element: 'neutral' },
   knights: { name: 'Knights', hp: 12, targets: 1, dice: 1, sides: 8, element: 'neutral' },
   frost_golem: { name: 'Frost Golem', hp: 16, targets: 1, dice: 1, sides: 6, element: 'ice' },
   storm_griffin: { name: 'Storm Griffin', hp: 10, targets: 1, dice: 1, sides: 8, element: 'air' },
-  sea_serpent: { name: 'Sea Serpent', hp: 14, targets: 2, dice: 1, sides: 4, element: 'water' },
+  sea_serpent: { name: 'Sea Serpent', hp: 15, targets: 2, dice: 1, sides: 4, element: 'water' },
   // The two point-scoring kingdoms' leaders (#321): each one unit worth about
   // two thirds of its kingdom's power, so taking one costs casualties.
-  fire_giant: { name: 'Fire Giant', hp: 96, targets: 2, dice: 2, sides: 12, element: 'fire' },
-  titan: { name: 'Titan', hp: 160, targets: 2, dice: 3, sides: 12, element: 'lightning' },
+  fire_giant: { name: 'Fire Giant', hp: 100, targets: 2, dice: 2, sides: 12, element: 'fire' },
+  titan: { name: 'Titan', hp: 164, targets: 2, dice: 3, sides: 12, element: 'lightning' },
 };
 
 // Aggressive fauna: wild beasts on the map. A hex with fauna can't be built
@@ -363,12 +364,11 @@ export interface FaunaDef extends UnitDef {
 export const FAUNA: Record<string, FaunaDef> = {
   wolf: { name: 'Wolf', hp: 8, targets: 1, dice: 1, sides: 6, element: 'neutral', loot: { livestock: 2 } },
   cave_bear: { name: 'Cave Bear', hp: 16, targets: 1, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4 } },
-  basilisk: { name: 'Basilisk', hp: 26, targets: 2, dice: 1, sides: 8, element: 'neutral', loot: { livestock: 4, gold: 2 } },
+  basilisk: { name: 'Basilisk', hp: 28, targets: 2, dice: 1, sides: 10, element: 'neutral', loot: { livestock: 4, gold: 2 } },
 };
 // Great beasts (#67): the top tier of the fauna, one of each on every map.
 // Each holds its hex and every hex around it until it is slain: nothing is
-// built there. Fighting one is clearing fauna, but a player gets one try at
-// a great beast a round, and the one who slays it scores its points for good.
+// built there. Fighting one is clearing fauna, and the one who slays it scores its points for good.
 // It never comes back. Its weakness makes the race about the right dragons.
 export interface BeastDef extends FaunaDef {
   points: number;
@@ -376,7 +376,7 @@ export interface BeastDef extends FaunaDef {
 
 export const BEASTS: Record<string, BeastDef> = {
   // On the mountain at the centre of the map.
-  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 8, element: 'air', loot: {}, points: 4 },
+  thunderbird: { name: 'Thunderbird', hp: 70, targets: 2, dice: 2, sides: 10, element: 'air', loot: {}, points: 4 },
   // In the ocean off one coast, beside its harbor.
   leviathan: { name: 'Leviathan', hp: 80, targets: 1, dice: 3, sides: 10, element: 'water', loot: {}, points: 4 },
 };
@@ -409,12 +409,12 @@ export const TARGETS: Record<string, TargetDef> = {
   frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24
   knightsgate: { name: 'Knightsgate', units: ['knights', 'knights', 'knights', 'knights'], loot: { gold: 10, stone: 4 } }, // 28
   stormspire: { name: 'Stormspire', units: ['storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'storm_griffin'], loot: { gold: 17 } }, // 35
-  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 27, livestock: 4 } }, // 45
+  tidewatch: { name: 'Tidewatch', units: ['sea_serpent', 'sea_serpent', 'sea_serpent', 'knights', 'knights', 'knights'], loot: { gold: 27, livestock: 4 } }, // 48
   // The top two (#321) also score points, every time they fall, for the
   // raider with the most combat power still fighting at the end: a way for
   // late dragons to win the game that needs no land. Loot keeps to the curve.
-  cinderkeep: { name: 'Cinderkeep', units: ['fire_giant', 'knights', 'knights', 'knights'], loot: { gold: 62, crystal: 16, livestock: 16 }, points: 1 }, // 71
-  titans_throne: { name: "Titan's Throne", units: ['titan', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'knights', 'knights', 'knights'], loot: { gold: 190, stone: 18, timber: 18, crystal: 17 }, points: 2 }, // 121
+  cinderkeep: { name: 'Cinderkeep', units: ['fire_giant', 'knights', 'knights', 'knights'], loot: { gold: 62, crystal: 16, livestock: 16 }, points: 1 }, // 72
+  titans_throne: { name: "Titan's Throne", units: ['titan', 'storm_griffin', 'storm_griffin', 'storm_griffin', 'knights', 'knights', 'knights'], loot: { gold: 190, stone: 18, timber: 18, crystal: 17 }, points: 2 }, // 122
 };
 
 export const targetPower = (key: string) => TARGETS[key].units.reduce((s, u) => s + combatPower(UNITS[u]), 0);

@@ -262,9 +262,11 @@ Defenders:
 | Knights | 7 | 12 | 1×1d8 (4.5) | neutral |
 | Frost Golem | 7 | 16 | 1×1d6 (3.5) | ice |
 | Storm Griffin | 7 | 10 | 1×1d8 (4.5) | air |
-| Sea Serpent | 8 | 14 | 2×1d4 (5) | water |
-| Fire Giant | 50 | 96 | 2×2d12 (26) | fire |
-| Titan | 79 | 160 | 2×3d12 (39) | lightning |
+| Sea Serpent | 9 | 15 | 2×1d4 (5) | water |
+| Fire Giant | 51 | 100 | 2×2d12 (26) | fire |
+| Titan | 80 | 164 | 2×3d12 (39) | lightning |
+
+Everything that fights, on either side, hits up to its targets number of different enemies each combat round. Dragons, perched ones too, pick them by their targeting rule; defenders and beasts pick at random.
 
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
@@ -277,21 +279,21 @@ Kingdoms (all are on the ballot each raid; average damage is the defenders' tota
 | Frostpeak | Frost Golem, Frost Golem, Archers, Archers | **24** | 44 | 14 | 4 crystal, 7 gold | — |
 | Knightsgate | Knights, Knights, Knights, Knights | **28** | 48 | 18 | 4 stone, 10 gold | — |
 | Stormspire | Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin, Storm Griffin | **35** | 50 | 22.5 | 17 gold | — |
-| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **45** | 78 | 28.5 | 4 livestock, 27 gold | — |
-| Cinderkeep | Fire Giant, Knights, Knights, Knights | **71** | 132 | 39.5 | 16 crystal, 16 livestock, 62 gold | 1 |
-| Titan's Throne | Titan, Storm Griffin, Storm Griffin, Storm Griffin, Knights, Knights, Knights | **121** | 226 | 66 | 18 stone, 18 timber, 17 crystal, 190 gold | 2 |
+| Tidewatch | Sea Serpent, Sea Serpent, Sea Serpent, Knights, Knights, Knights | **48** | 81 | 28.5 | 4 livestock, 27 gold | — |
+| Cinderkeep | Fire Giant, Knights, Knights, Knights | **72** | 136 | 39.5 | 16 crystal, 16 livestock, 62 gold | 1 |
+| Titan's Throne | Titan, Storm Griffin, Storm Griffin, Storm Griffin, Knights, Knights, Knights | **122** | 230 | 66 | 18 stone, 18 timber, 17 crystal, 190 gold | 2 |
 
 Healing: a hurt dragon heals 7 health at each production it's fed, instead of growing. It fights with the health it has left; only a knocked-out one (0 health) can't fight, and its next fed production brings it back. From knocked out to whole, a base dragon takes: hatchling 1, young 2, adult 3 rounds of not growing; the Frost Wyrm, the toughest adult, 5.
 
 ## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is twice as likely. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, it is gone and its loot goes to that player, even if they lose to a dragon perched beside it, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in 3 chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is twice as likely. New fauna comes only from cards.
 
 | Beast | Health | Attack (avg) | Element | Loot | Starts |
 |---|---|---|---|---|---|
 | Wolf | 8 | 1×1d6 (3.5) | neutral | 2 livestock | 2 steps from the nearest tower |
 | Cave Bear | 16 | 1×1d10 (5.5) | neutral | 4 livestock | 3 steps from the nearest tower |
-| Basilisk | 26 | 2×1d8 (9) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
+| Basilisk | 28 | 2×1d10 (11) | neutral | 4 livestock, 2 gold | 4+ steps from the nearest tower |
 
 On the starting map: one beast per 8 land hexes, none within 1 step of a tower.
 
@@ -304,14 +306,14 @@ Cards that send fauna (action cards; see Decks for how often they come):
 
 ## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes 2 more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 | Beast | Health | Attack (avg) | Element | Points | Lives in |
 |---|---|---|---|---|---|
-| Thunderbird | 70 | 2×2d8 (18) | air | 4 | the mountain peak at the centre |
+| Thunderbird | 70 | 2×2d10 (22) | air | 4 | the mountain peak at the centre |
 | Leviathan | 80 | 1×3d10 (16.5) | water | 4 | the ocean, starting beside one harbor; in production it moves to another ocean hex, each as likely as it is far |
 
-A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
+A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here; nor do a beast's against a lone dragon.
 
 When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult 6 rounds after it is hatched, 3 with a Hatchery. 
 

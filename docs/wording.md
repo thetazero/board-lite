@@ -52,6 +52,7 @@ Use these and only these for each thing. Game terms are lower case in running te
 | **raid-ready** | fit, able | A hatched dragon that isn't knocked out or perched |
 | **beast**, **fauna** | animal, monster | One wild creature on a hex is a beast; all of them, and the rules about them, are fauna |
 | **kingdom** | target, town | What a raid attacks. "target" only in the vote ("vote for a target") |
+| **enemy** | foe, opponent | What something fights in combat, whichever side it's on: to a dragon, a defender, a beast or another dragon |
 | **falls** / **holds** | is defeated, wins, survives | A kingdom's or a beast's fate after a fight |
 | **hold back** | bail, hide, sit out, stay back | A player in a raid keeping some or all of their dragons out of its combat: they take no hits and still share the loot. Always "holds back", never a bare "holds", which is a kingdom's |
 | **no one** | nobody | No player |

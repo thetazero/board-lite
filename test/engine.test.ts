@@ -1069,7 +1069,7 @@ test('placing a building shows what it would do on each hex, peak bonus or not',
   assert.equal(g.buildings[ring], undefined);
 });
 
-test('fighting a great beast: one try a round, it heals between fights, the slayer scores for good', () => {
+test('fighting a great beast: no limit on tries (#535), it heals between fights, the slayer scores for good', () => {
   const { g } = beastGame();
   const d = g.dragons.find((x) => x.owner === 0)!;
   d.stage = 1; // a hatchling can't beat the Thunderbird
@@ -1077,9 +1077,15 @@ test('fighting a great beast: one try a round, it heals between fights, the slay
   g.dragons.push(extra);
   apply(g, 0, { do: 'clear', hex: PEAK, dragons: [d.id] });
   assert.equal(g.map[PEAK].fauna, 'thunderbird');
-  assert.throws(() => apply(g, 0, { do: 'clear', hex: PEAK, dragons: ['d90'] }), /1 try each round/);
-  // Next round: three adult ice dragons, its weakness.
-  g.round++;
+  apply(g, 0, { do: 'clear', hex: PEAK, dragons: ['d90'] }); // again, the same round
+  assert.equal(g.map[PEAK].fauna, 'thunderbird');
+  // And the other great beast, the same round.
+  g.dragons.push({ ...d, id: 'd91', damage: 0 });
+  const sea = Object.keys(g.map).find((k) => g.map[k].fauna === 'leviathan')!;
+  assert.ok(seatState(g, 0).huntable.includes(sea) && seatState(g, 0).huntable.includes(PEAK));
+  apply(g, 0, { do: 'clear', hex: sea, dragons: ['d91'] });
+  assert.equal(g.map[sea].fauna, 'leviathan');
+  // Once more, the same round: three adult ice dragons, its weakness.
   g.dragons = g.dragons.filter((x) => x.owner !== 0);
   for (let i = 0; i < 3; i++) g.dragons.push({ id: `d8${i}`, owner: 0, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0 });
   const untitled = () => score(g, 0).total - score(g, 0).titles; // the army title may move too
@@ -1151,6 +1157,19 @@ test('a lost fight leaves the beast at full health on its hex', () => {
   apply(g, 0, { do: 'clear', hex: beyond, dragons: [d.id] });
   assert.equal(g.map[beyond].fauna, 'basilisk');
   assert.equal(d.damage, DRAGONS[d.key].stages[0].hp); // knocked out
+});
+
+test('a beast hits up to its targets number of different dragons a round, never one twice (#532)', () => {
+  for (const [n, want] of [[1, 1], [3, 2]]) {
+    const { g, beyond } = faunaGame();
+    g.map[beyond].fauna = 'basilisk';
+    g.dragons = Array.from({ length: n }, (_, i) => ({ id: `d8${i}`, owner: 0, key: 'frost_wyrm', stage: 2, growth: 0, damage: 0 }));
+    apply(g, 0, { do: 'clear', hex: beyond, dragons: g.dragons.map((d) => d.id) });
+    const rounds = g.log.flatMap((e) => (e.ev?.k === 'combat' ? [e.ev.hits.filter((h) => h.by === 'unit').map((h) => h.d)] : [])).filter((r) => r.length);
+    assert.ok(rounds.length);
+    assert.equal(rounds[0].length, want);
+    for (const r of rounds) assert.equal(new Set(r).size, r.length, 'no dragon is hit twice');
+  }
 });
 
 test('fauna cards place a beast on any land hex with no tower or beast, shutting down a building', () => {

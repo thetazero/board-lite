@@ -168,7 +168,7 @@ const PAGES: Record<BookTab, (b: Rulebook) => string> = {
       `<div class="bstats">${powerTag(f.power)}${statTag('Health', f.maxHp)}${statTag('Attack', esc(f.attack))}</div>${f.weak.length ? `<p class="btext">Weak to ${elemWords(f.weak)}</p>` : ''}${f.points !== undefined ? lootLine({}, 1.1, f.points) : lootLine(f.loot, 1.1)}${more ? text(more) : ''}`, `beast ${f.key}`);
     return `${head('Fauna', `Nothing is built on a beast’s hex, and a building under one is suppressed. Clear a beast for its loot (none if a card placed it). Each round a beast has a 1 in ${b.faunaWanderOdds} chance to move to an adjacent hex.`)}
       ${b.fauna.map((f) => beast(f, '')).join('')}
-      ${head('Great beasts', 'Nothing is built on or adjacent to one while it lives. You may try to slay each once a round; whoever slays it scores its points for good.')}
+      ${head('Great beasts', 'Nothing is built on or adjacent to one while it lives. Whoever slays it scores its points for good.')}
       ${b.greatBeasts.map((f) => beast(f, f.key === 'thunderbird' ? 'Lives on the peak at the center.' : 'Lives in the ocean. Each round it swims to another ocean hex, usually a far one.')).join('')}`;
   },
   dragons(b) {
