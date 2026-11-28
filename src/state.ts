@@ -186,7 +186,7 @@ export interface SeatState {
   // which of your buildings, and what each would do with it.
   upgradeProjects: { key: string; name: string; text: string; cost: Res; affordable: boolean; hexes: string[]; after: Record<string, BuildingDoes>; why: string | null }[];
   raidReady: string[]; // my dragons that can raid, or be sent against fauna on my turn
-  huntable: string[]; // hexes I may clear now: beasts (one try at a great beast a round) and rivals' perched dragons
+  huntable: string[]; // hexes I may clear now: beasts and rivals' perched dragons
   autoClear: string[]; // my buildings auto clear would clear, weakest first: under fauna (not a great beast) or rivals' perched dragons
   perchable: string[]; // rivals' buildings my raid-ready dragons may perch on (never a tower)
   perched: string[]; // my perched dragons, to recall

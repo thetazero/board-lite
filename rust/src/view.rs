@@ -326,7 +326,7 @@ pub fn hints(g: &PublicState, you: &SeatState) -> Vec<String> {
                 format!("{k} {}", who.join(" and "))
             })
             .collect();
-        out.push(format!("{{\"do\":\"clear\",\"hex\":\"<hex>\",\"dragons\":[\"<dragon id>\", ...]}}   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. 1 try at a great beast each round. Raid-ready: {ready}. Hexes: {})", foes.join(", ")));
+        out.push(format!("{{\"do\":\"clear\",\"hex\":\"<hex>\",\"dragons\":[\"<dragon id>\", ...]}}   (fight its beast and all rivals' dragons perched there, together, to the end; a coin flip says which side strikes first. Dragons not knocked out can clear again this turn, and still raid. Raid-ready: {ready}. Hexes: {})", foes.join(", ")));
     }
     if !you.auto_clear.is_empty() && any {
         out.push(format!("{{\"do\":\"auto_clear\"}}   (your own buildings, weakest first, with all your raid-ready dragons, until one fight is lost. Held: {})", keys(&you.auto_clear)));

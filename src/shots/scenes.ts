@@ -1879,6 +1879,35 @@ export const SCENES: Scene[] = [
     ],
   },
   {
+    // A beast killed in a fight lost to the dragon perched with it (#530): the
+    // TV says it falls, what the player gets, and that the dragons hold.
+    name: 'perch-beast-3p',
+    players: 3,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      perchers(g);
+      const k = perchedPasture(g);
+      g.map[k].fauna = 'wolf';
+      g.dragons = g.dragons.filter((d) => d.perch !== k && d.owner !== g.turn);
+      g.dragons.push({ id: 'd900', owner: (g.turn + 1) % 3, key: 'frost_wyrm', stage: 3, growth: 0, damage: 0, perch: k });
+      g.dragons.push({ id: 'd901', owner: g.turn, key: 'cinder_drake', stage: 2, growth: 0, damage: 0 });
+    },
+    shots: () => [{ file: 'tv-perch-beast-3p', caption: 'TV: the Wolf falls: +2 livestock; the dragon perched with it holds', client: 'tv', waitMs: 9000, then: (room) => room.mutate((g2) => {
+      const k = Object.keys(g2.map).find((x) => g2.map[x].fauna === 'wolf' && g2.buildings[x]?.owner === g2.turn)!;
+      // The first fight, by seed, in which the Wolf falls and the Frost Wyrm doesn't.
+      for (let seed = 1; ; seed++) {
+        const c = structuredClone(g2);
+        c.rng.state = seed;
+        apply(c, c.turn, { do: 'clear', hex: k, dragons: ['d901'] });
+        if (!c.log.some((e) => e.ev?.k === 'combat' && e.ev.hits.some((h) => h.by === 'dragon' && h.u === 0 && h.down))) continue;
+        g2.rng.state = seed;
+        break;
+      }
+      apply(g2, g2.turn, { do: 'clear', hex: k, dragons: ['d901'] });
+    }) }],
+  },
+  {
     // A rival perched on the acting player's roost (#352): suppressed, it
     // houses no dragons, and the phone says they're over their room.
     name: 'perch-roost-3p',

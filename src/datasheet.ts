@@ -205,6 +205,8 @@ Defenders:
 
 ${table(['Unit', 'Power', 'Health', 'Attack (avg)', 'Element'], unitRows)}
 
+Everything that fights, on either side, hits up to its targets number of different enemies each combat round. Dragons, perched ones too, pick them by their targeting rule; defenders and beasts pick at random.
+
 Combat power is √(health × average damage a combat round), rounded; a kingdom's is its defenders' summed, and raiders' powers add up the same way. It ignores elements and targeting, so it is a rough guide on purpose.
 
 Kingdoms (all are on the ballot each raid; average damage is the defenders' total a combat round). Loot is the printed loot below plus the gold the kingdom has hoarded: each round, raid or not, each kingdom that didn't fall that round adds 1 gold (once, however many raids), and one that falls goes back to its printed loot. Shared loot is split by the combat power each player has in the raid not knocked out at the end, fought or held back (each resource rounded down; what's left over is handed out 1 at a time, the most power first and equal powers in the round's turn order, carrying on from one resource to the next). A kingdom with points scores them each time it falls, for the player with the most of that power (a dragon counts its stage's power, hurt or not; equal powers go in the round's turn order).
@@ -223,7 +225,7 @@ function fauna(): string {
   const cardRows = Object.values(ACTIONS).filter((a) => a.effect === 'send_fauna').map((a) => [a.name, FAUNA[a.fauna!].name, cost(a.cost), a.copies]);
   return `## Fauna
 
-Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, the hex is empty and its loot goes to that player, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is ${TUNING.faunaSpreadWeight === 2 ? 'twice' : `${TUNING.faunaSpreadWeight} times`} as likely. New fauna comes only from cards.
+Beasts on the map. Nothing is built on a hex with fauna, and a building under fauna is suppressed: it counts as if it weren't there (see the rules). On their turn, any player may send raid-ready dragons against any beast, in the raids' combat; the hits they take stay on them, into the round's raids, as after a raid. If the beast falls, it is gone and its loot goes to that player, even if they lose to a dragon perched beside it, unless a card placed it: then there is no loot. If not, it stays at full health. In production, each beast has a 1 in ${TUNING.faunaWanderOdds} chance to move to a random adjacent land hex with no tower or beast; one beside no other beast is ${TUNING.faunaSpreadWeight === 2 ? 'twice' : `${TUNING.faunaSpreadWeight} times`} as likely. New fauna comes only from cards.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Loot', 'Starts'], unitRows)}
 
@@ -246,11 +248,11 @@ function beasts(): string {
   const fast = growth(base.growthTime, 1 + hatchery.growthBonus!, 3);
   return `## Great beasts
 
-Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), but each player gets one try at a great beast a round, and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
+Two on every map, the top tier of the fauna: fought like fauna (on your turn, your dragons, to the end), and it is at full health for every fight. Each holds its hex and every hex next to it: nothing is built there while it lives, and a building there is suppressed while it's held. The player who slays one scores its points for good; it never comes back. Once the Thunderbird falls, every production building on or next to its peak makes ${TUNING.peakBonus} more a round. The Leviathan keeps to ocean hexes whose hold is clear of every tower's adjacent hexes.
 
 ${table(['Beast', 'Health', 'Attack (avg)', 'Element', 'Points', 'Lives in'], unitRows)}
 
-A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here.
+A single beast takes one hit per dragon a combat round, so a dragon's extra targets don't help here; nor do a beast's against a lone dragon.
 
 When that force exists: a base egg (any element, by special project, or a dragon card of the element) is an adult ${adult} rounds after it is hatched, ${fast} with a ${hatchery.name}. `;
 }

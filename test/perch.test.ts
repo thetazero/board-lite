@@ -244,6 +244,73 @@ test('a beast and perched dragons on one building fight together', () => {
   assert.equal(hunt.units[1].d, a.id);
 });
 
+test('a beast killed in a fight lost to a perched dragon is gone, and its loot is paid (#530)', () => {
+  for (const sent of [false, true]) {
+    let seen = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const { g, pasture } = perchGame();
+      const perched = addDragon(g, 1, 3, 'frost_wyrm');
+      apply(g, 0, { do: 'end' });
+      apply(g, 1, { do: 'perch', hex: pasture, dragons: [perched.id] });
+      apply(g, 1, { do: 'end' });
+      toTurnOf(g, 0);
+      g.map[pasture].fauna = 'wolf';
+      if (sent) g.map[pasture].sent = true;
+      g.rng.state = seed;
+      const me = addDragon(g, 0, 3, 'cinder_drake'); // the lowest health first: the Wolf
+      const before = g.players[0].resources.livestock;
+      apply(g, 0, { do: 'clear', hex: pasture, dragons: [me.id] });
+      const at = g.log.findLast((e) => e.ev?.k === 'cleared')!;
+      const end = at.ev as Extract<Game['log'][number]['ev'], { k: 'cleared' }>;
+      if (end.won || !end.fell) continue;
+      seen++;
+      const loot = sent ? 0 : FAUNA.wolf.loot.livestock!;
+      assert.equal(g.map[pasture].fauna, undefined);
+      assert.equal(g.map[pasture].sent, undefined);
+      assert.equal(g.players[0].resources.livestock, before + loot);
+      assert.deepEqual(end.gain, sent ? {} : FAUNA.wolf.loot);
+      assert.equal(g.dragons.find((d) => d.id === perched.id)!.perch, pasture);
+      assert.equal(at.text, `The Wolf at ${pasture} falls.${sent ? '' : ` P1 gains ${loot} livestock.`} The dragons there hold against P1.`);
+    }
+    assert.ok(seen > 0);
+  }
+});
+
+// A perched dragon's hits, each combat round: which of the dragons sent it
+// hit. In a fight whose coin flip it won, so it strikes before any can fell it.
+function perchedHits(key: string, sent: [string, number, number?][]) {
+  const { g, pasture } = perchGame();
+  const d = addDragon(g, 1, 3, key);
+  apply(g, 0, { do: 'end' });
+  apply(g, 1, { do: 'perch', hex: pasture, dragons: [d.id] });
+  apply(g, 1, { do: 'end' });
+  toTurnOf(g, 0);
+  const mine = sent.map(([k, stage, damage]) => Object.assign(addDragon(g, 0, stage, k), { damage: damage ?? 0 }));
+  let seed = 1;
+  for (; ; seed++) {
+    const flip = structuredClone(g);
+    flip.rng.state = seed;
+    apply(flip, 0, { do: 'clear', hex: pasture, dragons: mine.map((x) => x.id) });
+    const hunt = flip.log.findLast((e) => e.ev?.k === 'hunt')!.ev as Extract<Game['log'][number]['ev'], { k: 'hunt' }>;
+    if (hunt.first === 'defenders') break;
+  }
+  g.rng.state = seed;
+  apply(g, 0, { do: 'clear', hex: pasture, dragons: mine.map((x) => x.id) });
+  const rounds = g.log.flatMap((e) => (e.ev?.k === 'combat' ? [e.ev.hits.filter((h) => h.by === 'unit').map((h) => mine.findIndex((m) => m.id === h.d))] : []));
+  return rounds.filter((r) => r.length);
+}
+
+test("a perched dragon fights as a sent one does: its targets number of different dragons, by its card's rule (#532)", () => {
+  for (const r of perchedHits('storm_wyrm', [['frost_wyrm', 3]])) assert.equal(r.length, 1, 'a lone dragon is hit once a round');
+  const wide = perchedHits('storm_wyrm', [['frost_wyrm', 3], ['frost_wyrm', 3], ['frost_wyrm', 3]]);
+  for (const r of wide) assert.equal(new Set(r).size, r.length);
+  assert.equal(wide[0].length, 3);
+  // The hardest-hitting, the one weak to it, the lowest health: each first.
+  assert.deepEqual(perchedHits('frost_wyrm', [['water_whelp', 1], ['ember_wyrm', 3], ['water_whelp', 1]])[0], [1]);
+  assert.equal(perchedHits('rime_drake', [['water_whelp', 3], ['air_whelp', 3], ['water_whelp', 3]])[0][0], 1);
+  assert.equal(perchedHits('sky_wyrm', [['frost_wyrm', 3], ['frost_wyrm', 3, 20], ['frost_wyrm', 3]])[0][0], 1);
+});
+
 test("the CLI offers perch, recall and clearing a rival's perched dragons", () => {
   const { g, pasture } = perchGame();
   const seats = g.players.map((_, q) => ({ id: q, name: `P${q + 1}`, kind: 'player' as const, connected: true, standIn: false, left: false }));

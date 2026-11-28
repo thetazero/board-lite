@@ -347,8 +347,6 @@ pub struct Game {
     pub slain: IndexMap<Key, usize>,
     #[serde(default)]
     pub raid_points: Vec<i64>,
-    #[serde(default)]
-    pub beast_tried: Vec<i64>,
     pub winner: Option<usize>,
     pub next_id: u32,
     pub log: Vec<LogEntry>,
@@ -450,6 +448,31 @@ struct FoeStats {
     name: S,
     attack: Attack,
     element: S,
+    targeting: S,
+}
+
+/// What an attack may hit, as its targeting sees it.
+pub struct Mark {
+    pub hp: i64,
+    pub attack: Attack,
+    pub element: S,
+}
+/// The up to `n` different marks still standing that an attack hits, whichever side it's on: in the
+/// order its targeting rule puts them, ties at random. Kingdoms' defenders and beasts pick at random.
+pub fn pick_targets(rng: &mut Rng, targeting: S, element: S, n: i64, marks: &[Mark]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..marks.len()).filter(|i| marks[*i].hp > 0).collect();
+    rng.shuffle(&mut order);
+    match targeting {
+        "lowest_health" => order.sort_by_key(|i| marks[*i].hp),
+        "strongest_attacker" => order.sort_by_key(|i| {
+            let a = &marks[*i].attack;
+            -(a.targets * a.dice * (a.sides + 1))
+        }),
+        "weak_to_me" => order.sort_by_key(|i| !DATA.element_weak[marks[*i].element].contains(&element)),
+        _ => {}
+    }
+    order.truncate(n as usize);
+    order
 }
 
 /// What a building makes of one resource: a fixed amount and dice.
@@ -563,7 +586,6 @@ impl Game {
             titles: Titles { army: None, tower: None, hoard: None },
             slain: IndexMap::new(),
             raid_points: vec![0; players],
-            beast_tried: vec![0; players],
             winner: None,
             next_id: 1,
             log: vec![],
@@ -608,7 +630,6 @@ impl Game {
             titles: self.titles,
             slain: self.slain.clone(),
             raid_points: self.raid_points.clone(),
-            beast_tried: self.beast_tried.clone(),
             winner: self.winner,
             next_id: self.next_id,
             log: vec![],
@@ -1183,26 +1204,10 @@ impl Game {
     fn foe(&self, u: &Foe) -> FoeStats {
         if let Some(id) = u.d {
             let d = self.dragon(id);
-            return FoeStats { name: d.name(), attack: d.stats().unwrap(), element: d.def().element };
+            return FoeStats { name: d.name(), attack: d.stats().unwrap(), element: d.def().element, targeting: d.def().targeting };
         }
         let x = DATA.units.get(u.key.0).unwrap_or_else(|| fauna_def(u.key.0));
-        FoeStats { name: x.name, attack: x.attack(), element: x.element }
-    }
-    fn pick_targets(&mut self, b: &Battle, d: Id, n: i64) -> Vec<usize> {
-        let mut order: Vec<usize> = (0..b.units.len()).filter(|i| b.units[*i].hp > 0).collect();
-        self.rng.shuffle(&mut order);
-        let def = self.dragon(d).def();
-        match def.targeting {
-            "lowest_health" => order.sort_by_key(|i| b.units[*i].hp),
-            "strongest_attacker" => order.sort_by_key(|i| {
-                let a = self.foe(&b.units[*i]).attack;
-                -(a.targets * a.dice * (a.sides + 1))
-            }),
-            "weak_to_me" => order.sort_by_key(|i| !DATA.element_weak[self.foe(&b.units[*i]).element].contains(&def.element)),
-            _ => {}
-        }
-        order.truncate(n as usize);
-        order
+        FoeStats { name: x.name, attack: x.attack(), element: x.element, targeting: "random" }
     }
     fn combat_round(&mut self, b: &mut Battle, round: i64, first: Side) {
         let mut lines = vec![];
@@ -1218,8 +1223,9 @@ impl Game {
     }
     fn dragons_strike(&mut self, b: &mut Battle, lines: &mut Vec<String>, hits: &mut Vec<serde_json::Value>) {
         for id in b.fighters.clone() {
-            let (st, el) = (self.dragon(id).stats().unwrap(), self.dragon(id).def().element);
-            for ui in self.pick_targets(b, id, st.targets) {
+            let (st, el, targeting) = (self.dragon(id).stats().unwrap(), self.dragon(id).def().element, self.dragon(id).def().targeting);
+            let marks: Vec<Mark> = b.units.iter().map(|u| (u.hp, self.foe(u))).map(|(hp, x)| Mark { hp, attack: x.attack, element: x.element }).collect();
+            for ui in pick_targets(&mut self.rng, targeting, el, st.targets, &marks) {
                 let def = self.foe(&b.units[ui]);
                 let roll = self.roll_attack(&st);
                 let dmg = elemental(roll, el, def.element);
@@ -1245,11 +1251,9 @@ impl Game {
                 continue;
             }
             let def = self.foe(&b.units[ui]);
-            for _ in 0..def.attack.targets {
-                if b.fighters.is_empty() {
-                    break;
-                }
-                let id = self.rng.pick(&b.fighters);
+            let marks: Vec<Mark> = b.fighters.iter().map(|id| self.dragon(*id)).map(|d| Mark { hp: d.health(), attack: d.stats().unwrap(), element: d.def().element }).collect();
+            let picked = pick_targets(&mut self.rng, def.targeting, def.element, def.attack.targets, &marks);
+            for id in picked.into_iter().map(|i| b.fighters[i]).collect::<Vec<_>>() {
                 let roll = self.roll_attack(&def.attack);
                 let d = self.dragon_mut(id);
                 let dmg = elemental(roll, def.element, d.def().element);
@@ -1270,12 +1274,6 @@ impl Game {
     fn clear_hex(&mut self, p: usize, k: K, ds: &[Id]) -> Rule<bool> {
         let f = self.map[&k].fauna;
         let great = f.and_then(|f| DATA.beasts.get(f.0));
-        if great.is_some() {
-            if self.beast_tried[p] == self.round {
-                return fail("You've fought a great beast this round already: 1 try each round.");
-            }
-            self.beast_tried[p] = self.round;
-        }
         let perched: Vec<Dragon> = self.rivals_perched(p, k).into_iter().cloned().collect();
         let mut units: Vec<Foe> = f.iter().map(|f| Foe { key: *f, hp: fauna_def(f.0).hp, d: None }).collect();
         units.extend(perched.iter().map(|d| Foe { key: d.key, hp: d.health(), d: Some(d.id) }));
@@ -1315,8 +1313,10 @@ impl Game {
         }
         let won = b.cleared();
         let home: Vec<Id> = perched.iter().map(|d| d.id).filter(|d| self.dragon(*d).perch.is_none()).collect();
-        let loot = if f.is_some() { self.fauna_loot(k) } else { Bundle::default() };
-        if let Some(f) = f.filter(|_| won) {
+        // The beast comes first in the fight: killed, it's gone, even if the perched dragons beside it win.
+        let fell = f.is_some() && b.units[0].hp <= 0;
+        let loot = if fell { self.fauna_loot(k) } else { Bundle::default() };
+        if let Some(f) = f.filter(|_| fell) {
             let h = &mut self.map[&k];
             h.fauna = None;
             h.sent = false;
@@ -1327,21 +1327,23 @@ impl Game {
         }
         let flown = if home.is_empty() { String::new() } else { format!(" {} {} home.", ids(&home), if home.len() == 1 { "goes" } else { "go" }) };
         let me = pname(p);
+        let gains = if loot.empty() { String::new() } else { format!(" {me} gains {}.", loot.text()) };
         let text = match (f, great) {
             (None, _) if won => format!("{me} clears {k}.{flown}"),
             (None, _) => format!("The dragons at {k} hold against {me}.{flown}"),
-            _ if !won => format!("The {name} at {k} holds against {me}.{flown}"),
+            _ if !fell => format!("The {name} at {k} holds against {me}.{flown}"),
             (Some(f), Some(g)) => {
                 let peak = if f.0 == "thunderbird" { format!(" Production buildings on and adjacent to its peak make {} more each round.", tuning().peak_bonus) } else { String::new() };
                 format!("The {name} is slain. {me} scores {}.{peak}", points_text(g.points))
             }
-            _ => {
-                let gains = if loot.empty() { String::new() } else { format!(" {me} gains {}.", loot.text()) };
-                format!("The {name} at {k} falls.{gains}{flown}")
-            }
+            _ if !won => format!("The {name} at {k} falls.{gains} The dragons there hold against {me}.{flown}"),
+            _ => format!("The {name} at {k} falls.{gains}{flown}"),
         };
-        let mut ev = serde_json::json!({"k": "cleared", "p": p, "hex": k, "fauna": f, "name": name, "won": won, "gain": if won { loot } else { Bundle::default() }});
-        if let Some(g) = great.filter(|_| won) {
+        let mut ev = serde_json::json!({"k": "cleared", "p": p, "hex": k, "fauna": f, "name": name, "won": won, "gain": loot});
+        if fell && !won {
+            ev["fell"] = true.into();
+        }
+        if let Some(g) = great.filter(|_| fell) {
             ev["points"] = g.points.into();
         }
         if !home.is_empty() {
@@ -1400,7 +1402,6 @@ impl Game {
     }
     pub fn huntable(&self, p: usize) -> Vec<K> {
         let mut out = self.fauna_on_map();
-        out.retain(|k| !self.map[k].beast() || self.beast_tried[p] != self.round);
         out.extend(self.dragons.iter().filter(|d| d.owner != p).filter_map(|d| d.perch));
         out.sort();
         out.dedup();

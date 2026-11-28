@@ -1121,14 +1121,14 @@ function huntView(g: PublicState, me: Me): string {
   }
   const perched = h.perched.filter((x) => x.owner !== me.seat).map((x) => g.dragons.find((d) => d.id === x.d)!).filter(Boolean);
   if (!h.fauna && !perched.length) return '';
-  // A great beast pays in points, for good; it's 1 try each round, to the end.
+  // A great beast pays in points, for good.
   const great = h.fauna?.points !== undefined;
   const power = (h.fauna?.power ?? 0) + perched.reduce((s, d) => s + d.power, 0);
   const title = h.fauna ? `${great ? 'Slay' : 'Clear'} the ${esc(h.fauna.name)}` : 'Clear the perched dragons';
   const beast = h.fauna ? `${foeStack([h.fauna], 1.8)}${lootLine(h.fauna.loot, 1.4, h.fauna.points)}` : '';
   const ds = perched.map((d) => `<div class="foe"><span class="foe-pic">${dragonBadge(d, 40)}</span><span class="foe-body"><b class="foe-name">${playerTag(d.owner, names)} ${esc(dragonName(d, g.dragons))}</b><span class="foe-stats">${statTag('Health', `${d.hp}/${d.maxHp}`)}${statTag('Attack', esc(d.attack))}</span>${d.weak.length ? `<span class="foe-elem weak">Weak to ${elemWords(d.weak)}</span>` : ''}</span></div>`).join('');
   return `<h3 class="huntname">${title}${on}</h3><section class="ptarget">${powerTag(power, 'big')}${beast}${ds ? `<div class="foes">${ds}</div>` : ''}</section>
-    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off, note: great ? '1 try each round' : undefined })}`;
+    ${sendPicker(g, me, hunting!.chosen, 'hunter', { go: 'huntgo', out: off })}`;
 }
 
 // Choosing dragons to send into a fight (a beast to clear or slay, or which
