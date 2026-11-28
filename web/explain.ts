@@ -10,6 +10,7 @@ import { PLAYER_COLORS, POINTS_TO_WIN, TITLE_ICON, buildingIcon, dieFace, esc, g
 import { kingdomCard, lootLine } from './kingdom.ts';
 import { cardArt, frameColor, kindIcon } from './art.ts';
 import { backdrop, dragonFigure, unitFigure } from './arena.ts';
+import { keepTrying } from './retry.ts';
 import { BUILT, DRAWN, HEXES, KINGDOMS, RAIDED, ROUND, STEPS, TITLES, TITLE_POINTS, BEAST_POINTS, BUILDING_POINTS, MONUMENT_POINTS, type Show } from './explain-steps.ts';
 
 type Board = Pick<PublicState, 'map' | 'dragons'>;
@@ -174,13 +175,14 @@ export function explain(el: HTMLElement, title: string, board: Board3D | null, s
     const acts = shows[s.show]();
     if (hold !== undefined) return acts.slice(0, hold).forEach(([, run]) => run());
     for (const [at, run] of acts) later(at, run);
-    // Nothing to play without the rules: the title stays.
+    // Nothing to play without the rules: the title stays until they load.
     later(s.ms, () => play(book ? (i + 1) % STEPS.length : 0));
   }
   play(0);
   const keys = Object.keys(PORTRAITS);
   const drawn = stage3d?.portraits(keys.map((k) => PORTRAITS[k]), 420, 336).then((urls) => keys.forEach((k, i) => urls[i] && pics.set(k, urls[i]))).catch(() => {});
-  const loaded = fetch('/api/rulebook').then((r) => (r.ok ? r.json() : null)).then((b: Rulebook | null) => { book = b; }).catch(() => {});
+  const fetchBook = (): Promise<Rulebook> => fetch('/api/rulebook', { signal: AbortSignal.timeout(10_000) }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+  const loaded = keepTrying(fetchBook, () => el.isConnected).then((b) => { book = b; });
   // For screenshots: a step as it ends (or after `n` of what happens in it), held.
   Object.assign(window, { explainAt: async (show: Show, n = Infinity) => { await loaded; await drawn; play(STEPS.findIndex((s) => s.show === show), n); } });
   return { title: (html) => { const t = part('xtitle'); if (t.innerHTML !== html) t.innerHTML = html; } };
