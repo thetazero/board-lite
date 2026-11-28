@@ -373,12 +373,9 @@ fn points_text(n: i64) -> String {
 }
 const STAGE_INTO: [S; 4] = ["an egg", "a hatchling", "a young dragon", "an adult"];
 
-// What JavaScript's \s and trim() take as a space.
+// What JavaScript's \s takes as a space.
 pub fn js_space(c: char) -> bool {
     (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
-}
-pub fn js_trim(s: &str) -> &str {
-    s.trim_matches(js_space)
 }
 impl Card {
     pub fn kind(&self) -> S {
