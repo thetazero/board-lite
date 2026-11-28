@@ -19,9 +19,9 @@ const data = Object.fromEntries(Object.entries(D).filter(([, v]) => typeof v !==
 writeFileSync(join(out, 'data.json'), JSON.stringify({ ...data, HELP: { act: ACT_HELP, actFields: ACT_FIELDS, rules: RULES_HELP, say: SAY_HELP, view: VIEW_HELP, wait: waitHelp(50), image: MAP_IMAGE_KEY } }));
 writeFileSync(join(out, 'rules.md'), readFileSync(join(root, 'docs/rules.md')));
 
-const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.ts': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
+const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.ts': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const rows: string[] = [];
-const add = (path: string, text: string, type: string, cache: string) => {
+const add = (path: string, text: string | Buffer, type: string, cache: string) => {
   const file = path.slice(1).replace(/\W/g, '_');
   writeFileSync(join(out, file), text);
   const etag = cache === 'no-cache' ? `"${createHash('sha1').update(text).digest('base64url')}"` : '';
@@ -30,8 +30,8 @@ const add = (path: string, text: string, type: string, cache: string) => {
 for (const n of readdirSync(join(root, 'web')).sort()) {
   const ext = extname(n);
   if (!TYPES[ext]) continue;
-  const src = readFileSync(join(root, 'web', n), 'utf8');
-  add(`/${n}`, ext === '.ts' ? stripTypeScriptTypes(src, { mode: 'strip' }) : src, TYPES[ext], 'no-cache');
+  const src = readFileSync(join(root, 'web', n));
+  add(`/${n}`, ext === '.ts' ? stripTypeScriptTypes(src.toString(), { mode: 'strip' }) : src, TYPES[ext], 'no-cache');
 }
 const three = fileURLToPath(new URL('./', import.meta.resolve('three')));
 for (const n of ['three.module.js', 'three.core.js']) add(`/vendor/three/${n}`, readFileSync(join(three, n), 'utf8'), TYPES['.js'], 'max-age=86400');

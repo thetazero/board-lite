@@ -78,6 +78,29 @@ test('the link tells a client that reads it how to join; a browser gets the page
   } finally { s.close(); }
 });
 
+test('a shared link has a preview: the game\'s image and text, and the code of a game', async () => {
+  const s = await host(SITE);
+  const home = await host();
+  try {
+    const tag = (html: string, name: string) => new RegExp(`<meta (?:name|property)="${name}" content="([^"]*)">`).exec(html)?.[1];
+    for (const [path, title] of [['/', 'board-lite'], ['/tv', 'board-lite'], ['/HXNL', 'Join game HXNL'], ['/hxnl/', 'Join game HXNL']]) {
+      const html = await (await fetch(s.url + path)).text();
+      assert.equal(tag(html, 'og:title'), title, path);
+      assert.equal(tag(html, 'og:description'), 'Raise dragons and raid kingdoms.');
+      assert.equal(tag(html, 'og:image'), `${SITE.origin}/preview.png`);
+      assert.equal(tag(html, 'twitter:card'), 'summary_large_image');
+      assert.ok(!html.includes('<!--preview-->'));
+    }
+    // A preview app reads the size it's told; the image has to be it.
+    const png = Buffer.from(await (await fetch(`${s.url}/preview.png`)).arrayBuffer());
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
+    assert.equal(tag(await (await fetch(`${home.url}/HXNL`)).text(), 'og:image'), `${home.url}/preview.png`);
+  } finally {
+    s.close();
+    home.close();
+  }
+});
+
 test('a public website says nothing of its machine or of other games, and limits each visitor', async () => {
   const s = await host({ ...SITE, trustProxy: true, limits: { roomsPerHour: 2, wrongCodesPerMinute: 2, open: 1 } });
   try {

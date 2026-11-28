@@ -550,6 +550,9 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
       assert.equal(icon.headers.get('content-type'), 'image/svg+xml');
       await icon.text();
     }
+    const touch = await fetch(`${base}/apple-touch-icon.png`);
+    assert.equal(touch.headers.get('content-type'), 'image/png');
+    assert.equal(Buffer.from(await touch.arrayBuffer()).toString('latin1', 1, 4), 'PNG', 'sent as bytes, not text');
     for (const path of ['/', '/tv']) assert.match(await (await fetch(`${base}${path}`)).text(), /rel="icon" href="\/favicon.svg"/, path);
 
     // The clients are served with their TypeScript types stripped.
