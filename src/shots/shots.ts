@@ -401,11 +401,11 @@ function makeRoom(staged: Staged, code: string): Room {
   if (staged.game) {
     mkdirSync(join(CACHE, 'rooms'), { recursive: true });
     save(file, staged.game);
-    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, ...recap });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, openMs: scene.openMs, ...recap });
     // A hosted saved game starts with every seat open; otherwise everyone is seated.
     if (!scene.resume) room.seats.forEach((s, i) => Object.assign(s, { name: names[i], kind: scene.bots?.includes(i) ? 'bot' : 'player' }));
   } else {
-    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, ...recap });
+    room = new Room(code, { file, botDelayMs: NEVER, remote: scene.remote, openMs: scene.openMs, ...recap });
     for (let i = 0; i < scene.players - scene.lobby!.bots; i++) room.join(names[i]);
     for (let i = 0; i < scene.lobby!.bots; i++) room.addBot();
   }

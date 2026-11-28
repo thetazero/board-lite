@@ -1187,6 +1187,8 @@ button.on:disabled { opacity: 1; }
 button.danger { background: var(--grain), #c0392b; color: #fff; --text: #fff; }
 /* Someone the table waits on is away: anyone can let a bot play for them. */
 .awayline { margin: .35em .7em 0; padding: .3em 1em; display: flex; align-items: center; gap: .5em; flex-wrap: wrap; font-weight: 600; color: var(--text); }
+.awayline > span { flex: 1; }
+.awayline small { display: block; font-weight: 400; overflow-wrap: anywhere; }
 .awayline button { margin-left: auto; }
 .lastround { margin: .35em .7em 0; padding: .3em 1em; border-radius: 3px; font-weight: 700; color: var(--ink); background: var(--grain), linear-gradient(175deg, #ffd866 0 50%, #f0bb34 50%); }
 .toast.news { border-left-color: var(--accent); }

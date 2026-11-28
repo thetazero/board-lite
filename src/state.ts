@@ -219,9 +219,11 @@ export interface Lobby {
   seating: boolean; // a saved game hosted again, waiting in the lobby until every seat is taken
   saved: number | null; // when someone at the table saved the game (ms epoch): it waits until someone continues it
   // standIn: a bot makes this player's moves (they quit: left, or they're away).
+  // opened: the first player opened it, though its phone is still here.
+  // deciders: while the game waits on a seat that is open or can be opened: the seats that may open it or let a bot play.
   // strong: a bot seat played by the strong bot (src/strongbot.ts).
   // id: the seat's own, which stays with it when its number changes: what removing a player names.
-  seats: { id: number; name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean; strong?: boolean }[];
+  seats: { id: number; name: string; kind: SeatKind; connected: boolean; standIn: boolean; left: boolean; opened?: boolean; deciders?: number[]; strong?: boolean }[];
   minPlayers: number;
   maxPlayers: number;
   starter?: number | null; // the seat that can start the game (with the TV)

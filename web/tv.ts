@@ -11,7 +11,7 @@ import { openRoom } from './tvroom.ts';
 import { steady } from './taps.ts';
 import type { DragonView, EventView, PublicState, SavedGame, Snapshot, TargetView } from '../src/state.ts';
 import {
-  ELEMENT_COLORS, PLAYER_COLORS, starterName, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
+  ELEMENT_COLORS, PLAYER_COLORS, starterName, POINTS_TO_WIN, STAGE_LABEL, TERRAIN_COLORS, TERRAIN_NAMES, TITLE_ICON, buildingIcon, dieFace, dragonBadge, dragonChip, dragonLabel, dragonState, elemWords, esc, eventHtml, hungerTags, gainChips, netChips, hpBar, statTag, hpFill, powerTag, icon, iconText, openSeat, lastRoundHtml, mapSvg, pointsTrack, named, playerTag, post, resChips, savedWhen, resIcon, standingsHtml, tiebreakNote, watch, fadeAway,
 } from './common.ts';
 import { foeStack, kingdomCard, lootLine, pointsLeader, pointsLine, voterTag } from './kingdom.ts';
 import { TITLE_READ_MS, TITLE_TOAST_MS, TitleNews, type TitleChange } from './titles.ts';
@@ -144,9 +144,11 @@ function seatNews(before: Snapshot, now: Snapshot) {
     const was = before.lobby.seats[i];
     if (!was || s.kind !== 'player') return;
     const who = esc(s.name);
-    if (s.left && !was.left) note(`${who} quits: a bot plays for them`);
+    if (s.name !== was.name && was.kind === 'player') note(`${who} takes ${esc(was.name)}'s seat`);
+    else if (s.left && !was.left) note(`${who} quits: a bot plays for them`);
     else if (s.standIn && !was.standIn) note(`${who} is away: a bot plays for them`);
-    else if (!s.standIn && was.standIn) note(`${who} is back`);
+    else if (s.opened && !was.opened) note(`${who}'s seat is open`);
+    else if ((!s.standIn && was.standIn) || (!s.opened && was.opened)) note(`${who} is back`);
   });
 }
 
@@ -364,7 +366,7 @@ function tvDragonsBrief(ds: DragonView[], all: DragonView[]): string {
 function seatTag(seat: Snapshot['lobby']['seats'][number] | undefined): string {
   if (!seat || seat.standIn) return '';
   if (seat.kind === 'open') return ' <small>(open seat)</small>';
-  return seat.connected ? '' : ' <small>(away)</small>';
+  return '';
 }
 
 // Every player has quit: the server stops the game (bots alone never score)
@@ -377,6 +379,7 @@ function everyoneQuit(l: Snapshot['lobby']): boolean {
 // A bot playing for a player says so on its own line: the table should know
 // those moves aren't theirs.
 function seatNote(seat: Snapshot['lobby']['seats'][number] | undefined): string {
+  if (seat && openSeat(seat)) return '<span class="seatnote">Open seat</span>';
   if (!seat?.standIn) return '';
   if (everyoneQuit(snap!.lobby)) return '<span class="seatnote">Quit</span>';
   return `<span class="seatnote">${seat.left ? 'Quit' : 'Away'}: bot plays</span>`;

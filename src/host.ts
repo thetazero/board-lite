@@ -102,6 +102,7 @@ export interface Seat {
   seen: number; // when this seat was last heard from (ms epoch)
   standIn: boolean;
   left: boolean;
+  opened?: boolean;
   strong?: boolean;
   via?: 'phone' | 'cli' | 'claude';
 }
@@ -111,6 +112,7 @@ export interface RoomOptions {
   hideFile?: boolean;
   botDelayMs?: number;
   awayMs?: number;
+  openMs?: number;
   remote?: boolean;
   tvGoneMs?: number;
   recaps?: string;
@@ -247,6 +249,8 @@ export class Room {
   addBot(strong = false) { this.ask('addBot', { strong }); }
   leave(seat: number) { this.ask('leave', { seat }); }
   quit(tok: string) { this.ask('quit', { tok }); }
+  open(tok: string, seat: number) { this.ask('open', { tok, seat }); }
+  back(tok: string) { this.ask('back', { tok }); }
   standInFor(tok: string, seat: number) { this.ask('standInFor', { tok, seat }); }
   save(tok: string) { this.ask('save', { tok }); }
   continue(tok: string): boolean { return this.ask('continue', { tok }); }
