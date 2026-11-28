@@ -30,6 +30,7 @@ export interface Shot {
   tailscale?: boolean; // TV: the machine also has a Tailscale address
   loading?: boolean; // shot before the page's script runs (what a slow connection shows)
   then?: (room: Room) => void; // something that happens at the table after the page is up (before the clicks)
+  gone?: boolean; // the server forgets the room after the page is up (the scene's last shot)
   offline?: boolean; // the connection to the server drops after the page is up
   clicks?: string[]; // CSS selectors tapped in order before the shot (the first match each time)
   run?: string; // a script run in the page after the clicks (e.g. the TV's summaryAt)
@@ -2271,6 +2272,25 @@ export const SCENES: Scene[] = [
       { file: 'tv-remote-recap-race-4p', caption: 'No TV, at the end: the points race on the table view, here round 12', client: 'tv', table: true, sizes: true, run: summaryAt(11), waitFor: '[data-step="race-12"]', hold: true },
       { file: 'tv-remote-recap-growth-4p', caption: "No TV, at the end: everyone's dragon power and production, on the table view", client: 'tv', table: true, sizes: true, run: summaryAt(-2), waitFor: '[data-step="growth"]', hold: true },
       { file: 'tv-remote-recap-points-4p', caption: "No TV, at the end: where everyone's points came from, on the table view", client: 'tv', table: true, run: summaryAt(-1), waitFor: '[data-step="points"]', hold: true },
+    ],
+  },
+  {
+    // A game every player quits: it ends with no winner.
+    name: 'everyone-quit-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action' && g.turn === 1,
+    shots: () => [
+      { file: 'tv-everyone-quit-2p', caption: 'TV: every player quits', client: 'tv', then: (room) => room.seats.map((s) => s.token).forEach((t) => room.quit(t)) },
+    ],
+  },
+  {
+    name: 'room-gone-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 2 && g.phase === 'action' && g.turn === 1,
+    shots: () => [
+      { file: 'phone-room-gone-2p', caption: 'Phone: its room is gone from the server: a join page that works', client: 'phone', seat: 0, gone: true, waitFor: '.joinpage' },
     ],
   },
 ];

@@ -139,6 +139,9 @@ impl Events {
                 }
                 return Some((b, self));
             }
+            if self.room.is_closed() {
+                return None; // the page asks for the room, and hears it's gone
+            }
             // A named event, not an SSE comment: the page hears it, so a stream that went quiet is noticed.
             let ping = tokio::select! {
                 r = self.changes.changed() => { r.ok()?; false }
@@ -147,7 +150,9 @@ impl Events {
             if ping {
                 return Some((Bytes::from_static(b"event: ping\ndata: 1\n\n"), self));
             }
-            self.send();
+            if !self.room.is_closed() {
+                self.send();
+            }
         }
     }
 }
@@ -317,8 +322,8 @@ impl Server {
                 continue;
             }
             if let Some(files) = r.forget() {
+                self.delete_room(&r.code); // first: a page whose stream ends asks for the room at once
                 r.close();
-                self.delete_room(&r.code);
                 if files {
                     remove_files(&r.file);
                 }

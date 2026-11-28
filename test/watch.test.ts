@@ -91,3 +91,28 @@ test('a stream that goes quiet is opened again; one that pings stays', async () 
     for (const k of ['EventSource', 'document', 'addEventListener', 'removeEventListener']) delete g[k];
   }
 });
+
+// A phone's page is greyed out and can't be tapped while it reconnects (#539).
+test('a room gone from the server: the page stops reconnecting before it hears so', async () => {
+  const g = globalThis as Record<string, unknown>;
+  const fetched = g.fetch;
+  Object.assign(g, {
+    fetch: async () => new Response('{"error":"No room with code ABCD: check the code."}', { status: 400 }),
+    EventSource: FakeSource,
+    document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  });
+  try {
+    const { watch } = await import('../web/common.ts');
+    const heard: unknown[] = [];
+    await new Promise<void>((gone) => {
+      watch('ABCD', 'tok', () => {}, (ok) => heard.push(ok), () => (heard.push('gone'), gone()));
+      FakeSource.made.at(-1)!.onerror!();
+    });
+    assert.deepEqual(heard, [false, true, 'gone']);
+  } finally {
+    g.fetch = fetched;
+    for (const k of ['EventSource', 'document', 'addEventListener', 'removeEventListener']) delete g[k];
+  }
+});

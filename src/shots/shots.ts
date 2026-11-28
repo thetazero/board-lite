@@ -563,6 +563,11 @@ async function main() {
               shot.then(room);
               await sleep(150);
             }
+            if (shot.gone) {
+              rooms.delete(code);
+              room.close();
+              server.closeAllConnections();
+            }
             if (shot.offline) {
               await tab.offline(true);
               server.closeAllConnections(); // the stream drops; the page's retries can't get through

@@ -141,7 +141,7 @@ function onSnapshot(s: Snapshot) {
 // Mid-game, the table hears when someone quits, when a bot starts playing for
 // someone who's away, and when a seat is taken back.
 function seatNews(before: Snapshot, now: Snapshot) {
-  if (everyoneQuit(now.lobby) && !everyoneQuit(before.lobby)) return note('Everyone quits. The game ends.');
+  if (everyoneQuit(now.lobby) && !everyoneQuit(before.lobby)) return; // the overlay says so
   now.lobby.seats.forEach((s, i) => {
     const was = before.lobby.seats[i];
     if (!was || s.kind !== 'player') return;
@@ -1269,7 +1269,7 @@ function showFinal(g: PublicState) {
 }
 
 // Whether the board itself comes next, with no overlay over it.
-const boardNext = (g: PublicState) => !banners.length && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
+const boardNext = (g: PublicState) => !banners.length && !everyoneQuit(snap!.lobby) && g.phase !== 'over' && !(g.phase === 'raid' && g.raid);
 
 function updateOverlay(g: PublicState) {
   if (bannerUp) return;
@@ -1281,8 +1281,16 @@ function updateOverlay(g: PublicState) {
   }
   if (g.phase === 'over') return endHeld(g) ? undefined : showEnd(g);
   dropEndHold();
+  if (!remote && everyoneQuit(snap!.lobby)) return showQuit();
   if (g.phase === 'raid' && g.raid) return renderRaid(g);
   hideOverlay();
+}
+
+// Until the server forgets the room (the TV opens a new one then), or someone takes their seat back.
+function showQuit() {
+  for (const t of document.querySelectorAll<HTMLElement>('.toast.news')) fadeAway(t); // no bot plays for anyone any more
+  const box = showOverlay('quit', 'quit', `<div class="noroom"><h1 class="title">Everyone quits</h1><p>The game ends.</p><button id="newroom" class="primary">Open a new room</button></div>`);
+  if (box) $('newroom').onclick = () => location.assign('/tv');
 }
 
 let bannerN = 0;
@@ -1339,7 +1347,7 @@ const CATCH_UP_MS = 200; // to draw the board's catch-up before a scene fades of
 let overlayKey = ''; // '' while the overlay is hidden or fading out
 let hideTimer = 0;
 
-function showOverlay(kind: 'banner' | 'raid' | 'end', key: string, html: string): HTMLElement | null {
+function showOverlay(kind: 'banner' | 'raid' | 'end' | 'quit', key: string, html: string): HTMLElement | null {
   const el = $('overlay');
   clearTimeout(hideTimer);
   const was = overlayKey;
