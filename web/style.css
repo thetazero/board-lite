@@ -1148,7 +1148,7 @@ button.on:disabled { opacity: 1; }
 .menu p { margin: 0 0 .7em; color: var(--ink-soft); }
 .menu .row { display: flex; gap: .5em; }
 .menu .row + h3 { margin-top: 1.1em; }
-/* The rulebook (book.ts): Rules in the header opens it over the screen; Close goes back. */
+/* The rulebook (book.ts): Rules opens it over the screen; Close goes back. */
 .me .bookbtn { --text: var(--ink); color: var(--ink-soft); box-shadow: none; background: transparent; font-weight: 700; font-size: .9em; padding: .2em .35em; margin: 0 0 0 .4em; }
 .menu.booksheet { bottom: .6em; display: flex; flex-direction: column; padding: .6em .8em .4em; max-width: 34em; }
 .booksheet .bookbar { display: flex; align-items: center; justify-content: space-between; }
@@ -1157,6 +1157,11 @@ button.on:disabled { opacity: 1; }
 .booksheet .booktabs button { padding: .45em .2em; font-size: .9em; }
 .booksheet .booktabs button.on { background: var(--grain), var(--accent); color: var(--ink); }
 .booksheet .bookpage { flex: 1; overflow-y: auto; overscroll-behavior: contain; margin: 0 -.4em; padding: 0 .4em .6em; }
+.booksheet .bphases { margin: 0; padding-left: 1.4em; }
+.booksheet .bphases li { margin-bottom: .3em; }
+.booksheet .bscores { list-style: none; margin: 0; padding: 0; }
+.booksheet .bscores li { display: flex; gap: .6em; padding: .25em 0; font-size: .9em; line-height: 1.3; }
+.booksheet .bscores .tchip { flex: none; }
 .booksheet .bhead { margin: .9em 0 .2em; font-size: 1.05em; }
 .booksheet .bookpage > .bhead:first-child { margin-top: .2em; }
 .booksheet p.bintro { margin: 0 0 .5em; font-size: .9em; }
