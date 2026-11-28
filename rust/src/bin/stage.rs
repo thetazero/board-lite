@@ -151,7 +151,7 @@ impl Stage {
             "mutated" => json!(room.stage_mutated(int("before") as usize)?),
             "changed" => json!(room.stage_changed()),
             "connect" => {
-                let here = room.connect(q["tok"].as_str(), q["tv"] == true, q["answers"] == true);
+                let here = room.connect(q["tok"].as_str(), (q["tv"] == true).then_some(""), q["answers"] == true);
                 let id = self.id();
                 self.here.insert(id, here);
                 json!(id)

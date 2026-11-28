@@ -25,6 +25,7 @@ import { breakdownHtml, madeSvg, momentsHtml, powerSvg, raceSvg } from './recap-
 import type { Recap } from '../src/state.ts';
 import type { Side } from '../src/engine.ts';
 import { CROWN_AT_MS, FIGHT_LEAD_MS, POINTS_AT_MS, outcomeAt, PROD_LEAD_MS, PROD_PLAYER_IN_MS, PROD_TOTAL_MS, eatOf, hitStep, madeOf, prodSpin, prodRowsOf, prodStep, scenesOf, TEND_LEAD_MS, TEND_STAGE_AT_MS, type Scene } from './scenes.ts';
+import { SceneLog } from './scenelog.ts';
 
 document.body.insertAdjacentHTML('afterbegin', ART_DEFS);
 
@@ -93,7 +94,7 @@ async function boot() {
   savedGames = await fetch('/api/saved').then((r) => r.json()).catch(() => []);
   // A room the server no longer has (forgotten after hours idle): open a new one.
   // As a TV: while it watches, the table plays with a TV.
-  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), true);
+  watch(code, null, onSnapshot, (ok) => document.body.classList.toggle('offline', !ok), () => location.replace('/tv'), sceneLog.page);
 }
 
 function onSnapshot(s: Snapshot) {
@@ -106,6 +107,7 @@ function onSnapshot(s: Snapshot) {
   // while the game is saved, the TV shows the lobby.
   if (!s.game || s.lobby.seating || s.lobby.saved) {
     clearOverlay();
+    sceneLog.end(true); // the lobby takes over: saved in the middle of a scene, say
     if (remote) return void (app.innerHTML = '');
     if (s.game) seenLog = s.game.log.at(-1)?.i ?? -1; // the game goes on from here: nothing to replay
     dropTitleToasts();
@@ -616,13 +618,15 @@ function renderRaid(g: PublicState) {
 // and the final scores show whenever no banner is up.
 // top: what the top bar says while it's up (the board under it is held as it
 // was, so its own round and phase may have moved on).
-interface Banner { html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
+// i: the scene's entry in the game's log.
+interface Banner { i?: number; html: string; ms: number; top?: { round: number; phase: Phase }; play?: (el: HTMLElement) => void }
 let bannerTop: Banner['top'] | null = null;
 const banners: Banner[] = [];
 let bannerUp = false;
+const sceneLog = new SceneLog();
 
 function queueBanners(g: PublicState, fresh: EventView[]) {
-  for (const sc of scenesOf(fresh)) banners.push(banner(g, sc, fresh));
+  for (const sc of scenesOf(fresh)) banners.push({ ...banner(g, sc, fresh), i: fresh[sc.at].i });
 }
 
 function banner(g: PublicState, sc: Scene, fresh: EventView[]): Banner {
@@ -1185,12 +1189,15 @@ function playSummary(from = 0) {
   summaryPlayed = true;
   cutTitleToasts();
   summary = { step: from, timer: 0 };
+  const end = snap?.game?.log.findLast((e) => e.ev?.k === 'final');
+  if (!remote && end) sceneLog.start(code, end.i);
   summaryStep();
 }
 // For the screenshots: play it from a step (from the end if negative).
 (window as unknown as { summaryAt: (n: number) => void }).summaryAt = (n) => recap && playSummary(n < 0 ? summarySteps(recap).length + n : n);
 
-function stopSummary() {
+function stopSummary(cut = false) {
+  sceneLog.end(cut);
   if (summary) clearTimeout(summary.timer);
   summary = null;
   if (snap?.game) showFinal(snap.game);
@@ -1207,7 +1214,7 @@ function summaryStep() {
         <h1>How the game went</h1>
         <div class="sumbody"><div class="chart" id="sumchart"></div><div class="told" id="sumtold"></div></div>
         <button id="skip">Skip</button></div>`);
-      $('skip').onclick = stopSummary;
+      $('skip').onclick = () => stopSummary(true);
     }
     $('sumchart').innerHTML = raceSvg(r, { upTo: step.upTo });
     // What happened lately: this round's moments under the ones before it.
@@ -1224,13 +1231,13 @@ function summaryStep() {
         <figure><figcaption>Resources made each round</figcaption>${madeSvg(r, { width: 700, height: 460 })}</figure>
       </div>
       <button id="skip">Skip</button></div>`);
-    if (box) $('skip').onclick = stopSummary;
+    if (box) $('skip').onclick = () => stopSummary(true);
   } else {
     const box = showOverlay('end', 'end points', `<div class="summary points-step" data-step="points">
       <h1>Points</h1>
       ${breakdownHtml(r)}
       <button id="skip">Skip</button></div>`);
-    if (box) $('skip').onclick = stopSummary;
+    if (box) $('skip').onclick = () => stopSummary(true);
   }
   summary!.timer = window.setTimeout(() => {
     if (!summary) return;
@@ -1283,6 +1290,7 @@ let bannerTimers: number[] = [];
 
 function showBanner(b: Banner) {
   bannerUp = true;
+  if (!remote && b.i !== undefined) sceneLog.start(code, b.i);
   cutTitleToasts();
   bannerTop = b.top ?? null;
   const key = `banner ${++bannerN}`;
@@ -1305,6 +1313,7 @@ function showBanner(b: Banner) {
 
 function endBanner() {
   bannerTimers.forEach(clearTimeout);
+  sceneLog.end();
   bannerUp = false;
   bannerTop = null;
   if (!snap?.game) return;

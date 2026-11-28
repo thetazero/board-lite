@@ -3,7 +3,15 @@
 use crate::data::*;
 use crate::engine::LogEntry;
 use crate::state::Produced;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+/// A scene, by the entry of the game's log it's for; `kind` as in web/scenes.ts.
+#[derive(Clone, Serialize)]
+pub struct Scene {
+    pub kind: &'static str,
+    pub i: usize,
+    pub ms: f64,
+}
 
 #[derive(Deserialize)]
 struct Combat {
@@ -44,19 +52,38 @@ fn fight_ms(events: &[&LogEntry], at: usize, last: &str) -> f64 {
     let n = hits as f64;
     2400.0 + n * 400f64.min(6000.0 / n.max(1.0)) + 400.0 + if scored { 2400.0 + 1100.0 + 3800.0 } else { 4500.0 }
 }
+/// The kind of scene an entry makes, if any.
+pub fn kind(e: &LogEntry) -> Option<&'static str> {
+    if e.to.is_some() {
+        return None;
+    }
+    match e.kind() {
+        "round" => Some("roll"),
+        "tend" => Some("tend"),
+        "fight" => Some("fight"),
+        "hunt" => Some("hunt"),
+        "noRaid" if !e.raw().contains("\"why\":\"unable\"") => Some("noRaid"),
+        _ => None,
+    }
+}
 /// The length of the scenes in these events, private ones aside.
 pub fn ms(entries: &[LogEntry]) -> f64 {
-    let events: Vec<&LogEntry> = entries.iter().filter(|e| e.to.is_none()).collect();
-    let mut sum = 0.0;
+    of(entries, 0).iter().fold(0.0, |sum, s| sum + s.ms) // (a sum of none is -0)
+}
+/// The scenes in the entries from index `from` on, in order.
+pub fn of(entries: &[LogEntry], from: usize) -> Vec<Scene> {
+    let (is, events): (Vec<usize>, Vec<&LogEntry>) = entries.iter().enumerate().skip(from).filter(|(_, e)| e.to.is_none()).unzip();
+    let mut out = vec![];
     for (at, e) in events.iter().enumerate() {
-        sum += match e.kind() {
-            "round" => prod_ms(&events[at + 1..].iter().filter(|x| x.round == e.round).map(|x| prod_rows(x)).filter(|n| *n > 0.0).collect::<Vec<_>>()),
+        let Some(kind) = kind(e) else { continue };
+        let ms = match kind {
+            "roll" => prod_ms(&events[at + 1..].iter().filter(|x| x.round == e.round).map(|x| prod_rows(x)).filter(|n| *n > 0.0).collect::<Vec<_>>()),
             "tend" => 4800.0,
             "fight" => fight_ms(&events, at, "raidEnd"),
             "hunt" => fight_ms(&events, at, "cleared"),
-            "noRaid" if !e.raw().contains("\"why\":\"unable\"") => 4000.0,
-            _ => 0.0,
+            _ => 4000.0,
         };
+        out.push(Scene { kind, i: is[at], ms });
     }
-    sum
+    out
 }
