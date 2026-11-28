@@ -208,7 +208,7 @@ function renderLobby() {
     ? `<li class="seatcard open needed" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}<span class="pname">Open seat</span></li>`
     : `<li class="seatcard" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 2.6)}
       <span class="pname">${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
-      ${isHost ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`).join('')
+      ${isHost ? `<button class="x" data-remove="${s.id}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`).join('')
     + (l.seating ? '' : Array.from({ length: l.maxPlayers - l.seats.length }, (_, i) => `<li class="seatcard open${l.seats.length + i < l.minPlayers ? ' needed' : ''}"></li>`).join(''));
   const canStart = l.seats.length >= l.minPlayers;
   const first = firstPlayer(l);
@@ -247,7 +247,7 @@ function renderLobby() {
   app.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => location.assign(`/tv?room=${b.dataset.open}`)));
   $('bot').onclick = () => post(`/api/rooms/${code}/bot`, { token: hostToken }).catch(toast);
   if (!l.seating) $('start').onclick = () => post(`/api/rooms/${code}/start`, { token: hostToken }).catch(toast);
-  app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, seat: Number(b.dataset.remove) }).catch(toast)));
+  app.querySelectorAll<HTMLElement>('[data-remove]').forEach((b) => (b.onclick = () => post(`/api/rooms/${code}/leave`, { token: hostToken, player: Number(b.dataset.remove) }).catch(toast)));
 }
 
 const nameplate = (goal = true) => `<div class="nameplate"><h1 class="title">board-lite</h1>${goal ? `<p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>` : ''}</div>`;

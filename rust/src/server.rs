@@ -526,13 +526,19 @@ impl Server {
         let seat = b.get("seat").and_then(|v| v.as_f64());
         // A seat that isn't one is no player's.
         let seat = seat.map(|n| if n >= 0.0 && n.fract() == 0.0 { n as usize } else { usize::MAX });
+        // Who to remove, by the seat's id. A seat number, as older pages send, names no player.
+        let player = match (b.get("player"), b.get("seat")) {
+            (Some(v), _) => Some(v.as_u64().unwrap_or(u64::MAX)),
+            (None, Some(_)) => Some(u64::MAX),
+            (None, None) => None,
+        };
         match action {
             "join" => {
                 let (token, p, _) = room.join(str_of(&b, "name"), via(str_of(&b, "via")))?;
                 return Ok(ok(json!({"token": token, "seat": p + 1})));
             }
             "bot" => room.add_bot(tok, b.get("strong") == Some(&Value::Bool(true)))?,
-            "leave" => room.leave(tok, seat)?,
+            "leave" => room.leave(tok, player)?,
             "quit" => room.quit(tok)?,
             "standin" => room.stand_in_for(tok, seat)?,
             // A TV opening the room while no other TV watches it becomes the room's TV, with its buttons.

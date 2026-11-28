@@ -63,7 +63,7 @@ impl Kind {
 }
 #[derive(Clone)]
 pub struct Seat {
-    uid: u64, // which seat a stream or a wait is on, as seats come and go in the lobby
+    uid: u64, // which seat a stream or a removal is on, as seats come and go in the lobby
     pub name: String,
     pub token: String,
     pub kind: Kind,
@@ -266,6 +266,14 @@ impl Inner {
         self.seats[p].seen = now_ms();
         Some(p)
     }
+    /// The player whose token this is, now. A wait asks each time it wakes:
+    /// players are removed while it sleeps, and seat numbers change.
+    fn player_of(&self, tok: &str) -> Res<usize> {
+        match self.seats.iter().position(|s| s.token == tok && s.kind == Kind::Player) {
+            Some(p) => Ok(p),
+            None => no("You are not in this game."),
+        }
+    }
     fn sender(&self, p: usize) -> Sender {
         let s = &self.seats[p];
         let kind = if s.kind == Kind::Bot { "bot" } else { s.via.unwrap_or("player") };
@@ -331,7 +339,7 @@ impl Room {
         let host = saved.as_ref().map_or_else(token, |s| s.host_token.clone());
         let mut i = Inner {
             seats: vec![],
-            next_uid: 0,
+            next_uid: u32::from_ne_bytes(random()) as u64, // a page from before a restart names no seat of now
             last_active: now_ms(),
             saved_at: saved.as_ref().and_then(|s| s.saved_at),
             game,
@@ -607,11 +615,12 @@ impl Room {
         self.join_as(i, &name, Kind::Bot, None, strong && self.home)?;
         Ok(())
     }
-    /// A player leaves the lobby; the TV or first player can remove anyone.
-    pub fn leave(&self, tok: &str, seat: Option<usize>) -> Res {
+    /// A player leaves the lobby; the TV or first player can remove anyone, by
+    /// the seat's id: its number may be someone else's by now.
+    pub fn leave(&self, tok: &str, id: Option<u64>) -> Res {
         let i = &mut *lock(&self.inner);
         let own = i.seat_of(tok);
-        let p = seat.or(own);
+        let p = id.map_or(own, |id| i.seats.iter().position(|s| s.uid == id));
         if p != own && !self.can_start(i, tok) {
             return no("You can only remove yourself.");
         }
@@ -627,8 +636,7 @@ impl Room {
         let name = i.seats[p].name.clone();
         self.change(i, |i| {
             if seating {
-                let s = &mut i.seats[p];
-                (s.name, s.kind, s.token, s.stand_in, s.left) = (format!("P{}", p + 1), Kind::Open, token(), false, false);
+                i.seats[p] = i.new_seat(format!("P{}", p + 1), Kind::Open);
             } else {
                 i.seats.remove(p);
             }
@@ -799,7 +807,8 @@ impl Room {
         done
     }
     fn player_seat(&self, i: &mut Inner, tok: &str) -> Res<usize> {
-        let Some(p) = i.seat_of(tok).filter(|p| i.seats[*p].kind == Kind::Player) else { return no("You are not in this game.") };
+        let p = i.player_of(tok)?;
+        i.seats[p].seen = now_ms();
         self.back(i, p);
         Ok(p)
     }
@@ -829,14 +838,15 @@ impl Room {
     /// Waits for this seat's decision, or the game's end (0), or until time runs out (2).
     pub async fn wait(&self, tok: &str, secs: f64) -> Res<(u8, Vec<Bytes>)> {
         let end = tokio::time::Instant::now() + Duration::from_secs_f64(secs);
-        let (p, here, mut rx) = {
+        let (here, mut rx) = {
             let i = &mut *lock(&self.inner);
             let p = self.player_seat(i, tok)?;
-            (p, self.holding(i, p), self.changes.subscribe())
+            (self.holding(i, p), self.changes.subscribe())
         };
         let code = loop {
             {
                 let i = &*lock(&self.inner);
+                let p = i.player_of(tok)?;
                 if i.phase() == Some(Phase::Over) || i.waits_on(p) {
                     break 0;
                 }
@@ -847,31 +857,35 @@ impl Room {
             }
         };
         drop(here);
-        Ok((code, self.snapshot(Some(tok))))
+        let i = &mut *lock(&self.inner);
+        i.player_of(tok)?;
+        Ok((code, self.snapshot_of(i, Some(tok))))
     }
     /// Every event this seat can see from `since` on, the index to ask from
     /// next, and what `then` makes of them. With a time, waits first until it's
     /// this seat's decision, someone else talks or the game ends.
     pub async fn listen<T>(&self, tok: &str, since: usize, secs: f64, then: impl FnOnce(&Room, &mut Heard) -> T) -> Res<T> {
         let end = tokio::time::Instant::now() + Duration::from_secs_f64(secs);
-        let (p, here, mut rx) = {
+        let (here, mut rx) = {
             let i = &mut *lock(&self.inner);
             let p = self.player_seat(i, tok)?;
             let here = (secs > 0.0 && !ready(i, p, since)).then(|| self.holding(i, p));
-            (p, here, self.changes.subscribe())
+            (here, self.changes.subscribe())
         };
         while here.is_some() {
             tokio::select! {
                 _ = rx.changed() => {}
                 _ = tokio::time::sleep_until(end) => break,
             }
-            if ready(&lock(&self.inner), p, since) {
+            let i = &*lock(&self.inner);
+            if ready(i, i.player_of(tok)?, since) {
                 break;
             }
         }
         drop(here);
         let i = &mut *lock(&self.inner);
-        let p = i.seat_of(tok).unwrap_or(p);
+        let p = i.player_of(tok)?;
+        i.seats[p].seen = now_ms();
         Ok(then(self, &mut Heard { i, p, since, tok }))
     }
     /// For a Claude player: what it has been shown so far, if anything.
@@ -970,7 +984,7 @@ impl Room {
             started: i.game.is_some(),
             seating: i.seating(),
             saved: i.saved_at,
-            seats: i.seats.iter().map(|s| LobbySeat { name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
+            seats: i.seats.iter().map(|s| LobbySeat { id: s.uid, name: s.name.clone(), kind: s.kind.name().into(), connected: s.here(now, self.opts.away_ms), stand_in: s.stand_in, left: s.left, strong: s.strong }).collect(),
             min_players: MIN_PLAYERS,
             max_players: MAX_PLAYERS,
             file: if self.home { self.file.display().to_string() } else { String::new() }, // a public website doesn't say where its files are

@@ -389,7 +389,7 @@ function renderLobby() {
   const seat = (s: Snapshot['lobby']['seats'][number], i: number) => s.kind === 'open'
     ? `<li class="open" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>Open seat</span></li>`
     : `<li class="${i === me ? 'me' : ''}" style="--pc:${PLAYER_COLORS[i]}">${towerToken(PLAYER_COLORS[i], 1.8)}<span>${esc(s.name)}</span>${s.kind === 'bot' ? '<span class="tag">bot</span>' : ''}${s.kind === 'player' && !s.connected ? '<span class="tag">away</span>' : ''}
-      ${host && i !== me ? `<button class="x" data-remove="${i}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
+      ${host && i !== me ? `<button class="x" data-remove="${s.id}" aria-label="remove ${esc(s.name)}" title="remove">×</button>` : ''}</li>`;
   const hint = l.seating ? `The game goes on once every seat is taken.`
     : host ? '' : `${first ? esc(first) : 'The first to join'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
@@ -412,7 +412,7 @@ function renderLobby() {
   if (host) {
     on('bot', () => call(`/api/rooms/${code}/bot`, { token }));
     if (!l.seating) on('start', () => call(`/api/rooms/${code}/start`, { token }));
-    bind('[data-remove]', (b) => call(`/api/rooms/${code}/leave`, { token, seat: Number(b.dataset.remove) }));
+    bind('[data-remove]', (b) => call(`/api/rooms/${code}/leave`, { token, player: Number(b.dataset.remove) }));
   }
   on('leave', async () => {
     await call(`/api/rooms/${code}/leave`, { token });
