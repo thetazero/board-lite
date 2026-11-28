@@ -381,6 +381,7 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     const bram = (await post(`/api/rooms/${code}/join`, { name: 'Bram' })).token;
     await post(`/api/rooms/${code}/start`, { token: ada });
     const room = rooms.get(code)!;
+    // Held to the end: a response that's garbage collected closes its stream.
     const stream = await fetch(`${base}/api/rooms/${code}/events?token=${bram}&answers`, { signal: ctrl.signal });
     assert.ok(room.here(room.seats[1]), 'not at once');
     // The table plays on: being sent it doesn't make Bram here.
@@ -409,8 +410,7 @@ test('a phone that loses Wi-Fi with its stream still open is away once it stops 
     assert.ok(room.snapshot(null).v! <= version! + 1, 'at most Ada going quiet');
     // Its stream ending long after the phone went doesn't bring it back.
     assert.ok(await until(() => !room.here(room.seats[1]), 5000));
-    // A response nothing refers to is garbage-collected, and its stream closed: this keeps it until here.
-    assert.equal(stream.status, 200);
+    assert.ok(stream.ok);
     ctrl.abort();
     assert.ok(await until(() => room.seats[1].connected === 0, 5000));
     assert.ok(!room.here(room.seats[1]));
@@ -556,6 +556,9 @@ test('the HTTP server: rooms, joining, live snapshots, commands and the clients'
       assert.equal(icon.headers.get('content-type'), 'image/svg+xml');
       await icon.text();
     }
+    const touch = await fetch(`${base}/apple-touch-icon.png`);
+    assert.equal(touch.headers.get('content-type'), 'image/png');
+    assert.equal(Buffer.from(await touch.arrayBuffer()).toString('latin1', 1, 4), 'PNG', 'sent as bytes, not text');
     for (const path of ['/', '/tv']) assert.match(await (await fetch(`${base}${path}`)).text(), /rel="icon" href="\/favicon.svg"/, path);
 
     // The clients are served with their TypeScript types stripped.
