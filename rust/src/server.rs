@@ -354,7 +354,7 @@ impl Server {
         if let Some(l) = &self.limits {
             l.wrong_code(by)?;
         }
-        Err(Fail::Room(format!("No room with code {code}. Check the code on the TV.")))
+        Err(Fail::Room(format!("No room with code {code}: check the code.")))
     }
 
     async fn route(&self, req: Request<Incoming>, peer: IpAddr) -> Res<Answer> {

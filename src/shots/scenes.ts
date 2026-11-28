@@ -43,7 +43,7 @@ export interface Shot {
   frames?: number[]; // TV: one shot per time on the 3D board's clock (seconds; the page opens at 0)
   flight?: boolean; // and the frames are fractions (0 to 1) of the way through the first dragon flight instead
   table?: boolean; // TV: the table view a phone shows in a game with no TV (/tv?remote), on a phone's screen
-  window?: [number, number]; // TV: shot in a window this wide and tall instead of 1920×1080 (a browser's bars eat some of a screen)
+  window?: [number, number]; // shot in a window this wide and tall instead of 1920×1080 (a phone: 390×844): a browser's bars eat some of a screen
 }
 
 export interface Scene {
@@ -326,8 +326,11 @@ export const SCENES: Scene[] = [
       { file: 'phone-home-host', caption: 'Phone: Host on a TV tapped on the home page', client: 'phone', path: '/', clicks: ['#hosttv'], sizes: true },
       { file: 'phone-join-remembered', caption: 'Phone: the join form, remembering the name from last time', client: 'phone', path: '/', remember: 'Dax' },
       { file: 'phone-join-bad-code', caption: 'Phone: joining with a code no room has', client: 'phone', path: '/', fill: { code: 'QQQQ', name: 'Dax' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-home-412', caption: "Phone: the home page under a phone browser's bars", client: 'phone', path: '/', window: [412, 780] },
+      { file: 'phone-home-no-name', caption: 'Phone: Play with no TV tapped with no name', client: 'phone', path: '/', clicks: ['#notv'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-join-dead-link', caption: "Phone: a link to a room that isn't there", client: 'phone', path: '/QQQQ', waitFor: '.error:not(:empty)' },
       { file: 'phone-join-name-taken', caption: 'Phone: joining with a name already taken', client: 'phone', fill: { name: 'ada' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
-      { file: 'phone-join-blank-name', caption: 'Phone: joining with only spaces for a name (empty is stopped by the browser first)', client: 'phone', fill: { name: '   ' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
+      { file: 'phone-join-blank-name', caption: 'Phone: joining with only spaces for a name', client: 'phone', fill: { name: '   ' }, clicks: ['#join button[type=submit]'], waitFor: '.error:not(:empty)' },
       { file: 'tv-guest-lobby', caption: "TV: a second screen on the room's address (no host token): no buttons for the room, it says who starts", client: 'tv', guest: true },
     ],
   },
@@ -1860,6 +1863,17 @@ export const SCENES: Scene[] = [
     remote: true,
     shots: () => [
       { file: 'phone-remote-lobby-host', caption: 'No TV: the lobby on the phone that made the game, with the code to join by', client: 'phone', seat: 0, sizes: true },
+    ],
+  },
+  {
+    name: 'remote-lobby-3p',
+    players: 3,
+    seed: 1,
+    lobby: { bots: 1 },
+    remote: true,
+    shots: () => [
+      { file: 'phone-remote-lobby-host-3p', caption: "No TV: the host's lobby with 3 players, under a phone browser's bars", client: 'phone', seat: 0, window: [412, 780] },
+      { file: 'phone-remote-lobby-guest-3p', caption: "No TV: a guest's lobby with 3 players, under a phone browser's bars", client: 'phone', seat: 1, window: [412, 780] },
     ],
   },
   {

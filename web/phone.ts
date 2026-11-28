@@ -93,8 +93,9 @@ async function boot() {
   renderJoin();
 }
 
-type RoomInfo = { lobby: Snapshot['lobby'] } | null;
-const roomInfo = (c: string): Promise<RoomInfo> => fetch(`/api/rooms/${c}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+// The room with this code, or why there's none, in the server's words.
+type RoomInfo = { lobby?: Snapshot['lobby']; error?: string };
+const roomInfo = (c: string): Promise<RoomInfo> => fetch(`/api/rooms/${c}`).then((r) => r.json()).catch(() => ({}));
 
 // The join form. Opened from a room's address (the QR code on the TV), it asks
 // only for a name; a game that has started instead shows the seats a player
@@ -108,23 +109,25 @@ const roomInfo = (c: string): Promise<RoomInfo> => fetch(`/api/rooms/${c}`).then
 async function renderJoin(err = '', typed?: { code: string; name: string }, news = '') {
   const name = typed?.name ?? localStorage.getItem('name') ?? '';
   const c = typed?.code ?? code;
-  const room = /^[A-Za-z]{4}$/.test(c) ? await roomInfo(c.toUpperCase()) : null;
-  if (room?.lobby.started) return renderSeats(room.lobby, err, name, news);
-  const known = !!room; // the room is there: no code to type
+  const room = /^[A-Za-z]{4}$/.test(c) ? await roomInfo(c.toUpperCase()) : {};
+  const lobby = room.lobby;
+  if (lobby?.started) return renderSeats(lobby, err, name, news);
+  const known = !!lobby; // the room is there: no code to type
+  err ||= room.error ?? ''; // a link to a room that isn't there says so right away
   // With no room yet, the server's saved games are offered too: each opens on its seats.
   const saved: SavedGame[] = known ? [] : await fetch('/api/saved').then((r) => (r.ok ? r.json() : [])).catch(() => []);
   app.innerHTML = `
     <div class="joinpage${known ? '' : ' home'}">
       <div class="hero">${tableScene(PLAYER_COLORS.slice(0, 3), 360, 200)}${known ? '' : tableScene(PLAYER_COLORS.slice(0, 3), 480, 124, 0.4, 1)}<h1 class="title">board-lite</h1></div>
       ${known ? '' : `<div class="hosthere"><a class="button primary big" href="/tv">Host on this screen</a></div>`}
-      <form class="joinform" id="join">
+      <form class="joinform" id="join" novalidate>
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="subtitle">Wizards raise dragons. First to ${iconText(`${POINTS_TO_WIN} points`)} wins.</p>
-        ${known ? `<p class="roomline">Room <b>${esc(room!.lobby.code)}</b></p><input id="code" type="hidden" value="${esc(room!.lobby.code)}">`
+        ${known ? `<p class="roomline">Room <b>${esc(lobby.code)}</b></p><input id="code" type="hidden" value="${esc(lobby.code)}">`
           : `<label><span>Room code <small>on the TV</small></span><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="4 letters" value="${esc(c)}" required></label>`}
         <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
+        <p class="error" role="alert">${esc(err)}</p>
         <button class="primary big" type="submit">Join</button>
-        <p class="error">${esc(err)}</p>
         ${known ? '' : `<div class="hostline">
           <button id="hosttv" class="big" type="button">Host on a TV</button>
           <p id="hosthow" hidden>On the TV, open <b class="url">${esc(`${location.host}/tv`)}</b>. Then join here with the room code it shows.</p>
@@ -134,6 +137,17 @@ async function renderJoin(err = '', typed?: { code: string; name: string }, news
       </form>
     </div>`;
   wireJoin();
+}
+
+// What's still to type before joining (or, with `code` false, before making a
+// room): said on the page, by the field.
+function missing(code: boolean): boolean {
+  const field = (id: string) => document.getElementById(id) as HTMLInputElement;
+  const empty = code && !field('code').value.trim() ? field('code') : !field('name').value.trim() ? field('name') : null;
+  if (!empty) return false;
+  document.querySelector('.joinpage .error')!.textContent = empty.id === 'code' ? 'Type the room code.' : 'Choose a name.';
+  empty.focus();
+  return true;
 }
 
 function wireJoin() {
@@ -150,8 +164,8 @@ function wireJoin() {
   };
   // One room, one seat, however often Play with no TV or Join is tapped while it's on its way.
   if (noTv) noTv.onclick = () => tapper.tap('join', async () => {
+    if (missing(false)) return;
     const name = document.getElementById('name') as HTMLInputElement;
-    if (!name.reportValidity()) return;
     try {
       const r = await post('/api/rooms', { remote: true });
       await join(String(r.code), name.value.trim(), name.value.trim());
@@ -161,6 +175,7 @@ function wireJoin() {
   });
   form.onsubmit = (e) => {
     e.preventDefault();
+    if (missing(true)) return;
     const c = (document.getElementById('code') as HTMLInputElement).value.trim().toUpperCase();
     const n = (document.getElementById('name') as HTMLInputElement).value.trim();
     tapper.tap('join', () => join(c, n, n));
@@ -183,7 +198,7 @@ async function join(c: string, name: string, typed: string) {
 // A game that has started: tap your name to take your seat back (after closing
 // the tab, on another phone, or after quitting). A seat with someone at it
 // isn't offered. A saved game hosted again also has open seats: join those
-// with a name.
+// with a name. Anyone with no seat here can go to the home page.
 function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '') {
   const free = l.seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'player' && (s.left || !s.connected));
   const open = l.seats.some((s) => s.kind === 'open');
@@ -195,10 +210,11 @@ function renderSeats(l: Snapshot['lobby'], err: string, name: string, news = '')
         ${news ? `<p class="news">${esc(news)}</p>` : ''}
         <p class="roomline">Room <b>${esc(l.code)}</b>: the game ${l.saved ? 'is saved' : 'has started'}.</p>
         ${free.length ? `<p>Tap your name to take your seat back.</p><div class="seatlist">${seats}</div>` : open ? '' : '<p>Every seat is taken.</p>'}
-        ${open ? `<form id="join" class="joinform inner"><p>${free.length ? 'Or take' : 'Take'} an open seat:</p><input id="code" type="hidden" value="${esc(l.code)}">
+        ${open ? `<form id="join" class="joinform inner" novalidate><p>${free.length ? 'Or take' : 'Take'} an open seat:</p><input id="code" type="hidden" value="${esc(l.code)}">
           <label>Your name <input id="name" maxlength="12" autocomplete="nickname" value="${esc(name)}" required></label>
           <button class="primary big" type="submit">Join</button></form>` : ''}
-        <p class="error">${esc(err)}</p>
+        <p class="error" role="alert">${esc(err)}</p>
+        <a class="button" href="/">Go to the home page</a>
       </div>
     </div>`;
   app.querySelectorAll<HTMLElement>('[data-seat]').forEach((b) => (b.onclick = () => tapper.tap('join', () => join(l.code, b.dataset.seat!, name))));
@@ -378,17 +394,19 @@ function renderLobby() {
     : host ? '' : `${first ? esc(first) : 'The first to join'}${l.remote ? '' : ' or the TV'} starts the game.`;
   // Your tower in your colour stands at the front: that's your colour for the game.
   morph(app, screen('lobby', `
-    <div class="plobby" style="--pc:${pc}">
-      <div class="hero">${tableScene([pc])}</div>
+    <div class="plobby${l.remote ? ' notv' : ''}" style="--pc:${pc}">
+      <div class="hero">${l.remote ? tableScene([pc], 480, 124) : tableScene([pc])}</div>
       <div class="lobbybody">
         <h1>You're in, ${esc(l.seats[me]?.name ?? '')}</h1>
         <p class="muted">Room <b>${esc(l.code)}</b>${l.seating ? `: ${open > 1 ? `${open} open seats` : '1 open seat'}` : ''}</p>
-        ${l.remote ? invite(l.code) : ''}
+        ${hint ? `<p class="hint">${hint}</p>` : ''}
+        ${l.remote && host ? invite(l.code) : ''}
         <ul class="seatlist">${l.seats.map(seat).join('')}</ul>
+        ${l.remote && !host ? invite(l.code) : ''}
         ${host && !l.seating ? act('Start game', 'id="start"', l.seats.length >= l.minPlayers ? null : `You need ${l.minPlayers} players: add a bot.`) : ''}
         ${host ? act('Add a bot', 'id="bot"', l.seating ? null : l.seats.length >= l.maxPlayers ? `The table is full: ${l.maxPlayers} players.` : null, '') : ''}
-        ${hint ? `<p class="hint">${hint}</p>` : ''}
         <button id="leave" class="ghost">Leave</button>
+        ${l.remote ? tvHint(l.code) : ''}
       </div>
     </div>`));
   if (host) {
@@ -436,7 +454,7 @@ function renderSaved() {
 // this phone reached the server on, or (on the server's own machine) the
 // address the TV would show.
 let lan: { lan: string[]; tailscale: string[]; port: number } | null = null;
-function invite(c: string): string {
+function inviteHost(): string {
   const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
   if (local && !lan) {
     fetch('/api/info').then((r) => r.json()).then((v) => {
@@ -444,12 +462,16 @@ function invite(c: string): string {
       if (snap && !snap.game) renderLobby();
     }).catch(() => {});
   }
-  const host = local && lan ? `${lan.lan[0] ?? lan.tailscale[0] ?? location.hostname}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}` : location.host;
-  const url = `${host}/${c}`;
-  // A TV can join the table at any time, and then it's a game with a TV.
+  return local && lan ? `${lan.lan[0] ?? lan.tailscale[0] ?? location.hostname}${lan.port && lan.port !== 80 ? `:${lan.port}` : ''}` : location.host;
+}
+function invite(c: string): string {
+  const url = `${inviteHost()}/${c}`;
   return `<div class="invite">${qrSvg(`${location.protocol}//${url}`, 'the room\'s address')}
-    <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>
-    <p class="hint tvhint">On a TV, open <b class="url">${esc(`${host}/tv?room=${c}`)}</b> to play there.</p>`;
+    <p><b>Join on another phone</b>Point its camera at the code, or open <span class="url">${esc(url)}</span></p></div>`;
+}
+// A TV can join the table at any time, and then it's a game with a TV.
+function tvHint(c: string): string {
+  return `<p class="hint tvhint">On a TV, open <b class="url">${esc(`${inviteHost()}/tv?room=${c}`)}</b> to play there.</p>`;
 }
 
 // ---------- the table ----------
