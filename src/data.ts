@@ -91,25 +91,25 @@ export const TUNING = {
 };
 
 // A building's class is what upgrades and other buildings' effects refer to.
-// The four resource classes each hold a basic building and the special
-// buildings that make the same resource.
-export const CLASSES = ['quarry', 'lumber', 'mine', 'pasture', 'dragon', 'monument', 'trade'] as const;
+// The four basic resource classes each hold a basic building and the special
+// buildings that make the same resource; the gold class is the Market.
+export const CLASSES = ['quarry', 'lumber', 'mine', 'pasture', 'market', 'dragon', 'monument', 'trade'] as const;
 export type BuildingClass = (typeof CLASSES)[number];
 // How card text names one building of a class. A class is always a "building",
-// and the four resource classes are named for what they make, so a card that
+// and the resource classes are named for what they make, so a card that
 // counts buildings never reads like one that counts terrain ("livestock
 // building", not "pasture", next to "meadow hex"; #150).
 export const CLASS_NAMES: Record<BuildingClass, string> = {
-  quarry: 'stone building', lumber: 'timber building', mine: 'crystal building', pasture: 'livestock building', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
+  quarry: 'stone building', lumber: 'timber building', mine: 'crystal building', pasture: 'livestock building', market: 'gold building', dragon: 'dragon building', monument: 'monument', trade: 'trade building',
 };
 // The tower is a monument (it holds floors) and a dragon building (it houses one).
 export const TOWER_CLASSES: BuildingClass[] = ['monument', 'dragon'];
 
-// The classes that make a basic resource: stone, timber, crystal and livestock buildings.
-export const PRODUCTION_CLASSES: BuildingClass[] = ['quarry', 'lumber', 'mine', 'pasture'];
+// The classes that make a resource: stone, timber, crystal, livestock and gold buildings.
+export const PRODUCTION_CLASSES: BuildingClass[] = ['quarry', 'lumber', 'mine', 'pasture', 'market'];
 
 // What a building's effect counts among its six neighbouring hexes: buildings
-// of a class (whoever owns them), production buildings (any of the four
+// of a class (whoever owns them), production buildings (any of the
 // resource classes), or hexes of a terrain (built on or not).
 export type Counted = BuildingClass | Terrain | 'production';
 
@@ -174,7 +174,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   crystal_port: portCard('crystal'),
   livestock_port: portCard('livestock'),
   // Gold for a strong engine, while raids stay the main source (#305).
-  market: { name: 'Market', class: 'trade', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'production', perOwn: true, perMax: 3, text: 'Makes 1 gold each round for each of your adjacent production buildings, up to 3.', copies: 3 },
+  market: { name: 'Market', class: 'market', cost: { stone: 6, timber: 6, crystal: 6, gold: 4 }, makes: { gold: 1 }, per: 'production', perOwn: true, perMax: 3, points: 1, text: 'Makes 1 gold each round for each of your adjacent production buildings, up to 3; worth 1 point.', copies: 3 },
   // Point cards: a flat 2 points each, built adjacent to what they used to
   // count (#134). About 11 resources and no gold: 50% better at points than a
   // production card (8 resources, 1 point), the owner's call.
@@ -200,7 +200,7 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<string, UpgradeDef> = {
-  workshop: { name: 'Workshop', appliesTo: ['quarry', 'lumber', 'mine', 'pasture'], cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, stackBonus: 1, points: 1, text: 'This production building makes 2 more (1 if it already has a Workshop); worth 1 point.', copies: 4, base: true },
+  workshop: { name: 'Workshop', appliesTo: PRODUCTION_CLASSES, cost: { timber: 4, stone: 4, crystal: 2 }, baseBonus: 2, stackBonus: 1, points: 1, text: 'This production building makes 2 more (1 if it already has a Workshop); worth 1 point.', copies: 4, base: true },
   nesting_grounds: { name: 'Nesting Grounds', appliesTo: ['dragon'], cost: { stone: 4, timber: 2 }, dragonCapacity: 2, text: 'This dragon building houses 2 more dragons.', copies: 3 },
 };
 
@@ -221,7 +221,7 @@ export interface ActionDef {
 export const ACTIONS: Record<string, ActionDef> = {
   windfall: { name: 'Windfall', effect: 'gain_resource', amount: 3, cost: {}, text: 'Gain 3 of one resource other than gold.', copies: 4 },
   treasure: { name: 'Buried Treasure', effect: 'gain_gold', amount: 2, cost: {}, text: 'Gain 2 gold.', copies: 10 },
-  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your dragons to its next life stage.', copies: 10 },
+  growth_elixir: { name: 'Growth Elixir', effect: 'grow_dragon', cost: { gold: 3 }, text: 'Grow one of your fully healed dragons to its next life stage, with 0 steps grown.', copies: 10 },
   healing_potion: { name: 'Healing Potion', effect: 'heal_dragon', cost: {}, text: 'Fully heal one of your hurt dragons.', copies: 8 },
   war_horn: { name: 'War Horn', effect: 'extra_raid', cost: { crystal: 1 }, text: 'Hold 1 more raid this round.', copies: 6 },
   secret_hoard: { name: 'Secret Hoard', effect: 'hidden_point', amount: 2, cost: {}, text: 'Worth 2 points while in your hand.', copies: 4 },
@@ -403,7 +403,7 @@ export const TARGETS: Record<string, TargetDef> = {
   // give little, hard ones a lot. Per point of power sent, Tidewatch pays
   // about three times Brindle. Brindle's one gold is the only gold a
   // young dragon can win alone (#80). This is printed loot: each kingdom adds
-  // 1 gold after every raid it doesn't fall in (the engine's hoard, #99).
+  // 1 gold each round it doesn't fall in, raid or not (the engine's hoard, #99).
   brindle: { name: 'Hamlet of Brindle', units: ['militia', 'militia'], loot: { livestock: 2, gold: 1 } }, // 8
   archers_hold: { name: "Archer's Hold", units: ['archers', 'archers', 'archers', 'militia'], loot: { gold: 4, timber: 4 } }, // 19
   frostpeak: { name: 'Frostpeak', units: ['frost_golem', 'frost_golem', 'archers', 'archers'], loot: { gold: 7, crystal: 4 } }, // 24

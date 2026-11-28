@@ -936,6 +936,9 @@ function dragonStats(key: string, element: string, d: { growth: number; targetin
   return `<div class="dstats">${rows}<div class="dgrow">Grows a stage every ${d.growth} round${d.growth === 1 ? '' : 's'} it's fed</div></div><p class="ctext">${esc(sentence)}</p>`;
 }
 
+// Your dragons a Growth Elixir can't go on until they're healed (#536).
+const tooHurt = (c: CardView, me: Me): string[] => (c.key !== 'growth_elixir' ? [] : snap!.game!.dragons.filter((d) => d.owner === me.seat && d.stage > 0 && d.stage < 3 && d.hp < d.maxHp).map((d) => d.id));
+
 // A card tapped open: full size, its rule text, and how to play it. The ✕ on
 // its corner closes it, for whoever doesn't know a tap outside does too.
 function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): string {
@@ -949,7 +952,7 @@ function cardZoom(c: CardView, me: Me, playable: boolean, discarding = false): s
   // cost: its chips show that, the short ones marked).
   else if (c.why || !playable) actions = act(c.verb, '', c.why ?? `${c.verb} it on your turn.`);
   else if (c.needs === 'resource') actions = choose('Choose a resource to gain', RESOURCES.filter((r) => r !== 'gold').map((r) => `<button class="primary" data-play="${c.id}" data-resource="${r}" aria-label="Gain ${r}">Gain ${resIcon(r, 1.6)}</button>`));
-  else if (c.needs === 'dragon') actions = choose(`Choose a dragon for the ${esc(c.name)}`, c.dragons.map((id) => dragonOption(id, `data-play="${c.id}" data-on="${id}"`)));
+  else if (c.needs === 'dragon') actions = choose(`Choose a dragon for the ${esc(c.name)}`, [...c.dragons.map((id) => dragonOption(id, `data-play="${c.id}" data-on="${id}"`)), ...tooHurt(c, me).map((id) => dragonOption(id, 'disabled'))], whyLine(tooHurt(c, me).length ? 'Only a fully healed dragon grows: heal it first.' : null));
   else if (c.needs === 'hex') actions = act(c.verb, `data-pickhex="${c.id}"`);
   else if (c.kind === 'building') actions = act(c.verb, `data-build="${c.id}"`);
   else actions = act(c.verb, `data-play="${c.id}"`);

@@ -340,6 +340,8 @@ pub struct Game {
     pub raid: Option<Raid>,
     #[serde(default)]
     pub hoard: IndexMap<Key, i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fell: Vec<Key>,
     pub titles: Titles,
     #[serde(default)]
     pub slain: IndexMap<Key, usize>,
@@ -557,6 +559,7 @@ impl Game {
             raids_left: 0,
             raid: None,
             hoard: DATA.targets.keys().map(|t| (Key::of(t), 0)).collect(),
+            fell: vec![],
             titles: Titles { army: None, tower: None, hoard: None },
             slain: IndexMap::new(),
             raid_points: vec![0; players],
@@ -601,6 +604,7 @@ impl Game {
             raids_left: self.raids_left,
             raid: self.raid.clone(),
             hoard: self.hoard.clone(),
+            fell: self.fell.clone(),
             titles: self.titles,
             slain: self.slain.clone(),
             raid_points: self.raid_points.clone(),
@@ -874,7 +878,7 @@ impl Game {
                 }
                 let stock = &mut pl.resources.0[LIVESTOCK];
                 if *stock < t.livestock_per_dragon {
-                    break;
+                    continue;
                 }
                 *stock -= t.livestock_per_dragon;
                 eat += t.livestock_per_dragon;
@@ -909,7 +913,8 @@ impl Game {
             let ds: Vec<_> = tended.into_iter().map(|(x, _)| x).collect();
             self.log(if any { "Dragons heal and grow." } else { "No dragon heals or grows." }, ev! {"k": "tend", "ds": ds});
         }
-        for p in 0..self.n() {
+        let mut full = true;
+        for p in self.turn_order() {
             let mut actions = vec![];
             for _ in 0..t.action_cards_per_round {
                 actions.extend(self.draw(Deck::Action));
@@ -924,6 +929,7 @@ impl Game {
             let drew = if actions.is_empty() { "no action card".into() } else { named(&actions) };
             let kept = if choice.is_empty() { String::new() } else { format!(", and building cards {}: keep 1", named(&choice)) };
             self.mine(p, format!("You draw {drew}{kept}."));
+            full &= choice.len() == 2;
             let n = actions.len() + choice.len();
             self.log(format!("{} draws {}.", pname(p), n_cards(n)), ev! {"k": "draw", "p": p, "n": n});
             if choice.len() == 1 {
@@ -934,7 +940,7 @@ impl Game {
         if self.players.iter().all(|pl| pl.choice.is_empty()) {
             return self.start_actions();
         }
-        self.log("Everyone keeps 1 of their 2 building cards.", ev! {"k": "pick"});
+        self.log(if full { "Everyone keeps 1 of their 2 building cards." } else { "Each player who drew 2 building cards keeps 1." }, ev! {"k": "pick"});
     }
 
     fn tend(&mut self, i: usize, fed: &[Id]) {
@@ -1021,9 +1027,9 @@ impl Game {
         loot
     }
     fn finish_raid(&mut self, fell: Option<Key>) {
-        for t in DATA.targets.keys() {
-            let n = self.hoard.entry(Key::of(t)).or_insert(0);
-            *n = if fell.is_some_and(|f| f.0 == *t) { 0 } else { *n + 1 };
+        if let Some(t) = fell {
+            self.hoard.insert(t, 0);
+            self.fell.push(t);
         }
         self.raid = None;
         self.raids_left -= 1;
@@ -1031,6 +1037,10 @@ impl Game {
         if self.raids_left > 0 {
             self.log("Another raid follows this round.", ev! {"k": "again"});
             return self.start_raid();
+        }
+        let fell = mem::take(&mut self.fell);
+        for t in DATA.targets.keys().map(|t| Key::of(t)).filter(|t| !fell.contains(t)) {
+            *self.hoard.entry(t).or_insert(0) += 1;
         }
         self.phase = Phase::Discard;
         self.maybe_end_round();
@@ -1850,6 +1860,9 @@ impl Game {
                 let id = self.own_dragon(p, on_dragon(def.name)?)?;
                 if self.dragon(id).stage == 3 {
                     return fail(format!("{id} is already an adult."));
+                }
+                if self.dragon(id).damage > 0 {
+                    return fail(format!("{id} is hurt: heal it first."));
                 }
                 self.players[p].pay(&def.cost)?;
                 let d = self.dragon_mut(id);

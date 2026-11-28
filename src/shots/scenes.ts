@@ -1383,6 +1383,20 @@ export const SCENES: Scene[] = [
     },
   },
   {
+    // Growth Elixir with every dragon that can grow hurt (#536).
+    name: 'elixir-hurt-2p',
+    players: 2,
+    seed: 1,
+    until: (g) => g.round === 3 && g.phase === 'action',
+    setup: (g) => {
+      arm(g, g.turn, [1, 2, 3]);
+      g.dragons.filter((d) => d.owner === g.turn).forEach((d) => (d.damage = 2));
+      giveHand(g, g.turn, ['growth_elixir']);
+      g.players[g.turn].resources.gold = 9;
+    },
+    shots: (g) => [{ file: 'phone-elixir-hurt-2p', caption: "Phone: Growth Elixir can't be played: every dragon that can grow is hurt", client: 'phone', seat: g!.turn, clicks: ['[data-card]'] }],
+  },
+  {
     name: 'empty-hand-2p',
     players: 2,
     seed: 1,
@@ -1932,6 +1946,7 @@ export const SCENES: Scene[] = [
       })),
       { file: 'phone-rules-marks-3p', caption: 'Phone: the rulebook, further down its board tab: borders and marks on the board', client: 'phone', seat: 2, clicks: ['#book'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = document.querySelectorAll('.bookpage .bhead')[1].offsetTop - document.querySelector('.bookpage').offsetTop` },
       { file: 'phone-rules-trade-3p', caption: 'Phone: the rulebook, at the trade buildings on its buildings tab: the four ports', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `const p = document.querySelector('.bookpage'); p.scrollTop = [...p.querySelectorAll('.bhead')].find((h) => h.textContent === 'Trade buildings').offsetTop - p.offsetTop` },
+      { file: 'phone-rules-gold-3p', caption: 'Phone: the rulebook, at the gold buildings on its buildings tab: the Market', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `const p = document.querySelector('.bookpage'); p.scrollTop = [...p.querySelectorAll('.bhead')].find((h) => h.textContent === 'Gold buildings').offsetTop - p.offsetTop` },
       { file: 'phone-rules-upgrades-3p', caption: 'Phone: the rulebook, at the end of its buildings tab: the upgrades', client: 'phone', seat: 2, clicks: ['#book', '[data-booktab="buildings"]'], waitFor: '.bookpage img.bpic', run: `document.querySelector('.bookpage').scrollTop = 1e6` },
       { file: 'phone-quit-3p', caption: 'Phone: after tapping Quit game: take a seat back from here', client: 'phone', seat: 2, clicks: ['#menu', '#quit'], waitFor: '.seats' },
       { file: 'tv-quit-3p', caption: 'TV: someone quits; a bot plays for them', client: 'tv', then: (room) => room.quit(room.seats[0].token) },
